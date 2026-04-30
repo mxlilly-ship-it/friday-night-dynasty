@@ -1,0 +1,3 @@
+Name: Scissors
+Formation: Dual
+Category: Long Pass (Deep)

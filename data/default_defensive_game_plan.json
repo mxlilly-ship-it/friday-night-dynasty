@@ -1,0 +1,226 @@
+{
+  "Base D&D": {
+    "Backed-Up": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "Middle Field": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "High Redzone": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "Low Redzone": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "Goal Line": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    }
+  },
+  "3rd & Long": {
+    "Backed-Up": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "Middle Field": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "High Redzone": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "Low Redzone": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "Goal Line": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    }
+  },
+  "3rd & Medium": {
+    "Backed-Up": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "Middle Field": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "High Redzone": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "Low Redzone": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "Goal Line": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    }
+  },
+  "3rd & Short": {
+    "Backed-Up": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "Middle Field": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "High Redzone": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "Low Redzone": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "Goal Line": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    }
+  },
+  "High Redzone": {
+    "Backed-Up": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "Middle Field": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "High Redzone": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "Low Redzone": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "Goal Line": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    }
+  },
+  "Low Redzone": {
+    "Backed-Up": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "Middle Field": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "High Redzone": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "Low Redzone": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "Goal Line": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    }
+  },
+  "Goal Line": {
+    "Backed-Up": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "Middle Field": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "High Redzone": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "Low Redzone": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    },
+    "Goal Line": {
+      "Zones": 25,
+      "Man": 25,
+      "Zone Pressure": 25,
+      "Man Pressure": 25
+    }
+  }
+}

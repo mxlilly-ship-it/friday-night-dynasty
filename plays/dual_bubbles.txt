@@ -1,0 +1,5 @@
+Name: Bubbles
+Formation: Dual
+Category: Short Pass (Quick Game)
+
+Concept: Quick Game

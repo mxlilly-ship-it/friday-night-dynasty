@@ -1,0 +1,112 @@
+{
+  "team": {
+    "most_championships": {
+      "value": 1,
+      "holder": "Fairmont Senior",
+      "holder_team": "Fairmont Senior",
+      "season": 1,
+      "detail": "all-time"
+    },
+    "most_wins_season": {
+      "value": 12,
+      "holder": "Fairmont Senior",
+      "holder_team": "Fairmont Senior",
+      "season": 1
+    },
+    "most_points_season": {
+      "value": 596,
+      "holder": "Bridgeport",
+      "holder_team": "Bridgeport",
+      "season": 1
+    }
+  },
+  "rushing": {
+    "single_season_yards": {
+      "value": 187,
+      "holder": "Noah White",
+      "holder_team": "Huntington",
+      "season": 1
+    },
+    "career_yards": {
+      "value": 374,
+      "holder": "Noah White",
+      "holder_team": "Huntington",
+      "season": 1,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 3,
+      "holder": "Noah White",
+      "holder_team": "Huntington",
+      "season": 1
+    }
+  },
+  "passing": {
+    "single_season_yards": {
+      "value": 300,
+      "holder": "James Thompson",
+      "holder_team": "North Marion",
+      "season": 1
+    },
+    "career_yards": {
+      "value": 633,
+      "holder": "Jackson Miller",
+      "holder_team": "Cabell Midland",
+      "season": 1,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 5,
+      "holder": "Jackson Miller",
+      "holder_team": "Cabell Midland",
+      "season": 1
+    }
+  },
+  "receiving": {
+    "single_season_yards": {
+      "value": 118,
+      "holder": "Brian Wilson",
+      "holder_team": "Cabell Midland",
+      "season": 1
+    },
+    "career_yards": {
+      "value": 188,
+      "holder": "Ethan Jackson",
+      "holder_team": "Bridgeport",
+      "season": 1,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 2,
+      "holder": "Matthew Smith",
+      "holder_team": "Robert C. Byrd",
+      "season": 1
+    }
+  },
+  "defense": {
+    "single_season_sacks": {
+      "value": 2,
+      "holder": "Michael Wilson",
+      "holder_team": "Fairmont Senior",
+      "season": 1
+    },
+    "career_sacks": {
+      "value": 3,
+      "holder": "Michael Wilson",
+      "holder_team": "Fairmont Senior",
+      "season": 1,
+      "detail": "career"
+    },
+    "single_season_interceptions": {
+      "value": 1,
+      "holder": "Steven Miller",
+      "holder_team": "Spring Mills",
+      "season": 1
+    }
+  },
+  "game": {
+    "most_passing_yards": null,
+    "most_rushing_yards": null,
+    "most_points": null
+  }
+}

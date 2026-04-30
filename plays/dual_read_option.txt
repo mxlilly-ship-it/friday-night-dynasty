@@ -1,0 +1,5 @@
+Name: Read Option
+Formation: Dual
+Category: Inside Run
+
+Ball carrier: QB or RB

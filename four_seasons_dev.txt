@@ -1,0 +1,79 @@
+FRIDAY NIGHT DYNASTY - 4 SEASON DEVELOPMENT TEST
+============================================================
+One team, 4 offseasons: graduation -> advance age/year -> develop -> add freshmen
+
+Team: Independence Patriots
+  Facilities: 5  Coach (dev): 5
+
+------------------------------------------------------------
+BEFORE SEASON 1 (initial roster)
+------------------------------------------------------------
+  Roster: 73 players
+  By year: Fr(9)=19 So(10)=12 Jr(11)=13 Sr(12)=29
+  By age:  14=19 15=12 16=13 17=14 18=15
+  Top 5 (overall):
+    Jackson Lee (So) OL ovr=78 pot=70
+    Michael Brown (Sr) DT ovr=73 pot=74
+    Logan Brown (Jr) CB ovr=73 pot=71
+    Joshua Garcia (Fr) K ovr=71 pot=56
+    Timothy White (Sr) OL ovr=70 pot=70
+
+------------------------------------------------------------
+AFTER SEASON 1 (start of season 2)
+  Offseason: removed 29 graduated, added 30 freshmen
+------------------------------------------------------------
+  Roster: 74 players
+  By year: Fr(9)=30 So(10)=19 Jr(11)=12 Sr(12)=13
+  By age:  14=30 15=19 16=12 17=13 18=0
+  Top 5 (overall):
+    Jackson Lee (Jr) OL ovr=79 pot=70
+    Logan Brown (Sr) CB ovr=74 pot=71
+    William Miller (Fr) OL ovr=73 pot=48
+    James Johnson (So) CB ovr=71 pot=70
+    Joshua Garcia (So) K ovr=71 pot=56
+
+------------------------------------------------------------
+AFTER SEASON 2 (start of season 3)
+  Offseason: removed 13 graduated, added 5 freshmen
+------------------------------------------------------------
+  Roster: 66 players
+  By year: Fr(9)=5 So(10)=30 Jr(11)=19 Sr(12)=12
+  By age:  14=5 15=30 16=19 17=12 18=0
+  Top 5 (overall):
+    Jackson Lee (Sr) OL ovr=79 pot=70
+    William Miller (So) OL ovr=73 pot=48
+    James Johnson (Jr) CB ovr=72 pot=70
+    James Garcia (Sr) S ovr=72 pot=68
+    Robert Martin (Jr) DE ovr=71 pot=72
+
+------------------------------------------------------------
+AFTER SEASON 3 (start of season 4)
+  Offseason: removed 12 graduated, added 18 freshmen
+------------------------------------------------------------
+  Roster: 72 players
+  By year: Fr(9)=18 So(10)=5 Jr(11)=30 Sr(12)=19
+  By age:  14=18 15=5 16=30 17=19 18=0
+  Top 5 (overall):
+    William Miller (Jr) OL ovr=73 pot=48
+    Robert Martin (Sr) DE ovr=72 pot=72
+    James Johnson (Sr) CB ovr=72 pot=70
+    David Lee (Jr) OL ovr=72 pot=75
+    Robert Jackson (Jr) K ovr=72 pot=66
+
+------------------------------------------------------------
+AFTER SEASON 4 (start of season 5)
+  Offseason: removed 19 graduated, added 16 freshmen
+------------------------------------------------------------
+  Roster: 69 players
+  By year: Fr(9)=16 So(10)=18 Jr(11)=5 Sr(12)=30
+  By age:  14=16 15=18 16=5 17=30 18=0
+  Top 5 (overall):
+    Robert Jackson (Sr) K ovr=75 pot=66
+    William Miller (Sr) OL ovr=73 pot=48
+    David Lee (Sr) OL ovr=73 pot=75
+    Jackson Williams (Sr) LB ovr=71 pot=66
+    Tyler Wilson (Jr) CB ovr=71 pot=47
+
+============================================================
+DONE - Roster has evolved over 4 offseasons.
+============================================================

@@ -1,0 +1,456 @@
+FRIDAY NIGHT DYNASTY - 10 YEAR RECRUITING SIMULATION
+============================================================
+
+============================================================
+YEAR 1
+============================================================
+  [Coach] MT View Knights fires Ken Edwards
+  [Coach] Eric Young leaves Shady Spring Tigers for MT View Knights
+  [Coach] Shady Spring Tigers hires Ken Edwards
+
+Season result: Bluefield Beavers State Champion
+Standings: Independence Patriots 0-0, MT View Knights 0-0, Bluefield Beavers 0-0, Shady Spring Tigers 0-0
+AWARDS
+--------------------------------------------------
+Player of the Year: Christopher Davis (Shady Spring Tigers)
+Offensive Player of the Year: Christopher Davis (Shady Spring Tigers) - 684 total yds
+Defensive Player of the Year: Mason Anderson (Independence Patriots) - 33 tack, 2 sack
+
+All-State 1st Team
+------------------------------
+  QB: Christopher Davis (Shady Spring Tigers) - 684 yds
+  RB: Steven Jackson (Shady Spring Tigers) - 179 yds
+  RB: Timothy Williams (Bluefield Beavers) - 205 yds
+  WR: Jackson Williams (Shady Spring Tigers) - 215 yds
+  WR: Kenneth Brown (Shady Spring Tigers) - 159 yds
+
+INCOMING 9TH GRADE CLASSES
+--------------------------------------------------
+  Independence Patriots (Recruiting Score: 61.2)
+    34 recruits | Avg potential: 65.9
+    Top 5: Mark Martin (DT) 85, Joshua Moore (LB) 85, Donald Johnson (LB) 81, William Johnson (QB) 80, Paul Thompson (OL) 77
+
+  MT View Knights (Recruiting Score: 33.1)
+    28 recruits | Avg potential: 58.3
+    Top 5: Christopher Moore (OL) 85, Christopher Miller (OL) 80, Timothy Garcia (WR) 80, Joshua Martin (LB) 77, Ethan Brown (CB) 74
+
+  Bluefield Beavers (Recruiting Score: 71.5)
+    22 recruits | Avg potential: 68.7
+    Top 5: Anthony Smith (RB) 100, Michael Brown (QB) 89, Kevin Miller (LB) 89, Andrew Moore (LB) 87, Tyler Martin (CB) 74
+
+  Shady Spring Tigers (Recruiting Score: 59.4)
+    14 recruits | Avg potential: 60.8
+    Top 5: Paul Thomas (WR) 81, John White (DE) 77, Tyler Davis (S) 72, Tyler Martin (LB) 70, Kenneth Anderson (RB) 70
+
+
+============================================================
+YEAR 2
+============================================================
+  [Coach] MT View Knights fires Eric Young
+  [Coach] MT View Knights hires Eric Young
+
+Season result: Bluefield Beavers State Champion
+Standings: Independence Patriots 0-0, MT View Knights 0-0, Bluefield Beavers 0-0, Shady Spring Tigers 0-0
+AWARDS
+--------------------------------------------------
+Player of the Year: William Johnson (Independence Patriots)
+Offensive Player of the Year: William Johnson (Independence Patriots) - 751 total yds
+Defensive Player of the Year: Noah Taylor (MT View Knights) - 37 tack, 1 sack
+
+All-State 1st Team
+------------------------------
+  QB: William Johnson (Independence Patriots) - 751 yds
+  RB: Mason Miller (Bluefield Beavers) - 292 yds
+  RB: Anthony Smith (Bluefield Beavers) - 272 yds
+  WR: David Wilson (Independence Patriots) - 200 yds
+  WR: William Wilson (Independence Patriots) - 195 yds
+
+INCOMING 9TH GRADE CLASSES
+--------------------------------------------------
+  Independence Patriots (Recruiting Score: 64.5)
+    5 recruits | Avg potential: 66.8
+    Top 5: David Davis (WR) 80, William Miller (RB) 67, Timothy Davis (LB) 63, Timothy Brown (CB) 63, Matthew Jones (LB) 61
+
+  MT View Knights (Recruiting Score: 33.1)
+    8 recruits | Avg potential: 53.0
+    Top 5: Logan Taylor (OL) 65, Logan Thomas (LB) 57, David Wilson (DT) 56, Lucas Moore (LB) 54, Mason Jones (S) 52
+
+  Bluefield Beavers (Recruiting Score: 75.1)
+    5 recruits | Avg potential: 63.8
+    Top 5: Brian Johnson (LB) 82, Daniel Taylor (OL) 74, John Martinez (OL) 60, Anthony Thomas (WR) 53, Logan Lee (S) 50
+
+  Shady Spring Tigers (Recruiting Score: 60.0)
+    18 recruits | Avg potential: 66.3
+    Top 5: Andrew Jones (S) 85, Christopher Rodriguez (OL) 80, Matthew Martin (WR) 79, Noah White (CB) 78, Ethan Martin (OL) 78
+
+
+============================================================
+YEAR 3
+============================================================
+  [Coach] Bob Jones changes scheme at Independence Patriots (defense: Aggressive Man → Conservative Man)
+
+Season result: Shady Spring Tigers State Champion
+Standings: Independence Patriots 0-0, MT View Knights 0-0, Bluefield Beavers 0-0, Shady Spring Tigers 0-0
+AWARDS
+--------------------------------------------------
+Player of the Year: David Jackson (MT View Knights)
+Offensive Player of the Year: David Jackson (MT View Knights) - 602 total yds
+Defensive Player of the Year: Noah Taylor (MT View Knights) - 44 tack, 1 sack
+
+All-State 1st Team
+------------------------------
+  QB: David Jackson (MT View Knights) - 602 yds
+  RB: Mason Williams (Shady Spring Tigers) - 291 yds
+  RB: Robert Garcia (Shady Spring Tigers) - 279 yds
+  WR: Donald Miller (MT View Knights) - 165 yds
+  WR: Logan Jackson (Shady Spring Tigers) - 160 yds
+
+INCOMING 9TH GRADE CLASSES
+--------------------------------------------------
+  Independence Patriots (Recruiting Score: 66.9)
+    18 recruits | Avg potential: 61.9
+    Top 5: Andrew Taylor (DT) 91, Tyler Lee (OL) 77, Robert Jones (CB) 73, Jackson Johnson (OL) 69, Jackson Rodriguez (OL) 68
+
+  MT View Knights (Recruiting Score: 34.3)
+    11 recruits | Avg potential: 58.6
+    Top 5: William Miller (DE) 80, Joshua Thompson (QB) 68, Michael Johnson (S) 67, Andrew Anderson (RB) 62, William Anderson (K) 61
+
+  Bluefield Beavers (Recruiting Score: 73.3)
+    18 recruits | Avg potential: 67.3
+    Top 5: Robert Miller (LB) 89, John Martin (WR) 88, Robert Johnson (TE) 79, Logan Miller (DT) 76, Kenneth Rodriguez (DE) 74
+
+  Shady Spring Tigers (Recruiting Score: 63.5)
+    6 recruits | Avg potential: 61.5
+    Top 5: Logan Brown (DT) 75, Noah Lee (LB) 69, Christopher Anderson (WR) 60, Jacob Martinez (S) 56, Kevin Garcia (LB) 55
+
+
+============================================================
+YEAR 4
+============================================================
+  [Coach] MT View Knights fires Eric Young
+  [Coach] MT View Knights hires Eric Young
+
+Season result: Shady Spring Tigers State Champion
+Standings: Independence Patriots 0-0, MT View Knights 0-0, Bluefield Beavers 0-0, Shady Spring Tigers 0-0
+AWARDS
+--------------------------------------------------
+Player of the Year: Jackson Brown (Shady Spring Tigers)
+Offensive Player of the Year: Jackson Brown (Shady Spring Tigers) - 583 total yds
+Defensive Player of the Year: Timothy Jones (Shady Spring Tigers) - 28 tack, 5 sack
+
+All-State 1st Team
+------------------------------
+  QB: Jackson Brown (Shady Spring Tigers) - 583 yds
+  RB: Mason Miller (Bluefield Beavers) - 374 yds
+  RB: Anthony Smith (Bluefield Beavers) - 353 yds
+  WR: Timothy Thomas (Independence Patriots) - 187 yds
+  WR: Jacob Martin (Bluefield Beavers) - 172 yds
+
+INCOMING 9TH GRADE CLASSES
+--------------------------------------------------
+  Independence Patriots (Recruiting Score: 66.6)
+    11 recruits | Avg potential: 73.9
+    Top 5: Joshua Davis (DT) 100, David Thomas (OL) 93, James Miller (TE) 86, Kenneth Wilson (OL) 79, Paul Martin (DT) 76
+
+  MT View Knights (Recruiting Score: 34.3)
+    15 recruits | Avg potential: 54.4
+    Top 5: Michael Martinez (CB) 79, James Johnson (WR) 75, Brian Thomas (P) 59, Kevin Smith (RB) 59, Donald Jackson (DE) 58
+
+  Bluefield Beavers (Recruiting Score: 74.0)
+    7 recruits | Avg potential: 73.7
+    Top 5: John Taylor (WR) 98, James Davis (P) 82, Tyler Johnson (LB) 77, Daniel Miller (OL) 71, George Lee (WR) 65
+
+  Shady Spring Tigers (Recruiting Score: 68.1)
+    16 recruits | Avg potential: 65.0
+    Top 5: Steven Jones (QB) 82, Anthony Anderson (CB) 80, David Lee (OL) 80, Andrew Brown (RB) 75, Jacob Moore (RB) 72
+
+
+============================================================
+YEAR 5
+============================================================
+  [Coach] MT View Knights fires Eric Young
+  [Coach] MT View Knights hires Eric Young
+  [Coach] Mark Lewis changes scheme at Bluefield Beavers (defense: Conservative Man → Primary Zone)
+
+Season result: Independence Patriots State Champion
+Standings: Independence Patriots 0-0, MT View Knights 0-0, Bluefield Beavers 0-0, Shady Spring Tigers 0-0
+AWARDS
+--------------------------------------------------
+Player of the Year: Steven Jones (Shady Spring Tigers)
+Offensive Player of the Year: Steven Jones (Shady Spring Tigers) - 538 total yds
+Defensive Player of the Year: Donald Johnson (Independence Patriots) - 34 tack, 1 sack
+
+All-State 1st Team
+------------------------------
+  QB: Steven Jones (Shady Spring Tigers) - 538 yds
+  RB: Mason Williams (Shady Spring Tigers) - 342 yds
+  RB: Andrew Jones (Shady Spring Tigers) - 330 yds
+  WR: Paul Thomas (Shady Spring Tigers) - 153 yds
+  WR: Matthew Martin (Shady Spring Tigers) - 150 yds
+
+INCOMING 9TH GRADE CLASSES
+--------------------------------------------------
+  Independence Patriots (Recruiting Score: 71.2)
+    36 recruits | Avg potential: 66.2
+    Top 5: Tyler Jackson (DE) 91, Anthony Jackson (OL) 90, Tyler Brown (DE) 87, Jackson Davis (DE) 79, William Taylor (CB) 78
+
+  MT View Knights (Recruiting Score: 34.3)
+    28 recruits | Avg potential: 55.5
+    Top 5: Michael Jackson (DE) 82, Joshua Thompson (LB) 81, Mark Rodriguez (CB) 80, Timothy Thompson (OL) 72, Jackson Brown (DT) 69
+
+  Bluefield Beavers (Recruiting Score: 71.2)
+    24 recruits | Avg potential: 71.6
+    Top 5: Mark Moore (WR) 93, Matthew Smith (DE) 88, George Thompson (DE) 88, Mark Williams (OL) 84, Andrew Brown (CB) 82
+
+  Shady Spring Tigers (Recruiting Score: 71.4)
+    7 recruits | Avg potential: 69.1
+    Top 5: Anthony Johnson (WR) 91, Ethan Taylor (OL) 80, Logan Thompson (CB) 70, Jacob Martinez (CB) 65, Anthony Miller (S) 63
+
+
+============================================================
+YEAR 6
+============================================================
+  [Coach] MT View Knights fires Eric Young
+  [Coach] MT View Knights hires Eric Young
+  [Coach] Bob Jones changes scheme at Independence Patriots (defense: Conservative Man → Aggressive Man)
+  [Coach] Ken Edwards changes scheme at Shady Spring Tigers (defense: Heavy Pressure → Base)
+
+Season result: Bluefield Beavers State Champion
+Standings: Independence Patriots 0-0, MT View Knights 0-0, Bluefield Beavers 0-0, Shady Spring Tigers 0-0
+AWARDS
+--------------------------------------------------
+Player of the Year: Steven Thomas (Bluefield Beavers)
+Offensive Player of the Year: Steven Thomas (Bluefield Beavers) - 667 total yds
+Defensive Player of the Year: Robert Miller (Bluefield Beavers) - 32 tack, 6 sack
+
+All-State 1st Team
+------------------------------
+  QB: Steven Thomas (Bluefield Beavers) - 667 yds
+  RB: Jacob Moore (Shady Spring Tigers) - 278 yds
+  RB: William Miller (Independence Patriots) - 212 yds
+  WR: Lucas Rodriguez (Bluefield Beavers) - 181 yds
+  WR: Andrew Smith (Shady Spring Tigers) - 170 yds
+
+INCOMING 9TH GRADE CLASSES
+--------------------------------------------------
+  Independence Patriots (Recruiting Score: 72.7)
+    4 recruits | Avg potential: 75.5
+    Top 5: Jacob Martinez (DE) 85, Daniel Lee (LB) 79, Matthew Rodriguez (LB) 72, Christopher Brown (S) 66
+
+  MT View Knights (Recruiting Score: 33.1)
+    2 recruits | Avg potential: 50.5
+    Top 5: Daniel Anderson (CB) 58, Daniel Martinez (WR) 43
+
+  Bluefield Beavers: No recruits this year (roster full)
+
+  Shady Spring Tigers (Recruiting Score: 71.9)
+    16 recruits | Avg potential: 70.2
+    Top 5: Jackson Jackson (WR) 88, Brian Wilson (WR) 86, Mason Smith (QB) 82, Kenneth Thompson (LB) 80, Matthew Thompson (LB) 79
+
+
+============================================================
+YEAR 7
+============================================================
+  [Coach] MT View Knights fires Eric Young
+  [Coach] MT View Knights hires Eric Young
+
+Season result: Shady Spring Tigers State Champion
+Standings: Independence Patriots 0-0, MT View Knights 0-0, Bluefield Beavers 0-0, Shady Spring Tigers 0-0
+AWARDS
+--------------------------------------------------
+Player of the Year: George Thomas (Shady Spring Tigers)
+Offensive Player of the Year: George Thomas (Shady Spring Tigers) - 724 total yds
+Defensive Player of the Year: Steven Jones (Shady Spring Tigers) - 37 tack, 2 sack
+
+All-State 1st Team
+------------------------------
+  QB: George Thomas (Shady Spring Tigers) - 724 yds
+  RB: Lucas Miller (Independence Patriots) - 204 yds
+  RB: Jackson Rodriguez (Shady Spring Tigers) - 175 yds
+  WR: Jackson Jackson (Shady Spring Tigers) - 186 yds
+  WR: Anthony Garcia (Independence Patriots) - 172 yds
+
+INCOMING 9TH GRADE CLASSES
+--------------------------------------------------
+  Independence Patriots (Recruiting Score: 76.3)
+    17 recruits | Avg potential: 68.4
+    Top 5: Donald Jackson (OL) 86, Donald Taylor (DE) 85, Joshua Taylor (LB) 84, Robert Taylor (TE) 82, Kevin Miller (WR) 80
+
+  MT View Knights (Recruiting Score: 33.1)
+    14 recruits | Avg potential: 55.1
+    Top 5: Donald Moore (CB) 77, Michael Lee (RB) 69, Noah Brown (LB) 67, Paul Martinez (DT) 67, Timothy Moore (OL) 61
+
+  Bluefield Beavers (Recruiting Score: 77.9)
+    22 recruits | Avg potential: 71.0
+    Top 5: Tyler Davis (WR) 91, John Lee (P) 90, Kevin Thomas (CB) 81, Brian Miller (QB) 80, Brian Thomas (LB) 78
+
+  Shady Spring Tigers (Recruiting Score: 75.4)
+    6 recruits | Avg potential: 66.2
+    Top 5: William Johnson (CB) 76, Noah Moore (RB) 69, Michael Smith (LB) 69, Robert Garcia (OL) 67, Christopher Thomas (LB) 59
+
+
+============================================================
+YEAR 8
+============================================================
+
+Season result: Bluefield Beavers State Champion
+Standings: Independence Patriots 0-0, MT View Knights 0-0, Bluefield Beavers 0-0, Shady Spring Tigers 0-0
+AWARDS
+--------------------------------------------------
+Player of the Year: William Anderson (Bluefield Beavers)
+Offensive Player of the Year: William Anderson (Bluefield Beavers) - 646 total yds
+Defensive Player of the Year: John Thomas (Independence Patriots) - 34 tack, 2 sack
+
+All-State 1st Team
+------------------------------
+  QB: William Anderson (Bluefield Beavers) - 646 yds
+  RB: Daniel Lee (Independence Patriots) - 266 yds
+  RB: Tyler Johnson (Bluefield Beavers) - 249 yds
+  WR: John Taylor (Bluefield Beavers) - 225 yds
+  WR: Jackson Jackson (Shady Spring Tigers) - 179 yds
+
+INCOMING 9TH GRADE CLASSES
+--------------------------------------------------
+  Independence Patriots (Recruiting Score: 74.9)
+    9 recruits | Avg potential: 72.0
+    Top 5: Donald Wilson (OL) 90, Joshua Jones (DT) 87, Kenneth Rodriguez (WR) 82, Logan Jones (CB) 76, Tyler Moore (DE) 74
+
+  MT View Knights (Recruiting Score: 33.1)
+    16 recruits | Avg potential: 49.3
+    Top 5: Donald Jackson (OL) 68, Paul Jackson (S) 62, Daniel Miller (WR) 61, William Williams (DE) 53, Kenneth Taylor (OL) 53
+
+  Bluefield Beavers (Recruiting Score: 82.5)
+    9 recruits | Avg potential: 76.0
+    Top 5: Donald Smith (LB) 96, Noah Thompson (DE) 88, Lucas Jones (OL) 84, Paul Jones (OL) 75, Donald White (DT) 75
+
+  Shady Spring Tigers (Recruiting Score: 75.7)
+    18 recruits | Avg potential: 68.3
+    Top 5: Matthew Martin (CB) 91, Kevin Taylor (S) 89, Jacob Jones (CB) 82, Kenneth Miller (K) 80, Paul Williams (OL) 71
+
+
+============================================================
+YEAR 9
+============================================================
+  [Coach] MT View Knights fires Eric Young
+  [Coach] MT View Knights hires Eric Young
+
+Season result: Shady Spring Tigers State Champion
+Standings: Independence Patriots 0-0, MT View Knights 0-0, Bluefield Beavers 0-0, Shady Spring Tigers 0-0
+AWARDS
+--------------------------------------------------
+Player of the Year: George Thomas (Shady Spring Tigers)
+Offensive Player of the Year: George Thomas (Shady Spring Tigers) - 578 total yds
+Defensive Player of the Year: Jackson Jackson (Shady Spring Tigers) - 32 tack, 2 INT
+
+All-State 1st Team
+------------------------------
+  QB: George Thomas (Shady Spring Tigers) - 578 yds
+  RB: Robert Miller (Independence Patriots) - 238 yds
+  RB: Jackson Rodriguez (Shady Spring Tigers) - 257 yds
+  WR: Tyler Davis (Bluefield Beavers) - 193 yds
+  WR: Jackson Jackson (Shady Spring Tigers) - 180 yds
+
+INCOMING 9TH GRADE CLASSES
+--------------------------------------------------
+  Independence Patriots (Recruiting Score: 76.4)
+    41 recruits | Avg potential: 68.0
+    Top 5: Brian Martinez (WR) 91, Jacob Williams (DE) 91, Jackson Brown (OL) 90, Logan Martinez (QB) 88, Kenneth Martinez (DT) 88
+
+  MT View Knights (Recruiting Score: 33.1)
+    22 recruits | Avg potential: 55.9
+    Top 5: Joshua Jackson (OL) 79, Kenneth Jones (OL) 75, Paul Martin (S) 75, Kenneth Miller (DE) 72, William Davis (LB) 66
+
+  Bluefield Beavers (Recruiting Score: 80.0)
+    27 recruits | Avg potential: 70.6
+    Top 5: Brian Wilson (S) 97, Daniel Johnson (TE) 96, James Jackson (LB) 88, Lucas Brown (S) 86, David Williams (RB) 85
+
+  Shady Spring Tigers (Recruiting Score: 77.1)
+    13 recruits | Avg potential: 66.0
+    Top 5: Christopher Johnson (S) 96, Ethan Garcia (RB) 84, Steven Taylor (CB) 80, Donald Martin (P) 76, William Taylor (TE) 71
+
+
+============================================================
+YEAR 10
+============================================================
+  [Coach] Bob Jones (age 65) retires from Independence Patriots
+  [Coach] MT View Knights fires Eric Young
+  [Coach] Independence Patriots hires Eric Young
+  [Coach] MT View Knights hires Gary White
+
+Season result: Shady Spring Tigers State Champion
+Standings: Independence Patriots 0-0, MT View Knights 0-0, Bluefield Beavers 0-0, Shady Spring Tigers 0-0
+AWARDS
+--------------------------------------------------
+Player of the Year: Brian Miller (Bluefield Beavers)
+Offensive Player of the Year: Brian Miller (Bluefield Beavers) - 784 total yds
+Defensive Player of the Year: Noah Thompson (Bluefield Beavers) - 24 tack, 5 sack
+
+All-State 1st Team
+------------------------------
+  QB: Brian Miller (Bluefield Beavers) - 784 yds
+  RB: Ethan Garcia (Shady Spring Tigers) - 255 yds
+  RB: Brian Wilson (Bluefield Beavers) - 280 yds
+  WR: Andrew Anderson (Bluefield Beavers) - 209 yds
+  WR: Paul Thomas (Bluefield Beavers) - 160 yds
+
+INCOMING 9TH GRADE CLASSES
+--------------------------------------------------
+  Independence Patriots (Recruiting Score: 68.0)
+    5 recruits | Avg potential: 63.0
+    Top 5: Paul Martin (DE) 73, Andrew Smith (S) 72, David Williams (WR) 63, Timothy Garcia (DE) 54, Joshua Williams (DE) 53
+
+  MT View Knights (Recruiting Score: 37.6)
+    5 recruits | Avg potential: 51.4
+    Top 5: Noah Martin (RB) 80, Michael Lee (OL) 52, Anthony Taylor (CB) 44, Michael Martinez (LB) 41, Kevin Williams (K) 40
+
+  Bluefield Beavers: No recruits this year (roster full)
+
+  Shady Spring Tigers (Recruiting Score: 77.1)
+    15 recruits | Avg potential: 72.8
+    Top 5: Mark Martin (CB) 94, Jacob White (OL) 91, Joshua Jones (OL) 86, Ethan Lee (CB) 86, Jacob Moore (WR) 80
+
+============================================================
+RECORD BOOK
+============================================================
+RECORD BOOK
+==================================================
+
+Team
+------------------------------
+  Most Championships: 55 - Shady Spring Tigers (Season 141)
+  Most Wins (Season): 5 - Shady Spring Tigers (Season 123)
+  Most Points (Season): 107 - Shady Spring Tigers (Season 136)
+
+Rushing
+------------------------------
+  Single Season Yards: 355 - Daniel Jones (Shady Spring Tigers) (Season 128)
+  Career Yards: 1001 - Mason Smith (Shady Spring Tigers) (Season 126)
+  Single Season TD: 5 - John Miller (MT View Knights) (Season 127)
+
+Passing
+------------------------------
+  Single Season Yards: 891 - Jacob Jones (Independence Patriots) (Season 122)
+  Career Yards: 2470 - George Thomas (Shady Spring Tigers) (Season 141)
+  Single Season TD: 7 - David Jackson (MT View Knights) (Season 133)
+
+Receiving
+------------------------------
+  Single Season Yards: 241 - George Anderson (Bluefield Beavers) (Season 130)
+  Career Yards: 653 - John Taylor (Bluefield Beavers) (Season 139)
+  Single Season TD: 4 - Jackson Williams (MT View Knights) (Season 133)
+
+Defense
+------------------------------
+  Single Season Sacks: 8 - John Williams (Shady Spring Tigers) (Season 135)
+  Career Sacks: 13 - John Williams (Shady Spring Tigers) (Season 135)
+  Single Season INT: 3 - Robert Jones (Independence Patriots) (Season 136)
+
+Game
+------------------------------
+  Most Passing Yards (Game): 286 - Jacob Jones (Independence Patriots) (Season 1)
+  Most Rushing Yards (Game): 143 - Daniel Lee (Independence Patriots) (Season 8)
+  Most Points (Game): 35 - Independence Patriots (Season 2)
+
+============================================================
+END OF 10 YEAR RECRUITING SIMULATION
+============================================================

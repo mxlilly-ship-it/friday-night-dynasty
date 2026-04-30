@@ -1,0 +1,112 @@
+{
+  "team": {
+    "most_championships": {
+      "value": 1,
+      "holder": "Cabell Midland",
+      "holder_team": "Cabell Midland",
+      "season": 1,
+      "detail": "all-time"
+    },
+    "most_wins_season": {
+      "value": 13,
+      "holder": "Cabell Midland",
+      "holder_team": "Cabell Midland",
+      "season": 1
+    },
+    "most_points_season": {
+      "value": 565,
+      "holder": "Martinsburg",
+      "holder_team": "Martinsburg",
+      "season": 1
+    }
+  },
+  "rushing": {
+    "single_season_yards": {
+      "value": 165,
+      "holder": "Matthew Lee",
+      "holder_team": "Martinsburg",
+      "season": 1
+    },
+    "career_yards": {
+      "value": 278,
+      "holder": "Matthew Lee",
+      "holder_team": "Martinsburg",
+      "season": 1,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 5,
+      "holder": "Robert Wilson",
+      "holder_team": "Huntington",
+      "season": 1
+    }
+  },
+  "passing": {
+    "single_season_yards": {
+      "value": 282,
+      "holder": "Mason Thomas",
+      "holder_team": "Spring Mills",
+      "season": 1
+    },
+    "career_yards": {
+      "value": 518,
+      "holder": "Kevin White",
+      "holder_team": "Cabell Midland",
+      "season": 1,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 5,
+      "holder": "Kevin White",
+      "holder_team": "Cabell Midland",
+      "season": 1
+    }
+  },
+  "receiving": {
+    "single_season_yards": {
+      "value": 124,
+      "holder": "Christopher Thomas",
+      "holder_team": "University",
+      "season": 1
+    },
+    "career_yards": {
+      "value": 168,
+      "holder": "Mark Garcia",
+      "holder_team": "Cabell Midland",
+      "season": 1,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 3,
+      "holder": "Kevin Anderson",
+      "holder_team": "Cabell Midland",
+      "season": 1
+    }
+  },
+  "defense": {
+    "single_season_sacks": {
+      "value": 1,
+      "holder": "Brian Thomas",
+      "holder_team": "Huntington",
+      "season": 1
+    },
+    "career_sacks": {
+      "value": 1,
+      "holder": "Brian Thomas",
+      "holder_team": "Huntington",
+      "season": 1,
+      "detail": "career"
+    },
+    "single_season_interceptions": {
+      "value": 1,
+      "holder": "Noah Taylor",
+      "holder_team": "Martinsburg",
+      "season": 1
+    }
+  },
+  "game": {
+    "most_passing_yards": null,
+    "most_rushing_yards": null,
+    "most_points": null
+  }
+}

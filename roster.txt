@@ -1,0 +1,115 @@
+============================================================
+  INDEPENDENCE PATRIOTS - ROSTER
+============================================================
+
+Total: 70 players
+
+QB (3)
+--------------------------------------------------
+  William Garcia / LB  Yr10  Overall 53 | Off 62 | Def 48 | Pot 63 (Role player) *
+  Lucas Lee  Yr12  Overall 52 | Off 60 | Def 59 | Pot 65 (Role player)
+  Jacob Brown  Yr12  Overall 47 | Off 53 | Def 52 | Pot 61 (Role player)
+
+RB (9)
+--------------------------------------------------
+  Jackson Martin / S  Yr10  Overall 60 | Off 67 | Def 62 | Pot 87 (Elite) *
+  Brian Thomas / CB  Yr12  Overall 56 | Off 62 | Def 66 | Pot 64 (Role player) *
+  Mason Wilson  Yr9  Overall 56 | Off 62 | Def 49 | Pot 50 (Bench / developmental)
+  Paul Wilson / S  Yr12  Overall 56 | Off 63 | Def 68 | Pot 55 (Bench / developmental) *
+  Jacob Martin  Yr12  Overall 54 | Off 61 | Def 58 | Pot 66 (Solid starter)
+  Daniel White / CB  Yr10  Overall 54 | Off 60 | Def 62 | Pot 57 (Role player) *
+  David Martin / S  Yr12  Overall 52 | Off 59 | Def 61 | Pot 62 (Role player) *
+  Noah Taylor  Yr9  Overall 48 | Off 54 | Def 53 | Pot 50 (Bench / developmental)
+  Andrew Thomas / CB  Yr9  Overall 47 | Off 53 | Def 51 | Pot 62 (Role player) *
+
+WR (11)
+--------------------------------------------------
+  Noah White  Yr12  Overall 66 | Off 74 | Def 56 | Pot 50 (Bench / developmental)
+  Andrew Rodriguez / S  Yr12  Overall 62 | Off 70 | Def 62 | Pot 75 (Solid starter) *
+  Michael Davis / S  Yr10  Overall 58 | Off 64 | Def 60 | Pot 60 (Role player) *
+  David Rodriguez / S  Yr10  Overall 58 | Off 64 | Def 56 | Pot 66 (Solid starter) *
+  Donald Garcia / S  Yr9  Overall 58 | Off 65 | Def 58 | Pot 62 (Role player) *
+  Joshua Johnson / S  Yr11  Overall 57 | Off 62 | Def 53 | Pot 49 (Bench / developmental) *
+  Daniel Moore  Yr12  Overall 56 | Off 60 | Def 59 | Pot 73 (Solid starter)
+  Ethan Wilson / S  Yr10  Overall 55 | Off 62 | Def 62 | Pot 52 (Bench / developmental) *
+  Steven Jackson  Yr12  Overall 55 | Off 62 | Def 58 | Pot 63 (Role player)
+  Noah Lee / S  Yr12  Overall 54 | Off 62 | Def 62 | Pot 50 (Bench / developmental) *
+  Tyler Martin / CB  Yr12  Overall 50 | Off 56 | Def 54 | Pot 45 (Bench / developmental) *
+
+OL (12)
+--------------------------------------------------
+  Steven Davis / DT  Yr12  Overall 73 | Off 73 | Def 57 | Pot 43 (Bench / developmental) *
+  Robert Martin / DE  Yr12  Overall 71 | Off 72 | Def 56 | Pot 77 (All-State) *
+  Mark Garcia / DT  Yr11  Overall 70 | Off 69 | Def 62 | Pot 58 (Role player) *
+  George Lee / DT  Yr9  Overall 68 | Off 65 | Def 61 | Pot 43 (Bench / developmental) *
+  Matthew White / DE  Yr12  Overall 65 | Off 65 | Def 52 | Pot 75 (Solid starter) *
+  Joshua Rodriguez / DE  Yr11  Overall 64 | Off 62 | Def 64 | Pot 70 (Solid starter) *
+  Matthew Rodriguez  Yr12  Overall 63 | Off 62 | Def 54 | Pot 63 (Role player)
+  Noah Jackson  Yr12  Overall 63 | Off 64 | Def 51 | Pot 68 (Solid starter)
+  Kevin Thompson  Yr9  Overall 61 | Off 62 | Def 54 | Pot 54 (Bench / developmental)
+  Lucas Thomas / DT  Yr9  Overall 59 | Off 59 | Def 56 | Pot 47 (Bench / developmental) *
+  Daniel Williams / DT  Yr9  Overall 55 | Off 55 | Def 58 | Pot 45 (Bench / developmental) *
+  William Brown  Yr12  Overall 50 | Off 51 | Def 54 | Pot 64 (Role player)
+
+TE (3)
+--------------------------------------------------
+  Paul Martinez  Yr9  Overall 59 | Off 66 | Def 52 | Pot 77 (All-State)
+  George Johnson  Yr11  Overall 49 | Off 53 | Def 49 | Pot 50 (Bench / developmental)
+  Jackson Lee / LB  Yr9  Overall 48 | Off 50 | Def 56 | Pot 56 (Role player) *
+
+DE (7)
+--------------------------------------------------
+  Jacob Brown / TE  Yr12  Overall 66 | Off 55 | Def 66 | Pot 84 (All-State) *
+  Donald Taylor / TE  Yr11  Overall 63 | Off 54 | Def 63 | Pot 55 (Bench / developmental) *
+  Logan Jackson / TE  Yr9  Overall 63 | Off 56 | Def 63 | Pot 56 (Role player) *
+  Jacob Wilson  Yr12  Overall 62 | Off 64 | Def 62 | Pot 54 (Bench / developmental)
+  Anthony Miller  Yr12  Overall 58 | Off 51 | Def 58 | Pot 57 (Role player)
+  Joshua Johnson  Yr10  Overall 58 | Off 55 | Def 58 | Pot 71 (Solid starter)
+  Mason Moore / TE  Yr12  Overall 55 | Off 59 | Def 55 | Pot 85 (All-State) *
+
+DT (4)
+--------------------------------------------------
+  Jacob Taylor / OL  Yr9  Overall 61 | Off 64 | Def 61 | Pot 51 (Bench / developmental) *
+  Matthew Thomas / OL  Yr12  Overall 58 | Off 66 | Def 58 | Pot 89 (Elite) *
+  Mason Johnson / OL  Yr9  Overall 58 | Off 54 | Def 58 | Pot 69 (Solid starter) *
+  Noah Anderson  Yr11  Overall 57 | Off 56 | Def 57 | Pot 53 (Bench / developmental)
+
+LB (9)
+--------------------------------------------------
+  George Garcia  Yr11  Overall 65 | Off 55 | Def 65 | Pot 84 (All-State)
+  Jackson White  Yr10  Overall 61 | Off 51 | Def 61 | Pot 56 (Role player)
+  Steven Wilson / RB  Yr10  Overall 60 | Off 56 | Def 60 | Pot 62 (Role player) *
+  Steven Smith / RB  Yr12  Overall 58 | Off 56 | Def 58 | Pot 64 (Role player) *
+  Paul White / RB  Yr9  Overall 57 | Off 49 | Def 57 | Pot 80 (All-State) *
+  Matthew Jackson / TE  Yr12  Overall 56 | Off 48 | Def 56 | Pot 75 (Solid starter) *
+  Steven Jones / TE  Yr12  Overall 55 | Off 54 | Def 55 | Pot 51 (Bench / developmental) *
+  Kevin Thompson  Yr9  Overall 54 | Off 50 | Def 54 | Pot 64 (Role player)
+  Ethan Brown / RB  Yr10  Overall 54 | Off 57 | Def 54 | Pot 58 (Role player) *
+
+CB (6)
+--------------------------------------------------
+  David Garcia / WR  Yr9  Overall 72 | Off 61 | Def 72 | Pot 53 (Bench / developmental) *
+  Kenneth Jones / RB  Yr9  Overall 68 | Off 57 | Def 68 | Pot 45 (Bench / developmental) *
+  William Moore / RB  Yr12  Overall 68 | Off 58 | Def 68 | Pot 60 (Role player) *
+  Noah Wilson / RB  Yr10  Overall 67 | Off 64 | Def 67 | Pot 60 (Role player) *
+  Mason Johnson  Yr11  Overall 67 | Off 50 | Def 67 | Pot 67 (Solid starter)
+  John White  Yr12  Overall 62 | Off 50 | Def 62 | Pot 69 (Solid starter)
+
+S (4)
+--------------------------------------------------
+  Michael Moore / RB  Yr9  Overall 70 | Off 55 | Def 70 | Pot 62 (Role player) *
+  Mason Johnson / RB  Yr12  Overall 65 | Off 59 | Def 65 | Pot 53 (Bench / developmental) *
+  James Taylor / WR  Yr11  Overall 60 | Off 62 | Def 60 | Pot 56 (Role player) *
+  David Martinez / RB  Yr12  Overall 53 | Off 54 | Def 53 | Pot 85 (All-State) *
+
+K (1)
+--------------------------------------------------
+  Daniel Taylor  Yr11  Overall 65 | Off 51 | Def 58 | Pot 56 (Role player)
+
+P (1)
+--------------------------------------------------
+  Daniel Thompson  Yr12  Overall 76 | Off 50 | Def 53 | Pot 50 (Bench / developmental)
+
+* = two-way player
+
+Talent tiers (by potential): Bench 40-55 | Role 56-65 | Solid 66-75 | All-State 76-85 | Elite 86-95 | Generational 96+

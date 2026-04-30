@@ -1,0 +1,31 @@
+{
+  "offense_playbooks": {
+    "Spread": {
+      "formations": ["Dual", "Trio", "Empty", "Doubles"]
+    },
+    "Pro": {
+      "formations": ["Pro", "Twins", "Dual", "Doubles", "Trey Wing", "Wing"]
+    },
+    "Flexbone": {
+      "formations": ["Flexbone", "Power I", "Dual"]
+    },
+    "Smashmouth": {
+      "formations": ["Power I", "Trey Wing", "Wing", "Dual"]
+    },
+    "Double Wing": {
+      "formations": ["Double Wing", "Power I", "Dual"]
+    },
+    "Wing T": {
+      "formations": ["Wing T", "Power I", "Flexbone", "Dual"]
+    }
+  },
+  "defense_playbooks": {
+    "4-3": {
+      "formations": ["4-3", "Nickel"]
+    },
+    "3-4": {
+      "formations": ["3-4", "Nickel"]
+    }
+  },
+  "note": "Current backend builds playbooks from formation play definitions in systems/formation_plays.py and systems/defensive_formations.py. This JSON is a lightweight reference for UI/expansion."
+}

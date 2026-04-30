@@ -1,0 +1,112 @@
+{
+  "team": {
+    "most_championships": {
+      "value": 2,
+      "holder": "Fairmont Senior",
+      "holder_team": "Fairmont Senior",
+      "season": 2,
+      "detail": "all-time"
+    },
+    "most_wins_season": {
+      "value": 13,
+      "holder": "Fairmont Senior",
+      "holder_team": "Fairmont Senior",
+      "season": 1
+    },
+    "most_points_season": {
+      "value": 697,
+      "holder": "Fairmont Senior",
+      "holder_team": "Fairmont Senior",
+      "season": 2
+    }
+  },
+  "rushing": {
+    "single_season_yards": {
+      "value": 183,
+      "holder": "Steven Johnson",
+      "holder_team": "Bridgeport",
+      "season": 1
+    },
+    "career_yards": {
+      "value": 550,
+      "holder": "Jackson White",
+      "holder_team": "Fairmont Senior",
+      "season": 2,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 5,
+      "holder": "Steven Johnson",
+      "holder_team": "Bridgeport",
+      "season": 1
+    }
+  },
+  "passing": {
+    "single_season_yards": {
+      "value": 297,
+      "holder": "Brian White",
+      "holder_team": "Bridgeport",
+      "season": 2
+    },
+    "career_yards": {
+      "value": 945,
+      "holder": "Michael Brown",
+      "holder_team": "Huntington",
+      "season": 2,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 6,
+      "holder": "Michael Brown",
+      "holder_team": "Huntington",
+      "season": 1
+    }
+  },
+  "receiving": {
+    "single_season_yards": {
+      "value": 142,
+      "holder": "Lucas Thomas",
+      "holder_team": "Fairmont Senior",
+      "season": 1
+    },
+    "career_yards": {
+      "value": 250,
+      "holder": "Daniel Martinez",
+      "holder_team": "Huntington",
+      "season": 2,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 3,
+      "holder": "Christopher Jones",
+      "holder_team": "Huntington",
+      "season": 1
+    }
+  },
+  "defense": {
+    "single_season_sacks": {
+      "value": 2,
+      "holder": "Jackson Wilson",
+      "holder_team": "Fairmont Senior",
+      "season": 2
+    },
+    "career_sacks": {
+      "value": 3,
+      "holder": "Jackson Wilson",
+      "holder_team": "Fairmont Senior",
+      "season": 2,
+      "detail": "career"
+    },
+    "single_season_interceptions": {
+      "value": 2,
+      "holder": "Ethan Wilson",
+      "holder_team": "Fairmont Senior",
+      "season": 2
+    }
+  },
+  "game": {
+    "most_passing_yards": null,
+    "most_rushing_yards": null,
+    "most_points": null
+  }
+}

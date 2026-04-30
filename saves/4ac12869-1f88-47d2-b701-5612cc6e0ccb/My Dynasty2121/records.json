@@ -1,0 +1,112 @@
+{
+  "team": {
+    "most_championships": {
+      "value": 1,
+      "holder": "Doddridge Co",
+      "holder_team": "Doddridge Co",
+      "season": 1,
+      "detail": "all-time"
+    },
+    "most_wins_season": {
+      "value": 13,
+      "holder": "Fairmont Senior",
+      "holder_team": "Fairmont Senior",
+      "season": 1
+    },
+    "most_points_season": {
+      "value": 510,
+      "holder": "Fairmont Senior",
+      "holder_team": "Fairmont Senior",
+      "season": 1
+    }
+  },
+  "rushing": {
+    "single_season_yards": {
+      "value": 312,
+      "holder": "Lucas Lee",
+      "holder_team": "Doddridge Co",
+      "season": 1
+    },
+    "career_yards": {
+      "value": 312,
+      "holder": "Lucas Lee",
+      "holder_team": "Doddridge Co",
+      "season": 1,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 5,
+      "holder": "Ethan Moore",
+      "holder_team": "Martinsburg",
+      "season": 1
+    }
+  },
+  "passing": {
+    "single_season_yards": {
+      "value": 631,
+      "holder": "Logan Martin",
+      "holder_team": "Fairmont Senior",
+      "season": 1
+    },
+    "career_yards": {
+      "value": 631,
+      "holder": "Logan Martin",
+      "holder_team": "Fairmont Senior",
+      "season": 1,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 8,
+      "holder": "Logan Martin",
+      "holder_team": "Fairmont Senior",
+      "season": 1
+    }
+  },
+  "receiving": {
+    "single_season_yards": {
+      "value": 229,
+      "holder": "Ethan Johnson",
+      "holder_team": "Williamstown",
+      "season": 1
+    },
+    "career_yards": {
+      "value": 229,
+      "holder": "Ethan Johnson",
+      "holder_team": "Williamstown",
+      "season": 1,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 3,
+      "holder": "Christopher Lee",
+      "holder_team": "Huntington",
+      "season": 1
+    }
+  },
+  "defense": {
+    "single_season_sacks": {
+      "value": 1,
+      "holder": "Andrew Miller",
+      "holder_team": "Martinsburg",
+      "season": 1
+    },
+    "career_sacks": {
+      "value": 1,
+      "holder": "Andrew Miller",
+      "holder_team": "Martinsburg",
+      "season": 1,
+      "detail": "career"
+    },
+    "single_season_interceptions": {
+      "value": 3,
+      "holder": "George Wilson",
+      "holder_team": "Huntington",
+      "season": 1
+    }
+  },
+  "game": {
+    "most_passing_yards": null,
+    "most_rushing_yards": null,
+    "most_points": null
+  }
+}

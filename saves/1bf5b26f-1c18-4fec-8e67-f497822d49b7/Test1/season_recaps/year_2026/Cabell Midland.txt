@@ -1,0 +1,123 @@
+TEAM SEASON RECAP — Year 2026
+==================================================================
+Team: Cabell Midland
+Coach: Nick Thompson
+Record: 9-2
+Postseason: —
+
+SCHEDULE
+------------------------------------------------------------------
+Week 1: vs Buckhannon-Upshur — W 62-7
+Week 2: @ George Washington — W 34-14
+Week 3: @ Beckley — W 42-7
+Week 4: vs Parkersburg South — W 35-14
+Week 5: @ Riverside — W 62-0
+Week 6: vs Huntington — L 21-28
+Week 7: @ Oak Hill — W 42-6
+Week 8: @ Hurricane — W 35-14
+Week 9: vs Parkersburg — W 28-0
+Week 10: @ Buckhannon-Upshur — W 41-7
+
+TEAM STATS (regular season totals)
+------------------------------------------------------------------
+Total plays: 237
+Rush yards: 1254
+Pass yards: 1730
+Total yards: 2984
+Turnovers: 1
+Explosives: 63 (run 38 / pass 25)
+
+ROSTER (end of season)
+------------------------------------------------------------------
+- Jackson Anderson (QB) OVR None — Year 10
+- Robert Martin (QB) OVR None — Year 12
+- Kenneth Jackson (QB) OVR None — Year 12
+- Andrew Brown (RB) OVR None — Year 10
+- James Brown (RB) OVR None — Year 11
+- Kenneth Lee (RB) OVR None — Year 12
+- Lucas Thompson (RB) OVR None — Year 12
+- Kevin Martinez (RB) OVR None — Year 10
+- Ethan White (RB) OVR None — Year 10
+- Matthew White (WR) OVR None — Year 12
+- Joshua Johnson (WR) OVR None — Year 9
+- Jacob Thomas (WR) OVR None — Year 12
+- Christopher Jackson (WR) OVR None — Year 10
+- Mason Anderson (WR) OVR None — Year 12
+- Donald Rodriguez (WR) OVR None — Year 9
+- Kevin Taylor (WR) OVR None — Year 11
+- Steven Rodriguez (WR) OVR None — Year 12
+- Joshua Wilson (WR) OVR None — Year 9
+- Christopher Jones (WR) OVR None — Year 9
+- James Taylor (WR) OVR None — Year 12
+- David Smith (OL) OVR None — Year 10
+- Steven Johnson (OL) OVR None — Year 12
+- Steven Moore (OL) OVR None — Year 11
+- Timothy Thomas (OL) OVR None — Year 12
+- Brian Moore (OL) OVR None — Year 11
+- Mason Taylor (OL) OVR None — Year 11
+- Mark Martinez (OL) OVR None — Year 12
+- Daniel Garcia (OL) OVR None — Year 12
+- Steven Thompson (OL) OVR None — Year 9
+- Lucas Garcia (OL) OVR None — Year 10
+- Christopher Martin (OL) OVR None — Year 10
+- Robert Moore (OL) OVR None — Year 11
+- Anthony Jackson (OL) OVR None — Year 9
+- Mark Martin (OL) OVR None — Year 9
+- James Thompson (TE) OVR None — Year 12
+- Jackson Lee (TE) OVR None — Year 12
+- Mark Jackson (TE) OVR None — Year 12
+- Steven Davis (DE) OVR None — Year 12
+- Robert Rodriguez (DE) OVR None — Year 12
+- Paul White (DE) OVR None — Year 10
+- Jackson Davis (DE) OVR None — Year 9
+- Michael Moore (DE) OVR None — Year 12
+- Joshua Jones (DE) OVR None — Year 12
+- Christopher Jackson (DT) OVR None — Year 12
+- Christopher Thompson (DT) OVR None — Year 11
+- Kenneth Taylor (DT) OVR None — Year 11
+- Mason Rodriguez (DT) OVR None — Year 12
+- Kenneth Thomas (LB) OVR None — Year 12
+- Robert Smith (LB) OVR None — Year 12
+- Ethan Rodriguez (LB) OVR None — Year 9
+- Matthew Brown (LB) OVR None — Year 9
+- John Jones (LB) OVR None — Year 12
+- John White (LB) OVR None — Year 9
+- Andrew Moore (LB) OVR None — Year 10
+- Kevin Thompson (LB) OVR None — Year 11
+- Christopher Jones (CB) OVR None — Year 12
+- Andrew Thompson (CB) OVR None — Year 10
+- Paul Taylor (CB) OVR None — Year 10
+- Brian Williams (CB) OVR None — Year 12
+- Ethan Wilson (CB) OVR None — Year 10
+- Mark Thompson (CB) OVR None — Year 10
+- John Martin (CB) OVR None — Year 11
+- Jackson Taylor (CB) OVR None — Year 9
+- Kenneth Garcia (S) OVR None — Year 10
+- Anthony Moore (S) OVR None — Year 10
+- Tyler Brown (S) OVR None — Year 11
+- David Taylor (S) OVR None — Year 10
+- Paul Miller (K) OVR None — Year 11
+- Brian Davis (P) OVR None — Year 12
+
+TOP PLAYER SEASON STATS
+------------------------------------------------------------------
+- Robert Martin: 137 yds, 1 TD | Pass 137 (10/17) | Rush 0 | Rec 0
+- James Brown: 113 yds, 0 TD | Pass 0 (0/0) | Rush 63 | Rec 50
+- Andrew Brown: 48 yds, 0 TD | Pass 0 (0/0) | Rush 48 | Rec 0
+- Donald Rodriguez: 34 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 34
+- James Taylor: 25 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 25
+- Joshua Johnson: 19 yds, 1 TD | Pass 0 (0/0) | Rush 0 | Rec 19
+- Kenneth Lee: 13 yds, 1 TD | Pass 0 (0/0) | Rush 13 | Rec 0
+- Steven Davis: 9 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 9
+- Jackson Anderson: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- John Martin: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Christopher Jones: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- David Smith: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Steven Moore: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Mason Taylor: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Robert Moore: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Joshua Jones: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Paul White: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Steven Thompson: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- James Thompson: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Christopher Jackson: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0

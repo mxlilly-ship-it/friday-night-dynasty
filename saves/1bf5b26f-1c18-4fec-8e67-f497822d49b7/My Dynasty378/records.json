@@ -1,0 +1,112 @@
+{
+  "team": {
+    "most_championships": {
+      "value": 2,
+      "holder": "Huntington",
+      "holder_team": "Huntington",
+      "season": 2,
+      "detail": "all-time"
+    },
+    "most_wins_season": {
+      "value": 13,
+      "holder": "Huntington",
+      "holder_team": "Huntington",
+      "season": 1
+    },
+    "most_points_season": {
+      "value": 584,
+      "holder": "Martinsburg",
+      "holder_team": "Martinsburg",
+      "season": 1
+    }
+  },
+  "rushing": {
+    "single_season_yards": {
+      "value": 253,
+      "holder": "Ethan Anderson",
+      "holder_team": "Martinsburg",
+      "season": 1
+    },
+    "career_yards": {
+      "value": 257,
+      "holder": "David Anderson",
+      "holder_team": "Huntington",
+      "season": 2,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 5,
+      "holder": "Ethan Anderson",
+      "holder_team": "Martinsburg",
+      "season": 1
+    }
+  },
+  "passing": {
+    "single_season_yards": {
+      "value": 461,
+      "holder": "Andrew Thomas",
+      "holder_team": "Martinsburg",
+      "season": 1
+    },
+    "career_yards": {
+      "value": 630,
+      "holder": "Brian White",
+      "holder_team": "Cabell Midland",
+      "season": 2,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 4,
+      "holder": "Andrew Thomas",
+      "holder_team": "Martinsburg",
+      "season": 1
+    }
+  },
+  "receiving": {
+    "single_season_yards": {
+      "value": 168,
+      "holder": "William Jackson",
+      "holder_team": "Martinsburg",
+      "season": 1
+    },
+    "career_yards": {
+      "value": 200,
+      "holder": "James Davis",
+      "holder_team": "Cabell Midland",
+      "season": 2,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 3,
+      "holder": "Jacob Brown",
+      "holder_team": "Jefferson",
+      "season": 2
+    }
+  },
+  "defense": {
+    "single_season_sacks": {
+      "value": 2,
+      "holder": "Michael Martin",
+      "holder_team": "Cabell Midland",
+      "season": 1
+    },
+    "career_sacks": {
+      "value": 2,
+      "holder": "Michael Martin",
+      "holder_team": "Cabell Midland",
+      "season": 1,
+      "detail": "career"
+    },
+    "single_season_interceptions": {
+      "value": 1,
+      "holder": "Timothy Martin",
+      "holder_team": "Martinsburg",
+      "season": 1
+    }
+  },
+  "game": {
+    "most_passing_yards": null,
+    "most_rushing_yards": null,
+    "most_points": null
+  }
+}

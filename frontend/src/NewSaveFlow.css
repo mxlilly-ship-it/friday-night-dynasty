@@ -1,0 +1,249 @@
+.newsave-root {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.newsave-steps {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+  justify-content: center;
+}
+
+.newsave-steps span {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #7a7f8a;
+}
+
+.newsave-steps span.active {
+  border-color: rgba(200, 210, 220, 0.45);
+  color: #d8dce4;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.newsave-steps span.done {
+  color: #8b9dc9;
+  border-color: rgba(100, 130, 180, 0.35);
+}
+
+.newsave-h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #c8ccd4;
+}
+
+.newsave-sub {
+  margin: 0 0 1.25rem;
+  font-size: 0.875rem;
+  color: #8b9099;
+  line-height: 1.45;
+}
+
+.newsave-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.7rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.35);
+  color: #e8eaef;
+  font-size: 1rem;
+  margin-bottom: 1rem;
+}
+
+.newsave-presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.newsave-preset-card {
+  text-align: left;
+  padding: 1rem;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  color: inherit;
+  font-family: inherit;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.newsave-preset-card:hover {
+  border-color: rgba(200, 210, 220, 0.25);
+}
+
+.newsave-preset-card.selected {
+  border-color: rgba(130, 170, 220, 0.55);
+  background: rgba(60, 90, 140, 0.15);
+}
+
+.newsave-preset-card strong {
+  display: block;
+  font-size: 0.95rem;
+  color: #e4e8f0;
+  margin-bottom: 0.35rem;
+}
+
+.newsave-preset-card small {
+  font-size: 0.78rem;
+  color: #8b919a;
+  line-height: 1.35;
+}
+
+.newsave-row2 {
+  display: grid;
+  grid-template-columns: 1fr 100px;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.newsave-slider-block {
+  margin-bottom: 1.1rem;
+}
+
+.newsave-slider-block label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.8rem;
+  color: #a8aeb8;
+  margin-bottom: 0.35rem;
+}
+
+.newsave-slider-block label span:last-child {
+  font-weight: 700;
+  color: #c8d0e0;
+  font-variant-numeric: tabular-nums;
+}
+
+.newsave-slider-block input[type='range'] {
+  width: 100%;
+  accent-color: #8fa8d0;
+}
+
+.newsave-select {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.35);
+  color: #e8eaef;
+  font-size: 0.9rem;
+  margin-bottom: 0.75rem;
+}
+
+.newsave-team-search {
+  margin-bottom: 1rem;
+}
+
+.newsave-retry {
+  background: none;
+  border: none;
+  color: #60a5fa;
+  cursor: pointer;
+  font-size: inherit;
+  text-decoration: underline;
+  padding: 0 0.25rem;
+}
+
+.newsave-retry:hover {
+  color: #93c5fd;
+}
+
+.newsave-schema {
+  font-size: 0.68rem;
+  color: #6a7080;
+  line-height: 1.4;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  max-height: 4.5rem;
+  overflow: auto;
+}
+
+.newsave-team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.65rem;
+  max-height: min(52vh, 420px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.newsave-team-card {
+  text-align: left;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+}
+
+.newsave-team-card:hover {
+  border-color: rgba(200, 210, 220, 0.2);
+}
+
+.newsave-team-card.selected {
+  border-color: rgba(120, 170, 230, 0.6);
+  background: rgba(50, 80, 130, 0.2);
+}
+
+.newsave-team-card .tn {
+  font-weight: 800;
+  font-size: 1rem;
+  color: #e8ecf4;
+  margin-bottom: 0.4rem;
+}
+
+.newsave-team-card .tm {
+  font-size: 0.72rem;
+  color: #8b929c;
+  line-height: 1.5;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.newsave-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.newsave-nav .fnd-title-btn {
+  max-width: none;
+  width: auto;
+  min-width: 140px;
+}
+
+.newsave-summary {
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: 12px;
+  padding: 1rem 1.15rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.88rem;
+  color: #b8c0cc;
+  line-height: 1.65;
+}
+
+.newsave-summary strong {
+  color: #e4e8f0;
+}

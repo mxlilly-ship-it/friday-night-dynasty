@@ -1,0 +1,5 @@
+Name: Inside Zone
+Formation: Dual
+Category: Inside Run
+
+Ball carrier: RB

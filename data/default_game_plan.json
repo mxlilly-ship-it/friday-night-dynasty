@@ -1,0 +1,296 @@
+{
+  "Base D&D": {
+    "Backed-Up": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "Middle Field": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "High Redzone": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "Low Redzone": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "Goal Line": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    }
+  },
+  "3rd & Long": {
+    "Backed-Up": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "Middle Field": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "High Redzone": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "Low Redzone": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "Goal Line": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    }
+  },
+  "3rd & Medium": {
+    "Backed-Up": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "Middle Field": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "High Redzone": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "Low Redzone": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "Goal Line": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    }
+  },
+  "3rd & Short": {
+    "Backed-Up": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "Middle Field": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "High Redzone": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "Low Redzone": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "Goal Line": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    }
+  },
+  "High Redzone": {
+    "Backed-Up": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "Middle Field": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "High Redzone": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "Low Redzone": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "Goal Line": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    }
+  },
+  "Low Redzone": {
+    "Backed-Up": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "Middle Field": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "High Redzone": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "Low Redzone": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "Goal Line": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    }
+  },
+  "Goal Line": {
+    "Backed-Up": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "Middle Field": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "High Redzone": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "Low Redzone": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    },
+    "Goal Line": {
+      "Inside Run": 17,
+      "Outside Run": 17,
+      "Quick Game": 17,
+      "Medium Passing": 17,
+      "Deep Passing": 16,
+      "Play Action Pass": 16
+    }
+  }
+}

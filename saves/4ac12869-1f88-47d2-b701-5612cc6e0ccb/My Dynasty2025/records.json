@@ -1,0 +1,112 @@
+{
+  "team": {
+    "most_championships": {
+      "value": 1,
+      "holder": "Bluefield",
+      "holder_team": "Bluefield",
+      "season": 1,
+      "detail": "all-time"
+    },
+    "most_wins_season": {
+      "value": 13,
+      "holder": "Bridgeport",
+      "holder_team": "Bridgeport",
+      "season": 1
+    },
+    "most_points_season": {
+      "value": 509,
+      "holder": "Bridgeport",
+      "holder_team": "Bridgeport",
+      "season": 1
+    }
+  },
+  "rushing": {
+    "single_season_yards": {
+      "value": 193,
+      "holder": "William Taylor",
+      "holder_team": "Bridgeport",
+      "season": 1
+    },
+    "career_yards": {
+      "value": 305,
+      "holder": "William Taylor",
+      "holder_team": "Bridgeport",
+      "season": 1,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 3,
+      "holder": "Kevin Martin",
+      "holder_team": "Morgantown",
+      "season": 1
+    }
+  },
+  "passing": {
+    "single_season_yards": {
+      "value": 290,
+      "holder": "Donald Rodriguez",
+      "holder_team": "Cabell Midland",
+      "season": 1
+    },
+    "career_yards": {
+      "value": 567,
+      "holder": "Donald Rodriguez",
+      "holder_team": "Cabell Midland",
+      "season": 1,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 3,
+      "holder": "Andrew Miller",
+      "holder_team": "Cabell Midland",
+      "season": 1
+    }
+  },
+  "receiving": {
+    "single_season_yards": {
+      "value": 157,
+      "holder": "Matthew Brown",
+      "holder_team": "Fairmont Senior",
+      "season": 1
+    },
+    "career_yards": {
+      "value": 232,
+      "holder": "Matthew Brown",
+      "holder_team": "Fairmont Senior",
+      "season": 1,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 3,
+      "holder": "Kenneth Davis",
+      "holder_team": "Herbert Hoover",
+      "season": 1
+    }
+  },
+  "defense": {
+    "single_season_sacks": {
+      "value": 1,
+      "holder": "Tyler Wilson",
+      "holder_team": "Bridgeport",
+      "season": 1
+    },
+    "career_sacks": {
+      "value": 2,
+      "holder": "Kevin Moore",
+      "holder_team": "Bluefield",
+      "season": 1,
+      "detail": "career"
+    },
+    "single_season_interceptions": {
+      "value": 2,
+      "holder": "Kevin Anderson",
+      "holder_team": "Williamstown",
+      "season": 1
+    }
+  },
+  "game": {
+    "most_passing_yards": null,
+    "most_rushing_yards": null,
+    "most_points": null
+  }
+}

@@ -1,0 +1,3 @@
+Name: Boot
+Formation: Dual
+Category: Play Action

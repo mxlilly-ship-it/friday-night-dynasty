@@ -1,0 +1,2434 @@
+FRIDAY NIGHT DYNASTY - 10 SEASON TEST
+Playbooks enabled (coach tendencies affect play calling)
+============================================================
+
+============================================================
+SEASON 1
+============================================================
+
+COACHES & PLAY CALLING TENDENCIES
+--------------------------------------------------
+  Independence Patriots: Todd Reed - Play Call Tendency: Heavy Pass
+  MT View Knights: Adam Scott - Play Call Tendency: Heavy Run
+  Bluefield Beavers: Jeff Stewart - Play Call Tendency: Heavy Run
+  Shady Spring Tigers: Adam Martin - Play Call Tendency: Balanced
+
+GAME RESULTS & STATS (no play-by-play)
+--------------------------------------------------
+  Independence Patriots 21 - MT View Knights 10
+    Independence Patriots: 55 rush / 189 pass | 37 plays | Run calls: 10 | Pass calls: 27
+    MT View Knights: 92 rush / 134 pass | 44 plays | Run calls: 29 | Pass calls: 15
+  Independence Patriots 0 - Bluefield Beavers 3
+    Independence Patriots: 22 rush / 98 pass | 27 plays | Run calls: 4 | Pass calls: 23
+    Bluefield Beavers: 151 rush / 93 pass | 54 plays | Run calls: 39 | Pass calls: 15
+  Independence Patriots 17 - Shady Spring Tigers 10
+    Independence Patriots: 49 rush / 203 pass | 37 plays | Run calls: 10 | Pass calls: 27
+    Shady Spring Tigers: 57 rush / 208 pass | 43 plays | Run calls: 14 | Pass calls: 29
+  MT View Knights 14 - Bluefield Beavers 10
+    MT View Knights: 144 rush / 60 pass | 42 plays | Run calls: 32 | Pass calls: 10
+    Bluefield Beavers: 128 rush / 10 pass | 30 plays | Run calls: 25 | Pass calls: 5
+  MT View Knights 3 - Shady Spring Tigers 14
+    MT View Knights: 88 rush / 99 pass | 45 plays | Run calls: 24 | Pass calls: 21
+    Shady Spring Tigers: 90 rush / 150 pass | 38 plays | Run calls: 18 | Pass calls: 20
+  Bluefield Beavers 19 - Shady Spring Tigers 17 (OT)
+    Bluefield Beavers: 202 rush / 81 pass | 57 plays | Run calls: 40 | Pass calls: 17
+    Shady Spring Tigers: 104 rush / 119 pass | 42 plays | Run calls: 20 | Pass calls: 22
+  Playoff: Independence Patriots 0 - MT View Knights 3 -> MT View Knights
+  Playoff: Bluefield Beavers 10 - Shady Spring Tigers 3 -> Bluefield Beavers
+  Playoff: Bluefield Beavers 17 - MT View Knights 3 -> Bluefield Beavers
+
+FINAL STANDINGS
+--------------------------------------------------
+  Bluefield Beavers: 4-1 (PF 59 PA 37 PD +22)
+  Independence Patriots: 2-2 (PF 38 PA 26 PD +12)
+  MT View Knights: 2-3 (PF 33 PA 62 PD -29)
+  Shady Spring Tigers: 1-3 (PF 44 PA 49 PD -5)
+
+SEASON LEADERBOARD
+--------------------------------------------------
+  Top Passer: Timothy Lee (Independence Patriots) - 546 yds, 60/88, 4 TD, 2 INT
+  Top Rusher: Noah Wilson (Bluefield Beavers) - 305 yds, 1 TD
+  Top Receiver: Ethan Lee (Shady Spring Tigers) - 15 rec, 175 yds, 2 TD
+  Top Sacks: James Wilson (Shady Spring Tigers) - 3 sacks
+  Top Tackles: Kevin Lee (MT View Knights) - 38 tackles
+
+PLAYER STATS BY TEAM
+--------------------------------------------------
+============================================================
+  LEAGUE LEADERS (Season)
+============================================================
+
+Passing Yards
+----------------------------------------
+  1. Timothy Lee (Independence Patriots): 546 yds  (60/88, 4 TD, 2 INT)
+  2. Noah Davis (Shady Spring Tigers): 501 yds  (52/88, 3 TD, 3 INT)
+  3. David Johnson (Bluefield Beavers): 400 yds  (62/85, 0 TD, 3 INT)
+  4. George Garcia (MT View Knights): 350 yds  (47/72, 0 TD, 4 INT)
+
+Passing Touchdowns
+----------------------------------------
+  1. Timothy Lee (Independence Patriots): 4 TD
+  2. Noah Davis (Shady Spring Tigers): 3 TD
+  3. David Johnson (Bluefield Beavers): 0 TD
+  4. George Garcia (MT View Knights): 0 TD
+
+Rushing Yards
+----------------------------------------
+  1. Noah Wilson (Bluefield Beavers): 305 yds, 1 TD
+  2. Brian Rodriguez (Bluefield Beavers): 279 yds, 2 TD
+  3. Christopher Garcia (Bluefield Beavers): 235 yds, 3 TD
+  4. Ethan Martin (MT View Knights): 150 yds, 0 TD
+  5. Steven Johnson (MT View Knights): 136 yds, 1 TD
+  6. Ethan Jackson (MT View Knights): 124 yds, 2 TD
+  7. Jackson Davis (Shady Spring Tigers): 116 yds, 1 TD
+  8. James Jones (Shady Spring Tigers): 106 yds, 1 TD
+  9. Mark Taylor (Independence Patriots): 96 yds, 0 TD
+  10. Jackson Brown (Independence Patriots): 86 yds, 0 TD
+
+Receiving Yards
+----------------------------------------
+  1. Ethan Lee (Shady Spring Tigers): 15 rec, 175 yds, 2 TD
+  2. Tyler Johnson (Independence Patriots): 18 rec, 135 yds, 1 TD
+  3. Kevin Thomas (Independence Patriots): 12 rec, 125 yds, 2 TD
+  4. Tyler Davis (Bluefield Beavers): 19 rec, 118 yds, 0 TD
+  5. Timothy Thompson (Independence Patriots): 13 rec, 116 yds, 1 TD
+  6. Christopher Thompson (Shady Spring Tigers): 13 rec, 116 yds, 0 TD
+  7. Joshua Taylor (Bluefield Beavers): 18 rec, 110 yds, 0 TD
+  8. James Davis (MT View Knights): 9 rec, 83 yds, 0 TD
+  9. Mark Taylor (Independence Patriots): 5 rec, 82 yds, 0 TD
+  10. Tyler Johnson (Shady Spring Tigers): 9 rec, 80 yds, 0 TD
+
+Tackles
+----------------------------------------
+  1. Kevin Lee (MT View Knights): 38 tkl
+  2. Robert Garcia (Shady Spring Tigers): 37 tkl
+  3. Anthony Lee (Independence Patriots): 34 tkl
+  4. Ethan Johnson (MT View Knights): 31 tkl
+  5. Donald Martin (Bluefield Beavers): 30 tkl
+  6. Brian Jones (MT View Knights): 29 tkl
+  7. Matthew Martin (Shady Spring Tigers): 28 tkl
+  8. Steven Miller (Shady Spring Tigers): 26 tkl
+  9. Michael Moore (Bluefield Beavers): 24 tkl
+  10. Ethan Johnson (Independence Patriots): 23 tkl
+
+Sacks
+----------------------------------------
+  1. James Wilson (Shady Spring Tigers): 3 sk
+  2. Paul Thomas (Shady Spring Tigers): 3 sk
+  3. Noah Martin (Bluefield Beavers): 2 sk
+  4. Anthony Martinez (Bluefield Beavers): 2 sk
+  5. Robert Garcia (Shady Spring Tigers): 2 sk
+  6. Anthony Lee (Independence Patriots): 1 sk
+  7. Ethan Johnson (Independence Patriots): 1 sk
+  8. Andrew Garcia (MT View Knights): 1 sk
+  9. Kevin Lee (MT View Knights): 1 sk
+  10. Donald Martin (Bluefield Beavers): 1 sk
+
+Interceptions
+----------------------------------------
+  1. Noah Wilson (Bluefield Beavers): 3 INT
+  2. James Jones (Shady Spring Tigers): 2 INT
+  3. Steven Smith (Independence Patriots): 1 INT
+  4. Steven Johnson (MT View Knights): 1 INT
+  5. Christopher Martinez (MT View Knights): 1 INT
+  6. Daniel Taylor (MT View Knights): 1 INT
+  7. Michael Moore (Bluefield Beavers): 1 INT
+  8. Steven Miller (Shady Spring Tigers): 1 INT
+  9. Ethan Lee (Shady Spring Tigers): 1 INT
+
+============================================================
+  INDIVIDUAL PLAYER STATS BY TEAM
+============================================================
+
+Independence Patriots
+----------------------------------------
+  QB:
+    Timothy Lee: 60/88 (68.2%) 546 yds, 4 TD, 2 INT
+  RB:
+    Mark Taylor: 96 rush yds, 0 TD
+    Jackson Brown: 86 rush yds, 0 TD
+    Daniel White: 83 rush yds, 1 TD
+  WR/TE:
+    Mark Taylor: 5 rec, 82 yds, 0 TD
+    Tyler Johnson: 18 rec, 135 yds, 1 TD
+    Kevin Thomas: 12 rec, 125 yds, 2 TD
+    Timothy Thompson: 13 rec, 116 yds, 1 TD
+    Jackson Brown: 4 rec, 29 yds, 0 TD
+    Paul Wilson: 8 rec, 59 yds, 0 TD
+  Defense:
+    Mark Taylor: 17 tkl
+    Anthony Lee: 34 tkl 1 sk 1 TFL
+    Ethan Johnson: 23 tkl 1 sk 1 TFL
+    Lucas Williams: 22 tkl
+    Michael Miller: 22 tkl
+    Ethan Johnson: 15 tkl
+    Jacob Garcia: 12 tkl
+    Steven Smith: 8 tkl 1 INT
+    Timothy Anderson: 5 tkl
+
+MT View Knights
+----------------------------------------
+  QB:
+    George Garcia: 47/72 (65.3%) 350 yds, 0 TD, 4 INT
+  RB:
+    Ethan Martin: 150 rush yds, 0 TD
+    Steven Johnson: 136 rush yds, 1 TD
+    Ethan Jackson: 124 rush yds, 2 TD
+  WR/TE:
+    Ethan Martin: 5 rec, 66 yds, 0 TD
+    Ethan Jackson: 3 rec, 12 yds, 0 TD
+    James Davis: 9 rec, 83 yds, 0 TD
+    Michael Martinez: 12 rec, 74 yds, 0 TD
+    Anthony White: 8 rec, 65 yds, 0 TD
+    William Brown: 10 rec, 50 yds, 0 TD
+  Defense:
+    Steven Johnson: 3 tkl 1 INT
+    Kevin Lee: 38 tkl 1 sk 1 TFL
+    Ethan Johnson: 31 tkl
+    Brian Jones: 29 tkl
+    Brian Miller: 21 tkl
+    Christopher Martinez: 18 tkl 1 INT
+    Andrew Garcia: 16 tkl 1 sk 1 TFL
+    Daniel Taylor: 13 tkl 1 INT
+    Timothy Smith: 9 tkl
+
+Bluefield Beavers
+----------------------------------------
+  QB:
+    David Johnson: 62/85 (72.9%) 400 yds, 0 TD, 3 INT
+  RB:
+    Brian Rodriguez: 279 rush yds, 2 TD
+    Noah Wilson: 305 rush yds, 1 TD
+    Christopher Garcia: 235 rush yds, 3 TD
+  WR/TE:
+    Brian Rodriguez: 7 rec, 44 yds, 0 TD
+    Christopher Garcia: 3 rec, 22 yds, 0 TD
+    Tyler Davis: 19 rec, 118 yds, 0 TD
+    Joshua Taylor: 18 rec, 110 yds, 0 TD
+    Logan Martin: 7 rec, 62 yds, 0 TD
+    Anthony Rodriguez: 8 rec, 44 yds, 0 TD
+  Defense:
+    Noah Wilson: 9 tkl 3 INT
+    Donald Martin: 30 tkl 1 sk 1 TFL
+    Michael Moore: 24 tkl 1 INT
+    Michael Martin: 15 tkl
+    Kenneth Martin: 13 tkl
+    Noah Martin: 11 tkl 2 sk 2 TFL
+    Mark Taylor: 9 tkl
+    Anthony Martinez: 7 tkl 2 sk 2 TFL
+    Anthony Rodriguez: 2 tkl
+
+Shady Spring Tigers
+----------------------------------------
+  QB:
+    Noah Davis: 52/88 (59.1%) 501 yds, 3 TD, 3 INT
+  RB:
+    Jackson Davis: 116 rush yds, 1 TD
+    James Jones: 106 rush yds, 1 TD
+    Steven Miller: 82 rush yds, 0 TD
+  WR/TE:
+    Ethan Lee: 15 rec, 175 yds, 2 TD
+    Jackson Davis: 2 rec, 30 yds, 1 TD
+    James Jones: 3 rec, 29 yds, 0 TD
+    Christopher Thompson: 13 rec, 116 yds, 0 TD
+    Tyler Johnson: 9 rec, 80 yds, 0 TD
+    Brian Jones: 10 rec, 71 yds, 0 TD
+  Defense:
+    Ethan Lee: 4 tkl 1 INT
+    Jackson Davis: 18 tkl
+    James Jones: 20 tkl 2 INT
+    Steven Miller: 26 tkl 1 INT
+    Robert Garcia: 37 tkl 2 sk 2 TFL
+    Matthew Martin: 28 tkl
+    Paul Thomas: 13 tkl 3 sk 3 TFL
+    Steven Rodriguez: 11 tkl 1 sk 1 TFL
+    James Wilson: 9 tkl 3 sk 3 TFL
+
+CHAMPION: Bluefield Beavers
+
+
+============================================================
+SEASON 2
+============================================================
+
+COACHES & PLAY CALLING TENDENCIES
+--------------------------------------------------
+  Independence Patriots: Todd Reed - Play Call Tendency: Heavy Pass
+  MT View Knights: Adam Scott - Play Call Tendency: Heavy Run
+  Bluefield Beavers: Jeff Stewart - Play Call Tendency: Heavy Run
+  Shady Spring Tigers: Adam Martin - Play Call Tendency: Balanced
+
+GAME RESULTS & STATS (no play-by-play)
+--------------------------------------------------
+  Independence Patriots 7 - MT View Knights 10
+    Independence Patriots: 36 rush / 195 pass | 37 plays | Run calls: 7 | Pass calls: 30
+    MT View Knights: 113 rush / 107 pass | 46 plays | Run calls: 27 | Pass calls: 19
+  Independence Patriots 0 - Bluefield Beavers 14
+    Independence Patriots: 25 rush / 114 pass | 36 plays | Run calls: 5 | Pass calls: 31
+    Bluefield Beavers: 207 rush / 62 pass | 46 plays | Run calls: 40 | Pass calls: 6
+  Independence Patriots 21 - Shady Spring Tigers 17
+    Independence Patriots: 57 rush / 367 pass | 54 plays | Run calls: 10 | Pass calls: 44
+    Shady Spring Tigers: 105 rush / 127 pass | 30 plays | Run calls: 13 | Pass calls: 17
+  MT View Knights 6 - Bluefield Beavers 14
+    MT View Knights: 68 rush / 58 pass | 28 plays | Run calls: 16 | Pass calls: 12
+    Bluefield Beavers: 192 rush / 85 pass | 51 plays | Run calls: 37 | Pass calls: 14
+  MT View Knights 7 - Shady Spring Tigers 17
+    MT View Knights: 112 rush / 67 pass | 36 plays | Run calls: 27 | Pass calls: 9
+    Shady Spring Tigers: 107 rush / 102 pass | 37 plays | Run calls: 19 | Pass calls: 18
+  Bluefield Beavers 21 - Shady Spring Tigers 10
+    Bluefield Beavers: 173 rush / 134 pass | 49 plays | Run calls: 33 | Pass calls: 16
+    Shady Spring Tigers: 67 rush / 94 pass | 35 plays | Run calls: 13 | Pass calls: 22
+  Playoff: Bluefield Beavers 21 - MT View Knights 7 -> Bluefield Beavers
+  Playoff: Shady Spring Tigers 22 - Independence Patriots 20 -> Shady Spring Tigers
+  Playoff: Bluefield Beavers 6 - Shady Spring Tigers 10 -> Shady Spring Tigers
+
+FINAL STANDINGS
+--------------------------------------------------
+  Bluefield Beavers: 4-1 (PF 76 PA 33 PD +43)
+  Shady Spring Tigers: 3-2 (PF 76 PA 75 PD +1)
+  Independence Patriots: 1-3 (PF 48 PA 63 PD -15)
+  MT View Knights: 1-3 (PF 30 PA 59 PD -29)
+
+SEASON LEADERBOARD
+--------------------------------------------------
+  Top Passer: John Williams (Independence Patriots) - 874 yds, 97/142, 7 TD, 4 INT
+  Top Rusher: Brian Rodriguez (Bluefield Beavers) - 265 yds, 3 TD
+  Top Receiver: Tyler Johnson (Independence Patriots) - 26 rec, 260 yds, 3 TD
+  Top Sacks: Daniel Martin (Bluefield Beavers) - 3 sacks
+  Top Tackles: Tyler Martin (Shady Spring Tigers) - 45 tackles
+
+PLAYER STATS BY TEAM
+--------------------------------------------------
+============================================================
+  LEAGUE LEADERS (Season)
+============================================================
+
+Passing Yards
+----------------------------------------
+  1. John Williams (Independence Patriots): 874 yds  (97/142, 7 TD, 4 INT)
+  2. Robert Taylor (Shady Spring Tigers): 638 yds  (76/114, 3 TD, 1 INT)
+  3. Michael Moore (Bluefield Beavers): 498 yds  (53/77, 4 TD, 1 INT)
+  4. Brian Wilson (MT View Knights): 343 yds  (43/61, 1 TD, 1 INT)
+
+Passing Touchdowns
+----------------------------------------
+  1. John Williams (Independence Patriots): 7 TD
+  2. Michael Moore (Bluefield Beavers): 4 TD
+  3. Robert Taylor (Shady Spring Tigers): 3 TD
+  4. Brian Wilson (MT View Knights): 1 TD
+
+Rushing Yards
+----------------------------------------
+  1. Brian Rodriguez (Bluefield Beavers): 265 yds, 3 TD
+  2. Tyler Johnson (Bluefield Beavers): 255 yds, 1 TD
+  3. James Jones (Shady Spring Tigers): 238 yds, 1 TD
+  4. Christopher Garcia (Bluefield Beavers): 199 yds, 2 TD
+  5. Mark Wilson (Shady Spring Tigers): 183 yds, 2 TD
+  6. Noah Anderson (MT View Knights): 154 yds, 1 TD
+  7. Jacob Garcia (Shady Spring Tigers): 126 yds, 3 TD
+  8. Ethan Jackson (MT View Knights): 117 yds, 0 TD
+  9. Mark Taylor (Independence Patriots): 86 yds, 0 TD
+  10. Matthew Taylor (Independence Patriots): 82 yds, 0 TD
+
+Receiving Yards
+----------------------------------------
+  1. Tyler Johnson (Independence Patriots): 26 rec, 260 yds, 3 TD
+  2. Noah Lee (Independence Patriots): 32 rec, 259 yds, 4 TD
+  3. Joshua Taylor (Bluefield Beavers): 14 rec, 173 yds, 1 TD
+  4. Timothy Moore (Shady Spring Tigers): 18 rec, 157 yds, 1 TD
+  5. John Davis (Independence Patriots): 15 rec, 157 yds, 0 TD
+  6. Kevin Thomas (Independence Patriots): 17 rec, 156 yds, 0 TD
+  7. William Anderson (Shady Spring Tigers): 22 rec, 150 yds, 1 TD
+  8. Tyler Martin (Shady Spring Tigers): 15 rec, 147 yds, 1 TD
+  9. Timothy Thompson (MT View Knights): 14 rec, 99 yds, 0 TD
+  10. Brian Jones (Shady Spring Tigers): 11 rec, 97 yds, 0 TD
+
+Tackles
+----------------------------------------
+  1. Tyler Martin (Shady Spring Tigers): 45 tkl
+  2. Tyler Martinez (Bluefield Beavers): 34 tkl
+  3. Logan Brown (MT View Knights): 33 tkl
+  4. Steven Miller (Shady Spring Tigers): 31 tkl
+  5. Joshua Taylor (Bluefield Beavers): 27 tkl
+  6. Paul Thomas (Shady Spring Tigers): 27 tkl
+  7. Daniel Taylor (MT View Knights): 26 tkl
+  8. Donald Martin (Bluefield Beavers): 26 tkl
+  9. Jackson Williams (Shady Spring Tigers): 26 tkl
+  10. Jacob Thomas (MT View Knights): 25 tkl
+
+Sacks
+----------------------------------------
+  1. Daniel Martin (Bluefield Beavers): 3 sk
+  2. Logan Brown (Bluefield Beavers): 3 sk
+  3. Michael Miller (Independence Patriots): 2 sk
+  4. Logan Brown (MT View Knights): 2 sk
+  5. Donald Martin (Bluefield Beavers): 2 sk
+  6. Tyler Martin (Shady Spring Tigers): 2 sk
+  7. Steven White (Independence Patriots): 1 sk
+  8. Anthony Lee (Independence Patriots): 1 sk
+  9. Ethan Johnson (Independence Patriots): 1 sk
+  10. Brian Miller (MT View Knights): 1 sk
+
+Interceptions
+----------------------------------------
+  1. Christopher Martinez (MT View Knights): 2 INT
+  2. Lucas Williams (Independence Patriots): 1 INT
+  3. George Garcia (Bluefield Beavers): 1 INT
+  4. Timothy Moore (Shady Spring Tigers): 1 INT
+  5. Jacob Garcia (Shady Spring Tigers): 1 INT
+  6. Jackson Williams (Shady Spring Tigers): 1 INT
+
+============================================================
+  INDIVIDUAL PLAYER STATS BY TEAM
+============================================================
+
+Independence Patriots
+----------------------------------------
+  QB:
+    John Williams: 97/142 (68.3%) 874 yds, 7 TD, 4 INT
+  RB:
+    Matthew Taylor: 82 rush yds, 0 TD
+    Jacob Smith: 76 rush yds, 0 TD
+    Mark Taylor: 86 rush yds, 0 TD
+  WR/TE:
+    Tyler Johnson: 26 rec, 260 yds, 3 TD
+    Noah Lee: 32 rec, 259 yds, 4 TD
+    John Davis: 15 rec, 157 yds, 0 TD
+    Kevin Thomas: 17 rec, 156 yds, 0 TD
+    Matthew Taylor: 4 rec, 19 yds, 0 TD
+    Jacob Smith: 3 rec, 23 yds, 0 TD
+  Defense:
+    Kevin Thomas: 22 tkl
+    Ethan Johnson: 24 tkl 1 sk 1 TFL
+    Anthony Lee: 23 tkl 1 sk 1 TFL
+    Lucas Williams: 19 tkl 1 INT
+    William Jackson: 19 tkl
+    Michael Miller: 14 tkl 2 sk 2 TFL
+    Steven Smith: 12 tkl
+    Timothy Anderson: 5 tkl
+    Steven White: 4 tkl 1 sk 1 TFL
+
+MT View Knights
+----------------------------------------
+  QB:
+    Brian Wilson: 43/61 (70.5%) 343 yds, 1 TD, 1 INT
+  RB:
+    Noah Anderson: 154 rush yds, 1 TD
+    Ethan Jackson: 117 rush yds, 0 TD
+    Daniel Taylor: 65 rush yds, 1 TD
+  WR/TE:
+    Noah Anderson: 2 rec, 14 yds, 0 TD
+    Ethan Jackson: 4 rec, 38 yds, 0 TD
+    Timothy Thompson: 14 rec, 99 yds, 0 TD
+    Michael Martinez: 9 rec, 76 yds, 0 TD
+    Daniel Jones: 8 rec, 71 yds, 1 TD
+    Anthony White: 6 rec, 45 yds, 0 TD
+  Defense:
+    Daniel Taylor: 26 tkl
+    Logan Brown: 33 tkl 2 sk 2 TFL
+    Jacob Thomas: 25 tkl
+    Andrew Garcia: 16 tkl 1 sk 1 TFL
+    Brian Miller: 15 tkl 1 sk 1 TFL
+    Paul Smith: 13 tkl
+    George Smith: 9 tkl
+    Christopher Martinez: 5 tkl 2 INT
+    Andrew Jones: 4 tkl
+
+Bluefield Beavers
+----------------------------------------
+  QB:
+    Michael Moore: 53/77 (68.8%) 498 yds, 4 TD, 1 INT
+  RB:
+    Brian Rodriguez: 265 rush yds, 3 TD
+    Tyler Johnson: 255 rush yds, 1 TD
+    Christopher Garcia: 199 rush yds, 2 TD
+  WR/TE:
+    Brian Rodriguez: 4 rec, 41 yds, 0 TD
+    Tyler Johnson: 1 rec, 23 yds, 0 TD
+    Joshua Taylor: 14 rec, 173 yds, 1 TD
+    Anthony Rodriguez: 14 rec, 94 yds, 0 TD
+    John Lee: 11 rec, 85 yds, 1 TD
+    Joshua Garcia: 9 rec, 82 yds, 2 TD
+  Defense:
+    Joshua Taylor: 27 tkl
+    Tyler Martinez: 34 tkl 1 sk 1 TFL
+    Donald Martin: 26 tkl 2 sk 2 TFL
+    Daniel Martin: 17 tkl 3 sk 3 TFL
+    Robert Thompson: 16 tkl
+    Andrew Thomas: 10 tkl
+    Ethan Johnson: 7 tkl 1 sk 1 TFL
+    George Garcia: 7 tkl 1 INT
+    Logan Brown: 6 tkl 3 sk 3 TFL
+
+Shady Spring Tigers
+----------------------------------------
+  QB:
+    Robert Taylor: 76/114 (66.7%) 638 yds, 3 TD, 1 INT
+  RB:
+    James Jones: 238 rush yds, 1 TD
+    Mark Wilson: 183 rush yds, 2 TD
+    Jacob Garcia: 126 rush yds, 3 TD
+  WR/TE:
+    James Jones: 5 rec, 61 yds, 0 TD
+    Timothy Moore: 18 rec, 157 yds, 1 TD
+    Jacob Garcia: 5 rec, 26 yds, 0 TD
+    William Anderson: 22 rec, 150 yds, 1 TD
+    Tyler Martin: 15 rec, 147 yds, 1 TD
+    Brian Jones: 11 rec, 97 yds, 0 TD
+  Defense:
+    Timothy Moore: 11 tkl 1 INT
+    Jacob Garcia: 10 tkl 1 INT
+    Tyler Martin: 45 tkl 2 sk 2 TFL
+    Steven Miller: 31 tkl
+    Paul Thomas: 27 tkl
+    Jackson Williams: 26 tkl 1 INT
+    John Miller: 16 tkl
+    James Wilson: 11 tkl 1 sk 1 TFL
+    Steven Rodriguez: 11 tkl 1 sk 1 TFL
+
+CHAMPION: Shady Spring Tigers
+
+
+============================================================
+SEASON 3
+============================================================
+
+COACHES & PLAY CALLING TENDENCIES
+--------------------------------------------------
+  Independence Patriots: Todd Reed - Play Call Tendency: Heavy Pass
+  MT View Knights: Adam Scott - Play Call Tendency: Heavy Run
+  Bluefield Beavers: Jeff Stewart - Play Call Tendency: Heavy Run
+  Shady Spring Tigers: Adam Martin - Play Call Tendency: Balanced
+
+GAME RESULTS & STATS (no play-by-play)
+--------------------------------------------------
+  Independence Patriots 10 - MT View Knights 7
+    Independence Patriots: 96 rush / 112 pass | 38 plays | Run calls: 11 | Pass calls: 27
+    MT View Knights: 130 rush / 85 pass | 45 plays | Run calls: 31 | Pass calls: 14
+  Independence Patriots 21 - Bluefield Beavers 7
+    Independence Patriots: 46 rush / 272 pass | 45 plays | Run calls: 8 | Pass calls: 37
+    Bluefield Beavers: 106 rush / 97 pass | 36 plays | Run calls: 21 | Pass calls: 15
+  Independence Patriots 27 - Shady Spring Tigers 29 (OT)
+    Independence Patriots: 59 rush / 231 pass | 55 plays | Run calls: 11 | Pass calls: 44
+    Shady Spring Tigers: 115 rush / 215 pass | 52 plays | Run calls: 21 | Pass calls: 31
+  MT View Knights 7 - Bluefield Beavers 14
+    MT View Knights: 113 rush / 75 pass | 36 plays | Run calls: 27 | Pass calls: 9
+    Bluefield Beavers: 138 rush / 116 pass | 38 plays | Run calls: 28 | Pass calls: 10
+  MT View Knights 7 - Shady Spring Tigers 14
+    MT View Knights: 139 rush / 104 pass | 52 plays | Run calls: 36 | Pass calls: 16
+    Shady Spring Tigers: 49 rush / 216 pass | 26 plays | Run calls: 5 | Pass calls: 21
+  Bluefield Beavers 7 - Shady Spring Tigers 10
+    Bluefield Beavers: 114 rush / 110 pass | 42 plays | Run calls: 27 | Pass calls: 15
+    Shady Spring Tigers: 68 rush / 77 pass | 40 plays | Run calls: 14 | Pass calls: 26
+  Playoff: Shady Spring Tigers 10 - MT View Knights 0 -> Shady Spring Tigers
+  Playoff: Independence Patriots 17 - Bluefield Beavers 7 -> Independence Patriots
+  Playoff: Shady Spring Tigers 13 - Independence Patriots 7 -> Shady Spring Tigers
+
+FINAL STANDINGS
+--------------------------------------------------
+  Shady Spring Tigers: 5-0 (PF 76 PA 48 PD +28)
+  Independence Patriots: 3-2 (PF 82 PA 63 PD +19)
+  Bluefield Beavers: 1-3 (PF 35 PA 55 PD -20)
+  MT View Knights: 0-4 (PF 21 PA 48 PD -27)
+
+SEASON LEADERBOARD
+--------------------------------------------------
+  Top Passer: John Williams (Independence Patriots) - 855 yds, 99/152, 7 TD, 2 INT
+  Top Rusher: Jacob Garcia (Shady Spring Tigers) - 178 yds, 1 TD
+  Top Receiver: William Anderson (Shady Spring Tigers) - 30 rec, 273 yds, 2 TD
+  Top Sacks: Timothy Taylor (Bluefield Beavers) - 4 sacks
+  Top Tackles: Jackson Williams (Shady Spring Tigers) - 37 tackles
+
+PLAYER STATS BY TEAM
+--------------------------------------------------
+============================================================
+  LEAGUE LEADERS (Season)
+============================================================
+
+Passing Yards
+----------------------------------------
+  1. John Williams (Independence Patriots): 855 yds  (99/152, 7 TD, 2 INT)
+  2. Robert Taylor (Shady Spring Tigers): 750 yds  (85/126, 7 TD, 2 INT)
+  3. Timothy Wilson (Bluefield Beavers): 451 yds  (42/59, 2 TD, 2 INT)
+  4. Brian Wilson (MT View Knights): 435 yds  (55/69, 2 TD, 1 INT)
+
+Passing Touchdowns
+----------------------------------------
+  1. John Williams (Independence Patriots): 7 TD
+  2. Robert Taylor (Shady Spring Tigers): 7 TD
+  3. Timothy Wilson (Bluefield Beavers): 2 TD
+  4. Brian Wilson (MT View Knights): 2 TD
+
+Rushing Yards
+----------------------------------------
+  1. Jacob Garcia (Shady Spring Tigers): 178 yds, 1 TD
+  2. Jackson Taylor (Bluefield Beavers): 175 yds, 2 TD
+  3. Ethan Jackson (MT View Knights): 173 yds, 0 TD
+  4. Matthew Taylor (Independence Patriots): 170 yds, 1 TD
+  5. Noah Anderson (MT View Knights): 145 yds, 1 TD
+  6. James Jones (Shady Spring Tigers): 142 yds, 0 TD
+  7. Brian Rodriguez (Bluefield Beavers): 131 yds, 0 TD
+  8. Andrew Taylor (Bluefield Beavers): 125 yds, 1 TD
+  9. Mark Wilson (Shady Spring Tigers): 125 yds, 1 TD
+  10. Jacob Smith (Independence Patriots): 119 yds, 2 TD
+
+Receiving Yards
+----------------------------------------
+  1. William Anderson (Shady Spring Tigers): 30 rec, 273 yds, 2 TD
+  2. Timothy Moore (Shady Spring Tigers): 26 rec, 241 yds, 3 TD
+  3. Noah Lee (Independence Patriots): 28 rec, 222 yds, 1 TD
+  4. Kenneth Rodriguez (Independence Patriots): 19 rec, 208 yds, 4 TD
+  5. Jackson Wilson (Independence Patriots): 23 rec, 192 yds, 0 TD
+  6. Joshua Garcia (Bluefield Beavers): 12 rec, 141 yds, 0 TD
+  7. David Jones (Bluefield Beavers): 12 rec, 129 yds, 0 TD
+  8. John Anderson (MT View Knights): 14 rec, 125 yds, 0 TD
+  9. John Lee (Bluefield Beavers): 10 rec, 110 yds, 1 TD
+  10. David Martin (MT View Knights): 15 rec, 108 yds, 1 TD
+
+Tackles
+----------------------------------------
+  1. Jackson Williams (Shady Spring Tigers): 37 tkl
+  2. Tyler Martin (Shady Spring Tigers): 37 tkl
+  3. Ethan Johnson (Independence Patriots): 36 tkl
+  4. Lucas Williams (Independence Patriots): 33 tkl
+  5. Timothy Wilson (Independence Patriots): 33 tkl
+  6. Tyler Martinez (Bluefield Beavers): 33 tkl
+  7. Jacob Thompson (MT View Knights): 28 tkl
+  8. George Thompson (Bluefield Beavers): 25 tkl
+  9. Paul Thomas (Shady Spring Tigers): 25 tkl
+  10. Christopher Lee (Independence Patriots): 24 tkl
+
+Sacks
+----------------------------------------
+  1. Timothy Taylor (Bluefield Beavers): 4 sk
+  2. Lucas Williams (MT View Knights): 3 sk
+  3. Timothy Wilson (Independence Patriots): 2 sk
+  4. John Miller (Shady Spring Tigers): 2 sk
+  5. William Jackson (Independence Patriots): 1 sk
+  6. Steven White (Independence Patriots): 1 sk
+  7. Ethan Johnson (Independence Patriots): 1 sk
+  8. Andrew Jones (MT View Knights): 1 sk
+  9. Daniel Martin (Bluefield Beavers): 1 sk
+  10. Tyler Martinez (Bluefield Beavers): 1 sk
+
+Interceptions
+----------------------------------------
+  1. Jackson Williams (Shady Spring Tigers): 2 INT
+  2. Lucas Williams (Independence Patriots): 1 INT
+  3. Jacob Smith (Independence Patriots): 1 INT
+  4. Christopher Lee (Independence Patriots): 1 INT
+  5. James Jones (Shady Spring Tigers): 1 INT
+  6. Timothy Moore (Shady Spring Tigers): 1 INT
+
+============================================================
+  INDIVIDUAL PLAYER STATS BY TEAM
+============================================================
+
+Independence Patriots
+----------------------------------------
+  QB:
+    John Williams: 99/152 (65.1%) 855 yds, 7 TD, 2 INT
+  RB:
+    Matthew Taylor: 170 rush yds, 1 TD
+    Jacob Smith: 119 rush yds, 2 TD
+    Mark Taylor: 110 rush yds, 1 TD
+  WR/TE:
+    Matthew Taylor: 8 rec, 77 yds, 0 TD
+    Noah Lee: 28 rec, 222 yds, 1 TD
+    Kenneth Rodriguez: 19 rec, 208 yds, 4 TD
+    Jackson Wilson: 23 rec, 192 yds, 0 TD
+    Jacob Smith: 8 rec, 66 yds, 0 TD
+    Jacob White: 13 rec, 90 yds, 2 TD
+  Defense:
+    Jackson Wilson: 17 tkl
+    Jacob Smith: 5 tkl 1 INT
+    Ethan Johnson: 36 tkl 1 sk 1 TFL
+    Lucas Williams: 33 tkl 1 INT
+    Timothy Wilson: 33 tkl 2 sk 2 TFL
+    Christopher Lee: 24 tkl 1 INT
+    William Jackson: 13 tkl 1 sk 1 TFL
+    Lucas Thomas: 12 tkl
+    Steven White: 10 tkl 1 sk 1 TFL
+
+MT View Knights
+----------------------------------------
+  QB:
+    Brian Wilson: 55/69 (79.7%) 435 yds, 2 TD, 1 INT
+  RB:
+    Ethan Jackson: 173 rush yds, 0 TD
+    Noah Anderson: 145 rush yds, 1 TD
+    Daniel Taylor: 112 rush yds, 0 TD
+  WR/TE:
+    Ethan Jackson: 5 rec, 45 yds, 0 TD
+    Noah Anderson: 6 rec, 56 yds, 0 TD
+    John Anderson: 14 rec, 125 yds, 0 TD
+    David Martin: 15 rec, 108 yds, 1 TD
+    Jacob Thompson: 11 rec, 78 yds, 1 TD
+    Jacob Jones: 4 rec, 23 yds, 0 TD
+  Defense:
+    John Anderson: 22 tkl
+    Jacob Thompson: 28 tkl
+    Jacob Jones: 6 tkl
+    Logan Brown: 21 tkl
+    Michael Moore: 12 tkl
+    Brian Miller: 11 tkl
+    Donald Anderson: 8 tkl
+    Lucas Williams: 6 tkl 3 sk 3 TFL
+    Andrew Jones: 4 tkl 1 sk 1 TFL
+
+Bluefield Beavers
+----------------------------------------
+  QB:
+    Timothy Wilson: 42/59 (71.2%) 451 yds, 2 TD, 2 INT
+  RB:
+    Jackson Taylor: 175 rush yds, 2 TD
+    Brian Rodriguez: 131 rush yds, 0 TD
+    Andrew Taylor: 125 rush yds, 1 TD
+  WR/TE:
+    Jackson Taylor: 2 rec, 9 yds, 1 TD
+    Brian Rodriguez: 2 rec, 31 yds, 0 TD
+    Joshua Garcia: 12 rec, 141 yds, 0 TD
+    David Jones: 12 rec, 129 yds, 0 TD
+    John Lee: 10 rec, 110 yds, 1 TD
+    Anthony Rodriguez: 4 rec, 31 yds, 0 TD
+  Defense:
+    Jackson Taylor: 7 tkl
+    Tyler Martinez: 33 tkl 1 sk 1 TFL
+    George Thompson: 25 tkl
+    Joshua Taylor: 21 tkl
+    Michael Moore: 15 tkl
+    Ethan Johnson: 13 tkl
+    Daniel Martin: 12 tkl 1 sk 1 TFL
+    Andrew Thomas: 11 tkl
+    Timothy Taylor: 3 tkl 4 sk 4 TFL
+
+Shady Spring Tigers
+----------------------------------------
+  QB:
+    Robert Taylor: 85/126 (67.5%) 750 yds, 7 TD, 2 INT
+  RB:
+    James Jones: 142 rush yds, 0 TD
+    Jacob Garcia: 178 rush yds, 1 TD
+    Mark Wilson: 125 rush yds, 1 TD
+  WR/TE:
+    William Anderson: 30 rec, 273 yds, 2 TD
+    Timothy Moore: 26 rec, 241 yds, 3 TD
+    James Jones: 4 rec, 55 yds, 0 TD
+    Jacob Garcia: 3 rec, 14 yds, 0 TD
+    Tyler Martin: 14 rec, 97 yds, 1 TD
+    Brian Jones: 8 rec, 70 yds, 1 TD
+  Defense:
+    Timothy Moore: 11 tkl 1 INT
+    James Jones: 17 tkl 1 INT
+    Tyler Martin: 37 tkl 1 sk 1 TFL
+    Brian Jones: 9 tkl
+    Jackson Williams: 37 tkl 2 INT
+    Paul Thomas: 25 tkl 1 sk 1 TFL
+    John Miller: 20 tkl 2 sk 2 TFL
+    Steven Rodriguez: 17 tkl
+    Noah Taylor: 11 tkl 1 sk 1 TFL
+
+CHAMPION: Shady Spring Tigers
+
+
+============================================================
+SEASON 4
+============================================================
+
+COACHES & PLAY CALLING TENDENCIES
+--------------------------------------------------
+  Independence Patriots: Todd Reed - Play Call Tendency: Heavy Pass
+  MT View Knights: Adam Scott - Play Call Tendency: Heavy Run
+  Bluefield Beavers: Jeff Stewart - Play Call Tendency: Heavy Run
+  Shady Spring Tigers: Adam Martin - Play Call Tendency: Balanced
+
+GAME RESULTS & STATS (no play-by-play)
+--------------------------------------------------
+  Independence Patriots 14 - MT View Knights 0
+    Independence Patriots: 49 rush / 272 pass | 45 plays | Run calls: 10 | Pass calls: 35
+    MT View Knights: 95 rush / 68 pass | 36 plays | Run calls: 24 | Pass calls: 12
+  Independence Patriots 3 - Bluefield Beavers 21
+    Independence Patriots: 14 rush / 147 pass | 33 plays | Run calls: 3 | Pass calls: 30
+    Bluefield Beavers: 182 rush / 75 pass | 47 plays | Run calls: 36 | Pass calls: 11
+  Independence Patriots 10 - Shady Spring Tigers 7
+    Independence Patriots: 52 rush / 209 pass | 45 plays | Run calls: 14 | Pass calls: 31
+    Shady Spring Tigers: 43 rush / 145 pass | 39 plays | Run calls: 8 | Pass calls: 31
+  MT View Knights 7 - Bluefield Beavers 28
+    MT View Knights: 133 rush / 76 pass | 48 plays | Run calls: 31 | Pass calls: 17
+    Bluefield Beavers: 163 rush / 83 pass | 35 plays | Run calls: 22 | Pass calls: 13
+  MT View Knights 9 - Shady Spring Tigers 21
+    MT View Knights: 136 rush / 78 pass | 51 plays | Run calls: 34 | Pass calls: 17
+    Shady Spring Tigers: 124 rush / 118 pass | 30 plays | Run calls: 14 | Pass calls: 16
+  Bluefield Beavers 14 - Shady Spring Tigers 7
+    Bluefield Beavers: 210 rush / 67 pass | 52 plays | Run calls: 39 | Pass calls: 13
+    Shady Spring Tigers: 76 rush / 59 pass | 25 plays | Run calls: 14 | Pass calls: 11
+  Playoff: Bluefield Beavers 28 - MT View Knights 7 -> Bluefield Beavers
+  Playoff: Independence Patriots 10 - Shady Spring Tigers 17 -> Shady Spring Tigers
+  Playoff: Bluefield Beavers 21 - Shady Spring Tigers 7 -> Bluefield Beavers
+
+FINAL STANDINGS
+--------------------------------------------------
+  Bluefield Beavers: 5-0 (PF 112 PA 31 PD +81)
+  Shady Spring Tigers: 2-3 (PF 59 PA 64 PD -5)
+  Independence Patriots: 2-2 (PF 37 PA 45 PD -8)
+  MT View Knights: 0-4 (PF 23 PA 91 PD -68)
+
+SEASON LEADERBOARD
+--------------------------------------------------
+  Top Passer: John Williams (Independence Patriots) - 834 yds, 94/133, 3 TD, 2 INT
+  Top Rusher: Jackson Taylor (Bluefield Beavers) - 373 yds, 6 TD
+  Top Receiver: Kenneth Rodriguez (Independence Patriots) - 23 rec, 217 yds, 1 TD
+  Top Sacks: James Thompson (Independence Patriots) - 4 sacks
+  Top Tackles: Tyler Martin (Shady Spring Tigers) - 46 tackles
+
+PLAYER STATS BY TEAM
+--------------------------------------------------
+============================================================
+  LEAGUE LEADERS (Season)
+============================================================
+
+Passing Yards
+----------------------------------------
+  1. John Williams (Independence Patriots): 834 yds  (94/133, 3 TD, 2 INT)
+  2. Robert Taylor (Shady Spring Tigers): 506 yds  (60/89, 3 TD, 0 INT)
+  3. Timothy Wilson (Bluefield Beavers): 500 yds  (59/85, 2 TD, 0 INT)
+  4. Timothy Brown (MT View Knights): 333 yds  (36/63, 1 TD, 3 INT)
+
+Passing Touchdowns
+----------------------------------------
+  1. John Williams (Independence Patriots): 3 TD
+  2. Robert Taylor (Shady Spring Tigers): 3 TD
+  3. Timothy Wilson (Bluefield Beavers): 2 TD
+  4. Timothy Brown (MT View Knights): 1 TD
+
+Rushing Yards
+----------------------------------------
+  1. Jackson Taylor (Bluefield Beavers): 373 yds, 6 TD
+  2. Brian Rodriguez (Bluefield Beavers): 280 yds, 3 TD
+  3. Brian Moore (Bluefield Beavers): 263 yds, 5 TD
+  4. James Jones (Shady Spring Tigers): 174 yds, 0 TD
+  5. Jacob Anderson (MT View Knights): 141 yds, 0 TD
+  6. Jacob Garcia (Shady Spring Tigers): 138 yds, 3 TD
+  7. Michael Moore (MT View Knights): 121 yds, 0 TD
+  8. James Martin (Shady Spring Tigers): 112 yds, 2 TD
+  9. Tyler Anderson (MT View Knights): 112 yds, 1 TD
+  10. Mark Martin (Independence Patriots): 82 yds, 0 TD
+
+Receiving Yards
+----------------------------------------
+  1. Kenneth Rodriguez (Independence Patriots): 23 rec, 217 yds, 1 TD
+  2. Noah Lee (Independence Patriots): 25 rec, 209 yds, 0 TD
+  3. Joshua Garcia (Bluefield Beavers): 23 rec, 192 yds, 1 TD
+  4. Matthew Moore (Independence Patriots): 18 rec, 154 yds, 2 TD
+  5. John Garcia (Shady Spring Tigers): 18 rec, 146 yds, 0 TD
+  6. Timothy Moore (Shady Spring Tigers): 15 rec, 138 yds, 1 TD
+  7. Noah Moore (Shady Spring Tigers): 14 rec, 128 yds, 1 TD
+  8. James Thompson (Independence Patriots): 14 rec, 126 yds, 0 TD
+  9. Jacob Jones (MT View Knights): 9 rec, 98 yds, 0 TD
+  10. Ethan Williams (Bluefield Beavers): 10 rec, 96 yds, 1 TD
+
+Tackles
+----------------------------------------
+  1. Tyler Martin (Shady Spring Tigers): 46 tkl
+  2. George Smith (Shady Spring Tigers): 45 tkl
+  3. Timothy Brown (MT View Knights): 32 tkl
+  4. John Anderson (MT View Knights): 31 tkl
+  5. Lucas Williams (Independence Patriots): 30 tkl
+  6. James Martin (Shady Spring Tigers): 29 tkl
+  7. Mark Martin (Independence Patriots): 28 tkl
+  8. Robert Thompson (Bluefield Beavers): 26 tkl
+  9. Lucas Thomas (Shady Spring Tigers): 26 tkl
+  10. Tyler Martinez (Bluefield Beavers): 25 tkl
+
+Sacks
+----------------------------------------
+  1. James Thompson (Independence Patriots): 4 sk
+  2. Logan Jones (Bluefield Beavers): 3 sk
+  3. David Martinez (Independence Patriots): 2 sk
+  4. Jacob Thompson (MT View Knights): 2 sk
+  5. Tyler Martinez (Bluefield Beavers): 2 sk
+  6. Timothy Taylor (Bluefield Beavers): 2 sk
+  7. Jackson Wilson (Independence Patriots): 1 sk
+  8. Kenneth Martin (Independence Patriots): 1 sk
+  9. Timothy Brown (MT View Knights): 1 sk
+  10. James Martin (Shady Spring Tigers): 1 sk
+
+Interceptions
+----------------------------------------
+  1. Lucas Thomas (Independence Patriots): 1 INT
+  2. Timothy Wilson (Bluefield Beavers): 1 INT
+  3. Jackson Taylor (Bluefield Beavers): 1 INT
+  4. Noah Moore (Shady Spring Tigers): 1 INT
+  5. George Smith (Shady Spring Tigers): 1 INT
+
+============================================================
+  INDIVIDUAL PLAYER STATS BY TEAM
+============================================================
+
+Independence Patriots
+----------------------------------------
+  QB:
+    John Williams: 94/133 (70.7%) 834 yds, 3 TD, 2 INT
+  RB:
+    Mark Martin: 82 rush yds, 0 TD
+    Jacob Smith: 62 rush yds, 1 TD
+    James White: 37 rush yds, 0 TD
+  WR/TE:
+    Kenneth Rodriguez: 23 rec, 217 yds, 1 TD
+    Noah Lee: 25 rec, 209 yds, 0 TD
+    Mark Martin: 9 rec, 89 yds, 0 TD
+    Matthew Moore: 18 rec, 154 yds, 2 TD
+    James Thompson: 14 rec, 126 yds, 0 TD
+    Jacob Smith: 5 rec, 39 yds, 0 TD
+  Defense:
+    Mark Martin: 28 tkl
+    James Thompson: 20 tkl 4 sk 4 TFL
+    Jacob Smith: 2 tkl
+    Lucas Williams: 30 tkl
+    David Martinez: 17 tkl 2 sk 2 TFL
+    Kenneth Martin: 13 tkl 1 sk 1 TFL
+    Christopher Lee: 12 tkl
+    Lucas Thomas: 9 tkl 1 INT
+    Jackson Wilson: 6 tkl 1 sk 1 TFL
+
+MT View Knights
+----------------------------------------
+  QB:
+    Timothy Brown: 36/63 (57.1%) 333 yds, 1 TD, 3 INT
+  RB:
+    Michael Moore: 121 rush yds, 0 TD
+    Jacob Anderson: 141 rush yds, 0 TD
+    Tyler Anderson: 112 rush yds, 1 TD
+  WR/TE:
+    Michael Moore: 5 rec, 36 yds, 0 TD
+    Tyler Anderson: 1 rec, 11 yds, 0 TD
+    Jacob Jones: 9 rec, 98 yds, 0 TD
+    Donald Anderson: 7 rec, 66 yds, 1 TD
+    John Anderson: 7 rec, 62 yds, 0 TD
+    Jacob Thompson: 7 rec, 60 yds, 0 TD
+  Defense:
+    Timothy Brown: 32 tkl 1 sk 1 TFL
+    Michael Moore: 18 tkl
+    Jacob Jones: 15 tkl
+    Donald Anderson: 7 tkl
+    John Anderson: 31 tkl
+    Jacob Thompson: 24 tkl 2 sk 2 TFL
+    Lucas Williams: 10 tkl
+    Paul Taylor: 6 tkl
+
+Bluefield Beavers
+----------------------------------------
+  QB:
+    Timothy Wilson: 59/85 (69.4%) 500 yds, 2 TD, 0 INT
+  RB:
+    Jackson Taylor: 373 rush yds, 6 TD
+    Brian Rodriguez: 280 rush yds, 3 TD
+    Brian Moore: 263 rush yds, 5 TD
+  WR/TE:
+    Jackson Taylor: 2 rec, 29 yds, 0 TD
+    Brian Rodriguez: 3 rec, 18 yds, 0 TD
+    Joshua Garcia: 23 rec, 192 yds, 1 TD
+    Ethan Williams: 10 rec, 96 yds, 1 TD
+    David Jones: 13 rec, 95 yds, 0 TD
+    John Lee: 8 rec, 70 yds, 0 TD
+  Defense:
+    Timothy Wilson: 13 tkl 1 INT
+    Jackson Taylor: 11 tkl 1 INT
+    Brian Moore: 11 tkl
+    Robert Thompson: 26 tkl
+    Tyler Martinez: 25 tkl 2 sk 2 TFL
+    Ethan Johnson: 11 tkl
+    Andrew Thomas: 10 tkl
+    Logan Jones: 10 tkl 3 sk 3 TFL
+    Timothy Taylor: 5 tkl 2 sk 2 TFL
+
+Shady Spring Tigers
+----------------------------------------
+  QB:
+    Robert Taylor: 60/89 (67.4%) 506 yds, 3 TD, 0 INT
+  RB:
+    James Jones: 174 rush yds, 0 TD
+    Jacob Garcia: 138 rush yds, 3 TD
+    James Martin: 112 rush yds, 2 TD
+  WR/TE:
+    Jacob Garcia: 3 rec, 16 yds, 0 TD
+    John Garcia: 18 rec, 146 yds, 0 TD
+    Timothy Moore: 15 rec, 138 yds, 1 TD
+    Noah Moore: 14 rec, 128 yds, 1 TD
+    James Martin: 3 rec, 15 yds, 1 TD
+    Tyler Martin: 7 rec, 63 yds, 0 TD
+  Defense:
+    Timothy Moore: 3 tkl
+    Noah Moore: 18 tkl 1 INT
+    James Martin: 29 tkl 1 sk 1 TFL
+    Tyler Martin: 46 tkl 1 sk 1 TFL
+    George Smith: 45 tkl 1 INT
+    Lucas Thomas: 26 tkl 1 sk 1 TFL
+    Jackson Williams: 22 tkl
+    Steven Brown: 15 tkl
+    Timothy Anderson: 9 tkl
+
+CHAMPION: Bluefield Beavers
+
+
+============================================================
+SEASON 5
+============================================================
+
+COACHES & PLAY CALLING TENDENCIES
+--------------------------------------------------
+  Independence Patriots: Todd Reed - Play Call Tendency: Heavy Pass
+  MT View Knights: Adam Scott - Play Call Tendency: Heavy Run
+  Bluefield Beavers: Jeff Stewart - Play Call Tendency: Heavy Run
+  Shady Spring Tigers: Adam Martin - Play Call Tendency: Balanced
+
+GAME RESULTS & STATS (no play-by-play)
+--------------------------------------------------
+  Independence Patriots 7 - MT View Knights 14
+    Independence Patriots: 39 rush / 273 pass | 45 plays | Run calls: 6 | Pass calls: 39
+    MT View Knights: 132 rush / 94 pass | 43 plays | Run calls: 33 | Pass calls: 10
+  Independence Patriots 14 - Bluefield Beavers 6
+    Independence Patriots: 28 rush / 146 pass | 31 plays | Run calls: 5 | Pass calls: 26
+    Bluefield Beavers: 164 rush / 98 pass | 51 plays | Run calls: 35 | Pass calls: 16
+  Independence Patriots 17 - Shady Spring Tigers 24 (OT)
+    Independence Patriots: 52 rush / 159 pass | 39 plays | Run calls: 13 | Pass calls: 26
+    Shady Spring Tigers: 149 rush / 147 pass | 39 plays | Run calls: 17 | Pass calls: 22
+  MT View Knights 21 - Bluefield Beavers 14
+    MT View Knights: 122 rush / 130 pass | 44 plays | Run calls: 29 | Pass calls: 15
+    Bluefield Beavers: 122 rush / 95 pass | 31 plays | Run calls: 20 | Pass calls: 11
+  MT View Knights 17 - Shady Spring Tigers 14
+    MT View Knights: 161 rush / 57 pass | 47 plays | Run calls: 37 | Pass calls: 10
+    Shady Spring Tigers: 82 rush / 137 pass | 28 plays | Run calls: 12 | Pass calls: 16
+  Bluefield Beavers 14 - Shady Spring Tigers 10
+    Bluefield Beavers: 196 rush / 67 pass | 47 plays | Run calls: 38 | Pass calls: 9
+    Shady Spring Tigers: 39 rush / 156 pass | 31 plays | Run calls: 7 | Pass calls: 24
+  Playoff: MT View Knights 7 - Bluefield Beavers 14 -> Bluefield Beavers
+  Playoff: Shady Spring Tigers 17 - Independence Patriots 10 -> Shady Spring Tigers
+  Playoff: Shady Spring Tigers 14 - Bluefield Beavers 0 -> Shady Spring Tigers
+
+FINAL STANDINGS
+--------------------------------------------------
+  Shady Spring Tigers: 3-2 (PF 79 PA 58 PD +21)
+  MT View Knights: 3-1 (PF 59 PA 49 PD +10)
+  Bluefield Beavers: 2-3 (PF 48 PA 66 PD -18)
+  Independence Patriots: 1-3 (PF 48 PA 61 PD -13)
+
+SEASON LEADERBOARD
+--------------------------------------------------
+  Top Passer: John Williams (Independence Patriots) - 701 yds, 86/131, 5 TD, 3 INT
+  Top Rusher: Jackson Taylor (Bluefield Beavers) - 259 yds, 1 TD
+  Top Receiver: Noah Moore (Shady Spring Tigers) - 25 rec, 250 yds, 3 TD
+  Top Sacks: Brian Moore (Bluefield Beavers) - 4 sacks
+  Top Tackles: Brian Moore (Bluefield Beavers) - 40 tackles
+
+PLAYER STATS BY TEAM
+--------------------------------------------------
+============================================================
+  LEAGUE LEADERS (Season)
+============================================================
+
+Passing Yards
+----------------------------------------
+  1. John Williams (Independence Patriots): 701 yds  (86/131, 5 TD, 3 INT)
+  2. Kenneth Taylor (Shady Spring Tigers): 654 yds  (80/111, 7 TD, 4 INT)
+  3. Joshua Taylor (Bluefield Beavers): 467 yds  (52/77, 2 TD, 4 INT)
+  4. Timothy Brown (MT View Knights): 380 yds  (43/63, 2 TD, 1 INT)
+
+Passing Touchdowns
+----------------------------------------
+  1. Kenneth Taylor (Shady Spring Tigers): 7 TD
+  2. John Williams (Independence Patriots): 5 TD
+  3. Joshua Taylor (Bluefield Beavers): 2 TD
+  4. Timothy Brown (MT View Knights): 2 TD
+
+Rushing Yards
+----------------------------------------
+  1. Jackson Taylor (Bluefield Beavers): 259 yds, 1 TD
+  2. Joshua Jackson (Bluefield Beavers): 198 yds, 2 TD
+  3. Brian Moore (Bluefield Beavers): 197 yds, 1 TD
+  4. Tyler Anderson (MT View Knights): 191 yds, 2 TD
+  5. Jacob Garcia (Shady Spring Tigers): 179 yds, 2 TD
+  6. Donald Davis (Shady Spring Tigers): 165 yds, 0 TD
+  7. James Martin (Shady Spring Tigers): 161 yds, 0 TD
+  8. Jacob Anderson (MT View Knights): 159 yds, 2 TD
+  9. Michael Moore (MT View Knights): 136 yds, 2 TD
+  10. James White (Independence Patriots): 53 yds, 0 TD
+
+Receiving Yards
+----------------------------------------
+  1. Noah Moore (Shady Spring Tigers): 25 rec, 250 yds, 3 TD
+  2. Kenneth Rodriguez (Independence Patriots): 26 rec, 189 yds, 2 TD
+  3. Noah Lee (Independence Patriots): 22 rec, 178 yds, 0 TD
+  4. John Anderson (MT View Knights): 16 rec, 135 yds, 1 TD
+  5. James Thompson (Independence Patriots): 16 rec, 134 yds, 1 TD
+  6. Jackson Lee (Independence Patriots): 12 rec, 129 yds, 1 TD
+  7. John Lee (Bluefield Beavers): 12 rec, 129 yds, 1 TD
+  8. Tyler Martin (Shady Spring Tigers): 15 rec, 128 yds, 2 TD
+  9. Joshua Garcia (Bluefield Beavers): 14 rec, 124 yds, 1 TD
+  10. John Garcia (Shady Spring Tigers): 20 rec, 118 yds, 1 TD
+
+Tackles
+----------------------------------------
+  1. Brian Moore (Bluefield Beavers): 40 tkl
+  2. Tyler Martin (Shady Spring Tigers): 39 tkl
+  3. Christopher Lee (Independence Patriots): 35 tkl
+  4. Mark Martin (Independence Patriots): 33 tkl
+  5. James Martin (Shady Spring Tigers): 31 tkl
+  6. George Smith (Shady Spring Tigers): 29 tkl
+  7. John Anderson (MT View Knights): 28 tkl
+  8. George Thompson (Bluefield Beavers): 26 tkl
+  9. Timothy Brown (MT View Knights): 24 tkl
+  10. Jacob Thompson (MT View Knights): 24 tkl
+
+Sacks
+----------------------------------------
+  1. Brian Moore (Bluefield Beavers): 4 sk
+  2. Lucas Thomas (Shady Spring Tigers): 3 sk
+  3. James Thompson (Independence Patriots): 2 sk
+  4. Tyler Martin (Shady Spring Tigers): 2 sk
+  5. Timothy Anderson (Shady Spring Tigers): 2 sk
+  6. Mark Martin (Independence Patriots): 1 sk
+  7. George Taylor (Independence Patriots): 1 sk
+  8. Timothy Brown (MT View Knights): 1 sk
+  9. Andrew Jones (MT View Knights): 1 sk
+  10. Logan Jones (Bluefield Beavers): 1 sk
+
+Interceptions
+----------------------------------------
+  1. Christopher Lee (Independence Patriots): 3 INT
+  2. George Taylor (Bluefield Beavers): 2 INT
+  3. George Smith (Shady Spring Tigers): 2 INT
+  4. Michael Moore (MT View Knights): 1 INT
+  5. Donald Anderson (MT View Knights): 1 INT
+  6. Robert Thompson (Bluefield Beavers): 1 INT
+  7. Timothy Moore (Shady Spring Tigers): 1 INT
+  8. Jackson Williams (Shady Spring Tigers): 1 INT
+
+============================================================
+  INDIVIDUAL PLAYER STATS BY TEAM
+============================================================
+
+Independence Patriots
+----------------------------------------
+  QB:
+    John Williams: 86/131 (65.6%) 701 yds, 5 TD, 3 INT
+  RB:
+    Robert Johnson: 41 rush yds, 0 TD
+    Mark Martin: 51 rush yds, 1 TD
+    James White: 53 rush yds, 0 TD
+  WR/TE:
+    Kenneth Rodriguez: 26 rec, 189 yds, 2 TD
+    Noah Lee: 22 rec, 178 yds, 0 TD
+    James Thompson: 16 rec, 134 yds, 1 TD
+    Jackson Lee: 12 rec, 129 yds, 1 TD
+    Robert Johnson: 7 rec, 53 yds, 1 TD
+    Mark Martin: 3 rec, 18 yds, 0 TD
+  Defense:
+    James Thompson: 23 tkl 2 sk 2 TFL
+    Mark Martin: 33 tkl 1 sk 1 TFL
+    Christopher Lee: 35 tkl 3 INT
+    George Taylor: 15 tkl 1 sk 1 TFL
+    Kenneth Martin: 15 tkl
+    Tyler White: 13 tkl
+    David Martinez: 10 tkl
+    Lucas Thomas: 5 tkl
+    Jacob Smith: 2 tkl
+
+MT View Knights
+----------------------------------------
+  QB:
+    Timothy Brown: 43/63 (68.3%) 380 yds, 2 TD, 1 INT
+  RB:
+    Tyler Anderson: 191 rush yds, 2 TD
+    Jacob Anderson: 159 rush yds, 2 TD
+    Michael Moore: 136 rush yds, 2 TD
+  WR/TE:
+    Tyler Anderson: 1 rec, 6 yds, 0 TD
+    Michael Moore: 1 rec, 5 yds, 0 TD
+    John Anderson: 16 rec, 135 yds, 1 TD
+    Jacob Jones: 12 rec, 112 yds, 0 TD
+    Jacob Thompson: 8 rec, 76 yds, 1 TD
+    Donald Anderson: 5 rec, 46 yds, 0 TD
+  Defense:
+    Timothy Brown: 24 tkl 1 sk 1 TFL
+    Michael Moore: 19 tkl 1 INT
+    John Anderson: 28 tkl
+    Jacob Jones: 9 tkl
+    Jacob Thompson: 24 tkl
+    Donald Anderson: 4 tkl 1 INT
+    Lucas Williams: 7 tkl
+    Paul Taylor: 4 tkl
+    Andrew Jones: 1 sk 1 TFL
+
+Bluefield Beavers
+----------------------------------------
+  QB:
+    Joshua Taylor: 52/77 (67.5%) 467 yds, 2 TD, 4 INT
+  RB:
+    Jackson Taylor: 259 rush yds, 1 TD
+    Brian Moore: 197 rush yds, 1 TD
+    Joshua Jackson: 198 rush yds, 2 TD
+  WR/TE:
+    Jackson Taylor: 6 rec, 48 yds, 0 TD
+    Brian Moore: 8 rec, 70 yds, 0 TD
+    John Lee: 12 rec, 129 yds, 1 TD
+    Joshua Garcia: 14 rec, 124 yds, 1 TD
+    David Jones: 7 rec, 53 yds, 0 TD
+    Daniel Taylor: 5 rec, 43 yds, 0 TD
+  Defense:
+    Jackson Taylor: 5 tkl
+    Brian Moore: 40 tkl 4 sk 4 TFL
+    George Thompson: 26 tkl
+    Robert Thompson: 23 tkl 1 INT
+    Tyler Jones: 18 tkl
+    George Taylor: 15 tkl 2 INT
+    Logan Jones: 14 tkl 1 sk 1 TFL
+    Daniel Davis: 11 tkl
+    Timothy Taylor: 10 tkl
+
+Shady Spring Tigers
+----------------------------------------
+  QB:
+    Kenneth Taylor: 80/111 (72.1%) 654 yds, 7 TD, 4 INT
+  RB:
+    James Martin: 161 rush yds, 0 TD
+    Donald Davis: 165 rush yds, 0 TD
+    Jacob Garcia: 179 rush yds, 2 TD
+  WR/TE:
+    Noah Moore: 25 rec, 250 yds, 3 TD
+    James Martin: 4 rec, 30 yds, 1 TD
+    Donald Davis: 4 rec, 22 yds, 0 TD
+    Tyler Martin: 15 rec, 128 yds, 2 TD
+    John Garcia: 20 rec, 118 yds, 1 TD
+    Timothy Moore: 12 rec, 106 yds, 0 TD
+  Defense:
+    Noah Moore: 9 tkl
+    James Martin: 31 tkl 1 sk 1 TFL
+    Tyler Martin: 39 tkl 2 sk 2 TFL
+    Timothy Moore: 3 tkl 1 INT
+    George Smith: 29 tkl 2 INT
+    Lucas Thomas: 23 tkl 3 sk 3 TFL
+    Jackson Williams: 22 tkl 1 INT
+    Steven Brown: 12 tkl
+    Timothy Anderson: 7 tkl 2 sk 2 TFL
+
+CHAMPION: Shady Spring Tigers
+
+
+============================================================
+SEASON 6
+============================================================
+
+COACHES & PLAY CALLING TENDENCIES
+--------------------------------------------------
+  Independence Patriots: Todd Reed - Play Call Tendency: Heavy Pass
+  MT View Knights: Adam Scott - Play Call Tendency: Heavy Run
+  Bluefield Beavers: Jeff Stewart - Play Call Tendency: Heavy Run
+  Shady Spring Tigers: Adam Martin - Play Call Tendency: Balanced
+
+GAME RESULTS & STATS (no play-by-play)
+--------------------------------------------------
+  Independence Patriots 21 - MT View Knights 7
+    Independence Patriots: 53 rush / 222 pass | 32 plays | Run calls: 8 | Pass calls: 24
+    MT View Knights: 137 rush / 76 pass | 46 plays | Run calls: 34 | Pass calls: 12
+  Independence Patriots 10 - Bluefield Beavers 14
+    Independence Patriots: 35 rush / 105 pass | 37 plays | Run calls: 7 | Pass calls: 30
+    Bluefield Beavers: 152 rush / 123 pass | 42 plays | Run calls: 28 | Pass calls: 14
+  Independence Patriots 14 - Shady Spring Tigers 7 (OT)
+    Independence Patriots: 49 rush / 249 pass | 53 plays | Run calls: 13 | Pass calls: 40
+    Shady Spring Tigers: 79 rush / 102 pass | 37 plays | Run calls: 16 | Pass calls: 21
+  MT View Knights 7 - Bluefield Beavers 14
+    MT View Knights: 154 rush / 24 pass | 45 plays | Run calls: 37 | Pass calls: 8
+    Bluefield Beavers: 174 rush / 61 pass | 28 plays | Run calls: 22 | Pass calls: 6
+  MT View Knights 0 - Shady Spring Tigers 10
+    MT View Knights: 81 rush / 86 pass | 47 plays | Run calls: 26 | Pass calls: 21
+    Shady Spring Tigers: 123 rush / 66 pass | 34 plays | Run calls: 17 | Pass calls: 17
+  Bluefield Beavers 20 - Shady Spring Tigers 22 (OT)
+    Bluefield Beavers: 130 rush / 100 pass | 52 plays | Run calls: 32 | Pass calls: 20
+    Shady Spring Tigers: 83 rush / 243 pass | 52 plays | Run calls: 16 | Pass calls: 36
+  Playoff: Independence Patriots 21 - MT View Knights 0 -> Independence Patriots
+  Playoff: Bluefield Beavers 0 - Shady Spring Tigers 14 -> Shady Spring Tigers
+  Playoff: Independence Patriots 0 - Shady Spring Tigers 10 -> Shady Spring Tigers
+
+FINAL STANDINGS
+--------------------------------------------------
+  Shady Spring Tigers: 4-1 (PF 63 PA 34 PD +29)
+  Independence Patriots: 3-2 (PF 66 PA 38 PD +28)
+  Bluefield Beavers: 2-2 (PF 48 PA 53 PD -5)
+  MT View Knights: 0-4 (PF 14 PA 66 PD -52)
+
+SEASON LEADERBOARD
+--------------------------------------------------
+  Top Passer: Kenneth Smith (Independence Patriots) - 803 yds, 92/136, 5 TD, 2 INT
+  Top Rusher: George Johnson (Shady Spring Tigers) - 212 yds, 2 TD
+  Top Receiver: Kenneth Rodriguez (Independence Patriots) - 28 rec, 193 yds, 1 TD
+  Top Sacks: Logan Jones (Bluefield Beavers) - 3 sacks
+  Top Tackles: Mark Martin (Independence Patriots) - 39 tackles
+
+PLAYER STATS BY TEAM
+--------------------------------------------------
+============================================================
+  LEAGUE LEADERS (Season)
+============================================================
+
+Passing Yards
+----------------------------------------
+  1. Kenneth Smith (Independence Patriots): 803 yds  (92/136, 5 TD, 2 INT)
+  2. Tyler Moore (Shady Spring Tigers): 637 yds  (82/123, 4 TD, 2 INT)
+  3. Timothy Anderson (Bluefield Beavers): 401 yds  (48/69, 3 TD, 1 INT)
+  4. Timothy Brown (MT View Knights): 275 yds  (44/64, 1 TD, 1 INT)
+
+Passing Touchdowns
+----------------------------------------
+  1. Kenneth Smith (Independence Patriots): 5 TD
+  2. Tyler Moore (Shady Spring Tigers): 4 TD
+  3. Timothy Anderson (Bluefield Beavers): 3 TD
+  4. Timothy Brown (MT View Knights): 1 TD
+
+Rushing Yards
+----------------------------------------
+  1. George Johnson (Shady Spring Tigers): 212 yds, 2 TD
+  2. Jackson Taylor (Bluefield Beavers): 207 yds, 1 TD
+  3. Mark Martin (Independence Patriots): 180 yds, 2 TD
+  4. James Martin (Shady Spring Tigers): 175 yds, 1 TD
+  5. Joshua Jackson (Bluefield Beavers): 172 yds, 1 TD
+  6. Jacob Anderson (MT View Knights): 164 yds, 0 TD
+  7. Michael Moore (MT View Knights): 139 yds, 1 TD
+  8. Donald Davis (Shady Spring Tigers): 138 yds, 1 TD
+  9. Brian Moore (Bluefield Beavers): 137 yds, 2 TD
+  10. Tyler Anderson (MT View Knights): 134 yds, 0 TD
+
+Receiving Yards
+----------------------------------------
+  1. Kenneth Rodriguez (Independence Patriots): 28 rec, 193 yds, 1 TD
+  2. John Garcia (Shady Spring Tigers): 26 rec, 183 yds, 1 TD
+  3. Ethan Anderson (Independence Patriots): 22 rec, 176 yds, 2 TD
+  4. Michael Martin (Independence Patriots): 17 rec, 169 yds, 2 TD
+  5. Noah Moore (Shady Spring Tigers): 20 rec, 165 yds, 0 TD
+  6. George Smith (Shady Spring Tigers): 17 rec, 150 yds, 1 TD
+  7. James Thompson (Independence Patriots): 10 rec, 106 yds, 0 TD
+  8. Jacob Thompson (MT View Knights): 13 rec, 100 yds, 0 TD
+  9. David Jones (Bluefield Beavers): 11 rec, 96 yds, 1 TD
+  10. Matthew Thomas (Bluefield Beavers): 11 rec, 94 yds, 0 TD
+
+Tackles
+----------------------------------------
+  1. Mark Martin (Independence Patriots): 39 tkl
+  2. John Martinez (Independence Patriots): 33 tkl
+  3. Brian Moore (Bluefield Beavers): 33 tkl
+  4. James Martin (Shady Spring Tigers): 33 tkl
+  5. Timothy Thompson (Shady Spring Tigers): 33 tkl
+  6. James Thompson (Independence Patriots): 27 tkl
+  7. John Anderson (MT View Knights): 25 tkl
+  8. Daniel Taylor (Bluefield Beavers): 25 tkl
+  9. Tyler Jones (Bluefield Beavers): 24 tkl
+  10. Timothy Brown (MT View Knights): 23 tkl
+
+Sacks
+----------------------------------------
+  1. Logan Jones (Bluefield Beavers): 3 sk
+  2. Mason Lee (Bluefield Beavers): 3 sk
+  3. Lucas Thomas (Shady Spring Tigers): 3 sk
+  4. Timothy Thompson (Shady Spring Tigers): 3 sk
+  5. James Martin (Shady Spring Tigers): 2 sk
+  6. Mark Martin (Independence Patriots): 1 sk
+  7. James Thompson (Independence Patriots): 1 sk
+  8. Timothy Brown (MT View Knights): 1 sk
+  9. Jacob Thompson (MT View Knights): 1 sk
+  10. Brian Moore (Bluefield Beavers): 1 sk
+
+Interceptions
+----------------------------------------
+  1. James White (Independence Patriots): 1 INT
+  2. John Martinez (Independence Patriots): 1 INT
+  3. Jacob Jones (MT View Knights): 1 INT
+  4. Jackson Taylor (Bluefield Beavers): 1 INT
+  5. George Smith (Shady Spring Tigers): 1 INT
+  6. Tyler Thomas (Shady Spring Tigers): 1 INT
+
+============================================================
+  INDIVIDUAL PLAYER STATS BY TEAM
+============================================================
+
+Independence Patriots
+----------------------------------------
+  QB:
+    Kenneth Smith: 92/136 (67.6%) 803 yds, 5 TD, 2 INT
+  RB:
+    Mark Martin: 180 rush yds, 2 TD
+    Robert Johnson: 105 rush yds, 0 TD
+    James White: 74 rush yds, 1 TD
+  WR/TE:
+    Mark Martin: 7 rec, 65 yds, 0 TD
+    Robert Johnson: 8 rec, 94 yds, 0 TD
+    Kenneth Rodriguez: 28 rec, 193 yds, 1 TD
+    Ethan Anderson: 22 rec, 176 yds, 2 TD
+    Michael Martin: 17 rec, 169 yds, 2 TD
+    James Thompson: 10 rec, 106 yds, 0 TD
+  Defense:
+    Mark Martin: 39 tkl 1 sk 1 TFL
+    James Thompson: 27 tkl 1 sk 1 TFL
+    James White: 8 tkl 1 INT
+    John Martinez: 33 tkl 1 INT
+    Steven Smith: 22 tkl
+    Anthony Taylor: 20 tkl
+    George Taylor: 17 tkl
+    Noah Davis: 17 tkl
+    David Martinez: 9 tkl
+
+MT View Knights
+----------------------------------------
+  QB:
+    Timothy Brown: 44/64 (68.8%) 275 yds, 1 TD, 1 INT
+  RB:
+    Tyler Anderson: 134 rush yds, 0 TD
+    Jacob Anderson: 164 rush yds, 0 TD
+    Michael Moore: 139 rush yds, 1 TD
+  WR/TE:
+    Tyler Anderson: 7 rec, 56 yds, 0 TD
+    Michael Moore: 3 rec, 21 yds, 0 TD
+    Jacob Thompson: 13 rec, 100 yds, 0 TD
+    Jacob Jones: 11 rec, 61 yds, 1 TD
+    John Anderson: 5 rec, 28 yds, 0 TD
+    Donald Anderson: 5 rec, 9 yds, 0 TD
+  Defense:
+    Timothy Brown: 23 tkl 1 sk 1 TFL
+    Michael Moore: 12 tkl
+    Jacob Thompson: 23 tkl 1 sk 1 TFL
+    Jacob Jones: 7 tkl 1 INT
+    John Anderson: 25 tkl
+    Donald Anderson: 10 tkl
+    Lucas Williams: 8 tkl
+    Paul Taylor: 5 tkl
+    Daniel White: 1 tkl
+
+Bluefield Beavers
+----------------------------------------
+  QB:
+    Timothy Anderson: 48/69 (69.6%) 401 yds, 3 TD, 1 INT
+  RB:
+    Jackson Taylor: 207 rush yds, 1 TD
+    Joshua Jackson: 172 rush yds, 1 TD
+    Brian Moore: 137 rush yds, 2 TD
+  WR/TE:
+    Jackson Taylor: 2 rec, 26 yds, 0 TD
+    Joshua Jackson: 4 rec, 41 yds, 2 TD
+    David Jones: 11 rec, 96 yds, 1 TD
+    Matthew Thomas: 11 rec, 94 yds, 0 TD
+    Daniel Taylor: 9 rec, 82 yds, 0 TD
+    David Thomas: 11 rec, 62 yds, 0 TD
+  Defense:
+    Jackson Taylor: 2 tkl 1 INT
+    Joshua Jackson: 8 tkl
+    Brian Moore: 33 tkl 1 sk 1 TFL
+    Daniel Taylor: 25 tkl 1 sk 1 TFL
+    Tyler Jones: 24 tkl
+    Logan Jones: 18 tkl 3 sk 3 TFL
+    George Taylor: 16 tkl
+    Daniel Davis: 14 tkl 1 sk 1 TFL
+    Mason Lee: 3 tkl 3 sk 3 TFL
+    Michael Martin: 1 sk 1 TFL
+
+Shady Spring Tigers
+----------------------------------------
+  QB:
+    Tyler Moore: 82/123 (66.7%) 637 yds, 4 TD, 2 INT
+  RB:
+    George Johnson: 212 rush yds, 2 TD
+    James Martin: 175 rush yds, 1 TD
+    Donald Davis: 138 rush yds, 1 TD
+  WR/TE:
+    James Martin: 4 rec, 36 yds, 1 TD
+    John Garcia: 26 rec, 183 yds, 1 TD
+    Noah Moore: 20 rec, 165 yds, 0 TD
+    Donald Davis: 4 rec, 23 yds, 0 TD
+    George Smith: 17 rec, 150 yds, 1 TD
+    Timothy Thompson: 11 rec, 80 yds, 1 TD
+  Defense:
+    James Martin: 33 tkl 2 sk 2 TFL
+    Noah Moore: 21 tkl
+    George Smith: 19 tkl 1 INT
+    Timothy Thompson: 33 tkl 3 sk 3 TFL
+    Tyler Thomas: 23 tkl 1 INT
+    Lucas Thomas: 19 tkl 3 sk 3 TFL
+    Kevin Rodriguez: 17 tkl 1 sk 1 TFL
+    Timothy Anderson: 10 tkl 1 sk 1 TFL
+    Lucas Anderson: 7 tkl
+    Christopher Taylor: 1 sk 1 TFL
+
+CHAMPION: Shady Spring Tigers
+
+
+============================================================
+SEASON 7
+============================================================
+
+COACHES & PLAY CALLING TENDENCIES
+--------------------------------------------------
+  Independence Patriots: Todd Reed - Play Call Tendency: Heavy Pass
+  MT View Knights: Adam Scott - Play Call Tendency: Heavy Run
+  Bluefield Beavers: Jeff Stewart - Play Call Tendency: Heavy Run
+  Shady Spring Tigers: Adam Martin - Play Call Tendency: Balanced
+
+GAME RESULTS & STATS (no play-by-play)
+--------------------------------------------------
+  Independence Patriots 17 - MT View Knights 0
+    Independence Patriots: 28 rush / 232 pass | 37 plays | Run calls: 6 | Pass calls: 31
+    MT View Knights: 118 rush / 79 pass | 45 plays | Run calls: 29 | Pass calls: 16
+  Independence Patriots 6 - Bluefield Beavers 21
+    Independence Patriots: 17 rush / 228 pass | 53 plays | Run calls: 4 | Pass calls: 49
+    Bluefield Beavers: 115 rush / 160 pass | 37 plays | Run calls: 21 | Pass calls: 16
+  Independence Patriots 3 - Shady Spring Tigers 14
+    Independence Patriots: 29 rush / 68 pass | 38 plays | Run calls: 9 | Pass calls: 29
+    Shady Spring Tigers: 87 rush / 165 pass | 40 plays | Run calls: 18 | Pass calls: 22
+  MT View Knights 7 - Bluefield Beavers 10
+    MT View Knights: 103 rush / 34 pass | 34 plays | Run calls: 26 | Pass calls: 8
+    Bluefield Beavers: 163 rush / 82 pass | 41 plays | Run calls: 30 | Pass calls: 11
+  MT View Knights 3 - Shady Spring Tigers 14
+    MT View Knights: 105 rush / 52 pass | 49 plays | Run calls: 33 | Pass calls: 16
+    Shady Spring Tigers: 39 rush / 220 pass | 32 plays | Run calls: 8 | Pass calls: 24
+  Bluefield Beavers 10 - Shady Spring Tigers 7
+    Bluefield Beavers: 198 rush / 54 pass | 58 plays | Run calls: 48 | Pass calls: 10
+    Shady Spring Tigers: 22 rush / 38 pass | 17 plays | Run calls: 5 | Pass calls: 12
+  Playoff: Bluefield Beavers 13 - MT View Knights 0 -> Bluefield Beavers
+  Playoff: Shady Spring Tigers 3 - Independence Patriots 10 -> Independence Patriots
+  Playoff: Bluefield Beavers 14 - Independence Patriots 3 -> Bluefield Beavers
+
+FINAL STANDINGS
+--------------------------------------------------
+  Bluefield Beavers: 5-0 (PF 68 PA 23 PD +45)
+  Shady Spring Tigers: 2-2 (PF 38 PA 26 PD +12)
+  Independence Patriots: 2-3 (PF 39 PA 52 PD -13)
+  MT View Knights: 0-4 (PF 10 PA 54 PD -44)
+
+SEASON LEADERBOARD
+--------------------------------------------------
+  Top Passer: Kenneth Smith (Independence Patriots) - 750 yds, 97/149, 3 TD, 1 INT
+  Top Rusher: Logan Lee (Bluefield Beavers) - 285 yds, 1 TD
+  Top Receiver: Michael Martin (Independence Patriots) - 28 rec, 252 yds, 0 TD
+  Top Sacks: Logan Jones (Bluefield Beavers) - 3 sacks
+  Top Tackles: Mark Martin (Independence Patriots) - 35 tackles
+
+PLAYER STATS BY TEAM
+--------------------------------------------------
+============================================================
+  LEAGUE LEADERS (Season)
+============================================================
+
+Passing Yards
+----------------------------------------
+  1. Kenneth Smith (Independence Patriots): 750 yds  (97/149, 3 TD, 1 INT)
+  2. Timothy Anderson (Bluefield Beavers): 531 yds  (62/83, 6 TD, 0 INT)
+  3. Tyler Moore (Shady Spring Tigers): 504 yds  (56/84, 3 TD, 2 INT)
+  4. Tyler Brown (MT View Knights): 258 yds  (43/63, 0 TD, 1 INT)
+
+Passing Touchdowns
+----------------------------------------
+  1. Timothy Anderson (Bluefield Beavers): 6 TD
+  2. Kenneth Smith (Independence Patriots): 3 TD
+  3. Tyler Moore (Shady Spring Tigers): 3 TD
+  4. Tyler Brown (MT View Knights): 0 TD
+
+Rushing Yards
+----------------------------------------
+  1. Logan Lee (Bluefield Beavers): 285 yds, 1 TD
+  2. Joshua Jackson (Bluefield Beavers): 252 yds, 0 TD
+  3. Anthony Miller (Bluefield Beavers): 208 yds, 1 TD
+  4. Jacob Anderson (MT View Knights): 134 yds, 0 TD
+  5. George Rodriguez (MT View Knights): 129 yds, 0 TD
+  6. Mark Anderson (MT View Knights): 127 yds, 1 TD
+  7. Mark Martin (Independence Patriots): 127 yds, 0 TD
+  8. Robert Johnson (Independence Patriots): 75 yds, 0 TD
+  9. James Martin (Shady Spring Tigers): 74 yds, 0 TD
+  10. Donald Davis (Shady Spring Tigers): 73 yds, 1 TD
+
+Receiving Yards
+----------------------------------------
+  1. Michael Martin (Independence Patriots): 28 rec, 252 yds, 0 TD
+  2. Jackson Lee (Independence Patriots): 21 rec, 160 yds, 0 TD
+  3. James Thompson (Independence Patriots): 18 rec, 144 yds, 1 TD
+  4. John Garcia (Shady Spring Tigers): 13 rec, 138 yds, 1 TD
+  5. Ethan Anderson (Independence Patriots): 18 rec, 131 yds, 1 TD
+  6. Brian Taylor (Bluefield Beavers): 12 rec, 128 yds, 1 TD
+  7. Jacob Davis (Bluefield Beavers): 18 rec, 127 yds, 2 TD
+  8. Daniel Taylor (Bluefield Beavers): 14 rec, 120 yds, 1 TD
+  9. Lucas Martinez (MT View Knights): 16 rec, 115 yds, 0 TD
+  10. George Smith (Shady Spring Tigers): 12 rec, 101 yds, 0 TD
+
+Tackles
+----------------------------------------
+  1. Mark Martin (Independence Patriots): 35 tkl
+  2. Lucas Thomas (Shady Spring Tigers): 34 tkl
+  3. George Rodriguez (MT View Knights): 31 tkl
+  4. Brian Moore (Bluefield Beavers): 30 tkl
+  5. John Martinez (Independence Patriots): 29 tkl
+  6. Timothy Thompson (Shady Spring Tigers): 29 tkl
+  7. Mason Davis (MT View Knights): 28 tkl
+  8. James Thompson (Independence Patriots): 26 tkl
+  9. Kevin Rodriguez (Shady Spring Tigers): 25 tkl
+  10. James Martin (Shady Spring Tigers): 24 tkl
+
+Sacks
+----------------------------------------
+  1. Logan Jones (Bluefield Beavers): 3 sk
+  2. Daniel Taylor (Bluefield Beavers): 3 sk
+  3. Mark Martin (Independence Patriots): 2 sk
+  4. George Taylor (Independence Patriots): 2 sk
+  5. James Thompson (Independence Patriots): 2 sk
+  6. James Martin (Shady Spring Tigers): 2 sk
+  7. Lucas Thomas (Shady Spring Tigers): 2 sk
+  8. Timothy Thompson (Shady Spring Tigers): 2 sk
+  9. Matthew Miller (Independence Patriots): 1 sk
+  10. Anthony Taylor (Independence Patriots): 1 sk
+
+Interceptions
+----------------------------------------
+  1. George Taylor (Bluefield Beavers): 2 INT
+  2. Steven Smith (Independence Patriots): 1 INT
+  3. Brian Miller (Bluefield Beavers): 1 INT
+
+============================================================
+  INDIVIDUAL PLAYER STATS BY TEAM
+============================================================
+
+Independence Patriots
+----------------------------------------
+  QB:
+    Kenneth Smith: 97/149 (65.1%) 750 yds, 3 TD, 1 INT
+  RB:
+    Mark Martin: 127 rush yds, 0 TD
+    Robert Johnson: 75 rush yds, 0 TD
+    James White: 57 rush yds, 0 TD
+  WR/TE:
+    Michael Martin: 28 rec, 252 yds, 0 TD
+    Jackson Lee: 21 rec, 160 yds, 0 TD
+    Mark Martin: 6 rec, 28 yds, 0 TD
+    James Thompson: 18 rec, 144 yds, 1 TD
+    Ethan Anderson: 18 rec, 131 yds, 1 TD
+    Robert Johnson: 6 rec, 35 yds, 1 TD
+  Defense:
+    Mark Martin: 35 tkl 2 sk 2 TFL
+    James Thompson: 26 tkl 2 sk 2 TFL
+    James White: 9 tkl
+    John Martinez: 29 tkl
+    Steven Smith: 19 tkl 1 INT
+    George Taylor: 18 tkl 2 sk 2 TFL
+    Anthony Taylor: 17 tkl 1 sk 1 TFL
+    Noah Davis: 11 tkl
+    Matthew Miller: 10 tkl 1 sk 1 TFL
+
+MT View Knights
+----------------------------------------
+  QB:
+    Tyler Brown: 43/63 (68.3%) 258 yds, 0 TD, 1 INT
+  RB:
+    George Rodriguez: 129 rush yds, 0 TD
+    Jacob Anderson: 134 rush yds, 0 TD
+    Mark Anderson: 127 rush yds, 1 TD
+  WR/TE:
+    George Rodriguez: 3 rec, 14 yds, 0 TD
+    Jacob Anderson: 3 rec, 5 yds, 0 TD
+    Lucas Martinez: 16 rec, 115 yds, 0 TD
+    Jacob Garcia: 8 rec, 52 yds, 0 TD
+    Jackson Thompson: 5 rec, 42 yds, 0 TD
+    Mason Davis: 8 rec, 30 yds, 0 TD
+  Defense:
+    George Rodriguez: 31 tkl
+    Lucas Martinez: 13 tkl
+    Jacob Garcia: 6 tkl
+    Mason Davis: 28 tkl
+    Timothy Anderson: 19 tkl
+    Donald Thompson: 17 tkl 1 sk 1 TFL
+    Paul Taylor: 7 tkl
+    Jacob Anderson: 6 tkl
+    Daniel White: 4 tkl
+
+Bluefield Beavers
+----------------------------------------
+  QB:
+    Timothy Anderson: 62/83 (74.7%) 531 yds, 6 TD, 0 INT
+  RB:
+    Joshua Jackson: 252 rush yds, 0 TD
+    Logan Lee: 285 rush yds, 1 TD
+    Anthony Miller: 208 rush yds, 1 TD
+  WR/TE:
+    Joshua Jackson: 5 rec, 45 yds, 1 TD
+    Anthony Miller: 2 rec, 18 yds, 0 TD
+    Brian Taylor: 12 rec, 128 yds, 1 TD
+    Jacob Davis: 18 rec, 127 yds, 2 TD
+    Daniel Taylor: 14 rec, 120 yds, 1 TD
+    David Thomas: 11 rec, 93 yds, 1 TD
+  Defense:
+    Joshua Jackson: 11 tkl
+    Daniel Taylor: 21 tkl 3 sk 3 TFL
+    Brian Moore: 30 tkl 1 sk 1 TFL
+    Daniel Davis: 17 tkl
+    Noah Garcia: 17 tkl
+    Joshua Jones: 13 tkl 1 sk 1 TFL
+    Logan Jones: 12 tkl 3 sk 3 TFL
+    George Taylor: 11 tkl 2 INT
+    Brian Miller: 7 tkl 1 INT
+
+Shady Spring Tigers
+----------------------------------------
+  QB:
+    Tyler Moore: 56/84 (66.7%) 504 yds, 3 TD, 2 INT
+  RB:
+    James Martin: 74 rush yds, 0 TD
+    Donald Davis: 73 rush yds, 1 TD
+    William Rodriguez: 58 rush yds, 0 TD
+  WR/TE:
+    James Martin: 8 rec, 75 yds, 0 TD
+    John Garcia: 13 rec, 138 yds, 1 TD
+    George Smith: 12 rec, 101 yds, 0 TD
+    Donald Davis: 3 rec, 23 yds, 0 TD
+    Noah Moore: 11 rec, 91 yds, 1 TD
+    Timothy Thompson: 9 rec, 76 yds, 1 TD
+  Defense:
+    James Martin: 24 tkl 2 sk 2 TFL
+    George Smith: 20 tkl
+    Noah Moore: 9 tkl
+    Timothy Thompson: 29 tkl 2 sk 2 TFL
+    Lucas Thomas: 34 tkl 2 sk 2 TFL
+    Kevin Rodriguez: 25 tkl 1 sk 1 TFL
+    Tyler Anderson: 13 tkl
+    Logan Lee: 10 tkl
+    Andrew Brown: 5 tkl
+    Christopher Taylor: 1 sk 1 TFL
+
+CHAMPION: Bluefield Beavers
+
+
+============================================================
+SEASON 8
+============================================================
+
+COACHES & PLAY CALLING TENDENCIES
+--------------------------------------------------
+  Independence Patriots: Todd Reed - Play Call Tendency: Heavy Pass
+  MT View Knights: Adam Scott - Play Call Tendency: Heavy Run
+  Bluefield Beavers: Jeff Stewart - Play Call Tendency: Heavy Run
+  Shady Spring Tigers: Adam Martin - Play Call Tendency: Balanced
+
+GAME RESULTS & STATS (no play-by-play)
+--------------------------------------------------
+  Independence Patriots 7 - MT View Knights 3
+    Independence Patriots: 14 rush / 114 pass | 21 plays | Run calls: 3 | Pass calls: 18
+    MT View Knights: 145 rush / 53 pass | 60 plays | Run calls: 44 | Pass calls: 16
+  Independence Patriots 0 - Bluefield Beavers 28
+    Independence Patriots: 4 rush / 71 pass | 18 plays | Run calls: 2 | Pass calls: 16
+    Bluefield Beavers: 191 rush / 100 pass | 59 plays | Run calls: 44 | Pass calls: 15
+  Independence Patriots 13 - Shady Spring Tigers 10
+    Independence Patriots: 9 rush / 227 pass | 46 plays | Run calls: 4 | Pass calls: 42
+    Shady Spring Tigers: 50 rush / 177 pass | 41 plays | Run calls: 13 | Pass calls: 28
+  MT View Knights 0 - Bluefield Beavers 3
+    MT View Knights: 44 rush / 39 pass | 30 plays | Run calls: 20 | Pass calls: 10
+    Bluefield Beavers: 170 rush / 83 pass | 47 plays | Run calls: 35 | Pass calls: 12
+  MT View Knights 0 - Shady Spring Tigers 14
+    MT View Knights: 51 rush / 42 pass | 36 plays | Run calls: 21 | Pass calls: 15
+    Shady Spring Tigers: 87 rush / 237 pass | 46 plays | Run calls: 18 | Pass calls: 28
+  Bluefield Beavers 7 - Shady Spring Tigers 6
+    Bluefield Beavers: 123 rush / 121 pass | 51 plays | Run calls: 31 | Pass calls: 20
+    Shady Spring Tigers: 23 rush / 84 pass | 32 plays | Run calls: 7 | Pass calls: 25
+  Playoff: Bluefield Beavers 10 - MT View Knights 3 -> Bluefield Beavers
+  Playoff: Independence Patriots 11 - Shady Spring Tigers 3 -> Independence Patriots
+  Playoff: Bluefield Beavers 17 - Independence Patriots 3 -> Bluefield Beavers
+
+FINAL STANDINGS
+--------------------------------------------------
+  Bluefield Beavers: 5-0 (PF 65 PA 12 PD +53)
+  Independence Patriots: 3-2 (PF 34 PA 61 PD -27)
+  Shady Spring Tigers: 1-3 (PF 33 PA 31 PD +2)
+  MT View Knights: 0-4 (PF 6 PA 34 PD -28)
+
+SEASON LEADERBOARD
+--------------------------------------------------
+  Top Passer: Kenneth Smith (Independence Patriots) - 661 yds, 88/130, 3 TD, 6 INT
+  Top Rusher: Logan Lee (Bluefield Beavers) - 272 yds, 1 TD
+  Top Receiver: Brian Miller (Bluefield Beavers) - 23 rec, 202 yds, 0 TD
+  Top Sacks: Noah Martinez (Bluefield Beavers) - 5 sacks
+  Top Tackles: Daniel Moore (Independence Patriots) - 39 tackles
+
+PLAYER STATS BY TEAM
+--------------------------------------------------
+============================================================
+  LEAGUE LEADERS (Season)
+============================================================
+
+Passing Yards
+----------------------------------------
+  1. Kenneth Smith (Independence Patriots): 661 yds  (88/130, 3 TD, 6 INT)
+  2. Tyler Moore (Shady Spring Tigers): 584 yds  (64/105, 2 TD, 5 INT)
+  3. Timothy Anderson (Bluefield Beavers): 510 yds  (60/89, 2 TD, 2 INT)
+  4. Kenneth Thomas (MT View Knights): 207 yds  (41/58, 0 TD, 0 INT)
+
+Passing Touchdowns
+----------------------------------------
+  1. Kenneth Smith (Independence Patriots): 3 TD
+  2. Tyler Moore (Shady Spring Tigers): 2 TD
+  3. Timothy Anderson (Bluefield Beavers): 2 TD
+  4. Kenneth Thomas (MT View Knights): 0 TD
+
+Rushing Yards
+----------------------------------------
+  1. Logan Lee (Bluefield Beavers): 272 yds, 1 TD
+  2. Joshua Jackson (Bluefield Beavers): 249 yds, 2 TD
+  3. Anthony Miller (Bluefield Beavers): 236 yds, 3 TD
+  4. Timothy Brown (MT View Knights): 97 yds, 0 TD
+  5. Matthew Smith (MT View Knights): 94 yds, 0 TD
+  6. Noah Taylor (Shady Spring Tigers): 84 yds, 1 TD
+  7. Joshua White (Shady Spring Tigers): 74 yds, 0 TD
+  8. Kevin Anderson (Shady Spring Tigers): 69 yds, 0 TD
+  9. George Rodriguez (MT View Knights): 67 yds, 0 TD
+  10. Robert Johnson (Independence Patriots): 49 yds, 0 TD
+
+Receiving Yards
+----------------------------------------
+  1. Brian Miller (Bluefield Beavers): 23 rec, 202 yds, 0 TD
+  2. Noah Thompson (Independence Patriots): 24 rec, 184 yds, 1 TD
+  3. Ethan Anderson (Independence Patriots): 25 rec, 174 yds, 1 TD
+  4. Jacob Davis (Shady Spring Tigers): 15 rec, 165 yds, 1 TD
+  5. Michael Martin (Independence Patriots): 17 rec, 146 yds, 0 TD
+  6. Tyler Anderson (Shady Spring Tigers): 16 rec, 142 yds, 1 TD
+  7. Timothy Thompson (Shady Spring Tigers): 16 rec, 131 yds, 0 TD
+  8. David Thomas (Bluefield Beavers): 12 rec, 117 yds, 0 TD
+  9. Daniel Moore (Independence Patriots): 15 rec, 101 yds, 0 TD
+  10. Joshua Williams (Shady Spring Tigers): 9 rec, 75 yds, 0 TD
+
+Tackles
+----------------------------------------
+  1. Daniel Moore (Independence Patriots): 39 tkl
+  2. Timothy Thompson (Shady Spring Tigers): 34 tkl
+  3. Noah Williams (Independence Patriots): 33 tkl
+  4. John Martinez (Independence Patriots): 32 tkl
+  5. George Taylor (Independence Patriots): 30 tkl
+  6. Mason Davis (MT View Knights): 30 tkl
+  7. Michael Miller (MT View Knights): 28 tkl
+  8. George Jackson (Bluefield Beavers): 27 tkl
+  9. Joshua White (Shady Spring Tigers): 23 tkl
+  10. Logan Lee (Shady Spring Tigers): 23 tkl
+
+Sacks
+----------------------------------------
+  1. Noah Martinez (Bluefield Beavers): 5 sk
+  2. George Jackson (Bluefield Beavers): 3 sk
+  3. Logan Lee (Shady Spring Tigers): 3 sk
+  4. Noah Williams (Independence Patriots): 2 sk
+  5. Joshua Jones (Bluefield Beavers): 2 sk
+  6. Timothy Thompson (Shady Spring Tigers): 2 sk
+  7. George Taylor (Independence Patriots): 1 sk
+  8. Daniel Moore (Independence Patriots): 1 sk
+  9. Matthew Miller (Independence Patriots): 1 sk
+  10. Anthony Taylor (Independence Patriots): 1 sk
+
+Interceptions
+----------------------------------------
+  1. Brian Miller (Bluefield Beavers): 4 INT
+  2. George Rodriguez (MT View Knights): 2 INT
+  3. Timothy Anderson (MT View Knights): 2 INT
+  4. David Jackson (Independence Patriots): 1 INT
+  5. Andrew Smith (Independence Patriots): 1 INT
+  6. Noah Garcia (Bluefield Beavers): 1 INT
+  7. Jacob Davis (Shady Spring Tigers): 1 INT
+  8. Tyler Thomas (Shady Spring Tigers): 1 INT
+
+============================================================
+  INDIVIDUAL PLAYER STATS BY TEAM
+============================================================
+
+Independence Patriots
+----------------------------------------
+  QB:
+    Kenneth Smith: 88/130 (67.7%) 661 yds, 3 TD, 6 INT
+  RB:
+    Robert Johnson: 49 rush yds, 0 TD
+    Donald Jackson: 49 rush yds, 0 TD
+    Robert Martinez: 37 rush yds, 0 TD
+  WR/TE:
+    Noah Thompson: 24 rec, 184 yds, 1 TD
+    Ethan Anderson: 25 rec, 174 yds, 1 TD
+    Michael Martin: 17 rec, 146 yds, 0 TD
+    Daniel Moore: 15 rec, 101 yds, 0 TD
+    Robert Johnson: 4 rec, 39 yds, 1 TD
+    Donald Jackson: 3 rec, 17 yds, 0 TD
+  Defense:
+    Daniel Moore: 39 tkl 1 sk 1 TFL
+    Noah Williams: 33 tkl 2 sk 2 TFL
+    John Martinez: 32 tkl
+    George Taylor: 30 tkl 1 sk 1 TFL
+    David Jackson: 22 tkl 1 INT
+    Anthony Taylor: 21 tkl 1 sk 1 TFL
+    Matthew Miller: 17 tkl 1 sk 1 TFL
+    Steven Smith: 10 tkl
+    Andrew Smith: 8 tkl 1 INT
+
+MT View Knights
+----------------------------------------
+  QB:
+    Kenneth Thomas: 41/58 (70.7%) 207 yds, 0 TD, 0 INT
+  RB:
+    Timothy Brown: 97 rush yds, 0 TD
+    Matthew Smith: 94 rush yds, 0 TD
+    George Rodriguez: 67 rush yds, 0 TD
+  WR/TE:
+    Timothy Brown: 1 rec, 6 yds, 0 TD
+    George Rodriguez: 2 rec, 10 yds, 0 TD
+    Lucas Martinez: 14 rec, 74 yds, 0 TD
+    Jackson Thompson: 10 rec, 55 yds, 0 TD
+    Michael Jones: 8 rec, 53 yds, 0 TD
+    Mason Davis: 6 rec, 9 yds, 0 TD
+  Defense:
+    George Rodriguez: 22 tkl 2 INT
+    Lucas Martinez: 8 tkl
+    Michael Jones: 11 tkl
+    Mason Davis: 30 tkl
+    Michael Miller: 28 tkl 1 sk 1 TFL
+    Timothy Anderson: 16 tkl 2 INT
+    Jacob Anderson: 12 tkl 1 sk 1 TFL
+    Tyler Williams: 10 tkl
+    Daniel White: 2 tkl 1 sk 1 TFL
+
+Bluefield Beavers
+----------------------------------------
+  QB:
+    Timothy Anderson: 60/89 (67.4%) 510 yds, 2 TD, 2 INT
+  RB:
+    Joshua Jackson: 249 rush yds, 2 TD
+    Logan Lee: 272 rush yds, 1 TD
+    Anthony Miller: 236 rush yds, 3 TD
+  WR/TE:
+    Joshua Jackson: 5 rec, 28 yds, 0 TD
+    Anthony Miller: 4 rec, 35 yds, 1 TD
+    Brian Miller: 23 rec, 202 yds, 0 TD
+    David Thomas: 12 rec, 117 yds, 0 TD
+    Daniel Taylor: 9 rec, 74 yds, 0 TD
+    Tyler Jones: 7 rec, 54 yds, 1 TD
+  Defense:
+    Joshua Jackson: 12 tkl
+    Brian Miller: 7 tkl 4 INT
+    George Jackson: 27 tkl 3 sk 3 TFL
+    Lucas Lee: 19 tkl
+    Noah Martinez: 12 tkl 5 sk 5 TFL
+    Steven Jackson: 12 tkl
+    Noah Garcia: 8 tkl 1 INT
+    George Taylor: 7 tkl
+    Joshua Jones: 7 tkl 2 sk 2 TFL
+
+Shady Spring Tigers
+----------------------------------------
+  QB:
+    Tyler Moore: 64/105 (61.0%) 584 yds, 2 TD, 5 INT
+  RB:
+    Joshua White: 74 rush yds, 0 TD
+    Noah Taylor: 84 rush yds, 1 TD
+    Kevin Anderson: 69 rush yds, 0 TD
+  WR/TE:
+    Jacob Davis: 15 rec, 165 yds, 1 TD
+    Joshua White: 7 rec, 69 yds, 0 TD
+    Tyler Anderson: 16 rec, 142 yds, 1 TD
+    Timothy Thompson: 16 rec, 131 yds, 0 TD
+    Joshua Williams: 9 rec, 75 yds, 0 TD
+    Kevin Anderson: 1 rec, 2 yds, 0 TD
+  Defense:
+    Jacob Davis: 10 tkl 1 INT
+    Joshua White: 23 tkl 1 sk 1 TFL
+    Tyler Anderson: 18 tkl
+    Timothy Thompson: 34 tkl 2 sk 2 TFL
+    Logan Lee: 23 tkl 3 sk 3 TFL
+    Kevin Rodriguez: 17 tkl 1 sk 1 TFL
+    Tyler Thomas: 12 tkl 1 INT
+    Paul Williams: 9 tkl
+    Joshua Wilson: 4 tkl
+    Christopher Taylor: 1 sk 1 TFL
+
+CHAMPION: Bluefield Beavers
+
+
+============================================================
+SEASON 9
+============================================================
+
+COACHES & PLAY CALLING TENDENCIES
+--------------------------------------------------
+  Independence Patriots: Todd Reed - Play Call Tendency: Heavy Pass
+  MT View Knights: Adam Scott - Play Call Tendency: Heavy Run
+  Bluefield Beavers: Jeff Stewart - Play Call Tendency: Heavy Run
+  Shady Spring Tigers: Adam Martin - Play Call Tendency: Balanced
+
+GAME RESULTS & STATS (no play-by-play)
+--------------------------------------------------
+  Independence Patriots 13 - MT View Knights 6
+    Independence Patriots: 49 rush / 164 pass | 36 plays | Run calls: 9 | Pass calls: 27
+    MT View Knights: 98 rush / 87 pass | 47 plays | Run calls: 31 | Pass calls: 16
+  Independence Patriots 7 - Bluefield Beavers 13
+    Independence Patriots: 16 rush / 141 pass | 33 plays | Run calls: 4 | Pass calls: 29
+    Bluefield Beavers: 170 rush / 66 pass | 47 plays | Run calls: 36 | Pass calls: 11
+  Independence Patriots 3 - Shady Spring Tigers 17
+    Independence Patriots: 11 rush / 150 pass | 42 plays | Run calls: 4 | Pass calls: 38
+    Shady Spring Tigers: 71 rush / 142 pass | 43 plays | Run calls: 16 | Pass calls: 27
+  MT View Knights 0 - Bluefield Beavers 14
+    MT View Knights: 41 rush / 17 pass | 30 plays | Run calls: 19 | Pass calls: 11
+    Bluefield Beavers: 182 rush / 79 pass | 46 plays | Run calls: 35 | Pass calls: 11
+  MT View Knights 0 - Shady Spring Tigers 10
+    MT View Knights: 57 rush / 91 pass | 43 plays | Run calls: 26 | Pass calls: 17
+    Shady Spring Tigers: 40 rush / 106 pass | 32 plays | Run calls: 9 | Pass calls: 23
+  Bluefield Beavers 0 - Shady Spring Tigers 6
+    Bluefield Beavers: 225 rush / 69 pass | 63 plays | Run calls: 53 | Pass calls: 10
+    Shady Spring Tigers: 5 rush / -1 pass | 12 plays | Run calls: 2 | Pass calls: 10
+  Playoff: Shady Spring Tigers 10 - MT View Knights 3 -> Shady Spring Tigers
+  Playoff: Bluefield Beavers 3 - Independence Patriots 10 -> Independence Patriots
+  Playoff: Shady Spring Tigers 14 - Independence Patriots 0 -> Shady Spring Tigers
+
+FINAL STANDINGS
+--------------------------------------------------
+  Shady Spring Tigers: 5-0 (PF 57 PA 6 PD +51)
+  Bluefield Beavers: 2-2 (PF 30 PA 23 PD +7)
+  Independence Patriots: 2-3 (PF 33 PA 53 PD -20)
+  MT View Knights: 0-4 (PF 9 PA 47 PD -38)
+
+SEASON LEADERBOARD
+--------------------------------------------------
+  Top Passer: Kenneth Smith (Independence Patriots) - 674 yds, 96/142, 3 TD, 1 INT
+  Top Rusher: Jackson Johnson (Bluefield Beavers) - 268 yds, 0 TD
+  Top Receiver: Jacob Davis (Shady Spring Tigers) - 22 rec, 192 yds, 2 TD
+  Top Sacks: Joshua White (Shady Spring Tigers) - 4 sacks
+  Top Tackles: Daniel Moore (Independence Patriots) - 56 tackles
+
+PLAYER STATS BY TEAM
+--------------------------------------------------
+============================================================
+  LEAGUE LEADERS (Season)
+============================================================
+
+Passing Yards
+----------------------------------------
+  1. Kenneth Smith (Independence Patriots): 674 yds  (96/142, 3 TD, 1 INT)
+  2. Tyler Moore (Shady Spring Tigers): 613 yds  (79/118, 5 TD, 1 INT)
+  3. Timothy Anderson (Bluefield Beavers): 337 yds  (39/57, 2 TD, 3 INT)
+  4. Kenneth Thomas (MT View Knights): 245 yds  (38/58, 0 TD, 1 INT)
+
+Passing Touchdowns
+----------------------------------------
+  1. Tyler Moore (Shady Spring Tigers): 5 TD
+  2. Kenneth Smith (Independence Patriots): 3 TD
+  3. Timothy Anderson (Bluefield Beavers): 2 TD
+  4. Kenneth Thomas (MT View Knights): 0 TD
+
+Rushing Yards
+----------------------------------------
+  1. Jackson Johnson (Bluefield Beavers): 268 yds, 0 TD
+  2. Anthony Miller (Bluefield Beavers): 240 yds, 0 TD
+  3. Noah Garcia (Bluefield Beavers): 217 yds, 1 TD
+  4. Kevin Anderson (Shady Spring Tigers): 155 yds, 1 TD
+  5. Noah Taylor (Shady Spring Tigers): 137 yds, 0 TD
+  6. Joshua White (Shady Spring Tigers): 122 yds, 0 TD
+  7. George Rodriguez (MT View Knights): 75 yds, 0 TD
+  8. Timothy Brown (MT View Knights): 69 yds, 0 TD
+  9. Noah Anderson (MT View Knights): 60 yds, 0 TD
+  10. Tyler Jackson (Independence Patriots): 54 yds, 0 TD
+
+Receiving Yards
+----------------------------------------
+  1. Jacob Davis (Shady Spring Tigers): 22 rec, 192 yds, 2 TD
+  2. Daniel Moore (Independence Patriots): 22 rec, 183 yds, 0 TD
+  3. Michael Martin (Independence Patriots): 24 rec, 158 yds, 2 TD
+  4. Timothy Thompson (Shady Spring Tigers): 19 rec, 146 yds, 1 TD
+  5. Ethan Anderson (Independence Patriots): 21 rec, 132 yds, 0 TD
+  6. Tyler Anderson (Shady Spring Tigers): 17 rec, 132 yds, 0 TD
+  7. Brian Taylor (Bluefield Beavers): 11 rec, 107 yds, 0 TD
+  8. Joshua Williams (Shady Spring Tigers): 13 rec, 104 yds, 1 TD
+  9. Brian Miller (Bluefield Beavers): 9 rec, 84 yds, 0 TD
+  10. Matthew Jones (Independence Patriots): 9 rec, 80 yds, 1 TD
+
+Tackles
+----------------------------------------
+  1. Daniel Moore (Independence Patriots): 56 tkl
+  2. John Martinez (Independence Patriots): 31 tkl
+  3. Mason Davis (MT View Knights): 31 tkl
+  4. Joshua Smith (Independence Patriots): 30 tkl
+  5. Noah Williams (Independence Patriots): 29 tkl
+  6. George Rodriguez (MT View Knights): 29 tkl
+  7. Timothy Thompson (Shady Spring Tigers): 28 tkl
+  8. Michael Miller (MT View Knights): 27 tkl
+  9. Tyler Anderson (Shady Spring Tigers): 26 tkl
+  10. Joshua White (Shady Spring Tigers): 22 tkl
+
+Sacks
+----------------------------------------
+  1. Joshua White (Shady Spring Tigers): 4 sk
+  2. Timothy Garcia (Bluefield Beavers): 3 sk
+  3. Lucas Lee (Bluefield Beavers): 3 sk
+  4. Tyler Thomas (Shady Spring Tigers): 3 sk
+  5. Joshua Smith (Independence Patriots): 2 sk
+  6. Mason Davis (MT View Knights): 2 sk
+  7. Michael Miller (MT View Knights): 2 sk
+  8. Donald Jackson (Independence Patriots): 1 sk
+  9. Anthony Taylor (Independence Patriots): 1 sk
+  10. David Garcia (MT View Knights): 1 sk
+
+Interceptions
+----------------------------------------
+  1. Robert Martinez (Independence Patriots): 1 INT
+  2. Lucas Rodriguez (Independence Patriots): 1 INT
+  3. Michael Jones (MT View Knights): 1 INT
+  4. Timothy Anderson (MT View Knights): 1 INT
+  5. Brian Miller (Bluefield Beavers): 1 INT
+  6. Jacob Davis (Shady Spring Tigers): 1 INT
+
+============================================================
+  INDIVIDUAL PLAYER STATS BY TEAM
+============================================================
+
+Independence Patriots
+----------------------------------------
+  QB:
+    Kenneth Smith: 96/142 (67.6%) 674 yds, 3 TD, 1 INT
+  RB:
+    Donald Jackson: 50 rush yds, 0 TD
+    Tyler Jackson: 54 rush yds, 0 TD
+    Robert Martinez: 24 rush yds, 0 TD
+  WR/TE:
+    Daniel Moore: 22 rec, 183 yds, 0 TD
+    Michael Martin: 24 rec, 158 yds, 2 TD
+    Ethan Anderson: 21 rec, 132 yds, 0 TD
+    Donald Jackson: 12 rec, 76 yds, 0 TD
+    Tyler Jackson: 8 rec, 45 yds, 0 TD
+    Matthew Jones: 9 rec, 80 yds, 1 TD
+  Defense:
+    Daniel Moore: 56 tkl
+    Matthew Jones: 7 tkl
+    Robert Martinez: 16 tkl 1 INT
+    John Martinez: 31 tkl
+    Joshua Smith: 30 tkl 2 sk 2 TFL
+    Noah Williams: 29 tkl
+    Donald Jackson: 21 tkl 1 sk 1 TFL
+    Anthony Taylor: 18 tkl 1 sk 1 TFL
+    Lucas Rodriguez: 10 tkl 1 INT
+
+MT View Knights
+----------------------------------------
+  QB:
+    Kenneth Thomas: 38/58 (65.5%) 245 yds, 0 TD, 1 INT
+  RB:
+    George Rodriguez: 75 rush yds, 0 TD
+    Timothy Brown: 69 rush yds, 0 TD
+    Noah Anderson: 60 rush yds, 0 TD
+  WR/TE:
+    George Rodriguez: 7 rec, 60 yds, 0 TD
+    Timothy Brown: 2 rec, 5 yds, 0 TD
+    Michael Jones: 11 rec, 61 yds, 0 TD
+    Lucas Martinez: 11 rec, 59 yds, 0 TD
+    Jackson Thompson: 5 rec, 36 yds, 0 TD
+    Mason Davis: 2 rec, 24 yds, 0 TD
+  Defense:
+    George Rodriguez: 29 tkl
+    Michael Jones: 11 tkl 1 INT
+    Lucas Martinez: 7 tkl
+    Mason Davis: 31 tkl 2 sk 2 TFL
+    Michael Miller: 27 tkl 2 sk 2 TFL
+    Jacob Anderson: 15 tkl 1 sk 1 TFL
+    Timothy Anderson: 14 tkl 1 INT
+    Tyler Williams: 9 tkl
+    Daniel White: 5 tkl
+    David Garcia: 1 sk 1 TFL
+
+Bluefield Beavers
+----------------------------------------
+  QB:
+    Timothy Anderson: 39/57 (68.4%) 337 yds, 2 TD, 3 INT
+  RB:
+    Jackson Johnson: 268 rush yds, 0 TD
+    Anthony Miller: 240 rush yds, 0 TD
+    Noah Garcia: 217 rush yds, 1 TD
+  WR/TE:
+    Anthony Miller: 4 rec, 28 yds, 1 TD
+    Noah Garcia: 1 rec, 6 yds, 0 TD
+    Brian Taylor: 11 rec, 107 yds, 0 TD
+    Brian Miller: 9 rec, 84 yds, 0 TD
+    Mark Rodriguez: 9 rec, 71 yds, 0 TD
+    Noah Martinez: 5 rec, 41 yds, 1 TD
+  Defense:
+    Jackson Johnson: 8 tkl
+    Noah Garcia: 11 tkl
+    Brian Miller: 3 tkl 1 INT
+    Noah Martinez: 7 tkl
+    Lucas Lee: 16 tkl 3 sk 3 TFL
+    Robert Jackson: 11 tkl 1 sk 1 TFL
+    Steven Jackson: 11 tkl
+    Mark Rodriguez: 10 tkl
+    Timothy Garcia: 7 tkl 3 sk 3 TFL
+
+Shady Spring Tigers
+----------------------------------------
+  QB:
+    Tyler Moore: 79/118 (66.9%) 613 yds, 5 TD, 1 INT
+  RB:
+    Kevin Anderson: 155 rush yds, 1 TD
+    Noah Taylor: 137 rush yds, 0 TD
+    Joshua White: 122 rush yds, 0 TD
+  WR/TE:
+    Jacob Davis: 22 rec, 192 yds, 2 TD
+    Noah Taylor: 2 rec, 16 yds, 0 TD
+    Timothy Thompson: 19 rec, 146 yds, 1 TD
+    Joshua White: 6 rec, 23 yds, 1 TD
+    Tyler Anderson: 17 rec, 132 yds, 0 TD
+    Joshua Williams: 13 rec, 104 yds, 1 TD
+  Defense:
+    Jacob Davis: 16 tkl 1 INT
+    Timothy Thompson: 28 tkl 1 sk 1 TFL
+    Joshua White: 22 tkl 4 sk 4 TFL
+    Tyler Anderson: 26 tkl
+    Kevin Rodriguez: 21 tkl
+    Logan Lee: 19 tkl 1 sk 1 TFL
+    Tyler Thomas: 17 tkl 3 sk 3 TFL
+    Mark Jones: 10 tkl
+    Joshua Wilson: 4 tkl
+
+CHAMPION: Shady Spring Tigers
+
+
+============================================================
+SEASON 10
+============================================================
+
+COACHES & PLAY CALLING TENDENCIES
+--------------------------------------------------
+  Independence Patriots: Todd Reed - Play Call Tendency: Heavy Pass
+  MT View Knights: Adam Scott - Play Call Tendency: Heavy Run
+  Bluefield Beavers: Jeff Stewart - Play Call Tendency: Heavy Run
+  Shady Spring Tigers: Adam Martin - Play Call Tendency: Balanced
+
+GAME RESULTS & STATS (no play-by-play)
+--------------------------------------------------
+  Independence Patriots 21 - MT View Knights 3
+    Independence Patriots: 23 rush / 302 pass | 42 plays | Run calls: 6 | Pass calls: 36
+    MT View Knights: 78 rush / 16 pass | 42 plays | Run calls: 27 | Pass calls: 15
+  Independence Patriots 17 - Bluefield Beavers 14
+    Independence Patriots: 21 rush / 240 pass | 41 plays | Run calls: 6 | Pass calls: 35
+    Bluefield Beavers: 232 rush / 26 pass | 37 plays | Run calls: 30 | Pass calls: 7
+  Independence Patriots 7 - Shady Spring Tigers 10
+    Independence Patriots: 22 rush / 179 pass | 46 plays | Run calls: 9 | Pass calls: 37
+    Shady Spring Tigers: 38 rush / 145 pass | 39 plays | Run calls: 12 | Pass calls: 27
+  MT View Knights 0 - Bluefield Beavers 28
+    MT View Knights: 81 rush / 80 pass | 45 plays | Run calls: 29 | Pass calls: 16
+    Bluefield Beavers: 281 rush / 51 pass | 32 plays | Run calls: 25 | Pass calls: 7
+  MT View Knights 0 - Shady Spring Tigers 17
+    MT View Knights: 60 rush / 71 pass | 47 plays | Run calls: 27 | Pass calls: 20
+    Shady Spring Tigers: 54 rush / 171 pass | 31 plays | Run calls: 12 | Pass calls: 19
+  Bluefield Beavers 10 - Shady Spring Tigers 14
+    Bluefield Beavers: 128 rush / 30 pass | 38 plays | Run calls: 32 | Pass calls: 6
+    Shady Spring Tigers: 28 rush / 190 pass | 35 plays | Run calls: 10 | Pass calls: 25
+  Playoff: Shady Spring Tigers 7 - MT View Knights 0 -> Shady Spring Tigers
+  Playoff: Independence Patriots 3 - Bluefield Beavers 7 -> Bluefield Beavers
+  Playoff: Shady Spring Tigers 13 - Bluefield Beavers 10 -> Shady Spring Tigers
+
+FINAL STANDINGS
+--------------------------------------------------
+  Shady Spring Tigers: 5-0 (PF 61 PA 27 PD +34)
+  Bluefield Beavers: 2-3 (PF 69 PA 47 PD +22)
+  Independence Patriots: 2-2 (PF 48 PA 34 PD +14)
+  MT View Knights: 0-4 (PF 3 PA 73 PD -70)
+
+SEASON LEADERBOARD
+--------------------------------------------------
+  Top Passer: Christopher Johnson (Independence Patriots) - 853 yds, 92/134, 4 TD, 1 INT
+  Top Rusher: Jackson Johnson (Bluefield Beavers) - 304 yds, 3 TD
+  Top Receiver: Matthew Jones (Independence Patriots) - 27 rec, 281 yds, 0 TD
+  Top Sacks: Joshua Smith (Independence Patriots) - 4 sacks
+  Top Tackles: Timothy Johnson (Shady Spring Tigers) - 40 tackles
+
+PLAYER STATS BY TEAM
+--------------------------------------------------
+============================================================
+  LEAGUE LEADERS (Season)
+============================================================
+
+Passing Yards
+----------------------------------------
+  1. Christopher Johnson (Independence Patriots): 853 yds  (92/134, 4 TD, 1 INT)
+  2. Robert Brown (Shady Spring Tigers): 756 yds  (80/111, 6 TD, 3 INT)
+  3. Matthew Martinez (Bluefield Beavers): 327 yds  (44/62, 2 TD, 1 INT)
+  4. Kenneth Thomas (MT View Knights): 201 yds  (46/65, 0 TD, 1 INT)
+
+Passing Touchdowns
+----------------------------------------
+  1. Robert Brown (Shady Spring Tigers): 6 TD
+  2. Christopher Johnson (Independence Patriots): 4 TD
+  3. Matthew Martinez (Bluefield Beavers): 2 TD
+  4. Kenneth Thomas (MT View Knights): 0 TD
+
+Rushing Yards
+----------------------------------------
+  1. Jackson Johnson (Bluefield Beavers): 304 yds, 3 TD
+  2. Anthony Miller (Bluefield Beavers): 253 yds, 3 TD
+  3. Noah Garcia (Bluefield Beavers): 250 yds, 1 TD
+  4. Michael Rodriguez (Shady Spring Tigers): 135 yds, 0 TD
+  5. George Rodriguez (MT View Knights): 111 yds, 0 TD
+  6. Noah Taylor (Shady Spring Tigers): 94 yds, 1 TD
+  7. Donald Jackson (MT View Knights): 83 yds, 0 TD
+  8. Kevin Anderson (Shady Spring Tigers): 81 yds, 0 TD
+  9. Noah Anderson (MT View Knights): 72 yds, 0 TD
+  10. Robert Martinez (Independence Patriots): 52 yds, 0 TD
+
+Receiving Yards
+----------------------------------------
+  1. Matthew Jones (Independence Patriots): 27 rec, 281 yds, 0 TD
+  2. Mark Jones (Shady Spring Tigers): 22 rec, 236 yds, 3 TD
+  3. Christopher Williams (Independence Patriots): 18 rec, 195 yds, 1 TD
+  4. Joshua Wilson (Shady Spring Tigers): 18 rec, 187 yds, 0 TD
+  5. Jacob Davis (Shady Spring Tigers): 20 rec, 136 yds, 2 TD
+  6. Tyler Jackson (Independence Patriots): 10 rec, 126 yds, 0 TD
+  7. Noah Thompson (Independence Patriots): 17 rec, 121 yds, 1 TD
+  8. Daniel Moore (Independence Patriots): 17 rec, 110 yds, 2 TD
+  9. William Smith (Shady Spring Tigers): 8 rec, 109 yds, 0 TD
+  10. Kenneth Martinez (Bluefield Beavers): 12 rec, 108 yds, 0 TD
+
+Tackles
+----------------------------------------
+  1. Timothy Johnson (Shady Spring Tigers): 40 tkl
+  2. Lucas Lee (Bluefield Beavers): 30 tkl
+  3. Michael Miller (MT View Knights): 28 tkl
+  4. Robert Jackson (Bluefield Beavers): 28 tkl
+  5. Robert White (Independence Patriots): 27 tkl
+  6. Joshua Smith (Independence Patriots): 26 tkl
+  7. Noah Martin (Bluefield Beavers): 25 tkl
+  8. Tyler Thomas (Shady Spring Tigers): 25 tkl
+  9. Steven Jackson (Bluefield Beavers): 24 tkl
+  10. Jackson Jones (MT View Knights): 23 tkl
+
+Sacks
+----------------------------------------
+  1. Joshua Smith (Independence Patriots): 4 sk
+  2. Donald Miller (Shady Spring Tigers): 4 sk
+  3. Steven Jackson (Bluefield Beavers): 3 sk
+  4. Robert White (Independence Patriots): 2 sk
+  5. Noah Martinez (Bluefield Beavers): 2 sk
+  6. Robert Jackson (Bluefield Beavers): 2 sk
+  7. Daniel Moore (Independence Patriots): 1 sk
+  8. Donald Jackson (Independence Patriots): 1 sk
+  9. Jacob Anderson (MT View Knights): 1 sk
+  10. Robert Davis (MT View Knights): 1 sk
+
+Interceptions
+----------------------------------------
+  1. George Rodriguez (MT View Knights): 1 INT
+  2. Michael Jones (MT View Knights): 1 INT
+  3. Noah Garcia (Bluefield Beavers): 1 INT
+  4. Jackson Johnson (Bluefield Beavers): 1 INT
+  5. Michael Rodriguez (Shady Spring Tigers): 1 INT
+  6. Mark Jones (Shady Spring Tigers): 1 INT
+
+============================================================
+  INDIVIDUAL PLAYER STATS BY TEAM
+============================================================
+
+Independence Patriots
+----------------------------------------
+  QB:
+    Christopher Johnson: 92/134 (68.7%) 853 yds, 4 TD, 1 INT
+  RB:
+    Tyler Jackson: 33 rush yds, 1 TD
+    Robert Martinez: 52 rush yds, 0 TD
+    Joshua Thompson: 36 rush yds, 1 TD
+  WR/TE:
+    Matthew Jones: 27 rec, 281 yds, 0 TD
+    Christopher Williams: 18 rec, 195 yds, 1 TD
+    Tyler Jackson: 10 rec, 126 yds, 0 TD
+    Noah Thompson: 17 rec, 121 yds, 1 TD
+    Daniel Moore: 17 rec, 110 yds, 2 TD
+    Robert Martinez: 3 rec, 20 yds, 0 TD
+  Defense:
+    Tyler Jackson: 15 tkl
+    Daniel Moore: 22 tkl 1 sk 1 TFL
+    Robert Martinez: 10 tkl
+    Robert White: 27 tkl 2 sk 2 TFL
+    Joshua Smith: 26 tkl 4 sk 4 TFL
+    Mark Davis: 12 tkl
+    Donald Jackson: 9 tkl 1 sk 1 TFL
+    Brian Lee: 8 tkl
+    William Rodriguez: 3 tkl
+
+MT View Knights
+----------------------------------------
+  QB:
+    Kenneth Thomas: 46/65 (70.8%) 201 yds, 0 TD, 1 INT
+  RB:
+    George Rodriguez: 111 rush yds, 0 TD
+    Donald Jackson: 83 rush yds, 0 TD
+    Noah Anderson: 72 rush yds, 0 TD
+  WR/TE:
+    George Rodriguez: 6 rec, 34 yds, 0 TD
+    Donald Jackson: 3 rec, 8 yds, 0 TD
+    Michael Jones: 16 rec, 70 yds, 0 TD
+    Christopher White: 8 rec, 38 yds, 0 TD
+    Jacob Anderson: 7 rec, 35 yds, 0 TD
+    Mark Miller: 6 rec, 16 yds, 0 TD
+  Defense:
+    George Rodriguez: 21 tkl 1 INT
+    Donald Jackson: 12 tkl
+    Michael Jones: 14 tkl 1 INT
+    Jacob Anderson: 17 tkl 1 sk 1 TFL
+    Michael Miller: 28 tkl
+    Jackson Jones: 23 tkl 1 sk 1 TFL
+    Tyler Williams: 10 tkl
+    Robert Davis: 6 tkl 1 sk 1 TFL
+    John Anderson: 4 tkl
+
+Bluefield Beavers
+----------------------------------------
+  QB:
+    Matthew Martinez: 44/62 (71.0%) 327 yds, 2 TD, 1 INT
+  RB:
+    Jackson Johnson: 304 rush yds, 3 TD
+    Noah Garcia: 250 rush yds, 1 TD
+    Anthony Miller: 253 rush yds, 3 TD
+  WR/TE:
+    Jackson Johnson: 1 rec, 7 yds, 0 TD
+    Noah Garcia: 4 rec, 44 yds, 0 TD
+    Kenneth Martinez: 12 rec, 108 yds, 0 TD
+    Brian Taylor: 13 rec, 82 yds, 1 TD
+    Mark Rodriguez: 9 rec, 56 yds, 0 TD
+    Kenneth Williams: 5 rec, 30 yds, 1 TD
+  Defense:
+    Jackson Johnson: 13 tkl 1 INT
+    Noah Garcia: 18 tkl 1 INT
+    Kenneth Martinez: 14 tkl
+    Brian Taylor: 9 tkl
+    Lucas Lee: 30 tkl 1 sk 1 TFL
+    Robert Jackson: 28 tkl 2 sk 2 TFL
+    Noah Martin: 25 tkl 1 sk 1 TFL
+    Steven Jackson: 24 tkl 3 sk 3 TFL
+    Noah Martinez: 11 tkl 2 sk 2 TFL
+
+Shady Spring Tigers
+----------------------------------------
+  QB:
+    Robert Brown: 80/111 (72.1%) 756 yds, 6 TD, 3 INT
+  RB:
+    Michael Rodriguez: 135 rush yds, 0 TD
+    Noah Taylor: 94 rush yds, 1 TD
+    Kevin Anderson: 81 rush yds, 0 TD
+  WR/TE:
+    Mark Jones: 22 rec, 236 yds, 3 TD
+    Michael Rodriguez: 8 rec, 65 yds, 1 TD
+    Joshua Wilson: 18 rec, 187 yds, 0 TD
+    Jacob Davis: 20 rec, 136 yds, 2 TD
+    Noah Taylor: 4 rec, 23 yds, 0 TD
+    William Smith: 8 rec, 109 yds, 0 TD
+  Defense:
+    Mark Jones: 18 tkl 1 INT
+    Michael Rodriguez: 5 tkl 1 INT
+    Jacob Davis: 18 tkl
+    Timothy Johnson: 40 tkl
+    Tyler Thomas: 25 tkl
+    Donald Miller: 20 tkl 4 sk 4 TFL
+    Christopher Johnson: 19 tkl 1 sk 1 TFL
+    Kenneth Jones: 19 tkl 1 sk 1 TFL
+    Ethan Rodriguez: 12 tkl
+    Noah Martinez: 1 sk 1 TFL
+
+CHAMPION: Shady Spring Tigers
+
+============================================================
+END OF 10 SEASON TEST
+============================================================

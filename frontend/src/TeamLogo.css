@@ -1,0 +1,40 @@
+.teamlogo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  vertical-align: middle;
+}
+
+.teamlogo-empty {
+  opacity: 0.35;
+}
+
+.teamlogo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* No uploaded logo (404 etc.): empty crest slot, no glyph */
+.teamlogo-missing {
+  background: rgba(0, 0, 0, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.teamhome-name-with-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.teamhome-name-with-logo > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

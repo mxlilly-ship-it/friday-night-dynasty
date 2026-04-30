@@ -1,0 +1,120 @@
+TEAM SEASON RECAP — Year 2027
+==================================================================
+Team: University
+Coach: Mark Mitchell
+Record: 7-4
+Postseason: Quarterfinalist
+
+SCHEDULE
+------------------------------------------------------------------
+Week 1: vs Jefferson — W 35-14
+Week 2: @ Morgantown — L 14-21
+Week 3: vs Preston — W 70-0
+Week 4: @ Spring Mills — W 27-20
+Week 5: vs Washington — W 49-0
+Week 6: @ Martinsburg — L 28-35
+Week 7: vs Wheeling Park — L 28-35
+Week 8: @ Musselman — W 43-41 (OT)
+Week 9: vs Hedgesville — W 42-7
+Week 10: @ Jefferson — W 28-27
+
+POSTSEASON
+------------------------------------------------------------------
+Quarterfinal: @ Huntington — L 14-27
+
+TEAM STATS (regular season totals)
+------------------------------------------------------------------
+Total plays: 346
+Rush yards: 1210
+Pass yards: 1875
+Total yards: 3085
+Turnovers: 2
+Explosives: 58 (run 29 / pass 29)
+
+ROSTER (end of season)
+------------------------------------------------------------------
+- Matthew Jackson (QB) OVR None — Year 12
+- Steven Thomas (QB) OVR None — Year 12
+- Noah Anderson (OL) OVR None — Year 12
+- Kevin Jones (QB) OVR None — Year 10
+- Donald Martinez (WR) OVR None — Year 12
+- Mark Anderson (WR) OVR None — Year 10
+- Mason Johnson (QB) OVR None — Year 11
+- Daniel Williams (K) OVR None — Year 11
+- Jackson Johnson (WR) OVR None — Year 11
+- Mason Smith (WR) OVR None — Year 12
+- Jackson Williams (DE) OVR None — Year 10
+- Robert Brown (K) OVR None — Year 10
+- William Thompson (OL) OVR None — Year 12
+- Andrew Williams (QB) OVR None — Year 12
+- Michael Jackson (K) OVR None — Year 11
+- Paul Davis (K) OVR None — Year 12
+- Mark Jackson (OL) OVR None — Year 12
+- Kevin Moore (OL) OVR None — Year 11
+- Lucas Jones (DE) OVR None — Year 10
+- Noah Rodriguez (OL) OVR None — Year 10
+- Mason Jones (WR) OVR None — Year 11
+- George Williams (OL) OVR None — Year 12
+- James Smith (LB) OVR None — Year 12
+- Kevin Williams (DE) OVR None — Year 11
+- Robert Moore (DE) OVR None — Year 11
+- Paul Martinez (CB) OVR None — Year 12
+- Paul Thomas (DE) OVR None — Year 11
+- Mason Thomas (OL) OVR None — Year 10
+- Donald Taylor (LB) OVR None — Year 11
+- Robert Martinez (DE) OVR None — Year 11
+- Anthony Jackson (CB) OVR None — Year 11
+- Kenneth Johnson (LB) OVR None — Year 10
+- Jackson Miller (WR) OVR None — Year 10
+- Logan Williams (OL) OVR None — Year 12
+- Lucas Taylor (K) OVR None — Year 10
+- David Johnson (K) OVR None — Year 12
+- Jackson Johnson (RB) OVR None — Year 10
+- Jackson Thompson (OL) OVR None — Year 11
+- James Johnson (LB) OVR None — Year 11
+- William Brown (K) OVR None — Year 11
+- George Jackson (K) OVR None — Year 11
+- John Rodriguez (K) OVR None — Year 11
+- Ethan Lee (QB) OVR None — Year 9
+- Steven Wilson (WR) OVR None — Year 9
+- Noah Williams (OL) OVR None — Year 9
+- Robert Brown (K) OVR None — Year 9
+- Kevin Smith (QB) OVR None — Year 9
+- James Jones (OL) OVR None — Year 9
+- Jacob Garcia (OL) OVR None — Year 9
+- Anthony Anderson (K) OVR None — Year 9
+- David White (LB) OVR None — Year 9
+- John Moore (OL) OVR None — Year 9
+- Timothy Smith (CB) OVR None — Year 9
+- John Lee (OL) OVR None — Year 9
+- Tyler Moore (LB) OVR None — Year 9
+- Noah Smith (CB) OVR None — Year 9
+- Donald Martinez (CB) OVR None — Year 9
+- Brian Johnson (CB) OVR None — Year 9
+- David Moore (LB) OVR None — Year 9
+- Brian Thompson (K) OVR None — Year 9
+- Michael Jackson (RB) OVR None — Year 9
+- Mark Taylor (RB) OVR None — Year 9
+- John Jones (K) OVR None — Year 9
+
+TOP PLAYER SEASON STATS
+------------------------------------------------------------------
+- Matthew Jackson: 165 yds, 1 TD | Pass 165 (18/20) | Rush 0 | Rec 0
+- Mason Smith: 64 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 64
+- Donald Martinez: 47 yds, 1 TD | Pass 0 (0/0) | Rush 0 | Rec 47
+- James Johnson: 44 yds, 1 TD | Pass 0 (0/0) | Rush 14 | Rec 30
+- Mark Taylor: 25 yds, 0 TD | Pass 0 (0/0) | Rush 25 | Rec 0
+- Paul Thomas: 14 yds, 0 TD | Pass 0 (0/0) | Rush 8 | Rec 6
+- John Moore: 14 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 14
+- Kevin Williams: 4 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 4
+- Ethan Lee: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Michael Jackson: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Mason Jones: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- George Williams: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Kevin Moore: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Mark Jackson: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Donald Taylor: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Logan Williams: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Timothy Smith: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Paul Martinez: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- William Brown: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0

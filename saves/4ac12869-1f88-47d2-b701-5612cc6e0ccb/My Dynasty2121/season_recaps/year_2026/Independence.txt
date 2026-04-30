@@ -1,0 +1,108 @@
+TEAM SEASON RECAP — Year 2026
+==================================================================
+Team: Independence
+Coach: Dan Davis
+Record: 11-2
+Postseason: —
+
+SCHEDULE
+------------------------------------------------------------------
+Week 1: vs Bluefield — L 21-40
+Week 2: @ River View — W 42-9
+Week 3: @ Westside — W 35-7
+Week 4: vs Pikeview — W 34-3
+Week 5: @ Poca — W 28-6
+Week 6: vs Wyoming East — W 35-10
+Week 7: vs James Monroe — W 31-10
+Week 8: @ Ravenswood — W 35-7
+Week 9: @ Midland Trail — W 37-3
+Week 10: @ Lincoln — W 28-10
+
+POSTSEASON
+------------------------------------------------------------------
+Quarterfinal: vs Moorefield — W 42-10
+Semifinal: vs Roane County — W 34-6
+Championship: @ Bluefield — L 16-31
+
+TEAM STATS (regular season totals)
+------------------------------------------------------------------
+Total plays: 378
+Rush yards: 1944
+Pass yards: 1369
+Total yards: 3313
+Turnovers: 2
+Explosives: 63 (run 42 / pass 21)
+
+ROSTER (end of season)
+------------------------------------------------------------------
+- Daniel Jackson (K) OVR None — Year 11
+- John Miller (LB) OVR None — Year 9
+- Timothy Williams (WR) OVR None — Year 9
+- Tyler Jackson (OL) OVR None — Year 12
+- Jacob Johnson (RB) OVR None — Year 12
+- Tyler Smith (K) OVR None — Year 10
+- Daniel Miller (WR) OVR None — Year 10
+- Michael Johnson (K) OVR None — Year 9
+- Mason Brown (K) OVR None — Year 12
+- Ethan Taylor (CB) OVR None — Year 10
+- Kevin Brown (WR) OVR None — Year 11
+- Michael White (K) OVR None — Year 12
+- Matthew Martinez (WR) OVR None — Year 11
+- Daniel Johnson (WR) OVR None — Year 12
+- Lucas Thompson (OL) OVR None — Year 11
+- Lucas Smith (LB) OVR None — Year 10
+- Ethan Rodriguez (K) OVR None — Year 12
+- Steven Rodriguez (OL) OVR None — Year 10
+- David Davis (RB) OVR None — Year 9
+- Matthew Miller (OL) OVR None — Year 11
+- James Lee (LB) OVR None — Year 10
+- Jacob Brown (OL) OVR None — Year 9
+- John Smith (OL) OVR None — Year 12
+- Joshua Johnson (OL) OVR None — Year 10
+- Donald Davis (LB) OVR None — Year 10
+- Christopher White (WR) OVR None — Year 12
+- Anthony Garcia (OL) OVR None — Year 12
+- Noah White (K) OVR None — Year 10
+- Noah Martinez (LB) OVR None — Year 12
+- Michael Rodriguez (DE) OVR None — Year 9
+- Michael Miller (LB) OVR None — Year 12
+- Daniel Garcia (K) OVR None — Year 10
+- Jackson Lee (WR) OVR None — Year 10
+- Ethan Jackson (OL) OVR None — Year 11
+- Logan Moore (LB) OVR None — Year 11
+- Daniel White (CB) OVR None — Year 11
+- William Miller (LB) OVR None — Year 11
+- Robert Jones (WR) OVR None — Year 9
+- Donald Miller (CB) OVR None — Year 11
+- Jackson White (RB) OVR None — Year 9
+- Noah Miller (QB) OVR None — Year 12
+- Matthew Moore (K) OVR None — Year 12
+- Kenneth Rodriguez (K) OVR None — Year 12
+- Steven Davis (CB) OVR None — Year 10
+- Kenneth Lee (LB) OVR None — Year 9
+- Christopher Garcia (CB) OVR None — Year 12
+- Joshua Davis (K) OVR None — Year 9
+- Michael Lee (K) OVR None — Year 11
+
+TOP PLAYER SEASON STATS
+------------------------------------------------------------------
+- Noah Miller: 500 yds, 5 TD | Pass 500 (43/60) | Rush 0 | Rec 0
+- Jacob Johnson: 328 yds, 4 TD | Pass 0 (0/0) | Rush 256 | Rec 72
+- Christopher Garcia: 235 yds, 3 TD | Pass 0 (0/0) | Rush 213 | Rec 22
+- Matthew Martinez: 150 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 150
+- Kevin Brown: 135 yds, 2 TD | Pass 0 (0/0) | Rush 0 | Rec 135
+- David Davis: 96 yds, 2 TD | Pass 0 (0/0) | Rush 96 | Rec 0
+- Steven Rodriguez: 95 yds, 2 TD | Pass 0 (0/0) | Rush 0 | Rec 95
+- Daniel White: 26 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 26
+- Jackson White: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Daniel Johnson: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Anthony Garcia: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Ethan Jackson: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- John Smith: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Michael Rodriguez: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Donald Miller: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Noah Martinez: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Donald Davis: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Logan Moore: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- James Lee: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Steven Davis: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0

@@ -1,0 +1,164 @@
+/** Full-screen stack when profile opens above team home / gameplay (see PlayerProfileProvider). */
+.player-profile-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 15000;
+  overflow-y: auto;
+}
+
+.player-profile {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 1.25rem 1.5rem 2rem;
+  background: var(--teamhome-bg, #0f1419);
+  color: var(--teamhome-fg, #e8ecf0);
+}
+
+.player-profile-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.player-profile-back {
+  flex-shrink: 0;
+  padding: 0.45rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.player-profile-back:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.player-profile-identity {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.player-profile-title-block h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.5rem;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.player-profile-meta {
+  margin: 0;
+  font-size: 0.9rem;
+  opacity: 0.88;
+  line-height: 1.45;
+}
+
+.player-profile-measure {
+  font-weight: 800;
+  margin-top: 0.2rem;
+  letter-spacing: 0.02em;
+}
+
+.player-profile-ratings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1.25rem;
+  font-size: 0.88rem;
+  opacity: 0.95;
+}
+
+.player-profile-ratings span {
+  white-space: nowrap;
+}
+
+.player-profile-attrs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.player-profile-attr-col {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 0.75rem 0.85rem;
+}
+
+.player-profile-attr-col h2 {
+  margin: 0 0 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.player-profile-attr-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 0.65rem;
+  font-size: 0.82rem;
+}
+
+.player-profile-attr-grid dt {
+  margin: 0;
+  font-weight: 600;
+  opacity: 0.72;
+}
+
+.player-profile-attr-grid dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.player-profile-stats {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 1.25rem;
+}
+
+.player-profile-stats h2 {
+  margin: 0 0 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.player-profile-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.5rem 1rem;
+  font-size: 0.84rem;
+}
+
+.player-profile-stat {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.player-profile-stat-label {
+  opacity: 0.72;
+}
+
+.player-profile-stat-val {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.player-profile-stats-empty {
+  margin: 0;
+  font-size: 0.88rem;
+  opacity: 0.65;
+}

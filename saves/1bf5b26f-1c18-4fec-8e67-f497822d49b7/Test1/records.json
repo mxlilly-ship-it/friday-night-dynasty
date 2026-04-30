@@ -1,0 +1,112 @@
+{
+  "team": {
+    "most_championships": {
+      "value": 1,
+      "holder": "Fairmont Senior",
+      "holder_team": "Fairmont Senior",
+      "season": 1,
+      "detail": "all-time"
+    },
+    "most_wins_season": {
+      "value": 13,
+      "holder": "Fairmont Senior",
+      "holder_team": "Fairmont Senior",
+      "season": 1
+    },
+    "most_points_season": {
+      "value": 661,
+      "holder": "Bridgeport",
+      "holder_team": "Bridgeport",
+      "season": 1
+    }
+  },
+  "rushing": {
+    "single_season_yards": {
+      "value": 161,
+      "holder": "Kevin Thompson",
+      "holder_team": "Huntington",
+      "season": 1
+    },
+    "career_yards": {
+      "value": 465,
+      "holder": "Kenneth Thompson",
+      "holder_team": "Fairmont Senior",
+      "season": 1,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 3,
+      "holder": "Tyler Thomas",
+      "holder_team": "Wheeling Park",
+      "season": 1
+    }
+  },
+  "passing": {
+    "single_season_yards": {
+      "value": 345,
+      "holder": "Mason Williams",
+      "holder_team": "Jefferson",
+      "season": 1
+    },
+    "career_yards": {
+      "value": 579,
+      "holder": "Steven Garcia",
+      "holder_team": "Bridgeport",
+      "season": 1,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 3,
+      "holder": "Andrew Brown",
+      "holder_team": "North Marion",
+      "season": 1
+    }
+  },
+  "receiving": {
+    "single_season_yards": {
+      "value": 140,
+      "holder": "Andrew Miller",
+      "holder_team": "Bridgeport",
+      "season": 1
+    },
+    "career_yards": {
+      "value": 206,
+      "holder": "Andrew Miller",
+      "holder_team": "Bridgeport",
+      "season": 1,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 2,
+      "holder": "James Martin",
+      "holder_team": "Fairmont Senior",
+      "season": 1
+    }
+  },
+  "defense": {
+    "single_season_sacks": {
+      "value": 1,
+      "holder": "Brian Williams",
+      "holder_team": "Bridgeport",
+      "season": 1
+    },
+    "career_sacks": {
+      "value": 2,
+      "holder": "Daniel Miller",
+      "holder_team": "Martinsburg",
+      "season": 1,
+      "detail": "career"
+    },
+    "single_season_interceptions": {
+      "value": 1,
+      "holder": "William Wilson",
+      "holder_team": "Bridgeport",
+      "season": 1
+    }
+  },
+  "game": {
+    "most_passing_yards": null,
+    "most_rushing_yards": null,
+    "most_points": null
+  }
+}

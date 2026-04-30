@@ -1,0 +1,130 @@
+{
+  "team": {
+    "most_championships": {
+      "value": 55,
+      "holder": "Shady Spring Tigers",
+      "holder_team": "Shady Spring Tigers",
+      "season": 141,
+      "detail": "all-time"
+    },
+    "most_wins_season": {
+      "value": 13,
+      "holder": "Cabell Midland",
+      "holder_team": "Cabell Midland",
+      "season": 148
+    },
+    "most_points_season": {
+      "value": 526,
+      "holder": "Huntington",
+      "holder_team": "Huntington",
+      "season": 149
+    }
+  },
+  "rushing": {
+    "single_season_yards": {
+      "value": 1664,
+      "holder": "Paul Davis",
+      "holder_team": "Martinsburg",
+      "season": 148
+    },
+    "career_yards": {
+      "value": 1664,
+      "holder": "Paul Davis",
+      "holder_team": "Martinsburg",
+      "season": 148,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 21,
+      "holder": "James Garcia",
+      "holder_team": "Huntington",
+      "season": 148
+    }
+  },
+  "passing": {
+    "single_season_yards": {
+      "value": 2310,
+      "holder": "John Moore",
+      "holder_team": "Cabell Midland",
+      "season": 148
+    },
+    "career_yards": {
+      "value": 2470,
+      "holder": "George Thomas",
+      "holder_team": "Shady Spring Tigers",
+      "season": 141,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 32,
+      "holder": "Brian Johnson",
+      "holder_team": "Martinsburg",
+      "season": 148
+    }
+  },
+  "receiving": {
+    "single_season_yards": {
+      "value": 715,
+      "holder": "Brian Jackson",
+      "holder_team": "Wheeling Park",
+      "season": 148
+    },
+    "career_yards": {
+      "value": 756,
+      "holder": "Christopher Jones",
+      "holder_team": "Cabell Midland",
+      "season": 149,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 12,
+      "holder": "James Garcia",
+      "holder_team": "Martinsburg",
+      "season": 148
+    }
+  },
+  "defense": {
+    "single_season_sacks": {
+      "value": 8,
+      "holder": "John Williams",
+      "holder_team": "Shady Spring Tigers",
+      "season": 135
+    },
+    "career_sacks": {
+      "value": 13,
+      "holder": "John Williams",
+      "holder_team": "Shady Spring Tigers",
+      "season": 135,
+      "detail": "career"
+    },
+    "single_season_interceptions": {
+      "value": 5,
+      "holder": "Jacob Brown",
+      "holder_team": "Cabell Midland",
+      "season": 147
+    }
+  },
+  "game": {
+    "most_passing_yards": {
+      "value": 286,
+      "holder": "Jacob Jones",
+      "holder_team": "Independence Patriots",
+      "season": 1,
+      "detail": "single game"
+    },
+    "most_rushing_yards": {
+      "value": 143,
+      "holder": "Daniel Lee",
+      "holder_team": "Independence Patriots",
+      "season": 8,
+      "detail": "single game"
+    },
+    "most_points": {
+      "value": 35,
+      "holder": "Independence Patriots",
+      "holder_team": "Independence Patriots",
+      "season": 2,
+      "detail": "single game"
+    }
+  }
+}

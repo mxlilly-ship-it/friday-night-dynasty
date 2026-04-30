@@ -1,0 +1,6 @@
+Name: Trap
+Formation: Dual
+Category: Inside Run
+
+Ball carrier: RB
+Note: Quick Trap

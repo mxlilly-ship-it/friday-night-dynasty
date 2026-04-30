@@ -1,0 +1,67 @@
+============================================================
+Independence Patriots
+  Roster: 73 players
+  Coach: Nick Perez (Player Dev: 6)
+============================================================
+
+Potential tier breakdown:
+  Bench / developmental: 21
+  Role player: 25
+  Solid starter: 16
+  All-State: 6
+  Elite: 4
+  Generational: 1
+
+Sample by position (name | overall | potential | tier):
+------------------------------------------------------------
+  QB: William Johnson | ovr=60 pot=80 (All-State)
+  QB: Kenneth Garcia | ovr=50 pot=70 (Solid starter)
+  QB: Anthony Davis | ovr=50 pot=45 (Bench / developmental)
+
+  RB: Lucas Smith | ovr=57 pot=55 (Bench / developmental)
+  RB: Timothy Martin | ovr=49 pot=55 (Bench / developmental)
+  RB: Kevin Smith | ovr=52 pot=43 (Bench / developmental)
+  RB: Kevin Garcia | ovr=57 pot=59 (Role player)
+
+  WR: Brian Martinez | ovr=56 pot=51 (Bench / developmental)
+  WR: Timothy Thomas | ovr=58 pot=66 (Solid starter)
+  WR: Michael Rodriguez | ovr=57 pot=59 (Role player)
+  WR: Donald Miller | ovr=57 pot=62 (Role player)
+
+  OL: Brian Smith | ovr=58 pot=62 (Role player)
+  OL: David Wilson | ovr=70 pot=74 (Solid starter)
+  OL: Anthony Taylor | ovr=73 pot=87 (Elite)
+  OL: Michael Moore | ovr=57 pot=77 (All-State)
+
+  TE: Ethan Taylor | ovr=48 pot=45 (Bench / developmental)
+  TE: Brian Smith | ovr=57 pot=88 (Elite)
+  TE: Anthony Martinez | ovr=52 pot=58 (Role player)
+
+  DE: Steven Anderson | ovr=64 pot=59 (Role player)
+  DE: Kenneth Wilson | ovr=64 pot=56 (Role player)
+  DE: Andrew Johnson | ovr=68 pot=74 (Solid starter)
+  DE: James Wilson | ovr=66 pot=65 (Role player)
+
+  DT: Steven Garcia | ovr=76 pot=63 (Role player)
+  DT: Paul Jackson | ovr=65 pot=54 (Bench / developmental)
+  DT: Donald Thompson | ovr=60 pot=56 (Role player)
+  DT: Brian Wilson | ovr=69 pot=44 (Bench / developmental)
+
+  LB: George Jones | ovr=64 pot=58 (Role player)
+  LB: John Miller | ovr=67 pot=79 (All-State)
+  LB: Kenneth Jackson | ovr=61 pot=54 (Bench / developmental)
+  LB: Jackson Garcia | ovr=59 pot=58 (Role player)
+
+  CB: Steven White | ovr=56 pot=47 (Bench / developmental)
+  CB: Steven Brown | ovr=60 pot=75 (Solid starter)
+  CB: Christopher Wilson | ovr=65 pot=60 (Role player)
+  CB: Kevin Miller | ovr=58 pot=85 (All-State)
+
+  S: Tyler Smith | ovr=58 pot=46 (Bench / developmental)
+  S: Lucas Thomas | ovr=58 pot=66 (Solid starter)
+  S: John Miller | ovr=68 pot=49 (Bench / developmental)
+  S: Matthew Jones | ovr=66 pot=40 (Bench / developmental)
+
+  K: John Williams | ovr=86 pot=81 (All-State)
+
+  P: William Garcia | ovr=72 pot=61 (Role player)

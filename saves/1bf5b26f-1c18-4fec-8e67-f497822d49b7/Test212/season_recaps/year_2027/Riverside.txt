@@ -1,0 +1,83 @@
+TEAM SEASON RECAP — Year 2027
+==================================================================
+Team: Riverside
+Coach: Kevin King
+Record: 0-10
+Postseason: —
+
+SCHEDULE
+------------------------------------------------------------------
+Week 1: @ Oak Hill — L 6-35
+Week 2: @ Buckhannon-Upshur — L 21-28
+Week 3: vs Parkersburg — L 7-56
+Week 4: @ Hurricane — L 14-48
+Week 5: vs Cabell Midland — L 0-70
+Week 6: vs Beckley — L 0-42
+Week 7: @ Huntington — L 0-63
+Week 8: vs George Washington — L 7-42
+Week 9: @ Parkersburg South — L 14-42
+Week 10: vs Oak Hill — L 7-20
+
+TEAM STATS (regular season totals)
+------------------------------------------------------------------
+Total plays: 418
+Rush yards: 710
+Pass yards: 1096
+Total yards: 1806
+Turnovers: 9
+Explosives: 52 (run 33 / pass 19)
+
+ROSTER (end of season)
+------------------------------------------------------------------
+- Anthony Anderson (QB) OVR None — Year 10
+- George Davis (RB) OVR None — Year 12
+- Donald Miller (LB) OVR None — Year 10
+- Tyler Thomas (CB) OVR None — Year 11
+- William Miller (OL) OVR None — Year 12
+- Kevin Wilson (QB) OVR None — Year 10
+- George Williams (CB) OVR None — Year 11
+- David Davis (WR) OVR None — Year 12
+- Steven Thomas (WR) OVR None — Year 12
+- Robert Miller (WR) OVR None — Year 12
+- Paul Smith (OL) OVR None — Year 12
+- Michael Smith (WR) OVR None — Year 11
+- Daniel Thomas (OL) OVR None — Year 12
+- David Thompson (OL) OVR None — Year 11
+- Michael Williams (QB) OVR None — Year 10
+- Ethan Jones (OL) OVR None — Year 11
+- Joshua Garcia (OL) OVR None — Year 11
+- Michael Garcia (LB) OVR None — Year 12
+- Logan Rodriguez (OL) OVR None — Year 10
+- Michael Martin (DE) OVR None — Year 12
+- Kenneth Martinez (K) OVR None — Year 10
+- William Lee (WR) OVR None — Year 10
+- Noah Jackson (CB) OVR None — Year 12
+- Timothy Jackson (CB) OVR None — Year 11
+- Robert Johnson (LB) OVR None — Year 10
+- Jacob Moore (K) OVR None — Year 10
+- David Anderson (K) OVR None — Year 11
+- Steven Jackson (LB) OVR None — Year 9
+- Donald Rodriguez (WR) OVR None — Year 9
+- Michael Martinez (CB) OVR None — Year 9
+- Kevin Williams (RB) OVR None — Year 9
+- Kenneth Martinez (LB) OVR None — Year 9
+- Steven Garcia (RB) OVR None — Year 9
+- Steven Miller (WR) OVR None — Year 9
+- Anthony Martin (CB) OVR None — Year 9
+- Matthew Wilson (K) OVR None — Year 9
+- Paul Moore (WR) OVR None — Year 9
+- Robert Moore (DE) OVR None — Year 9
+- Mason Moore (WR) OVR None — Year 9
+- Joshua Johnson (K) OVR None — Year 9
+- Paul Smith (DE) OVR None — Year 9
+- Mark Martinez (CB) OVR None — Year 9
+- Lucas Williams (CB) OVR None — Year 9
+- Andrew Jones (CB) OVR None — Year 9
+- Robert Brown (OL) OVR None — Year 9
+- Jacob Johnson (OL) OVR None — Year 9
+- Ethan Lee (K) OVR None — Year 9
+- Matthew White (QB) OVR None — Year 9
+
+TOP PLAYER SEASON STATS
+------------------------------------------------------------------
+(no player season stats recorded)

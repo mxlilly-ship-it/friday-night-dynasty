@@ -1,0 +1,3 @@
+Name: Smash
+Formation: Dual
+Category: Medium Pass

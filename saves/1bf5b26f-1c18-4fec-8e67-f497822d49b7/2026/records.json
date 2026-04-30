@@ -1,0 +1,112 @@
+{
+  "team": {
+    "most_championships": {
+      "value": 3,
+      "holder": "Martinsburg",
+      "holder_team": "Martinsburg",
+      "season": 5,
+      "detail": "all-time"
+    },
+    "most_wins_season": {
+      "value": 12,
+      "holder": "Martinsburg",
+      "holder_team": "Martinsburg",
+      "season": 1
+    },
+    "most_points_season": {
+      "value": 585,
+      "holder": "Martinsburg",
+      "holder_team": "Martinsburg",
+      "season": 1
+    }
+  },
+  "rushing": {
+    "single_season_yards": {
+      "value": 287,
+      "holder": "Tyler Thomas",
+      "holder_team": "Wheeling Park",
+      "season": 3
+    },
+    "career_yards": {
+      "value": 747,
+      "holder": "Logan Johnson",
+      "holder_team": "Cabell Midland",
+      "season": 5,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 5,
+      "holder": "Tyler Thomas",
+      "holder_team": "Wheeling Park",
+      "season": 3
+    }
+  },
+  "passing": {
+    "single_season_yards": {
+      "value": 524,
+      "holder": "Robert Miller",
+      "holder_team": "Wheeling Park",
+      "season": 2
+    },
+    "career_yards": {
+      "value": 1242,
+      "holder": "Paul Thompson",
+      "holder_team": "Cabell Midland",
+      "season": 5,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 6,
+      "holder": "Kenneth Miller",
+      "holder_team": "Cabell Midland",
+      "season": 2
+    }
+  },
+  "receiving": {
+    "single_season_yards": {
+      "value": 177,
+      "holder": "Brian Moore",
+      "holder_team": "Wheeling Park",
+      "season": 3
+    },
+    "career_yards": {
+      "value": 409,
+      "holder": "Jacob Taylor",
+      "holder_team": "Cabell Midland",
+      "season": 4,
+      "detail": "career"
+    },
+    "single_season_td": {
+      "value": 3,
+      "holder": "James Thomas",
+      "holder_team": "Martinsburg",
+      "season": 1
+    }
+  },
+  "defense": {
+    "single_season_sacks": {
+      "value": 2,
+      "holder": "Paul Brown",
+      "holder_team": "Martinsburg",
+      "season": 2
+    },
+    "career_sacks": {
+      "value": 2,
+      "holder": "Paul Brown",
+      "holder_team": "Martinsburg",
+      "season": 2,
+      "detail": "career"
+    },
+    "single_season_interceptions": {
+      "value": 1,
+      "holder": "Paul Thomas",
+      "holder_team": "Martinsburg",
+      "season": 1
+    }
+  },
+  "game": {
+    "most_passing_yards": null,
+    "most_rushing_yards": null,
+    "most_points": null
+  }
+}

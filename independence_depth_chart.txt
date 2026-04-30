@@ -1,0 +1,65 @@
+==================================================
+  INDEPENDENCE PATRIOTS - DEPTH CHART
+==================================================
+
+Roster: 70 players
+
+OFFENSE
+--------------------------------------------------
+  QB1: Paul Thompson (Overall 53 | Off 64 | Def 52)
+  QB2: Kenneth Jackson / S (Overall 54 | Off 62 | Def 53)
+  RB1: David White (Overall 58 | Off 67 | Def 56)
+  RB2: Daniel Moore / LB (Overall 59 | Off 66 | Def 57)
+  RB3: Steven Thompson / S (Overall 55 | Off 62 | Def 65)
+  RB4: Kenneth Brown / RB (Overall 60 | Off 61 | Def 60)
+  WR1: Kevin Martin / WR (Overall 66 | Off 67 | Def 66)
+  WR2: Kevin Lee (Overall 58 | Off 67 | Def 66)
+  WR3: Steven Brown / S (Overall 57 | Off 67 | Def 66)
+  WR4: James Jackson / CB (Overall 57 | Off 66 | Def 68)
+  WR5: Timothy Williams (Overall 60 | Off 66 | Def 63)
+  WR6: Joshua Miller / WR (Overall 54 | Off 64 | Def 54)
+  OL1: Noah Smith (Overall 72 | Off 71 | Def 55)
+  OL2: Matthew Johnson / DT (Overall 70 | Off 70 | Def 56)
+  OL3: James Lee (Overall 68 | Off 68 | Def 54)
+  OL4: Jackson Smith / DE (Overall 69 | Off 67 | Def 66)
+  OL5: George Moore / DE (Overall 67 | Off 66 | Def 62)
+  OL6: Anthony Rodriguez (Overall 66 | Off 66 | Def 58)
+  OL7: Jackson Rodriguez / DE (Overall 65 | Off 65 | Def 58)
+  OL8: Ethan Thompson (Overall 63 | Off 63 | Def 60)
+  TE1: Jacob Garcia / TE (Overall 54 | Off 63 | Def 54)
+  TE2: Lucas Moore / TE (Overall 62 | Off 63 | Def 62)
+
+DEFENSE
+--------------------------------------------------
+  DE1: William Brown (Overall 69 | Off 60 | Def 69)
+  DE2: Jackson Smith / DE (Overall 69 | Off 67 | Def 66)
+  DE3: Jackson Miller / TE (Overall 64 | Off 57 | Def 64)
+  DE4: William Rodriguez (Overall 62 | Off 46 | Def 62)
+  DT1: Christopher Martinez (Overall 64 | Off 58 | Def 64)
+  DT2: Noah Wilson (Overall 63 | Off 64 | Def 63)
+  DT3: Ethan Wilson / OL (Overall 59 | Off 54 | Def 59)
+  LB1: Robert Thomas / TE (Overall 70 | Off 56 | Def 70)
+  LB2: Mark Williams / RB (Overall 68 | Off 61 | Def 68)
+  LB3: David Taylor (Overall 64 | Off 64 | Def 64)
+  LB4: Lucas Moore / TE (Overall 62 | Off 63 | Def 62)
+  LB5: Kenneth Brown / RB (Overall 60 | Off 61 | Def 60)
+  CB1: James Jackson / CB (Overall 57 | Off 66 | Def 68)
+  CB2: James Martin / CB (Overall 52 | Off 60 | Def 68)
+  CB3: John Lee (Overall 64 | Off 43 | Def 64)
+  CB4: Timothy Garcia / RB (Overall 63 | Off 59 | Def 63)
+  S1: Daniel Williams / WR (Overall 70 | Off 62 | Def 70)
+  S2: Andrew Davis / WR (Overall 66 | Off 53 | Def 66)
+  S3: Steven Brown / S (Overall 57 | Off 67 | Def 66)
+
+SPECIALISTS
+--------------------------------------------------
+  K1: Mason Martinez
+  P1: Mason Martinez
+
+TWO-WAY PLAYERS
+--------------------------------------------------
+  Jackson Smith: Overall 69 | Off 67 (OL) | Def 66 (DE)
+  Lucas Moore: Overall 62 | Off 63 (TE) | Def 62 (LB)
+  Kenneth Brown: Overall 60 | Off 61 (RB) | Def 60 (LB)
+  Steven Brown: Overall 57 | Off 67 (WR) | Def 66 (S)
+  James Jackson: Overall 57 | Off 66 (WR) | Def 68 (CB)

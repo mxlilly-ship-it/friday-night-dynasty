@@ -1,0 +1,116 @@
+TEAM SEASON RECAP — Year 2026
+==================================================================
+Team: Wheeling Park
+Coach: Adam Williams
+Record: 8-4
+Postseason: Semifinalist
+
+SCHEDULE
+------------------------------------------------------------------
+Week 1: @ Musselman — W 24-14
+Week 2: vs Preston — W 49-17
+Week 3: @ Spring Mills — L 40-42 (OT)
+Week 4: vs Washington — W 42-21
+Week 5: @ Hedgesville — W 38-6
+Week 6: @ University — W 31-3
+Week 7: vs Jefferson — W 20-17
+Week 8: @ Morgantown — W 35-20
+Week 9: vs Martinsburg — L 16-24
+Week 10: @ Parkersburg South — L 21-27
+
+POSTSEASON
+------------------------------------------------------------------
+Quarterfinal: vs Jefferson — W 28-23
+Semifinal: @ Martinsburg — L 6-34
+
+TEAM STATS (regular season totals)
+------------------------------------------------------------------
+Total plays: 363
+Rush yards: 2335
+Pass yards: 797
+Total yards: 3132
+Turnovers: 4
+Explosives: 74 (run 61 / pass 13)
+
+ROSTER (end of season)
+------------------------------------------------------------------
+- Lucas Jones (QB) OVR None — Year 11
+- Logan Williams (QB) OVR None — Year 10
+- Timothy Martinez (RB) OVR None — Year 12
+- Anthony Martinez (K) OVR None — Year 12
+- John Wilson (RB) OVR None — Year 11
+- Michael Thompson (RB) OVR None — Year 11
+- Brian Williams (CB) OVR None — Year 11
+- Logan Moore (CB) OVR None — Year 11
+- Michael Davis (RB) OVR None — Year 11
+- Matthew Smith (RB) OVR None — Year 10
+- George Jones (WR) OVR None — Year 12
+- Christopher Thompson (WR) OVR None — Year 11
+- Jacob Jones (QB) OVR None — Year 11
+- Daniel White (WR) OVR None — Year 9
+- John Taylor (WR) OVR None — Year 11
+- John Moore (RB) OVR None — Year 9
+- George Williams (K) OVR None — Year 9
+- Joshua Thomas (OL) OVR None — Year 9
+- George Miller (DE) OVR None — Year 11
+- Matthew Moore (OL) OVR None — Year 12
+- Donald Johnson (OL) OVR None — Year 10
+- Noah White (K) OVR None — Year 9
+- Brian Martin (K) OVR None — Year 9
+- Kevin Thomas (OL) OVR None — Year 10
+- Mark Anderson (OL) OVR None — Year 11
+- William Garcia (K) OVR None — Year 11
+- Ethan White (OL) OVR None — Year 12
+- Matthew Jones (K) OVR None — Year 9
+- Michael Johnson (OL) OVR None — Year 12
+- Timothy Anderson (K) OVR None — Year 12
+- Joshua Smith (WR) OVR None — Year 12
+- Robert Brown (LB) OVR None — Year 12
+- Anthony Smith (K) OVR None — Year 11
+- Jackson White (CB) OVR None — Year 12
+- Noah Smith (DE) OVR None — Year 9
+- Kevin Williams (DE) OVR None — Year 9
+- George Anderson (QB) OVR None — Year 12
+- John White (DE) OVR None — Year 11
+- Mark Jackson (OL) OVR None — Year 12
+- Timothy Williams (CB) OVR None — Year 12
+- Paul Brown (OL) OVR None — Year 11
+- Matthew Martin (WR) OVR None — Year 12
+- Lucas Martinez (K) OVR None — Year 11
+- Tyler Moore (K) OVR None — Year 9
+- William Garcia (CB) OVR None — Year 12
+- Donald Thomas (K) OVR None — Year 12
+- John Jones (K) OVR None — Year 11
+- Michael Lee (WR) OVR None — Year 11
+- Michael Williams (K) OVR None — Year 10
+- Lucas Jackson (DE) OVR None — Year 11
+- Michael Anderson (K) OVR None — Year 12
+- Kevin Garcia (CB) OVR None — Year 11
+- Donald Thompson (LB) OVR None — Year 9
+- George Anderson (K) OVR None — Year 12
+- Robert Jackson (DE) OVR None — Year 11
+- Brian Rodriguez (K) OVR None — Year 12
+- Mark Williams (K) OVR None — Year 12
+
+TOP PLAYER SEASON STATS
+------------------------------------------------------------------
+- Logan Williams: 152 yds, 1 TD | Pass 133 (20/32) | Rush 0 | Rec 19
+- Michael Davis: 128 yds, 1 TD | Pass 0 (0/0) | Rush 122 | Rec 6
+- Michael Thompson: 118 yds, 2 TD | Pass 0 (0/0) | Rush 118 | Rec 0
+- Timothy Martinez: 78 yds, 0 TD | Pass 0 (0/0) | Rush 50 | Rec 28
+- George Jones: 41 yds, 1 TD | Pass 0 (0/0) | Rush 0 | Rec 41
+- Matthew Martin: 34 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 34
+- Timothy Williams: 5 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 5
+- William Garcia: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- John Wilson: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Joshua Smith: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Mark Anderson: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Michael Johnson: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Ethan White: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Matthew Moore: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- John White: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Mark Jackson: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Michael Anderson: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- George Anderson: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Kevin Thomas: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Matthew Smith: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0

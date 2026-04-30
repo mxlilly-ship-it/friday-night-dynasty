@@ -1,0 +1,118 @@
+TEAM SEASON RECAP — Year 2027
+==================================================================
+Team: Herbert Hoover
+Coach: Kevin Harris
+Record: 11-1
+Postseason: Semifinalist
+
+SCHEDULE
+------------------------------------------------------------------
+Week 1: vs Princeton — W 28-21
+Week 2: @ Capital — W 35-14
+Week 3: vs Nicholas County — W 42-0
+Week 4: @ South Charleston — W 48-21
+Week 5: vs Greenbrier East — W 28-0
+Week 6: @ Shady Spring — W 42-0
+Week 7: vs Winfield — W 21-14
+Week 8: @ Lincoln County — W 62-0
+Week 9: vs Spring Valley — W 28-7
+Week 10: @ St. Albans — W 42-7
+
+POSTSEASON
+------------------------------------------------------------------
+Quarterfinal: vs Brooke — W 48-7
+Semifinal: vs Bridgeport — L 13-35
+
+TEAM STATS (regular season totals)
+------------------------------------------------------------------
+Total plays: 286
+Rush yards: 732
+Pass yards: 2456
+Total yards: 3188
+Turnovers: 1
+Explosives: 51 (run 19 / pass 32)
+
+ROSTER (end of season)
+------------------------------------------------------------------
+- Noah Moore (K) OVR None — Year 11
+- David Martin (WR) OVR None — Year 11
+- Daniel White (QB) OVR None — Year 10
+- Mark Moore (QB) OVR None — Year 12
+- Ethan Rodriguez (RB) OVR None — Year 12
+- Matthew Davis (K) OVR None — Year 12
+- Kenneth Thomas (CB) OVR None — Year 10
+- Timothy Garcia (OL) OVR None — Year 10
+- William Jones (OL) OVR None — Year 11
+- Jackson Wilson (DE) OVR None — Year 11
+- Daniel Garcia (K) OVR None — Year 12
+- John Garcia (WR) OVR None — Year 10
+- Jackson Martinez (K) OVR None — Year 10
+- Jackson Martinez (OL) OVR None — Year 10
+- Andrew Moore (OL) OVR None — Year 11
+- Joshua Miller (K) OVR None — Year 10
+- Daniel Taylor (K) OVR None — Year 10
+- Michael Anderson (DE) OVR None — Year 10
+- Jackson Johnson (OL) OVR None — Year 12
+- Donald Rodriguez (K) OVR None — Year 12
+- Jackson Anderson (OL) OVR None — Year 11
+- Christopher Anderson (OL) OVR None — Year 11
+- Lucas Thompson (CB) OVR None — Year 10
+- Mason Davis (LB) OVR None — Year 11
+- Timothy Anderson (LB) OVR None — Year 11
+- James Rodriguez (CB) OVR None — Year 11
+- Kenneth Martin (K) OVR None — Year 11
+- Robert Martin (OL) OVR None — Year 12
+- Jacob Wilson (K) OVR None — Year 11
+- Timothy Lee (OL) OVR None — Year 11
+- Paul Lee (CB) OVR None — Year 12
+- Jackson Thompson (K) OVR None — Year 11
+- Matthew Brown (LB) OVR None — Year 12
+- Lucas White (CB) OVR None — Year 10
+- James Moore (CB) OVR None — Year 11
+- Mark Lee (K) OVR None — Year 11
+- William Taylor (K) OVR None — Year 9
+- Logan Thompson (OL) OVR None — Year 9
+- James Williams (OL) OVR None — Year 9
+- George Wilson (WR) OVR None — Year 9
+- David Williams (QB) OVR None — Year 9
+- Jacob Lee (K) OVR None — Year 9
+- Mark Smith (K) OVR None — Year 9
+- Robert Garcia (DE) OVR None — Year 9
+- Tyler Anderson (LB) OVR None — Year 9
+- Jackson Smith (WR) OVR None — Year 9
+- William Thompson (K) OVR None — Year 9
+- Mason Davis (DE) OVR None — Year 9
+- Tyler Martinez (LB) OVR None — Year 9
+- Brian Jones (QB) OVR None — Year 9
+- David Smith (K) OVR None — Year 9
+- Mark Jackson (CB) OVR None — Year 9
+- Lucas Taylor (WR) OVR None — Year 9
+- Joshua Johnson (QB) OVR None — Year 9
+- Ethan Moore (WR) OVR None — Year 9
+- Joshua Jones (CB) OVR None — Year 9
+- George Miller (OL) OVR None — Year 9
+- Jacob White (OL) OVR None — Year 9
+- Noah Williams (K) OVR None — Year 9
+
+TOP PLAYER SEASON STATS
+------------------------------------------------------------------
+- Joshua Johnson: 270 yds, 1 TD | Pass 192 (18/29) | Rush 0 | Rec 78
+- William Taylor: 118 yds, 1 TD | Pass 0 (0/0) | Rush 118 | Rec 0
+- Joshua Johnson: 116 yds, 2 TD | Pass 92 (7/10) | Rush 0 | Rec 24
+- Lucas White: 107 yds, 0 TD | Pass 0 (0/0) | Rush 98 | Rec 9
+- Ethan Rodriguez: 81 yds, 5 TD | Pass 0 (0/0) | Rush 74 | Rec 7
+- Michael Anderson: 63 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 63
+- David Martin: 54 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 54
+- David Martin: 52 yds, 1 TD | Pass 0 (0/0) | Rush 0 | Rec 52
+- William Taylor: 48 yds, 1 TD | Pass 0 (0/0) | Rush 48 | Rec 0
+- Ethan Moore: 33 yds, 1 TD | Pass 0 (0/0) | Rush 0 | Rec 33
+- Lucas White: 27 yds, 0 TD | Pass 0 (0/0) | Rush 27 | Rec 0
+- Ethan Rodriguez: 26 yds, 0 TD | Pass 0 (0/0) | Rush 19 | Rec 7
+- Robert Garcia: 20 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 20
+- Mason Davis: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Ethan Moore: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Robert Garcia: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Timothy Garcia: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- Jackson Johnson: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- George Miller: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0
+- William Jones: 0 yds, 0 TD | Pass 0 (0/0) | Rush 0 | Rec 0

@@ -1,0 +1,589 @@
+FRIDAY NIGHT DYNASTY - SEASON PLAYER STATS
+============================================================
+
+============================================================
+  LEAGUE LEADERS (Season)
+============================================================
+
+Passing Yards
+----------------------------------------
+  1. Anthony Moore (Martinsburg): 2455 yds  (191/255, 29 TD, 1 INT)
+  2. David Anderson (Spring Mills): 2381 yds  (159/215, 19 TD, 1 INT)
+  3. Andrew Anderson (Huntington): 2270 yds  (157/203, 19 TD, 3 INT)
+  4. Jacob Wilson (Jefferson): 2159 yds  (168/234, 18 TD, 2 INT)
+  5. John Lee (Cabell Midland): 2099 yds  (179/231, 24 TD, 3 INT)
+
+Passing Touchdowns
+----------------------------------------
+  1. Anthony Moore (Martinsburg): 29 TD
+  2. John Lee (Cabell Midland): 24 TD
+  3. Kenneth Lee (George Washington): 21 TD
+  4. David Rodriguez (Parkersburg): 20 TD
+  5. David Anderson (Spring Mills): 19 TD
+
+Rushing Yards
+----------------------------------------
+  1. Joshua Martin (Huntington): 1596 yds, 17 TD
+  2. Logan Williams (Huntington): 1379 yds, 19 TD
+  3. Ethan Jackson (Huntington): 1208 yds, 22 TD
+  4. Kevin Smith (Martinsburg): 1155 yds, 11 TD
+  5. John Brown (Cabell Midland): 1108 yds, 8 TD
+
+Receiving Yards
+----------------------------------------
+  1. Jackson Davis (Jefferson): 49 rec, 728 yds, 3 TD
+  2. Logan Davis (Spring Mills): 45 rec, 677 yds, 8 TD
+  3. Robert Williams (Martinsburg): 45 rec, 655 yds, 4 TD
+  4. William Martinez (Cabell Midland): 47 rec, 594 yds, 6 TD
+  5. James Jones (Jefferson): 41 rec, 590 yds, 4 TD
+
+Tackles
+----------------------------------------
+  1. Christopher Smith (Hedgesville): 105 tkl
+  2. Matthew Rodriguez (Preston): 99 tkl
+  3. Mark Miller (George Washington): 94 tkl
+  4. Kevin Williams (Huntington): 91 tkl
+  5. William Rodriguez (Buckhannon-Upshur): 88 tkl
+
+Sacks
+----------------------------------------
+  1. Steven Brown (Wheeling Park): 5 sk
+  2. Paul White (Wheeling Park): 5 sk
+  3. James Davis (George Washington): 4 sk
+  4. Ethan Smith (Huntington): 4 sk
+  5. Paul Thomas (Spring Mills): 4 sk
+
+Interceptions
+----------------------------------------
+  1. John Brown (Cabell Midland): 4 INT
+  2. Mark Lee (Cabell Midland): 4 INT
+  3. Timothy Martinez (Huntington): 4 INT
+  4. William Williams (Beckley): 3 INT
+  5. Mason Moore (Martinsburg): 3 INT
+
+============================================================
+  INDIVIDUAL PLAYER STATS BY TEAM
+============================================================
+
+Martinsburg
+----------------------------------------
+  QB:
+    Anthony Moore: 191/255 (74.9%) 2455 yds, 29 TD, 1 INT
+  RB:
+    Kevin Smith: 1155 rush yds, 11 TD
+    Brian Brown: 1046 rush yds, 11 TD
+    Noah Thompson: 1092 rush yds, 12 TD
+  WR/TE:
+    Kevin Smith: 9 rec, 141 yds, 0 TD
+    Brian Brown: 15 rec, 244 yds, 1 TD
+    Robert Williams: 45 rec, 655 yds, 4 TD
+    Lucas Rodriguez: 49 rec, 538 yds, 9 TD
+    Noah Garcia: 41 rec, 522 yds, 8 TD
+    Mason Moore: 32 rec, 355 yds, 7 TD
+  Defense:
+    Mason Moore: 55 tkl 2 TFL 3 INT
+    Michael Taylor: 83 tkl 2 TFL 2 INT
+    Ethan Jones: 78 tkl 1 sk 7 TFL
+    Kevin Taylor: 69 tkl 2 sk 9 TFL
+    Anthony Williams: 47 tkl 2 INT
+    Christopher Thompson: 44 tkl 8 TFL
+    Noah Miller: 41 tkl 1 sk 5 TFL
+    William Johnson: 33 tkl 1 sk 9 TFL
+    William Martin: 26 tkl
+    George Jones: 1 sk 1 TFL
+
+Morgantown
+----------------------------------------
+  QB:
+    Mason Garcia: 146/193 (75.6%) 1467 yds, 12 TD, 1 INT
+  RB:
+    Tyler White: 801 rush yds, 6 TD
+    Anthony Taylor: 832 rush yds, 13 TD
+    Anthony Miller: 657 rush yds, 7 TD
+  WR/TE:
+    Tyler White: 11 rec, 75 yds, 0 TD
+    Anthony Miller: 13 rec, 129 yds, 0 TD
+    Andrew Moore: 34 rec, 386 yds, 4 TD
+    Jacob Williams: 31 rec, 383 yds, 1 TD
+    Ethan Anderson: 35 rec, 300 yds, 4 TD
+    David Moore: 22 rec, 194 yds, 3 TD
+  Defense:
+    Jacob Lee: 62 tkl 3 sk 3 TFL
+    James Williams: 53 tkl
+    Mark Lee: 49 tkl 1 TFL
+    Kevin Davis: 41 tkl
+    Logan Williams: 39 tkl 1 sk 3 TFL
+    Mark Davis: 37 tkl
+    Mark Lee: 15 tkl 2 sk 3 TFL
+    Brian Garcia: 14 tkl
+    Mark Martin: 8 tkl
+    Paul Davis: 2 sk 2 TFL
+
+Huntington
+----------------------------------------
+  QB:
+    Andrew Anderson: 157/203 (77.3%) 2270 yds, 19 TD, 3 INT
+  RB:
+    Joshua Martin: 1596 rush yds, 17 TD
+    Logan Williams: 1379 rush yds, 19 TD
+    Ethan Jackson: 1208 rush yds, 22 TD
+  WR/TE:
+    Logan Williams: 10 rec, 177 yds, 1 TD
+    Ethan Jackson: 7 rec, 128 yds, 1 TD
+    George Lee: 36 rec, 526 yds, 5 TD
+    Robert Brown: 42 rec, 526 yds, 3 TD
+    Noah Davis: 34 rec, 470 yds, 4 TD
+    Ethan Anderson: 28 rec, 443 yds, 5 TD
+  Defense:
+    Kevin Williams: 91 tkl 2 sk 10 TFL
+    Timothy Martinez: 68 tkl 2 TFL 4 INT
+    Daniel Wilson: 60 tkl 1 sk 2 TFL
+    Ethan Smith: 53 tkl 4 sk 13 TFL
+    Kevin Johnson: 48 tkl 1 INT
+    David Taylor: 42 tkl 1 INT
+    Michael Brown: 37 tkl 11 TFL
+    Daniel Thomas: 29 tkl 1 INT
+    Ethan Martinez: 27 tkl 2 sk 11 TFL
+
+Jefferson
+----------------------------------------
+  QB:
+    Jacob Wilson: 168/234 (71.8%) 2159 yds, 18 TD, 2 INT
+  RB:
+    Jackson Moore: 1083 rush yds, 16 TD
+    Michael Jackson: 905 rush yds, 14 TD
+    Mark Miller: 714 rush yds, 5 TD
+  WR/TE:
+    Michael Jackson: 7 rec, 89 yds, 1 TD
+    Mark Miller: 8 rec, 105 yds, 2 TD
+    Jackson Davis: 49 rec, 728 yds, 3 TD
+    James Jones: 41 rec, 590 yds, 4 TD
+    Kevin Garcia: 29 rec, 377 yds, 5 TD
+    Michael Johnson: 34 rec, 270 yds, 3 TD
+  Defense:
+    Michael Johnson: 43 tkl 2 INT
+    Mason White: 87 tkl 1 sk 1 TFL
+    William Anderson: 81 tkl 2 INT
+    Timothy Taylor: 65 tkl 2 INT
+    Anthony Garcia: 56 tkl
+    Anthony Anderson: 41 tkl 1 sk 2 TFL
+    Kenneth Martin: 30 tkl
+    Andrew Williams: 25 tkl 1 TFL
+    Mark Williams: 13 tkl 2 TFL
+
+George Washington
+----------------------------------------
+  QB:
+    Kenneth Lee: 158/225 (70.2%) 1890 yds, 21 TD, 7 INT
+  RB:
+    Mason Williams: 551 rush yds, 4 TD
+    Robert Martin: 605 rush yds, 3 TD
+    Mason Lee: 586 rush yds, 9 TD
+  WR/TE:
+    Mason Williams: 13 rec, 176 yds, 2 TD
+    Robert Martin: 14 rec, 84 yds, 1 TD
+    William Lee: 41 rec, 517 yds, 7 TD
+    Matthew Garcia: 37 rec, 488 yds, 5 TD
+    David Lee: 33 rec, 414 yds, 4 TD
+    Donald Garcia: 20 rec, 211 yds, 2 TD
+  Defense:
+    William Lee: 35 tkl
+    Mark Miller: 94 tkl 1 INT
+    John Moore: 74 tkl 1 sk 1 TFL
+    Ethan Wilson: 63 tkl
+    Mark Martinez: 45 tkl
+    Brian Taylor: 40 tkl 2 INT
+    Donald Taylor: 34 tkl
+    James Davis: 23 tkl 4 sk 4 TFL
+    Joshua Smith: 6 tkl 1 sk 1 TFL
+
+Wheeling Park
+----------------------------------------
+  QB:
+    Tyler White: 158/241 (65.6%) 1882 yds, 17 TD, 3 INT
+  RB:
+    Jackson Jones: 706 rush yds, 11 TD
+    Steven Williams: 784 rush yds, 9 TD
+    William Lee: 751 rush yds, 4 TD
+  WR/TE:
+    Jackson Jones: 17 rec, 335 yds, 3 TD
+    Steven Williams: 12 rec, 110 yds, 1 TD
+    Noah White: 33 rec, 427 yds, 6 TD
+    Brian Brown: 41 rec, 410 yds, 5 TD
+    Kevin Thomas: 35 rec, 379 yds, 2 TD
+    Logan Martin: 20 rec, 221 yds, 0 TD
+  Defense:
+    Steven Williams: 61 tkl 3 TFL
+    Noah White: 52 tkl 1 INT
+    Anthony Garcia: 78 tkl 1 TFL
+    Paul Garcia: 71 tkl
+    Logan White: 45 tkl 1 TFL 2 INT
+    Steven Brown: 30 tkl 5 sk 7 TFL
+    Brian Jones: 25 tkl 1 INT
+    Robert Thomas: 23 tkl 1 sk 2 TFL
+    Paul White: 19 tkl 5 sk 9 TFL
+
+University
+----------------------------------------
+  QB:
+    Matthew Anderson: 157/226 (69.5%) 1956 yds, 16 TD, 4 INT
+  RB:
+    Michael Johnson: 1080 rush yds, 10 TD
+    John Martinez: 864 rush yds, 6 TD
+    Kenneth Johnson: 793 rush yds, 14 TD
+  WR/TE:
+    John Martinez: 12 rec, 103 yds, 0 TD
+    Kenneth Johnson: 11 rec, 131 yds, 1 TD
+    Anthony Wilson: 46 rec, 526 yds, 6 TD
+    Matthew Martinez: 39 rec, 502 yds, 2 TD
+    Christopher Jackson: 29 rec, 377 yds, 4 TD
+    Kevin Moore: 20 rec, 317 yds, 3 TD
+  Defense:
+    John Martinez: 56 tkl 2 TFL
+    Christopher Jackson: 43 tkl 1 INT
+    Kenneth Martin: 60 tkl 1 sk 3 TFL
+    Lucas Davis: 51 tkl 1 INT
+    Paul Garcia: 32 tkl 1 sk 4 TFL
+    Anthony Taylor: 31 tkl 2 sk 6 TFL
+    Kevin Smith: 31 tkl 2 TFL
+    Christopher Garcia: 20 tkl
+    Logan Moore: 19 tkl 2 sk 4 TFL
+    Mark Moore: 1 sk 1 TFL
+
+Spring Mills
+----------------------------------------
+  QB:
+    David Anderson: 159/215 (74.0%) 2381 yds, 19 TD, 1 INT
+  RB:
+    Jackson Smith: 802 rush yds, 9 TD
+    Jackson Martin: 737 rush yds, 8 TD
+    Andrew Moore: 867 rush yds, 10 TD
+  WR/TE:
+    Jackson Smith: 11 rec, 189 yds, 0 TD
+    Jackson Martin: 12 rec, 189 yds, 3 TD
+    Logan Davis: 45 rec, 677 yds, 8 TD
+    Robert Martinez: 37 rec, 542 yds, 4 TD
+    Steven Wilson: 29 rec, 426 yds, 2 TD
+    George Johnson: 25 rec, 358 yds, 2 TD
+  Defense:
+    Robert Martinez: 16 tkl
+    Steven Wilson: 58 tkl 1 TFL
+    Daniel Moore: 64 tkl 1 sk 3 TFL
+    Paul Thomas: 51 tkl 4 sk 5 TFL
+    Timothy Wilson: 42 tkl
+    James Martinez: 33 tkl 1 INT
+    James Thompson: 31 tkl 1 sk 4 TFL
+    Lucas Johnson: 29 tkl 2 sk 3 TFL
+    Noah Wilson: 13 tkl 2 sk 3 TFL
+
+Musselman
+----------------------------------------
+  QB:
+    Joshua Jackson: 179/246 (72.8%) 1713 yds, 10 TD, 3 INT
+  RB:
+    Logan White: 684 rush yds, 7 TD
+    Logan Davis: 651 rush yds, 5 TD
+    Steven Williams: 487 rush yds, 5 TD
+  WR/TE:
+    Logan White: 16 rec, 153 yds, 1 TD
+    Steven Williams: 13 rec, 150 yds, 1 TD
+    Matthew Taylor: 48 rec, 558 yds, 4 TD
+    Anthony Brown: 44 rec, 337 yds, 2 TD
+    William Anderson: 26 rec, 273 yds, 1 TD
+    Brian Lee: 32 rec, 242 yds, 1 TD
+  Defense:
+    Steven Williams: 74 tkl
+    Matthew Taylor: 22 tkl
+    Timothy Rodriguez: 72 tkl
+    Joshua Jones: 56 tkl 1 INT
+    James Brown: 50 tkl 2 sk 2 TFL
+    James Taylor: 50 tkl 1 INT
+    George Martin: 34 tkl
+    Matthew Smith: 25 tkl 1 sk 1 TFL
+    Logan Garcia: 11 tkl 1 sk 1 TFL
+
+Parkersburg
+----------------------------------------
+  QB:
+    David Rodriguez: 155/206 (75.2%) 1500 yds, 20 TD, 0 INT
+  RB:
+    Christopher Johnson: 987 rush yds, 5 TD
+    Daniel Miller: 790 rush yds, 12 TD
+    Mason White: 773 rush yds, 5 TD
+  WR/TE:
+    Christopher Johnson: 15 rec, 154 yds, 0 TD
+    Daniel Miller: 6 rec, 49 yds, 0 TD
+    Noah Wilson: 42 rec, 392 yds, 5 TD
+    James Jackson: 34 rec, 336 yds, 7 TD
+    George Moore: 28 rec, 300 yds, 2 TD
+    Brian Garcia: 30 rec, 269 yds, 6 TD
+  Defense:
+    George Miller: 71 tkl
+    Timothy Smith: 70 tkl 1 TFL
+    James Anderson: 45 tkl 1 sk 1 TFL
+    David Brown: 40 tkl 1 INT
+    James Taylor: 40 tkl 2 sk 3 TFL
+    Christopher Martinez: 36 tkl
+    Joshua Garcia: 20 tkl 1 sk 3 TFL
+    Michael Williams: 14 tkl
+    Paul Davis: 6 tkl 1 sk 1 TFL
+    James Williams: 2 sk 2 TFL
+
+Beckley
+----------------------------------------
+  QB:
+    John Anderson: 128/189 (67.7%) 1222 yds, 12 TD, 7 INT
+  RB:
+    Jacob Rodriguez: 861 rush yds, 9 TD
+    Daniel Jones: 919 rush yds, 5 TD
+    Anthony Smith: 937 rush yds, 10 TD
+  WR/TE:
+    Jacob Rodriguez: 7 rec, 118 yds, 1 TD
+    Daniel Jones: 10 rec, 46 yds, 1 TD
+    Matthew Miller: 26 rec, 312 yds, 2 TD
+    William Brown: 31 rec, 300 yds, 2 TD
+    Mason Williams: 31 rec, 230 yds, 1 TD
+    Mark White: 23 rec, 216 yds, 5 TD
+  Defense:
+    Kenneth Taylor: 62 tkl 2 sk 2 TFL
+    Christopher Rodriguez: 50 tkl
+    William Williams: 49 tkl 3 INT
+    Brian Lee: 43 tkl 1 sk 1 TFL
+    Paul Jones: 39 tkl
+    Joshua Anderson: 25 tkl 3 sk 5 TFL
+    Matthew Wilson: 24 tkl
+    Lucas Martinez: 18 tkl 2 sk 3 TFL
+    Ethan Martin: 13 tkl 2 sk 4 TFL
+
+Oak Hill
+----------------------------------------
+  QB:
+    Timothy Johnson: 196/252 (77.8%) 1985 yds, 12 TD, 2 INT
+  RB:
+    Jacob Anderson: 522 rush yds, 1 TD
+    Mason Brown: 499 rush yds, 6 TD
+    Christopher Johnson: 524 rush yds, 5 TD
+  WR/TE:
+    Jacob Anderson: 15 rec, 220 yds, 0 TD
+    Mason Brown: 12 rec, 82 yds, 0 TD
+    Jacob Anderson: 46 rec, 525 yds, 3 TD
+    Kevin Wilson: 45 rec, 488 yds, 2 TD
+    Tyler White: 48 rec, 375 yds, 3 TD
+    Matthew Wilson: 30 rec, 295 yds, 4 TD
+  Defense:
+    Christopher Johnson: 58 tkl
+    Andrew Jones: 53 tkl
+    Mark Anderson: 51 tkl
+    Jacob Miller: 43 tkl 1 INT
+    Mark Taylor: 36 tkl
+    Daniel Williams: 27 tkl
+    George Jones: 26 tkl
+    Kevin Johnson: 14 tkl 1 sk 1 TFL
+    Tyler Brown: 3 tkl
+
+Washington
+----------------------------------------
+  QB:
+    Ethan Wilson: 172/244 (70.5%) 1576 yds, 3 TD, 2 INT
+  RB:
+    Noah Johnson: 365 rush yds, 2 TD
+    Christopher Williams: 414 rush yds, 5 TD
+    James Martinez: 459 rush yds, 6 TD
+  WR/TE:
+    Noah Johnson: 16 rec, 203 yds, 0 TD
+    Christopher Williams: 16 rec, 130 yds, 0 TD
+    Jackson Smith: 41 rec, 395 yds, 1 TD
+    Paul Moore: 41 rec, 389 yds, 1 TD
+    Ethan Jones: 36 rec, 269 yds, 1 TD
+    Mark Martinez: 22 rec, 190 yds, 0 TD
+  Defense:
+    Ethan Wilson: 45 tkl
+    Noah Johnson: 75 tkl 1 INT
+    Donald Jones: 57 tkl
+    Noah Williams: 54 tkl 2 sk 2 TFL
+    Robert Jackson: 43 tkl
+    Jacob Wilson: 24 tkl 1 INT
+    James Thompson: 20 tkl
+    Anthony Martinez: 9 tkl
+    Mark Moore: 5 tkl 1 sk 1 TFL
+
+Parkersburg South
+----------------------------------------
+  QB:
+    Noah Smith: 139/196 (70.9%) 1346 yds, 9 TD, 1 INT
+  RB:
+    Daniel Garcia: 885 rush yds, 11 TD
+    Lucas Johnson: 755 rush yds, 6 TD
+    Timothy Lee: 582 rush yds, 3 TD
+  WR/TE:
+    Daniel Garcia: 8 rec, 109 yds, 0 TD
+    Lucas Johnson: 9 rec, 41 yds, 0 TD
+    Noah Jackson: 31 rec, 351 yds, 2 TD
+    Noah Johnson: 34 rec, 349 yds, 4 TD
+    Anthony Brown: 37 rec, 265 yds, 3 TD
+    Joshua Garcia: 20 rec, 231 yds, 0 TD
+  Defense:
+    Anthony Brown: 42 tkl 2 INT
+    Donald Jones: 67 tkl 2 INT
+    Donald Martin: 65 tkl
+    Robert Williams: 44 tkl
+    Mark Taylor: 42 tkl 1 TFL
+    Daniel Lee: 32 tkl
+    Brian Johnson: 29 tkl
+    Jacob Anderson: 18 tkl 2 sk 3 TFL
+    William Wilson: 5 tkl
+
+Hedgesville
+----------------------------------------
+  QB:
+    Lucas White: 164/227 (72.2%) 655 yds, 0 TD, 2 INT
+  RB:
+    Ethan Moore: 228 rush yds, 1 TD
+    Noah Williams: 205 rush yds, 0 TD
+    William Thomas: 83 rush yds, 0 TD
+  WR/TE:
+    Ethan Moore: 18 rec, 89 yds, 0 TD
+    Brian Thompson: 27 rec, 153 yds, 0 TD
+    Paul Williams: 36 rec, 150 yds, 0 TD
+    William Thomas: 14 rec, 48 yds, 0 TD
+    Christopher Smith: 34 rec, 122 yds, 0 TD
+    William Moore: 35 rec, 93 yds, 0 TD
+  Defense:
+    Christopher Smith: 105 tkl 1 INT
+    Kevin Rodriguez: 71 tkl
+    William Anderson: 62 tkl
+    Matthew Martinez: 49 tkl
+    Steven Davis: 45 tkl
+    Robert Wilson: 32 tkl
+    Michael Thompson: 17 tkl
+    Tyler Jackson: 10 tkl
+
+Buckhannon-Upshur
+----------------------------------------
+  QB:
+    Andrew Davis: 172/216 (79.6%) 656 yds, 3 TD, 2 INT
+  RB:
+    Brian Anderson: 333 rush yds, 1 TD
+    Christopher Smith: 308 rush yds, 2 TD
+    Andrew Jones: 281 rush yds, 2 TD
+  WR/TE:
+    Brian Anderson: 11 rec, 23 yds, 0 TD
+    Christopher Smith: 9 rec, -1 yds, 0 TD
+    Jackson Thompson: 47 rec, 210 yds, 1 TD
+    William Rodriguez: 39 rec, 203 yds, 0 TD
+    Logan Davis: 37 rec, 165 yds, 1 TD
+    Joshua Thomas: 29 rec, 56 yds, 1 TD
+  Defense:
+    William Rodriguez: 88 tkl
+    Logan Davis: 68 tkl
+    Daniel Thomas: 51 tkl
+    William Brown: 50 tkl 2 sk 2 TFL
+    Jackson Thomas: 49 tkl
+    Steven Taylor: 29 tkl
+    Kevin Jackson: 11 tkl 1 sk 1 TFL
+    Matthew Lee: 8 tkl
+    Steven Jones: 1 tkl 1 sk 1 TFL
+
+Riverside
+----------------------------------------
+  QB:
+    Timothy Brown: 139/213 (65.3%) 518 yds, 0 TD, 5 INT
+  RB:
+    James Davis: 364 rush yds, 0 TD
+    George Williams: 324 rush yds, 2 TD
+    John Brown: 284 rush yds, 1 TD
+  WR/TE:
+    George Williams: 9 rec, 16 yds, 0 TD
+    John Brown: 9 rec, 35 yds, 0 TD
+    Andrew Taylor: 33 rec, 130 yds, 0 TD
+    David Thomas: 28 rec, 126 yds, 0 TD
+    Kevin Martinez: 21 rec, 115 yds, 0 TD
+    Jackson Rodriguez: 39 rec, 96 yds, 0 TD
+  Defense:
+    Andrew Taylor: 44 tkl
+    Anthony Rodriguez: 88 tkl
+    Logan Thomas: 70 tkl
+    Jacob Smith: 66 tkl
+    William White: 50 tkl
+    Mason Moore: 39 tkl
+    Andrew Thompson: 14 tkl
+    David Brown: 12 tkl
+    Lucas Jones: 2 tkl
+
+Preston
+----------------------------------------
+  QB:
+    Brian Garcia: 159/214 (74.3%) 786 yds, 3 TD, 2 INT
+  RB:
+    Matthew Anderson: 291 rush yds, 0 TD
+    Daniel Taylor: 251 rush yds, 0 TD
+    Lucas Garcia: 234 rush yds, 1 TD
+  WR/TE:
+    Matthew Anderson: 19 rec, 44 yds, 2 TD
+    Steven Jones: 40 rec, 267 yds, 0 TD
+    Lucas Garcia: 7 rec, 16 yds, 0 TD
+    Joshua Martin: 43 rec, 244 yds, 0 TD
+    Tyler Moore: 30 rec, 129 yds, 1 TD
+    Matthew Rodriguez: 20 rec, 86 yds, 0 TD
+  Defense:
+    Daniel Taylor: 46 tkl
+    Matthew Rodriguez: 99 tkl
+    Kenneth Wilson: 71 tkl
+    Donald Thomas: 70 tkl
+    Michael Taylor: 46 tkl
+    Daniel Martinez: 33 tkl
+    Timothy Brown: 13 tkl
+    Andrew Martin: 8 tkl
+
+Cabell Midland
+----------------------------------------
+  QB:
+    John Lee: 179/231 (77.5%) 2099 yds, 24 TD, 3 INT
+  RB:
+    Mason Lee: 1103 rush yds, 14 TD
+    John Brown: 1108 rush yds, 8 TD
+    Joshua Johnson: 990 rush yds, 15 TD
+  WR/TE:
+    Mason Lee: 16 rec, 143 yds, 2 TD
+    John Brown: 7 rec, 106 yds, 0 TD
+    William Martinez: 47 rec, 594 yds, 6 TD
+    James Rodriguez: 42 rec, 480 yds, 6 TD
+    Noah Garcia: 33 rec, 405 yds, 5 TD
+    Ethan Lee: 34 rec, 371 yds, 5 TD
+  Defense:
+    John Brown: 63 tkl 2 TFL 4 INT
+    Joshua Johnson: 42 tkl 1 TFL 2 INT
+    Ethan Lee: 16 tkl 1 sk 3 TFL
+    Kenneth White: 87 tkl 4 TFL
+    Noah Martinez: 48 tkl 3 sk 5 TFL
+    Mark Lee: 45 tkl 4 INT
+    Steven Lee: 45 tkl 1 sk 7 TFL
+    Donald Williams: 24 tkl 1 sk 2 TFL
+    Daniel Anderson: 19 tkl
+    Jacob Smith: 1 sk 1 TFL
+
+Hurricane
+----------------------------------------
+  QB:
+    Noah Martin: 143/205 (69.8%) 1291 yds, 4 TD, 3 INT
+  RB:
+    Steven Lee: 688 rush yds, 4 TD
+    Anthony Jones: 672 rush yds, 6 TD
+    Lucas Johnson: 402 rush yds, 6 TD
+  WR/TE:
+    Steven Lee: 11 rec, 108 yds, 1 TD
+    Lucas Johnson: 6 rec, 95 yds, 0 TD
+    Jackson Garcia: 40 rec, 370 yds, 1 TD
+    Ethan Moore: 34 rec, 319 yds, 0 TD
+    James Jackson: 29 rec, 291 yds, 1 TD
+    David Jones: 23 rec, 108 yds, 1 TD
+  Defense:
+    James Jackson: 51 tkl
+    Steven Smith: 74 tkl
+    Robert Miller: 59 tkl 1 sk 1 TFL
+    Paul Lee: 57 tkl 1 sk 1 TFL
+    Noah Johnson: 48 tkl
+    David Jackson: 28 tkl 1 TFL
+    David Davis: 23 tkl
+    William Anderson: 23 tkl
+    Robert Jones: 4 tkl 1 sk 1 TFL
