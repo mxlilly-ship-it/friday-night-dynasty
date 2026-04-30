@@ -16,6 +16,7 @@ from systems.save_system import (
 )
 from systems.teams_loader import build_teams_from_json, build_teams_from_configs
 from models.coach import apply_coach_config_dict
+from models.team import Team
 from systems.league_structure import (
     default_league_structure,
     ensure_league_structure_in_state,
