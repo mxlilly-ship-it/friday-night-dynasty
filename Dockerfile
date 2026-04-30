@@ -3,7 +3,7 @@ WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend ./
-RUN npm run build
+RUN npx vite build
 
 FROM python:3.13-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
