@@ -8,7 +8,8 @@ RUN npx vite build
 FROM python:3.13-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PORT=8080
+    PORT=8080 \
+    FND_IGNORE_STALE_SPA=1
 WORKDIR /app
 
 COPY backend/requirements.txt ./backend/requirements.txt
