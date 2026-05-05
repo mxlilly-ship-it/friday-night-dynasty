@@ -1,4 +1,14 @@
+import builtins
 import random
+
+
+def _safe_engine_print(*args, **kwargs) -> None:
+    """Never let console I/O crash sims (Windows errno 22 / broken pipe on stdout under uvicorn)."""
+    try:
+        builtins.print(*args, **kwargs)
+    except Exception:
+        # Also catches BrokenPipeError, BufferError, and odd Windows EINVAL from TextIOWrapper.flush.
+        return
 
 
 def _tri_int(lo: int, hi: int, mode: int) -> int:
@@ -94,6 +104,11 @@ def _defense_play_label(choice):
     return "BALANCED DEFENSE"
 
 
+# Kickoff is taken from the kicking team's own 40 (HS-style); ball_position is always
+# yards from the current offense's own goal toward the opponent's goal line.
+KICKOFF_TEE_YARDS = 40
+
+
 class Game:
     def __init__(self, offense_rating=60, defense_rating=60, run_rating=60, pass_rating=60):
         self.quarter = 1
@@ -150,12 +165,12 @@ class Game:
         """
         defense_mode: 'return' (default), 'block' (sell out for block — shorter / riskier punt)
         """
-        print("PUNT!")
+        _safe_engine_print("PUNT!")
         blocked = False
         punt_distance = random.randint(35, 50)
         if defense_mode == "block":
             if random.random() < 0.09:
-                print("PUNT BLOCKED!")
+                _safe_engine_print("PUNT BLOCKED!")
                 blocked = True
                 punt_distance = random.randint(8, 18)
             else:
@@ -165,11 +180,11 @@ class Game:
         self.ball_position += punt_distance
 
         if self.ball_position >= 100:
-            print("Touchback!")
+            _safe_engine_print("Touchback!")
             self.ball_position = 80
 
         if not blocked:
-            print(f"Punt travels {punt_distance} yards.")
+            _safe_engine_print(f"Punt travels {punt_distance} yards.")
         self.switch_possession()
         self.display_status()
         return {"blocked": blocked, "distance": punt_distance}
@@ -180,22 +195,21 @@ class Game:
         Returns metadata for play-by-play: kickoff, touchback, return_yards, kickoff_td.
         """
         meta: dict = {"kickoff": True, "touchback": False, "return_yards": 0, "kickoff_td": False}
-        r = random.random()
-        if r < 0.34:
+        kick_travel = random.randint(55, 70)
+        # Tee at own 40; travel toward opponent. Receiver's field yard = 100 - 40 - travel.
+        catch_yard = 100 - KICKOFF_TEE_YARDS - kick_travel
+        if catch_yard < 1 or random.random() < 0.28:
             meta["touchback"] = True
-            # ball_position is always measured from the offense's own goal line
-            # (switch_possession() already mirrors field orientation), so touchbacks
-            # always start at own 25 regardless of home/away.
             self.ball_position = 25
-            print("Kickoff — touchback.")
+            _safe_engine_print("Kickoff — touchback.")
             return meta
 
         ret = random.randint(8, 40)
         meta["return_yards"] = ret
-        land = random.randint(8, 20)
-        new_pos = land + ret
+        catch_yard = max(1, min(99, catch_yard))
+        new_pos = catch_yard + ret
         if new_pos >= 100:
-            print("KICKOFF RETURN TOUCHDOWN!")
+            _safe_engine_print("KICKOFF RETURN TOUCHDOWN!")
             meta["kickoff_td"] = True
             meta["touchdown"] = True
             if self.possession == "home":
@@ -206,7 +220,7 @@ class Game:
             self.ball_position = 97
             return meta
         self.ball_position = min(new_pos, 99)
-        print(f"Kickoff return: {ret} yards — ball at {self.ball_position}.")
+        _safe_engine_print(f"Kickoff return: {ret} yards — ball at {self.ball_position}.")
         return meta
 
     def apply_opening_kickoff(self) -> None:
@@ -242,7 +256,7 @@ class Game:
         blocked = False
         if defense_pat_choice == "block":
             if random.random() < 0.11:
-                print("EXTRA POINT BLOCKED!")
+                _safe_engine_print("EXTRA POINT BLOCKED!")
                 blocked = True
                 return {"pat_kick": True, "pat_success": False, "blocked": True, "missed": False}
             make_chance = 0.88
@@ -250,13 +264,13 @@ class Game:
             make_chance = 0.945
 
         if random.random() < make_chance:
-            print("EXTRA POINT IS GOOD!")
+            _safe_engine_print("EXTRA POINT IS GOOD!")
             if self.possession == "home":
                 self.score_home += 1
             else:
                 self.score_away += 1
             return {"pat_kick": True, "pat_success": True, "blocked": False, "missed": False}
-        print("EXTRA POINT NO GOOD!")
+        _safe_engine_print("EXTRA POINT NO GOOD!")
         return {"pat_kick": True, "pat_success": False, "blocked": False, "missed": True}
 
     def _second_half_receiver(self) -> str:
@@ -284,8 +298,8 @@ class Game:
         self.down = 1
         self.yards_to_go = 10
         self.time_remaining = 0   # No clock in OT
-        print(f"\n*** OVERTIME {self.ot_period} ***")
-        print(f"Coin toss: {self.possession.upper()} chooses to go first. Ball at opponent's 25.")
+        _safe_engine_print(f"\n*** OVERTIME {self.ot_period} ***")
+        _safe_engine_print(f"Coin toss: {self.possession.upper()} chooses to go first. Ball at opponent's 25.")
         self.display_status()
 
     def setup_ot_possession(self):
@@ -300,8 +314,8 @@ class Game:
         offense_choice = offense_choice or self.get_ai_play_call()
         defense_choice = defense_choice or self.get_ai_defense_call()
         if hasattr(offense_choice, "name"):
-            print(f"  2PT Offense: {_offense_play_label(offense_choice)}")
-            print(f"  2PT Defense: {_defense_play_label(defense_choice)}")
+            _safe_engine_print(f"  2PT Offense: {_offense_play_label(offense_choice)}")
+            _safe_engine_print(f"  2PT Defense: {_defense_play_label(defense_choice)}")
         offense_choice = _normalize_offense_choice(offense_choice)
         defense_choice = _normalize_defense_choice(defense_choice)
 
@@ -332,13 +346,13 @@ class Game:
         success = self.ball_position >= 100
 
         if success:
-            print("2-POINT CONVERSION GOOD!")
+            _safe_engine_print("2-POINT CONVERSION GOOD!")
             if self.possession == "home":
                 self.score_home += 2
             else:
                 self.score_away += 2
         else:
-            print("2-POINT CONVERSION FAILED.")
+            _safe_engine_print("2-POINT CONVERSION FAILED.")
 
         return {"success": success, "touchdown": success, "yards": yards}
 
@@ -354,10 +368,10 @@ class Game:
             h, a = self.ot_2pt_round["home"], self.ot_2pt_round["away"]
             if h and not a:
                 self.ot_winner = "home"
-                print("\n*** 2-POINT SHOOTOUT: HOME WINS! ***")
+                _safe_engine_print("\n*** 2-POINT SHOOTOUT: HOME WINS! ***")
             elif a and not h:
                 self.ot_winner = "away"
-                print("\n*** 2-POINT SHOOTOUT: AWAY WINS! ***")
+                _safe_engine_print("\n*** 2-POINT SHOOTOUT: AWAY WINS! ***")
             else:
                 # Both made or both missed - next round
                 self.ot_2pt_round = {"home": None, "away": None}
@@ -372,7 +386,7 @@ class Game:
     # ------------------ FIELD GOAL ------------------
     def attempt_field_goal(self, defense_fg_block: bool = False):
         kick_distance = (100 - self.ball_position) + 17
-        print(f"Field Goal Attempt from {kick_distance} yards!")
+        _safe_engine_print(f"Field Goal Attempt from {kick_distance} yards!")
 
         if kick_distance <= 35:
             success_chance = 0.95
@@ -385,7 +399,7 @@ class Game:
 
         if defense_fg_block:
             if random.random() < 0.09:
-                print("FIELD GOAL BLOCKED!")
+                _safe_engine_print("FIELD GOAL BLOCKED!")
                 self.switch_possession()
                 self.ball_position = 25
                 self.down = 1
@@ -396,7 +410,7 @@ class Game:
 
         good = random.random() < success_chance
         if good:
-            print("FIELD GOAL IS GOOD!")
+            _safe_engine_print("FIELD GOAL IS GOOD!")
             if self.possession == "home":
                 self.score_home += 3
             else:
@@ -412,7 +426,7 @@ class Game:
                 self.down = 1
                 self.yards_to_go = 10
         else:
-            print("Field Goal Missed!")
+            _safe_engine_print("Field Goal Missed!")
             self.switch_possession()
             self.ball_position = 25
             self.down = 1
@@ -513,7 +527,7 @@ class Game:
         # -------- 2-MINUTE DRILL LOGIC --------
         if self.quarter == 4 and self.time_remaining <= 2*60 and score_margin < 0:
             # Trailing with 2 minutes left → very aggressive passing
-            print("2-MINUTE DRILL: PASSING!")
+            _safe_engine_print("2-MINUTE DRILL: PASSING!")
             return "2"
 
         # Losing in 4th quarter → heavy pass
@@ -581,7 +595,7 @@ class Game:
         if self.down == 4 and offense_team is None:
             decision = self._fourth_down_decision()
             if decision == "punt":
-                print("4th down: PUNT")
+                _safe_engine_print("4th down: PUNT")
                 self.punt_ball()
                 clock_elapsed = regulation_dead_ball_clock_seconds()
                 self.time_remaining -= clock_elapsed
@@ -589,7 +603,7 @@ class Game:
                     self.time_remaining = 0
                 return {"yards": 0, "touchdown": False, "turnover": False, "sack": False, "interception": False, "incomplete_pass": False, "clock_elapsed": clock_elapsed, "first_down": False, "fumble": False}
             if decision == "fg":
-                print("4th down: Field Goal Attempt")
+                _safe_engine_print("4th down: Field Goal Attempt")
                 self.attempt_field_goal()
                 clock_elapsed = regulation_dead_ball_clock_seconds() if not self.is_overtime else 0
                 self.time_remaining -= clock_elapsed
@@ -607,8 +621,8 @@ class Game:
         # -------- DISPLAY CALLED PLAYS --------
         off_label = _offense_play_label(offense_choice)
         def_label = _defense_play_label(defense_choice)
-        print(f"Offense Call: {off_label}")
-        print(f"Defense Call: {def_label}")
+        _safe_engine_print(f"Offense Call: {off_label}")
+        _safe_engine_print(f"Defense Call: {def_label}")
 
         # Keep play objects around for turnover tuning by concept/coverage call
         offense_play_obj = offense_choice if hasattr(offense_choice, "offensive_category") else None
@@ -721,7 +735,7 @@ class Game:
             to_scale = max(0.48, min(1.12, to_scale))
             fumble_chance *= to_scale * 1.08
             if random.random() < fumble_chance:
-                print("FUMBLE!")
+                _safe_engine_print("FUMBLE!")
                 fumble = True
                 if self.possession == "home":
                     self.fumbles_home += 1
@@ -738,7 +752,7 @@ class Game:
             sack_chance = max(0.06, 0.20 - ((off_eff_pass - def_eff_defense) / 220))
             sack_chance = max(0.05, min(0.32, sack_chance + pressure_boost))
             if defense_choice == "2" and random.random() < sack_chance:
-                print("SACK! Loss of 7 yards")
+                _safe_engine_print("SACK! Loss of 7 yards")
                 yards = -7
                 sack = True
 
@@ -757,7 +771,7 @@ class Game:
                     yards = max(0, min(25, yards))  # cap scramble gains; good D can stuff
                     yards = max(-2, min(99, yards))
                     scramble = True
-                    print("QB SCRAMBLE! " + str(yards) + " yards")
+                    _safe_engine_print("QB SCRAMBLE! " + str(yards) + " yards")
 
             if not sack and not scramble:
                 # Yardage by concept. Avg 120-150/game; variance 75 (bad) to 300+ (great matchup)
@@ -828,7 +842,7 @@ class Game:
             _to_scale = max(0.48, min(1.12, 1.5 - _off_to / 72.0))
             int_chance *= _to_scale * 1.08
             if not sack and not scramble and random.random() < int_chance:
-                print("INTERCEPTION!")
+                _safe_engine_print("INTERCEPTION!")
                 interception = True
                 if self.possession == "home":
                     self.interceptions_home += 1
@@ -846,7 +860,7 @@ class Game:
             strip_fumble_chance = max(0.0012, min(0.022, strip_fumble_chance))
             strip_fumble_chance *= _to_scale * 1.08
             if sack and not interception and random.random() < strip_fumble_chance:
-                print("STRIP SACK FUMBLE!")
+                _safe_engine_print("STRIP SACK FUMBLE!")
                 fumble = True
                 if self.possession == "home":
                     self.fumbles_home += 1
@@ -860,7 +874,7 @@ class Game:
             if not sack and not scramble and not interception and random.random() < incomplete_chance:
                 yards = 0
                 incomplete_pass = True
-                print("Incomplete pass.")
+                _safe_engine_print("Incomplete pass.")
             # Explosive pass (20+): on completions only. Good O vs weak coverage = more.
             elif not sack and not scramble and not interception and random.random() < explosive_chance:
                 max_yards = min(55, 99 - self.ball_position)
@@ -886,7 +900,7 @@ class Game:
 
         # -------- TOUCHDOWN --------
         if self.ball_position >= 100:
-            print("TOUCHDOWN!")
+            _safe_engine_print("TOUCHDOWN!")
             needs_2pt = False
             needs_pat = False
             if self.is_overtime and self.ot_period >= 2:
@@ -939,7 +953,7 @@ class Game:
 
         # -------- TURNOVERS --------
         if interception or fumble:
-            print("Possession switches due to TURNOVER!")
+            _safe_engine_print("Possession switches due to TURNOVER!")
             clock_elapsed = regulation_dead_ball_clock_seconds() if not self.is_overtime else 0
             self.time_remaining -= clock_elapsed
             if self.time_remaining < 0:
@@ -957,16 +971,16 @@ class Game:
         # -------- FIRST DOWN --------
         first_down = self.yards_to_go <= 0
         if first_down:
-            print(f"{yards} yards – First Down!")
+            _safe_engine_print(f"{yards} yards – First Down!")
             self.down = 1
             self.yards_to_go = 10
         else:
-            print(f"{yards} yards")
+            _safe_engine_print(f"{yards} yards")
             self.down += 1
 
         # -------- 4TH DOWN FAILED (we went for it and didn't convert) --------
         if self.down > 4:
-            print("Failed 4th Down Conversion!")
+            _safe_engine_print("Failed 4th Down Conversion!")
             clock_elapsed = regulation_dead_ball_clock_seconds() if not self.is_overtime else 0
             self.time_remaining -= clock_elapsed
             if self.time_remaining < 0:
@@ -1002,43 +1016,36 @@ class Game:
 
     # ------------------ DISPLAY ------------------
     def display_status(self, last_play_yards=None):
-        def _safe_print(msg: str) -> None:
-            try:
-                print(msg)
-            except (OSError, UnicodeEncodeError):
-                # Never let console/log encoding issues crash sim execution.
-                return
-
         if self.ball_position < 50:
             yard_marker = f"Own {self.ball_position}"
         else:
             yard_marker = f"Opp {100 - self.ball_position}"
 
         if last_play_yards is not None:
-            _safe_print(f"Play Result: {last_play_yards} yards")
+            _safe_engine_print(f"Play Result: {last_play_yards} yards")
 
-        _safe_print(f"Possession: {self.possession.upper()}")
-        _safe_print(f"Down: {self.down} & {self.yards_to_go}")
-        _safe_print(f"Ball: {yard_marker} yard line")
-        _safe_print(f"Score: Home {self.score_home} - Away {self.score_away}")
-        _safe_print(f"Time: {self.time_remaining // 60}:{self.time_remaining % 60:02}")
-        _safe_print(f"INT - Home: {self.interceptions_home} | Away: {self.interceptions_away}")
-        _safe_print(f"FUM - Home: {self.fumbles_home} | Away: {self.fumbles_away}")
-        _safe_print("----------------------------")
+        _safe_engine_print(f"Possession: {self.possession.upper()}")
+        _safe_engine_print(f"Down: {self.down} & {self.yards_to_go}")
+        _safe_engine_print(f"Ball: {yard_marker} yard line")
+        _safe_engine_print(f"Score: Home {self.score_home} - Away {self.score_away}")
+        _safe_engine_print(f"Time: {self.time_remaining // 60}:{self.time_remaining % 60:02}")
+        _safe_engine_print(f"INT - Home: {self.interceptions_home} | Away: {self.interceptions_away}")
+        _safe_engine_print(f"FUM - Home: {self.fumbles_home} | Away: {self.fumbles_away}")
+        _safe_engine_print("----------------------------")
 
     # ------------------ END GAME SUMMARY ------------------
     def end_game_summary(self):
-        print("\n===== FINAL GAME STATS =====")
-        print(f"Final Score: Home {self.score_home} - Away {self.score_away}")
-        print(f"Interceptions - Home: {self.interceptions_home} | Away: {self.interceptions_away}")
-        print(f"Fumbles - Home: {self.fumbles_home} | Away: {self.fumbles_away}")
-        print("============================")
+        _safe_engine_print("\n===== FINAL GAME STATS =====")
+        _safe_engine_print(f"Final Score: Home {self.score_home} - Away {self.score_away}")
+        _safe_engine_print(f"Interceptions - Home: {self.interceptions_home} | Away: {self.interceptions_away}")
+        _safe_engine_print(f"Fumbles - Home: {self.fumbles_home} | Away: {self.fumbles_away}")
+        _safe_engine_print("============================")
 
     def advance_quarter(self):
         if getattr(self, "pending_pat", False):
             return
         if self.time_remaining <= 0 and not self.is_overtime:
-            print(f"End of Quarter {self.quarter}")
+            _safe_engine_print(f"End of Quarter {self.quarter}")
             if self.quarter == 4 and self.score_home == self.score_away:
                 # NCAA OT: Regulation ended tied
                 self.start_overtime()
@@ -1057,8 +1064,8 @@ class Game:
                             self.possession = self.kickoff_kicking_team
                             self.down = 1
                             self.yards_to_go = 10
-                            # Kickoff spot placeholder; kickoff play resolver sets landing/return.
-                            self.ball_position = 35
+                            # Kickoff spot at kicking team's own 40 until kickoff play resolves.
+                            self.ball_position = KICKOFF_TEE_YARDS
                         else:
                             self.apply_halftime_kickoff()
                     # Q1→Q2 and Q3→Q4: keep ball, down, and distance
@@ -1079,10 +1086,10 @@ class Game:
             # Both teams had possession - compare scores
             if self.score_home > self.score_away:
                 self.ot_winner = "home"
-                print(f"\n*** OVERTIME {self.ot_period} COMPLETE *** HOME WINS!")
+                _safe_engine_print(f"\n*** OVERTIME {self.ot_period} COMPLETE *** HOME WINS!")
             elif self.score_away > self.score_home:
                 self.ot_winner = "away"
-                print(f"\n*** OVERTIME {self.ot_period} COMPLETE *** AWAY WINS!")
+                _safe_engine_print(f"\n*** OVERTIME {self.ot_period} COMPLETE *** AWAY WINS!")
             else:
                 # Tied - next OT period
                 self.ot_period += 1
@@ -1091,12 +1098,12 @@ class Game:
                     # OT3+: 2-point shootout
                     self.ot_2pt_mode = True
                     self.ot_2pt_round = {"home": None, "away": None}
-                    print(f"\n*** OVERTIME {self.ot_period} *** 2-POINT CONVERSION SHOOTOUT")
+                    _safe_engine_print(f"\n*** OVERTIME {self.ot_period} *** 2-POINT CONVERSION SHOOTOUT")
                 else:
                     # OT2: Alternate who goes first (team that went second in previous OT goes first)
                     self.possession = "away" if self.possession == "home" else "home"
                     self.ball_position = 75
                     self.down = 1
                     self.yards_to_go = 10
-                    print(f"\n*** OVERTIME {self.ot_period} ***")
+                    _safe_engine_print(f"\n*** OVERTIME {self.ot_period} ***")
                 self.display_status()

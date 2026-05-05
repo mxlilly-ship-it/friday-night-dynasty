@@ -21,7 +21,7 @@ type GameState = {
   team_stats?: Record<string, { total_yards?: number; rush_yards?: number; pass_yards?: number; touchdowns?: number; turnovers?: number; third_down?: string; fourth_down?: string; time_of_possession?: string; explosives?: number }>
 }
 
-/** Full field: 0 = home goal line, 100 = away goal line (matches engine ball_position). */
+/** Full field: 0 = home goal line, 100 = away goal line (absolute). */
 const FIELD_YARD_MARKERS: { leftPct: number; label: string }[] = [
   { leftPct: 0, label: '0' },
   { leftPct: 10, label: '10' },
@@ -39,7 +39,16 @@ const FIELD_YARD_MARKERS: { leftPct: number; label: string }[] = [
 /** Five-yard ticks on the playing field only (excludes end zones). */
 const FIELD_MINOR_YARD_PCTS = [15, 25, 35, 45, 55, 65, 75, 85]
 
-/** Absolute field 0 = home goal, 100 = away goal — label must follow possession (e.g. away touchback at 75 is own 25, not opp 25). */
+/**
+ * Engine stores ball_position as yards from the current offense's own goal (0–100 toward the opponent).
+ * Map to absolute field percent for the graphic: 0 = home goal, 100 = away goal.
+ */
+function absoluteFieldPct(possession: 'home' | 'away', ballPosition: number): number {
+  const b = Math.max(0, Math.min(100, ballPosition))
+  return possession === 'home' ? b : 100 - b
+}
+
+/** Label uses offense-relative ball (same as engine). */
 function possessionYardLineLabel(possession: 'home' | 'away', ballPosition: number): string {
   const b = Math.round(ballPosition)
   if (possession === 'home') {
@@ -215,7 +224,7 @@ export default function GamePlayPage({
         throw new Error('Missing play selection')
       if (!defensePlayId) defensePlayId = options.defense_plays[0]?.id ?? ''
 
-      const snapPos = state.ball_position
+      const fromAbs = absoluteFieldPct(state.possession, state.ball_position)
       const r = isLocalBundle
         ? await fetch(`${apiBase}/sim/game/play`, {
             method: 'POST',
@@ -236,6 +245,7 @@ export default function GamePlayPage({
       const data = await r.json()
 
       const prevPossession = state.possession
+      const toAbs = absoluteFieldPct(data.state.possession, data.state.ball_position)
       if (isLocalBundle && data.game) setLocalGame(data.game)
       setState(data.state)
       setPreviousPlay(isUserOnOffense ? selectedPlay.name : (options.offense_plays.find((p: PlayOption) => p.id === offensePlayId)?.name ?? '—'))
@@ -273,7 +283,7 @@ export default function GamePlayPage({
       if (res?.touchdown || res?.turnover || possessionChanged) {
         setDriveArrows([])
       } else {
-        setDriveArrows((prev) => [...prev, { from: snapPos, to: data.state.ball_position }])
+        setDriveArrows((prev) => [...prev, { from: fromAbs, to: toAbs }])
       }
       await fetchOptions()
     } catch (e: unknown) {
@@ -553,7 +563,11 @@ export default function GamePlayPage({
                     />
                   )
                 })}
-                <div className="gameplay-ball" style={{ left: `${state.ball_position}%` }} title="Ball" />
+                <div
+                  className="gameplay-ball"
+                  style={{ left: `${absoluteFieldPct(state.possession, state.ball_position)}%` }}
+                  title="Ball"
+                />
               </div>
             </div>
           </div>

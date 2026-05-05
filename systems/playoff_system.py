@@ -4,7 +4,6 @@ Semifinals: 1v4, 2v3. Winners meet in championship.
 Player game stats are tracked and appended to output when output_lines is provided.
 """
 
-import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from engine.game_engine import Game
@@ -211,7 +210,6 @@ def run_playoff_game(
         if game.ot_2pt_mode:
             game.run_play_2pt_shootout()
             game.advance_quarter()
-            time.sleep(0.01)
             continue
 
         if game.down == 4 and not getattr(game, "is_overtime", False):
@@ -225,7 +223,6 @@ def run_playoff_game(
                 pass
             result = game.run_play()
             if isinstance(result, dict) and (result.get("first_down") is False) and (result.get("yards") == 0) and game.down != 4:
-                time.sleep(0.01)
                 continue
 
         offense_call = game.get_ai_play_call()
@@ -240,21 +237,18 @@ def run_playoff_game(
         if result.get("needs_pat"):
             game.attempt_extra_point_kick(defense_pat_choice="return")
             game.finish_pat_and_kickoff()
-            time.sleep(0.01)
             continue
 
         if result.get("needs_2pt"):
             game.attempt_two_point(offense_call, defense_call)
             game.setup_ot_possession()
             game.check_ot_period_end()
-            time.sleep(0.01)
             continue
 
         if result.get("ot_possession_ended"):
             game.check_ot_period_end()
 
         game.advance_quarter()
-        time.sleep(0.01)
 
     return (game.score_home, game.score_away, game.ot_winner, stats_map)
 

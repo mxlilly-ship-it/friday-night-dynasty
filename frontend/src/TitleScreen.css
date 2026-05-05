@@ -36,8 +36,19 @@
 .fnd-title-root--landing {
   padding-top: 0;
   justify-content: center;
+  align-items: stretch;
   background: #000;
   overflow: hidden;
+  position: relative;
+}
+
+.fnd-title-iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
 }
 
 .fnd-title-root::before,

@@ -6,7 +6,12 @@ from typing import Any, Dict, List, Optional
 
 from backend.services.game_state import dumps_game, loads_game
 from backend.storage.db import db
-from engine.game_engine import Game, regulation_dead_ball_clock_seconds, regulation_kneel_clock_seconds
+from engine.game_engine import (
+    Game,
+    KICKOFF_TEE_YARDS,
+    regulation_dead_ball_clock_seconds,
+    regulation_kneel_clock_seconds,
+)
 from play_single_game import sync_game_ratings
 from systems import calculate_team_ratings, calculate_turnover_profile
 from systems.depth_chart import build_depth_chart
@@ -107,6 +112,7 @@ def create_game(
     game.opening_kickoff_receiver = random.choice(["home", "away"])
     game.kickoff_kicking_team = "away" if game.opening_kickoff_receiver == "home" else "home"
     game.possession = game.kickoff_kicking_team
+    game.ball_position = KICKOFF_TEE_YARDS
 
     game_id = str(uuid.uuid4())
     now = int(time.time())
@@ -269,19 +275,19 @@ def _submit_kickoff_play(
         defense_play_id = "KICKOFF_RETURN_FIELD_RETURN"
 
     if offense_play_id == "KICKOFF_DEEP":
-        kick_distance = random.randint(55, 70)
+        kick_travel = random.randint(55, 70)
         touchback_chance = 0.16
         onside = False
     elif offense_play_id == "KICKOFF_MIDDLE_SQUIB":
-        kick_distance = random.randint(35, 50)
+        kick_travel = random.randint(35, 50)
         touchback_chance = 0.03
         onside = False
     elif offense_play_id == "KICKOFF_ONSIDE":
-        kick_distance = random.randint(9, 14)
+        kick_travel = random.randint(9, 14)
         touchback_chance = 0.0
         onside = True
     else:
-        kick_distance = random.randint(10, 20)
+        kick_travel = random.randint(10, 20)
         touchback_chance = 0.0
         onside = True
 
@@ -290,20 +296,29 @@ def _submit_kickoff_play(
         recover_chance = 0.16 if offense_play_id == "KICKOFF_ONSIDE" else 0.34
         recovered_by_kicking = random.random() < recover_chance
 
-    result: Dict[str, Any] = {"kickoff": True, "kick_distance": kick_distance, "return_yards": 0, "touchback": False, "kickoff_td": False}
+    result: Dict[str, Any] = {
+        "kickoff": True,
+        "kick_distance": kick_travel,
+        "return_yards": 0,
+        "touchback": False,
+        "kickoff_td": False,
+    }
     game.pending_kickoff = False
 
     if recovered_by_kicking:
         game.possession = kicking_side
-        game.ball_position = min(99, max(1, kick_distance))
+        landing = KICKOFF_TEE_YARDS + kick_travel
+        game.ball_position = min(99, max(1, landing))
         game.down = 1
         game.yards_to_go = 10
         result["onside_recovered"] = True
     else:
         game.possession = receiving_side
-        if random.random() < touchback_chance:
+        catch_yard = 100 - KICKOFF_TEE_YARDS - kick_travel
+        in_end_zone = catch_yard < 1
+        optional_tb = (not in_end_zone) and catch_yard <= 3 and random.random() < touchback_chance
+        if in_end_zone or optional_tb:
             result["touchback"] = True
-            # ball_position is always from current offense own goal line
             game.ball_position = 25
             game.down = 1
             game.yards_to_go = 10
@@ -315,8 +330,8 @@ def _submit_kickoff_play(
             else:
                 ret = random.randint(10, 38)
             result["return_yards"] = ret
-            land = max(1, min(99, kick_distance))
-            new_pos = land + ret
+            spot = max(1, min(99, catch_yard))
+            new_pos = spot + ret
             if new_pos >= 100:
                 result["kickoff_td"] = True
                 if receiving_side == "home":
@@ -377,6 +392,7 @@ def _attempt_field_goal_hs(game: Game, defense_play_id: str = "") -> Dict[str, A
             game.score_away += 3
         game.pending_kickoff = True
         game.kickoff_kicking_team = game.possession
+        game.ball_position = KICKOFF_TEE_YARDS
     else:
         game.switch_possession()
         game.ball_position = 25
@@ -750,6 +766,7 @@ def _submit_pat_play(game: Game, home_team: Any, away_team: Any, offense_play_id
     game.pending_pat = False
     game.pending_kickoff = True
     game.kickoff_kicking_team = game.possession
+    game.ball_position = KICKOFF_TEE_YARDS
 
     _append_game_log_line(
         game,
@@ -813,6 +830,7 @@ def _resolve_pat_ai(game: Game, home_team: Any, away_team: Any) -> None:
     game.pending_pat = False
     game.pending_kickoff = True
     game.kickoff_kicking_team = game.possession
+    game.ball_position = KICKOFF_TEE_YARDS
     _append_game_log_line(
         game,
         offense_name,
@@ -1170,8 +1188,6 @@ def sim_next_play(game: Game, home_team: Any, away_team: Any) -> Dict[str, Any]:
     # After a user-played TD, engine leaves pending_pat True until PAT — same as submit_play path.
     if getattr(game, "pending_pat", False):
         _resolve_pat_ai(game, home_team, away_team)
-        game.pending_kickoff = True
-        game.kickoff_kicking_team = game.possession
         game.advance_quarter()
         return {
             "result": {"pat_resolved": True},

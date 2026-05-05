@@ -719,6 +719,21 @@ export default function App() {
     setScreen('new')
   }
 
+  const titleNavRef = useRef({ onNewSaveClick, onLoadSaveClick })
+  titleNavRef.current = { onNewSaveClick, onLoadSaveClick }
+
+  useEffect(() => {
+    function onMessage(e: MessageEvent) {
+      if (e.origin !== window.location.origin) return
+      const d = e.data as { type?: string; action?: string } | null
+      if (!d || d.type !== 'fnd-title') return
+      if (d.action === 'new') void titleNavRef.current.onNewSaveClick()
+      else if (d.action === 'load') void titleNavRef.current.onLoadSaveClick()
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [])
+
   async function onContinueLoad() {
     const ok = await devLogin()
     if (ok) await loadSaves()
@@ -877,20 +892,16 @@ export default function App() {
 
   /* ——— Title + Load list + New save ——— */
   return (
-    <div className="fnd-title-root">
-      <div className="fnd-title-inner">
+    <div className={screen === 'title' ? 'fnd-title-root fnd-title-root--landing' : 'fnd-title-root'}>
+      {screen === 'title' ? (
+        <iframe
+          className="fnd-title-iframe"
+          title="Friday Night Dynasty"
+          src={`${import.meta.env.BASE_URL}fnd_homepage.html`}
+        />
+      ) : (
+        <div className="fnd-title-inner">
         <h1 className="fnd-title-heading">Friday Night Dynasty</h1>
-
-        {screen === 'title' && (
-          <div className="fnd-title-buttons">
-            <button type="button" className="fnd-title-btn" onClick={onNewSaveClick}>
-              New
-            </button>
-            <button type="button" className="fnd-title-btn" onClick={onLoadSaveClick}>
-              Load
-            </button>
-          </div>
-        )}
 
         {screen === 'load' && (
           <div className="fnd-panel">
@@ -1037,7 +1048,8 @@ export default function App() {
           </div>
         ) : null}
         {successMessage ? <div className="fnd-success">{successMessage}</div> : null}
-      </div>
+        </div>
+      )}
     </div>
   )
 }

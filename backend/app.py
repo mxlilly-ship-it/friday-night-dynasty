@@ -166,6 +166,14 @@ def create_app() -> FastAPI:
                 return FileResponse(p)
             raise HTTPException(status_code=404)
 
+        @app.get("/fnd_homepage.html")
+        def spa_title_homepage():
+            """Title screen markup (from Vite public/) for iframe on the React title route."""
+            p = dist / "fnd_homepage.html"
+            if p.is_file():
+                return FileResponse(p, media_type="text/html; charset=utf-8")
+            raise HTTPException(status_code=404)
+
         @app.get("/")
         def spa_index():
             """Serve the built React app from frontend/dist (no separate Vite process needed)."""

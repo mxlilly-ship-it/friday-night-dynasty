@@ -2466,7 +2466,6 @@ function TeamHomePageBody({
   const coachDevTotalCp = Number(saveState?.offseason_coach_dev_bank?.cp_total ?? 0)
   const coachDevAllocatedCp = COACH_DEV_SKILLS.reduce((sum, { key }) => sum + Number(coachDevAllocations[key] ?? 0), 0)
   const coachDevAvailableCp = coachDevTotalCp - coachDevAllocatedCp
-  const coachDevOverAllocated = phase === 'offseason' && offseasonCurrentStage === 'Coach development' && coachDevAvailableCp < 0
   const springBallResult = saveState?.offseason_spring_ball_results?.user_team_result ?? null
   const winterTrainingResult = saveState?.offseason_winter_training_results?.user_team_result ?? null
   const transferStage1 = saveState?.offseason_transfer_stage_1 ?? null
