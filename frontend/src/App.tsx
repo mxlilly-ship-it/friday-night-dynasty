@@ -14,6 +14,24 @@ const API_BASE = import.meta.env.DEV
 
 const USE_LOCAL_BUNDLES = String((import.meta as any).env?.VITE_USE_LOCAL_BUNDLES ?? '').toLowerCase() === 'true'
 
+/** Tokens live in the server DB; redeploys / new DB invalidate old browser tokens. */
+const STALE_SESSION_MSG =
+  'Your session expired. This often happens after a server restart or deploy. Enter your coach name and tap Continue to sign in again.'
+
+async function formatApiErrorBody(r: Response): Promise<string> {
+  const raw = await r.text()
+  try {
+    const j = JSON.parse(raw) as { detail?: unknown }
+    const d = j.detail
+    if (typeof d === 'string') return d
+    if (Array.isArray(d))
+      return d.map((x: any) => (typeof x?.msg === 'string' ? x.msg : JSON.stringify(x))).join('; ')
+  } catch {
+    /* use raw */
+  }
+  return raw || `Request failed (${r.status})`
+}
+
 function apiConnectionHint() {
   return ' Start the API: python -m uvicorn backend.app:app --host 127.0.0.1 --port 8001'
 }
@@ -125,6 +143,19 @@ export default function App() {
     if (!token) return {}
     return { Authorization: `Bearer ${token}` }
   }, [token])
+
+  function clearStaleSession() {
+    localStorage.removeItem('fnd_token')
+    setToken('')
+  }
+
+  /** If response is 401, clears stored token and sets a friendly message. Returns true = caller should stop. */
+  async function consumeUnauthorized(r: Response): Promise<boolean> {
+    if (r.status !== 401) return false
+    clearStaleSession()
+    setError(STALE_SESSION_MSG)
+    return true
+  }
 
   async function loadLocalBundleFromZip(file: File) {
     setError('')
@@ -347,7 +378,7 @@ export default function App() {
         body: JSON.stringify({ username }),
       })
       if (!r.ok) {
-        setError(await r.text())
+        setError(await formatApiErrorBody(r))
         return false
       }
       const data = await r.json()
@@ -370,7 +401,8 @@ export default function App() {
     try {
       const r = await fetch(`${API_BASE}/saves`, { headers })
       if (!r.ok) {
-        setError(await r.text())
+        if (await consumeUnauthorized(r)) return
+        setError(await formatApiErrorBody(r))
         return
       }
       const data = await r.json()
@@ -386,7 +418,8 @@ export default function App() {
     try {
       const r = await fetch(`${API_BASE}/saves/${id}`, { headers })
       if (!r.ok) {
-        setError(await r.text())
+        if (await consumeUnauthorized(r)) return
+        setError(await formatApiErrorBody(r))
         return
       }
       const data = await r.json()
@@ -408,8 +441,11 @@ export default function App() {
     try {
       const r = await fetch(`${API_BASE}/saves/${id}`, { method: 'DELETE', headers })
       if (!r.ok) {
-        const txt = await r.text()
-        setError(txt || 'Delete failed')
+        if (await consumeUnauthorized(r)) {
+          setDeletingId(null)
+          return
+        }
+        setError((await formatApiErrorBody(r)) || 'Delete failed')
         setDeletingId(null)
         return
       }
@@ -496,14 +532,8 @@ export default function App() {
           body: JSON.stringify(payload),
         })
         if (!r.ok) {
-          const errText = await r.text()
-          try {
-            const j = JSON.parse(errText) as { detail?: unknown }
-            const d = j.detail
-            setError(typeof d === 'string' ? d : errText)
-          } catch {
-            setError(errText)
-          }
+          if (await consumeUnauthorized(r)) return false
+          setError(await formatApiErrorBody(r))
           return false
         }
         const data = await r.json()
@@ -534,8 +564,8 @@ export default function App() {
       try {
         const r = await fetch(`${API_BASE}/saves/${saveId}/season/finish`, { method: 'POST', headers })
         if (!r.ok) {
-          const errText = await r.text()
-          setError(errText || 'Failed to advance season')
+          if (await consumeUnauthorized(r)) return false
+          setError((await formatApiErrorBody(r)) || 'Failed to advance season')
           return false
         }
         const data = await r.json()
@@ -555,14 +585,8 @@ export default function App() {
       try {
         const r = await fetch(`${API_BASE}/saves/${saveId}/playoffs/sim`, { method: 'POST', headers })
         if (!r.ok) {
-          const errText = await r.text()
-          try {
-            const j = JSON.parse(errText) as { detail?: unknown }
-            const d = j.detail
-            setError(typeof d === 'string' ? d : errText)
-          } catch {
-            setError(errText)
-          }
+          if (await consumeUnauthorized(r)) return false
+          setError(await formatApiErrorBody(r))
           return false
         }
         const data = await r.json()
@@ -581,14 +605,8 @@ export default function App() {
       try {
         const r = await fetch(`${API_BASE}/saves/${saveId}/playoffs/sim-round`, { method: 'POST', headers })
         if (!r.ok) {
-          const errText = await r.text()
-          try {
-            const j = JSON.parse(errText) as { detail?: unknown }
-            const d = j.detail
-            setError(typeof d === 'string' ? d : errText)
-          } catch {
-            setError(errText)
-          }
+          if (await consumeUnauthorized(r)) return false
+          setError(await formatApiErrorBody(r))
           return false
         }
         const data = await r.json()
@@ -612,20 +630,8 @@ export default function App() {
           body: JSON.stringify(ob),
         })
         if (!r.ok) {
-          const errText = await r.text()
-          try {
-            const j = JSON.parse(errText) as { detail?: unknown }
-            const d = j.detail
-            setError(
-              typeof d === 'string'
-                ? d
-                : Array.isArray(d)
-                  ? d.map((x: any) => (typeof x?.msg === 'string' ? x.msg : JSON.stringify(x))).join('; ')
-                  : errText,
-            )
-          } catch {
-            setError(errText)
-          }
+          if (await consumeUnauthorized(r)) return false
+          setError(await formatApiErrorBody(r))
           return false
         }
         const data = await r.json()
@@ -672,20 +678,8 @@ export default function App() {
         body,
       })
       if (!r.ok) {
-        const errText = await r.text()
-        try {
-          const j = JSON.parse(errText) as { detail?: unknown }
-          const d = j.detail
-          setError(
-            typeof d === 'string'
-              ? d
-              : Array.isArray(d)
-                ? d.map((x: any) => (typeof x?.msg === 'string' ? x.msg : JSON.stringify(x))).join('; ')
-                : errText,
-          )
-        } catch {
-          setError(errText)
-        }
+        if (await consumeUnauthorized(r)) return false
+        setError(await formatApiErrorBody(r))
         return false
       }
       let data: { state?: any }
