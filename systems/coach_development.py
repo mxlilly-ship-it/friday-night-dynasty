@@ -319,6 +319,14 @@ def apply_ai_coach_season_development(coach: Coach, bank: Dict[str, Any]) -> Non
     apply_coach_development(coach, bank, body)
 
 
+def build_bulk_sim_coach_dev_body(coach: Coach, bank: Dict[str, Any]) -> Dict[str, Any]:
+    """Allocations POST body matching CPU coach dev logic (bulk season simulation)."""
+    if coach is None or not isinstance(bank, dict):
+        return {}
+    cp_total = float(bank.get("cp_total", 0.0) or 0.0)
+    return {"coach_dev_allocations": _ai_target_allocations(coach, cp_total)}
+
+
 def apply_coach_development(coach: Coach, bank: Dict[str, Any], body: Dict[str, Any]) -> None:
     """Apply user/AI CP allocations, then derive levels from thresholds."""
     if coach is None:

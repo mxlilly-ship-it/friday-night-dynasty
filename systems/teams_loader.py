@@ -1,6 +1,10 @@
 """
 Load teams from data/teams.json.
 Single source of truth for league setup; add teams to the JSON file to expand the league.
+
+The same JSON also carries league-level metadata (currently just
+``playoff_system``) at the top, so a state's playoff structure travels with
+its team list — see ``load_league_config_from_json``.
 """
 
 import json
@@ -9,6 +13,7 @@ from typing import Any, Dict, List, Optional
 
 from models.team import Team
 from models.community import CommunityType
+from systems.playoff_systems import DEFAULT_PLAYOFF_SYSTEM_ID
 from systems.win_path_io import open_text_with_path_fallback, path_exists_any
 
 TEAMS_JSON_PATH = "data/teams.json"
@@ -50,6 +55,44 @@ def load_teams_from_json(path: Optional[str] = None) -> List[Dict[str, Any]]:
     with open_text_with_path_fallback(plain, "r") as f:
         data = json.load(f)
     return data.get("teams", [])
+
+
+def load_league_config_from_json(path: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Load the *full* league config (top-level dict) from a teams JSON file.
+
+    Returned dict carries every top-level key declared in the JSON — including
+    ``playoff_system`` — alongside the team rows. Returns an empty dict if the
+    file is missing so callers can rely on ``.get(...)`` with defaults.
+
+    Use this when you need league-level metadata such as the playoff system
+    id; use ``load_teams_from_json`` when you only need the team rows.
+    """
+    plain = os.path.abspath(os.path.normpath(path or _default_path()))
+    if not path_exists_any(plain):
+        return {}
+    with open_text_with_path_fallback(plain, "r") as f:
+        data = json.load(f)
+    return data if isinstance(data, dict) else {}
+
+
+def playoff_system_id_from_config(
+    config: Optional[Dict[str, Any]],
+    *,
+    default: str = DEFAULT_PLAYOFF_SYSTEM_ID,
+) -> str:
+    """
+    Extract the ``playoff_system`` id from a league config dict.
+
+    Falls back to ``default`` when the field is missing/blank/non-string so
+    legacy JSON files (and ad-hoc setups) still resolve to the WV system.
+    """
+    if not isinstance(config, dict):
+        return default
+    raw = config.get("playoff_system")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip().lower()
+    return default
 
 
 def build_teams_from_json(

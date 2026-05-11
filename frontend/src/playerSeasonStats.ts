@@ -82,7 +82,7 @@ export function buildPlayerStatRows(state: any): PlayerStatRow[] {
       absorb(g?.player_stats ?? [])
     }
   }
-  for (const s of state?.preseason_scrimmages ?? []) absorb(s?.player_stats ?? [])
+  // Preseason scrimmages keep their own box scores on the scrimmage panel only — do not fold into season totals.
 
   return Array.from(rows.values())
 }

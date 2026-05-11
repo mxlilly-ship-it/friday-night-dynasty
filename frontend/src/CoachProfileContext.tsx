@@ -91,7 +91,16 @@ export function CoachProfileProvider({
         }
       }
       if (!foundCoach) {
-        setProfile({ teamName: String(saveState?.user_team ?? ''), coach: { name: cn } })
+        const ut = String(saveState?.user_team ?? '').trim()
+        if (ut) {
+          const t = findTeam(saveState, ut)
+          const nm = String(t?.coach?.name ?? '').trim()
+          if (nm.toLowerCase() === lower) {
+            setProfile({ teamName: ut, coach: t.coach })
+            return
+          }
+        }
+        setProfile({ teamName: '', coach: { name: cn } })
         return
       }
       setProfile({ teamName: foundTeam, coach: foundCoach })

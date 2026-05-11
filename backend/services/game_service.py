@@ -11,6 +11,7 @@ from engine.game_engine import (
     KICKOFF_TEE_YARDS,
     regulation_dead_ball_clock_seconds,
     regulation_kneel_clock_seconds,
+    scaled_regulation_clock_drain,
 )
 from play_single_game import sync_game_ratings
 from systems import calculate_team_ratings, calculate_turnover_profile
@@ -168,6 +169,10 @@ def game_state_dict(game: Game) -> Dict[str, Any]:
             "explosives": ts.get("explosives", 0),
             "time_of_possession": ts.get("time_of_possession", "0:00"),
         }
+    try:
+        running_clock_active = bool(game.is_running_clock_active())
+    except Exception:
+        running_clock_active = False
     return {
         "quarter": game.quarter,
         "time_remaining": game.time_remaining,
@@ -186,6 +191,7 @@ def game_state_dict(game: Game) -> Dict[str, Any]:
         "ot_winner": getattr(game, "ot_winner", None),
         "pending_pat": getattr(game, "pending_pat", False),
         "pending_kickoff": getattr(game, "pending_kickoff", False),
+        "running_clock": running_clock_active,
         "team_stats": formatted_stats,
     }
 
@@ -345,17 +351,28 @@ def _submit_kickoff_play(
                 game.down = 1
                 game.yards_to_go = 10
         if not result.get("kickoff_td"):
-            game.time_remaining = max(0, game.time_remaining - random.randint(8, 18))
+            game.time_remaining = max(
+                0, game.time_remaining - scaled_regulation_clock_drain(random.randint(8, 18))
+            )
 
     narrative = build_play_narrative(
         receiving_team,
         kicking_team,
         result,
         is_run=False,
-        context={"down": 1, "yards_to_go": 10, "ball_position": game.ball_position, "quarter": game.quarter, "time_remaining": game.time_remaining, "score_margin": 0},
+        context={
+            "down": 1,
+            "yards_to_go": 10,
+            "ball_position": game.ball_position,
+            "quarter": game.quarter,
+            "time_remaining": game.time_remaining,
+            "score_margin": 0,
+            "running_clock": game.is_running_clock_active(),
+        },
     )
     if recovered_by_kicking:
         narrative = "Onside kick recovered by the kicking team!"
+    narrative = _finalize_play_running_clock(game, result, narrative)
     return {"result": result, "state": game_state_dict(game), "narrative": narrative}
 
 
@@ -662,10 +679,69 @@ def _append_game_log_line(
         lines = []
         game.play_log_lines = lines
     spot = f"Own {ball_before}" if ball_before <= 50 else f"Opp {100 - ball_before}"
+    rc_tag = ""
+    try:
+        if game.is_running_clock_active():
+            rc_tag = "[RC] "
+    except Exception:
+        rc_tag = ""
     lines.append(
-        f"Q{quarter_before} {_fmt_clock(time_before)} | {offense_name} {down_before}&{ytg_before} @ {spot} | "
+        f"{rc_tag}Q{quarter_before} {_fmt_clock(time_before)} | {offense_name} {down_before}&{ytg_before} @ {spot} | "
         f"O: {offense_call_label} | D: {defense_call_label} | Result: {narrative}"
     )
+
+
+def _maybe_emit_running_clock_announcement(game: Game) -> Optional[str]:
+    """If the running clock just turned on this play, append a banner log line and return its text.
+
+    Resets the announcement flag when the margin drops back under the threshold so a swing back
+    over 35 will re-announce. No-op when not active or already announced.
+    """
+    try:
+        active = bool(game.is_running_clock_active())
+    except Exception:
+        return None
+    if not active:
+        if getattr(game, "running_clock_announced", False):
+            game.running_clock_announced = False
+        return None
+    if getattr(game, "running_clock_announced", False):
+        return None
+
+    home_name = getattr(game, "home_team_name", "Home")
+    away_name = getattr(game, "away_team_name", "Away")
+    home = int(getattr(game, "score_home", 0) or 0)
+    away = int(getattr(game, "score_away", 0) or 0)
+    margin = abs(home - away)
+    leader = home_name if home > away else away_name
+    msg = f"RUNNING CLOCK IN EFFECT — {leader} leads by {margin}."
+
+    lines = getattr(game, "play_log_lines", None)
+    if lines is None or not isinstance(lines, list):
+        lines = []
+        game.play_log_lines = lines
+    lines.append(
+        f"[RC] Q{game.quarter} {_fmt_clock(game.time_remaining)} | {msg}"
+    )
+    game.running_clock_announced = True
+    return msg
+
+
+def _finalize_play_running_clock(game: Game, result: Dict[str, Any], narrative: str) -> str:
+    """Stamp ``running_clock`` onto the result, emit an activation banner if needed, and
+    append a sentence to the narrative on activation. Returns the (possibly extended) narrative.
+    """
+    try:
+        result["running_clock"] = bool(game.is_running_clock_active())
+    except Exception:
+        result["running_clock"] = False
+    banner = _maybe_emit_running_clock_announcement(game)
+    if banner:
+        result["running_clock_activated"] = True
+        if narrative:
+            return f"{narrative} {banner}".strip()
+        return banner
+    return narrative
 
 
 def _sync_ratings(game: Game, home_team: Any, away_team: Any) -> None:
@@ -782,6 +858,7 @@ def _submit_pat_play(game: Game, home_team: Any, away_team: Any, offense_play_id
         t_before,
     )
     game.advance_quarter()
+    narrative = _finalize_play_running_clock(game, result, narrative)
     return {"result": result, "state": game_state_dict(game), "narrative": narrative}
 
 
@@ -797,8 +874,8 @@ def _kickoff_followup_narrative(ko_meta: Dict[str, Any], recv_team: Any, other_t
     return build_play_narrative(recv_team, other_team, res, is_run=False, context={}).strip()
 
 
-def _resolve_pat_ai(game: Game, home_team: Any, away_team: Any) -> None:
-    """Auto-resolve PAT when simming (no user input)."""
+def _resolve_pat_ai(game: Game, home_team: Any, away_team: Any) -> Optional[str]:
+    """Auto-resolve PAT when simming (no user input). Returns running-clock activation banner or None."""
     offense_team = home_team if game.possession == "home" else away_team
     defense_team = away_team if game.possession == "home" else home_team
     offense_name = offense_team.name
@@ -844,6 +921,8 @@ def _resolve_pat_ai(game: Game, home_team: Any, away_team: Any) -> None:
         q_before,
         t_before,
     )
+    # AI PAT can push the lead over the running-clock threshold; emit the banner if so.
+    return _maybe_emit_running_clock_announcement(game)
 
 
 def submit_play(game: Game, home_team: Any, away_team: Any, offense_play_id: str, defense_play_id: str) -> Dict[str, Any]:
@@ -884,6 +963,7 @@ def submit_play(game: Game, home_team: Any, away_team: Any, offense_play_id: str
             t_before,
         )
         game.advance_quarter()
+        narrative = _finalize_play_running_clock(game, result, narrative)
         return {"result": result, "state": game_state_dict(game), "narrative": narrative}
 
     # Special Teams: Punt or Field Goal (only valid on 4th down)
@@ -995,6 +1075,7 @@ def submit_play(game: Game, home_team: Any, away_team: Any, offense_play_id: str
                 "quarter": q_before,
                 "time_remaining": t_before,
                 "score_margin": off_score_before - def_score_before,
+                "running_clock": game.is_running_clock_active(),
             },
         )
         _append_game_log_line(
@@ -1010,6 +1091,7 @@ def submit_play(game: Game, home_team: Any, away_team: Any, offense_play_id: str
             q_before,
             t_before,
         )
+        narrative = _finalize_play_running_clock(game, result, narrative)
         return {"result": result, "state": game_state_dict(game), "narrative": narrative}
 
     off_pb = build_playbook_for_team(offense_team)
@@ -1047,6 +1129,7 @@ def submit_play(game: Game, home_team: Any, away_team: Any, offense_play_id: str
             "quarter": q_before,
             "time_remaining": t_before,
             "score_margin": off_score_before - def_score_before,
+            "running_clock": bool(result.get("running_clock") or game.is_running_clock_active()),
         },
     )
     _append_game_log_line(
@@ -1062,6 +1145,7 @@ def submit_play(game: Game, home_team: Any, away_team: Any, offense_play_id: str
         q_before,
         t_before,
     )
+    narrative = _finalize_play_running_clock(game, result, narrative)
     return {"result": result, "state": game_state_dict(game), "narrative": narrative}
 
 
@@ -1144,6 +1228,7 @@ def _try_sim_fourth_down_special(game: Game, home_team: Any, away_team: Any) -> 
             "quarter": q_before,
             "time_remaining": t_before,
             "score_margin": off_score_before - def_score_before,
+            "running_clock": game.is_running_clock_active(),
         },
     )
     _append_game_log_line(
@@ -1160,6 +1245,7 @@ def _try_sim_fourth_down_special(game: Game, home_team: Any, away_team: Any) -> 
         t_before,
     )
     game.advance_quarter()
+    narrative = _finalize_play_running_clock(game, result, narrative)
     return {"result": result, "state": game_state_dict(game), "game_over": game.is_game_over(), "narrative": narrative}
 
 
@@ -1187,13 +1273,20 @@ def sim_next_play(game: Game, home_team: Any, away_team: Any) -> Dict[str, Any]:
 
     # After a user-played TD, engine leaves pending_pat True until PAT — same as submit_play path.
     if getattr(game, "pending_pat", False):
-        _resolve_pat_ai(game, home_team, away_team)
+        rc_banner = _resolve_pat_ai(game, home_team, away_team)
         game.advance_quarter()
+        narrative = "Extra point / two-point (auto)."
+        if rc_banner:
+            narrative = f"{narrative} {rc_banner}".strip()
         return {
-            "result": {"pat_resolved": True},
+            "result": {
+                "pat_resolved": True,
+                "running_clock": game.is_running_clock_active(),
+                "running_clock_activated": bool(rc_banner),
+            },
             "state": game_state_dict(game),
             "game_over": game.is_game_over(),
-            "narrative": "Extra point / two-point (auto).",
+            "narrative": narrative,
         }
 
     if getattr(game, "ot_2pt_mode", False):
@@ -1250,8 +1343,9 @@ def sim_next_play(game: Game, home_team: Any, away_team: Any) -> Dict[str, Any]:
     _update_team_stats(game, result, offense_team.name, defense_team.name, is_run, down_before)
     _coach_record_scrimmage_stats(game, home_team, away_team, possession_before, bool(is_run), result)
 
+    rc_banner_pat: Optional[str] = None
     if result.get("needs_pat"):
-        _resolve_pat_ai(game, home_team, away_team)
+        rc_banner_pat = _resolve_pat_ai(game, home_team, away_team)
     elif result.get("needs_2pt"):
         game.attempt_two_point(o, d)
         game.setup_ot_possession()
@@ -1272,6 +1366,7 @@ def sim_next_play(game: Game, home_team: Any, away_team: Any) -> Dict[str, Any]:
             "quarter": q_before,
             "time_remaining": t_before,
             "score_margin": off_score_before - def_score_before,
+            "running_clock": bool(result.get("running_clock") or game.is_running_clock_active()),
         },
     )
     _append_game_log_line(
@@ -1288,6 +1383,10 @@ def sim_next_play(game: Game, home_team: Any, away_team: Any) -> Dict[str, Any]:
         t_before,
     )
     game.advance_quarter()
+    narrative = _finalize_play_running_clock(game, result, narrative)
+    if rc_banner_pat and rc_banner_pat not in narrative:
+        result["running_clock_activated"] = True
+        narrative = f"{narrative} {rc_banner_pat}".strip()
     return {"result": result, "state": game_state_dict(game), "game_over": game.is_game_over(), "narrative": narrative}
 
 

@@ -17,6 +17,7 @@ from backend.services.league_service import (
     finish_season,
     sim_playoffs,
     sim_playoff_round,
+    simulate_seasons_forward,
     advance_offseason,
     advance_preseason,
     get_play_selection_for_team,
@@ -103,6 +104,7 @@ class CreateSaveRequest(BaseModel):
     coach_config: Dict[str, Any] = {}
     start_year: Optional[int] = None
     teams_data: Optional[Dict[str, Any]] = None
+    allow_user_coach_firing: bool = True
 
 
 STAGE_GOAL_OPTIONS = ["Winning Season", "Playoffs", "Semifinal", "State Championship", "Title Winner"]
@@ -132,12 +134,18 @@ class AdvanceOffseasonBody(BaseModel):
     improve_booster_support: Optional[int] = None  # 1-10
     # Coach development CP threshold allocations (skill -> allocated CP)
     coach_dev_allocations: Optional[Dict[str, Any]] = None
+    # Coaching carousel (stages I–III): user's ranked HC job applications (team names).
+    carousel_job_applications: Optional[List[str]] = None
 
 
 class StartCoachGameBody(BaseModel):
     """Start a coach-playable game (scrimmage, regular season, or playoff)."""
     context: str  # "scrimmage" | "week" | "playoff"
-    scrimmage_index: Optional[int] = 0  # 0 or 1 for Scrimmage 1 or 2
+    scrimmage_index: Optional[int] = 0  # 0 or 1 for Scrimmage 1 or Scrimmage 2
+
+
+class SimulateSeasonsBody(BaseModel):
+    seasons: int  # 1, 5, 10, or 20
 
 
 @router.get("", response_model=List[Dict[str, Any]])
@@ -155,6 +163,7 @@ def create_save_route(body: CreateSaveRequest, user=Depends(require_user)):
             body.coach_config,
             start_year=body.start_year,
             teams_data=body.teams_data,
+            allow_user_coach_firing=body.allow_user_coach_firing,
         )
     except Exception as e:
         msg = str(e)
@@ -408,6 +417,15 @@ def sim_week_route(save_id: str, user=Depends(require_user)):
         raise HTTPException(status_code=400, detail=_save_route_exception_detail(e))
 
 
+@router.post("/{save_id}/simulate-seasons", response_model=Dict[str, Any])
+def simulate_seasons_route(save_id: str, body: SimulateSeasonsBody, user=Depends(require_user)):
+    """CPU-fast-forward N full years (offseason uses default Continue behavior)."""
+    try:
+        return simulate_seasons_forward(user["user_id"], save_id, int(body.seasons))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=_save_route_exception_detail(e))
+
+
 @router.post("/{save_id}/season/finish", response_model=Dict[str, Any])
 def finish_season_route(save_id: str, user=Depends(require_user)):
     try:
@@ -519,7 +537,7 @@ def week_game_log_txt_route(save_id: str, week_num: int, game_index: int, user=D
 @router.get("/{save_id}/playoffs/game-text.txt")
 def playoff_game_text_txt_route(
     save_id: str,
-    round: str = Query(..., description="Quarterfinal | Semifinal | Championship"),
+    round: str = Query(..., description="Round of 16 | Quarterfinal | Semifinal | Championship"),
     home: str = Query(..., description="Home team name"),
     away: str = Query(..., description="Away team name"),
     kind: str = Query(..., description="box-score | game-log"),

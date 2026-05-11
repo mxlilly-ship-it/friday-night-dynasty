@@ -1,5 +1,7 @@
 import random
 
+from engine.game_engine import REGULATION_QUARTER_SECONDS
+
 
 RUN_GAIN_OPENERS = [
     "{rb} takes the handoff",
@@ -183,15 +185,20 @@ def _situation_prefix(ctx):
     ytg = int(ctx.get("yards_to_go", 10) or 10)
     ball = int(ctx.get("ball_position", 25) or 25)
     qtr = int(ctx.get("quarter", 1) or 1)
-    sec = int(ctx.get("time_remaining", 12 * 60) or 0)
+    sec = int(ctx.get("time_remaining", REGULATION_QUARTER_SECONDS) or 0)
     offense_team = ctx.get("offense_team", "Offense")
     defense_team = ctx.get("defense_team", "Defense")
     score_margin = int(ctx.get("score_margin", 0) or 0)  # offense score - defense score
+    running_clock = bool(ctx.get("running_clock", False))
 
     red_zone = ball >= 80
     two_minute = qtr == 4 and sec <= 120
 
     lines = []
+    if running_clock:
+        # Mercy-rule running clock: clock keeps moving on incompletions too.
+        lines.append("Running clock in effect.")
+
     if down == 4:
         lines.append("Fourth down pressure.")
     elif down == 3 and ytg >= 7:
@@ -202,7 +209,7 @@ def _situation_prefix(ctx):
     if red_zone:
         lines.append(f"{offense_team} is in the red zone.")
 
-    if two_minute:
+    if two_minute and not running_clock:
         if score_margin < 0:
             lines.append(f"Two-minute drill for {offense_team}.")
         elif score_margin > 0:
@@ -275,8 +282,9 @@ def build_dynamic_play_by_play(
         "yards_to_go": int(context.get("yards_to_go", 10) or 10),
         "ball_position": int(context.get("ball_position", 25) or 25),
         "quarter": int(context.get("quarter", 1) or 1),
-        "time_remaining": int(context.get("time_remaining", 12 * 60) or 0),
+        "time_remaining": int(context.get("time_remaining", REGULATION_QUARTER_SECONDS) or 0),
         "score_margin": int(context.get("score_margin", 0) or 0),
+        "running_clock": bool(context.get("running_clock", False)),
     }
     style = _style_bucket(str(offensive_style or ""), str(offensive_formation or ""))
     pre = _situation_prefix(ctx) + _style_prefix(style, is_run=is_run, result=result) + _excitement_prefix(result, yards)

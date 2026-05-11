@@ -1,5 +1,7 @@
 {
   "_schema": "name, nickname, prestige (1-15), classification (1A-6A), region, culture_grade (1-10), booster_support (1-10), community (rural|urban|suburban|affluent|blue-collar|football factory), enrollment, facilities_grade; optional abbreviation",
+  "_playoff_system_schema": "Top-level 'playoff_system' selects the postseason structure. Registered ids live in systems/playoff_systems.py (PLAYOFF_SYSTEMS). Currently supported: 'wv' (one 8-team bracket per classification, 1v8/2v7/3v6/4v5, QF -> SF -> Championship). Add new ids here when adding new state systems.",
+  "playoff_system": "wv",
   "teams": [
     { "name": "Martinsburg", "nickname": "Bulldogs", "abbreviation": "MAR", "prestige": 15, "classification": "4A", "region": "North", "culture_grade": 10, "booster_support": 10, "community": "football factory", "enrollment": 1400, "facilities_grade": 10 },
     { "name": "Morgantown", "nickname": "Mohigans", "abbreviation": "MOR", "prestige": 12, "classification": "4A", "region": "North", "culture_grade": 9, "booster_support": 10, "community": "affluent", "enrollment": 1400, "facilities_grade": 10 },

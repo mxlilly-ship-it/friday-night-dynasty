@@ -87,7 +87,21 @@ from .recruiting_system import (
 )
 from .prestige_system import update_prestige, compute_prestige_delta, get_coach_skill_sum
 from .coach_career_system import run_coach_career_phase
-from .teams_loader import load_teams_from_json, build_teams_from_json
+from .teams_loader import (
+    load_teams_from_json,
+    build_teams_from_json,
+    load_league_config_from_json,
+    playoff_system_id_from_config,
+)
+from .playoff_systems import (
+    DEFAULT_PLAYOFF_SYSTEM_ID,
+    PLAYOFF_SYSTEMS,
+    PlayoffSystemConfig,
+    get_playoff_system,
+    list_playoff_systems,
+    ensure_playoff_system_in_state,
+    get_state_playoff_system,
+)
 from .awards_system import compute_awards, format_awards_text
 from .records_system import load_records, save_records, update_records_from_season, update_records_from_game, format_records_text
 from .game_fatigue import (
@@ -172,6 +186,15 @@ __all__ = [
     "run_coach_career_phase",
     "load_teams_from_json",
     "build_teams_from_json",
+    "load_league_config_from_json",
+    "playoff_system_id_from_config",
+    "DEFAULT_PLAYOFF_SYSTEM_ID",
+    "PLAYOFF_SYSTEMS",
+    "PlayoffSystemConfig",
+    "get_playoff_system",
+    "list_playoff_systems",
+    "ensure_playoff_system_in_state",
+    "get_state_playoff_system",
     "compute_awards",
     "format_awards_text",
     "load_records",

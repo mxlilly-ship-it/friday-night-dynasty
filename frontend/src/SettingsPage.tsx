@@ -28,6 +28,8 @@ type Props = {
   backupReminderFrequency: 'none' | '3_weeks' | '6_weeks' | 'stage'
   onBackupReminderFrequencyChange?: (value: 'none' | '3_weeks' | '6_weeks' | 'stage') => void
   onBackupNow?: () => void
+  /** Server saves only: apply full state after bulk season simulation. */
+  onApplySaveState?: (state: unknown) => void
 }
 
 export default function SettingsPage({
@@ -41,12 +43,15 @@ export default function SettingsPage({
   backupReminderFrequency,
   onBackupReminderFrequencyChange,
   onBackupNow,
+  onApplySaveState,
 }: Props) {
   const folderInputRef = useRef<HTMLInputElement | null>(null)
   const filesInputRef = useRef<HTMLInputElement | null>(null)
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<string | null>(null)
   const [lastResult, setLastResult] = useState<string | null>(null)
+  const [bulkSeasonCount, setBulkSeasonCount] = useState<1 | 5 | 10 | 20>(5)
+  const [bulkBusy, setBulkBusy] = useState(false)
 
   /** Rows: one file + which team it maps to (empty string = skip). */
   const [rows, setRows] = useState<{ file: File; team: string }[]>([])
@@ -164,6 +169,46 @@ export default function SettingsPage({
   }
 
   const sortedTeams = [...teamNames].sort((a, b) => a.localeCompare(b))
+  const isLocalSave = saveId === '__local__'
+  // Production build uses same-origin API: App passes apiBase="" so fetch URLs are `/saves/...` (empty string is falsy but valid).
+  const canBulkSimulate = Boolean(
+    !isLocalSave && Boolean(saveId) && typeof onApplySaveState === 'function' && typeof apiBase === 'string',
+  )
+
+  const runBulkSimulateSeasons = async () => {
+    if (!canBulkSimulate || !onApplySaveState) return
+    const n = bulkSeasonCount
+    if (
+      !window.confirm(
+        `Simulate ${n} season(s)? Full CPU offseasons include carousel hires/firings, your coach's ranked HC applications, program-point spending on upgrades/rebalances, coach development picks like CPU schools, and transfers. Regular season and playoffs are fully simmed; large counts can take a while.`,
+      )
+    ) {
+      return
+    }
+    setBulkBusy(true)
+    onError('')
+    try {
+      const r = await fetch(`${apiBase}/saves/${saveId}/simulate-seasons`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seasons: n }),
+      })
+      if (!r.ok) throw new Error(await r.text())
+      const j = (await r.json()) as { state?: unknown }
+      if (!j?.state || typeof j.state !== 'object') throw new Error('Invalid response from server')
+      onApplySaveState(j.state)
+      const cy = (j.state as { current_year?: number }).current_year
+      setLastResult(
+        typeof cy === 'number'
+          ? `Simulated ${n} season(s). Calendar year is now ${cy}.`
+          : `Simulated ${n} season(s).`,
+      )
+    } catch (e: unknown) {
+      onError(e instanceof Error ? e.message : 'Failed to simulate seasons')
+    } finally {
+      setBulkBusy(false)
+    }
+  }
 
   return (
     <div className="settings-root">
@@ -263,6 +308,46 @@ export default function SettingsPage({
               </div>
             </div>
           ) : null}
+        </section>
+
+        <section className="settings-section">
+          <h2 className="settings-section-title">Simulate seasons</h2>
+          <p className="settings-copy">
+            Fast-forward the dynasty: CPU sims remaining games plus full playoffs each year, runs full offseasons (coaching carousel hires and
+            firings, transfers, etc.), spends your <strong>program points</strong> on AI upgrades (and can downgrade an over-built area to fund
+            weaker grades), applies <strong>coach development</strong> using the same rules as CPU schools, picks ranked <strong>HC job apps</strong>{' '}
+            to open vacancies so your coach can move like the rest of the league, runs preseason scrimmages, then stops at{' '}
+            <strong>regular season Week&nbsp;1</strong> after the last simulated year.
+          </p>
+          <p className="settings-copy settings-copy-muted">
+            Not available for imported/local zip saves. Finish any interactive preseason step manually before using this if the game expects you to
+            be on that screen.
+          </p>
+          <div className="settings-actions settings-actions-row settings-simulate-row">
+            <label htmlFor="bulk-season-count" style={{ color: '#aeb7c3' }}>
+              Seasons
+            </label>
+            <select
+              id="bulk-season-count"
+              className="settings-team-select"
+              value={bulkSeasonCount}
+              onChange={(e) => setBulkSeasonCount(Number(e.target.value) as 1 | 5 | 10 | 20)}
+              disabled={bulkBusy || !canBulkSimulate}
+            >
+              <option value={1}>1</option>
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+            </select>
+            <button
+              type="button"
+              className="settings-primary"
+              disabled={bulkBusy || busy || !canBulkSimulate}
+              onClick={() => void runBulkSimulateSeasons()}
+            >
+              {bulkBusy ? 'Simulating…' : 'Run simulation'}
+            </button>
+          </div>
         </section>
 
         <section className="settings-section">

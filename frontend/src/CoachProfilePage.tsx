@@ -5,6 +5,7 @@ import {
   aggregateCoachCareer,
   buildCoachHistoryFromLeagueHistory,
   findLocalSeasonRecap,
+  mergeInProgressCoachHistory,
   type CoachHistoryRow,
 } from './coachHistory'
 import './TeamHomePage.css'
@@ -54,14 +55,25 @@ export default function CoachProfilePage({
       setHistoryRows([])
       return
     }
+    if (!isLocalBundle) return
     if (leagueHistory != null) {
-      setHistoryRows(buildCoachHistoryFromLeagueHistory(leagueHistory, coachName))
-      return
+      setHistoryRows(buildCoachHistoryFromLeagueHistory(leagueHistory, coachName, saveState?.teams))
+    } else {
+      setHistoryRows([])
     }
-    if (isLocalBundle || !apiBase || !saveId) {
+  }, [coachName, isLocalBundle, leagueHistory, saveState?.teams])
+
+  useEffect(() => {
+    if (!coachName || coachName === '—') {
       setHistoryRows([])
       return
     }
+    if (isLocalBundle) return
+    if (!apiBase || !saveId) {
+      setHistoryRows([])
+      return
+    }
+    setHistoryRows([])
     let cancelled = false
     setHistoryLoading(true)
     void (async () => {
@@ -89,13 +101,39 @@ export default function CoachProfilePage({
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- onError from parent; avoid refetch loops
-  }, [apiBase, coachName, headers, isLocalBundle, leagueHistory, saveId])
+  }, [apiBase, coachName, headers, isLocalBundle, saveId, saveState?.current_year])
 
-  const career = useMemo(() => aggregateCoachCareer(historyRows), [historyRows])
+  const displayRows = useMemo(
+    () => mergeInProgressCoachHistory(historyRows, coachName, teamName, saveState),
+    [historyRows, coachName, teamName, saveState],
+  )
+
+  const career = useMemo(() => aggregateCoachCareer(displayRows), [displayRows])
 
   const st = teamName ? saveState?.standings?.[teamName] : null
-  const seasonWins = st != null ? Number(st?.wins ?? 0) : Number(team?.wins ?? 0)
-  const seasonLosses = st != null ? Number(st?.losses ?? 0) : Number(team?.losses ?? 0)
+  const liveWins = st != null ? Number(st?.wins ?? 0) : Number(team?.wins ?? 0)
+  const liveLosses = st != null ? Number(st?.losses ?? 0) : Number(team?.losses ?? 0)
+  // Outside regular/playoffs the live ``standings`` are stale (reset to 0-0 by
+  // finish_season; can't accrue regular-season W-L in offseason/preseason). Always
+  // prefer the just-finished season's snapshot when available so this line doesn't
+  // read "This season 0-0" on every offseason / preseason screen.
+  const _phaseLower = String(saveState?.season_phase ?? '')
+    .trim()
+    .toLowerCase()
+  const _snap = teamName ? saveState?.last_completed_standings?.[teamName] : null
+  const _useSnapshot =
+    teamName != null &&
+    _phaseLower !== 'regular' &&
+    _phaseLower !== 'playoffs' &&
+    _snap != null &&
+    typeof _snap === 'object'
+  const seasonWins = _useSnapshot ? Number(_snap?.wins ?? 0) : liveWins
+  const seasonLosses = _useSnapshot ? Number(_snap?.losses ?? 0) : liveLosses
+  const seasonRecordLabel = _useSnapshot ? 'Last season' : 'This season'
+  const seasonRecordYear =
+    _useSnapshot && Number.isFinite(Number(saveState?.last_completed_year))
+      ? Number(saveState.last_completed_year)
+      : null
   const programChampionships = Number(team?.championships ?? 0)
   const programRegionals = Number(team?.regional_championships ?? 0)
   const prestige = team?.prestige != null ? String(team.prestige) : '—'
@@ -171,7 +209,9 @@ export default function CoachProfilePage({
             </p>
             <div className="player-profile-ratings coach-profile-summary-line">
               <span>
-                This season {teamName ? `${seasonWins}-${seasonLosses}` : '—'}
+                {seasonRecordLabel}
+                {seasonRecordYear != null ? ` (${seasonRecordYear})` : ''}{' '}
+                {teamName ? `${seasonWins}-${seasonLosses}` : '—'}
               </span>
               <span>Program titles {programChampionships}</span>
               <span>Program regionals {programRegionals}</span>
@@ -237,7 +277,7 @@ export default function CoachProfilePage({
         <h2 className="coach-profile-section-title">History</h2>
         {historyLoading ? (
           <p className="player-profile-stats-empty">Loading history…</p>
-        ) : historyRows.length === 0 ? (
+        ) : displayRows.length === 0 ? (
           <p className="player-profile-stats-empty">
             No league history rows for this coach yet (finish a season with history saved, or import a zip that includes league_history.json).
           </p>
@@ -252,7 +292,7 @@ export default function CoachProfilePage({
               <div className="teamhome-roster-cell teamhome-team-history-cell-recap">Recap</div>
             </div>
             <div className="teamhome-roster-table">
-              {historyRows.map((r) => (
+              {displayRows.map((r) => (
                 <div key={`${r.year}-${r.team}`} className="teamhome-roster-row teamhome-team-history-row">
                   <div className="teamhome-roster-cell">{r.year ?? '—'}</div>
                   <div className="teamhome-roster-cell teamhome-team-history-cell-team">{teamWithLogo(r.team, 22)}</div>

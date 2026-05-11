@@ -21,15 +21,15 @@ from systems.preferred_playbook import coach_may_change_preferred_playbooks, coa
 
 # --- Retirement ---
 RETIREMENT_AGE_FORCED = 75
-RETIREMENT_CHANCE_65 = 0.12
-RETIREMENT_CHANCE_68 = 0.24
-RETIREMENT_CHANCE_70 = 0.42
-RETIREMENT_CHANCE_72 = 0.62
+RETIREMENT_CHANCE_65 = 0.18
+RETIREMENT_CHANCE_68 = 0.32
+RETIREMENT_CHANCE_70 = 0.50
+RETIREMENT_CHANCE_72 = 0.70
 
 # --- Firing ---
-FIRING_LOSING_STREAK_THRESHOLD = 3   # Consecutive losing seasons
-FIRING_PLAYOFF_DROUGHT_THRESHOLD = 4  # Years without playoffs
-FIRING_CHANCE_PER_STRESS = 0.33      # Chance to fire when threshold met
+FIRING_LOSING_STREAK_THRESHOLD = 2   # Consecutive losing seasons
+FIRING_PLAYOFF_DROUGHT_THRESHOLD = 3  # Years without playoffs
+FIRING_CHANCE_PER_STRESS = 0.40      # Chance to fire when threshold met
 
 # --- Promotion ---
 PROMOTION_SUCCESS_MIN_WINS = 5       # Consider coach "successful" with 5+ wins recently

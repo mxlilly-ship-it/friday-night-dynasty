@@ -191,8 +191,20 @@
       font-size: clamp(10px, 1vw, 13px);
       color: rgba(255,255,255,0.35);
       letter-spacing: 0.2em;
-      margin-bottom: 36px;
+      margin-bottom: 6px;
       animation: fadeUp 1.4s 0.35s both;
+    }
+
+    .build-date {
+      font-family: 'Oswald', sans-serif;
+      font-weight: 300;
+      font-size: clamp(8px, 0.75vw, 10px);
+      color: rgba(255,255,255,0.28);
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      margin-bottom: 36px;
+      min-height: 1em;
+      animation: fadeUp 1.4s 0.4s both;
     }
 
     /* Buttons */
@@ -277,6 +289,7 @@
         <h1>Friday Night<br><em>Dynasty</em></h1>
         <div class="rule2"></div>
         <p class="version">v-Alpha</p>
+        <p class="build-date" id="build-date"></p>
         <div class="btn-row">
           <button class="game-btn" onclick="startNew()">
             <span class="fill"></span>New
@@ -312,6 +325,22 @@
     }
     function startNew() { fndPost('new'); }
     function loadGame() { fndPost('load'); }
+
+    // "Build last updated" stamp — pulls the file's HTTP Last-Modified
+    // timestamp (the same one shown by document.lastModified) and renders
+    // it as "Last updated MMM D, YYYY" so we don't have to hand-edit a
+    // date string every time we ship a homepage change. Falls back
+    // silently if the browser can't parse the value.
+    (function setBuildDate() {
+      var el = document.getElementById('build-date');
+      if (!el) return;
+      var raw = document.lastModified;
+      if (!raw) return;
+      var d = new Date(raw);
+      if (isNaN(d.getTime())) { el.textContent = 'Last updated ' + raw; return; }
+      var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      el.textContent = 'Last updated ' + months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+    })();
   </script>
 </body>
 </html>

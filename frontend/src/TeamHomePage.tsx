@@ -22,6 +22,17 @@ import {
 import NewsFeedPanel from './news/NewsFeedPanel'
 import { NewsProvider, NewsStateSync } from './news/NewsContext'
 import NewsTicker from './news/NewsTicker'
+import {
+  buildTeamHistoryFromLeagueHistory,
+  buildTeamProgramTotalsFromLeagueHistory,
+  mergeInProgressTeamProgramTotals,
+  type TeamProgramTotalsDisplay,
+} from './coachHistory'
+import {
+  findSeasonEntryByCalendarYear,
+  getHistoricalPlayoffsByClass,
+  standingsListToRecord,
+} from './leagueHistoryView'
 
 /** Team menu value for the playoff bracket view (vs roster / depth / gameplans). */
 const PLAYOFF_BRACKET_MENU = 'Playoff bracket'
@@ -155,6 +166,9 @@ type Props = {
       improve_culture_grade?: number
       improve_booster_support?: number
       coach_dev_allocations?: Record<string, number>
+      carousel_job_applications?: string[]
+      transfer_stage_1_ack_results?: boolean
+      transfer_stage_2_ack_results?: boolean
     }
   }) => Promise<boolean>
   onSaveState?: (state: any) => void
@@ -182,6 +196,16 @@ function safeStr(v: any) {
   return String(v)
 }
 
+/** Class year label for transfer portal tables (roster year 1–3). */
+function formatTransferPortalClassYear(year: unknown): string {
+  const y = Number(year)
+  if (y === 1) return 'Fr.'
+  if (y === 2) return 'So.'
+  if (y === 3) return 'Jr.'
+  if (Number.isFinite(y) && y > 0) return `Yr ${y}`
+  return '—'
+}
+
 function computeOffenseRating(p: any, pos: string) {
   const get = (k: string) => Number(p?.[k] ?? 0)
   if (pos === 'QB') return (get('throw_power') + get('throw_accuracy') + get('decisions') + get('football_iq')) / 4
@@ -203,35 +227,115 @@ function findTeam(state: any, teamName: string) {
   return (state?.teams ?? []).find((t: any) => t?.name === teamName) ?? null
 }
 
+/** Matches backend `league_service._improvement_pp_delta` (offseason school Improvements). Negative = spend PP. */
+function clampImprovementLevel(raw: number, fallback: number): number {
+  const x = Number(raw)
+  const base = Number.isFinite(x) ? x : fallback
+  return Math.max(1, Math.min(10, Math.floor(base)))
+}
+
+function improvementPpDelta(fromLevel: number, toLevel: number): number {
+  const a = clampImprovementLevel(fromLevel ?? 5, 5)
+  const b = clampImprovementLevel(toLevel ?? 5, 5)
+  if (b === a) return 0
+  if (b > a) {
+    let cost = 0
+    for (let k = a; k < b; k += 1) cost += 20 * k
+    return -cost
+  }
+  let refund = 0
+  for (let k = b; k < a; k += 1) refund += 20 * k
+  return refund
+}
+
+type TopBarStandingRow = { name: string; wins: number; points_for: number; points_against: number }
+
+function _topBarStandingsSort(a: TopBarStandingRow, b: TopBarStandingRow): number {
+  if (b.wins !== a.wins) return b.wins - a.wins
+  if (b.points_for !== a.points_for) return b.points_for - a.points_for
+  return a.points_against - b.points_against
+}
+
+/**
+ * Outside regular season / playoffs the live ``standings`` are reset to 0-0 for
+ * the new year. Fall back to the persisted last-completed-season snapshot so the
+ * UI shows last season's record (with a "(last season)" suffix) instead of 0-0
+ * until the new year actually plays a game.
+ *
+ * Always prefer the snapshot during preseason / offseason when one is available —
+ * regular-season W-L can't accrue in those phases, so any non-zero standings is
+ * leftover data from a prior run and would be misleading to display.
+ */
+function _liveOrLastCompletedStandingsRow(state: any, teamName: string) {
+  const live = state?.standings?.[teamName]
+  const liveWins = Number(live?.wins ?? 0)
+  const liveLosses = Number(live?.losses ?? 0)
+  const phase = String(state?.season_phase ?? '').toLowerCase()
+  const inLivePhase = phase === 'regular' || phase === 'playoffs'
+  const snap = state?.last_completed_standings?.[teamName]
+  const haveSnapshot = snap != null && typeof snap === 'object'
+  if (!inLivePhase && haveSnapshot) {
+    const yr = Number(state?.last_completed_year)
+    return {
+      wins: Number(snap.wins ?? 0),
+      losses: Number(snap.losses ?? 0),
+      pointsFor: Number(snap.points_for ?? 0),
+      pointsAgainst: Number(snap.points_against ?? 0),
+      isSnapshot: true,
+      snapshotYear: Number.isFinite(yr) ? yr : null,
+    }
+  }
+  return {
+    wins: liveWins,
+    losses: liveLosses,
+    pointsFor: Number(live?.points_for ?? 0),
+    pointsAgainst: Number(live?.points_against ?? 0),
+    isSnapshot: false,
+    snapshotYear: null as number | null,
+  }
+}
+
 function buildRecordAndRankForTeam(state: any, teamName: string) {
   const standings = state?.standings ?? {}
-  const st = standings?.[teamName]
-  const wins = Number(st?.wins ?? 0)
-  const losses = Number(st?.losses ?? 0)
-  const pointsFor = Number(st?.points_for ?? 0)
-  const pointsAgainst = Number(st?.points_against ?? 0)
-  const record = teamName ? `${wins}-${losses}` : '—'
+  const ranked = _liveOrLastCompletedStandingsRow(state, teamName)
+  const { wins, losses, pointsFor, pointsAgainst, isSnapshot, snapshotYear } = ranked
+  const baseRecord = teamName ? `${wins}-${losses}` : '—'
+  const record =
+    teamName && isSnapshot
+      ? snapshotYear != null
+        ? `${baseRecord} (${snapshotYear} season)`
+        : `${baseRecord} (last season)`
+      : baseRecord
 
-  const sorted = Object.keys(standings)
-    .map((name) => {
-      const s = standings[name] ?? {}
-      return {
-        name,
-        wins: Number(s?.wins ?? 0),
-        points_for: Number(s?.points_for ?? 0),
-        points_against: Number(s?.points_against ?? 0),
-      }
-    })
-    .sort((a, b) => {
-      if (b.wins !== a.wins) return b.wins - a.wins
-      if (b.points_for !== a.points_for) return b.points_for - a.points_for
-      return a.points_against - b.points_against
-    })
+  const clsMap = teamClassificationMap(state)
+  const classification = teamName ? (clsMap.get(teamName) ?? '—') : '—'
 
-  const rankIndex = sorted.findIndex((x) => x.name === teamName)
-  const rank = rankIndex >= 0 ? rankIndex + 1 : null
+  // Ranking source: live standings during regular/playoffs, snapshot otherwise — matches the
+  // record displayed above. Empty snapshot falls back to live (which will be all-zero, ranking arbitrary).
+  const rankingSource =
+    isSnapshot && state?.last_completed_standings && typeof state.last_completed_standings === 'object'
+      ? state.last_completed_standings
+      : standings
+  const rows: TopBarStandingRow[] = Object.keys(rankingSource).map((name) => {
+    const s = rankingSource[name] ?? {}
+    return {
+      name,
+      wins: Number(s?.wins ?? 0),
+      points_for: Number(s?.points_for ?? 0),
+      points_against: Number(s?.points_against ?? 0),
+    }
+  })
 
-  return { record, rank, wins, losses, pointsFor, pointsAgainst }
+  const sortedAll = [...rows].sort(_topBarStandingsSort)
+  const rankIndex = sortedAll.findIndex((x) => x.name === teamName)
+  const rank = teamName && rankIndex >= 0 ? rankIndex + 1 : null
+
+  const classPeers = rows.filter((r) => (clsMap.get(r.name) ?? '—') === classification)
+  const sortedClass = [...classPeers].sort(_topBarStandingsSort)
+  const classRankIndex = sortedClass.findIndex((x) => x.name === teamName)
+  const classRank = teamName && classRankIndex >= 0 ? classRankIndex + 1 : null
+
+  return { record, rank, classRank, classification, wins, losses, pointsFor, pointsAgainst }
 }
 
 function buildRecordAndRank(state: any) {
@@ -278,6 +382,7 @@ const CANONICAL_OFFSEASON_STAGES = [
   'Coaching carousel I',
   'Coaching carousel II',
   'Coaching carousel III',
+  'Coaching carousel IV',
   'Schedule Release',
 ] as const
 
@@ -297,9 +402,11 @@ function normalizeOffseasonStageName(raw: unknown): string {
     'coaching carousel i': 'Coaching carousel I',
     'coaching carousel ii': 'Coaching carousel II',
     'coaching carousel iii': 'Coaching carousel III',
+    'coaching carousel iv': 'Coaching carousel IV',
     'coaching carousel 1': 'Coaching carousel I',
     'coaching carousel 2': 'Coaching carousel II',
     'coaching carousel 3': 'Coaching carousel III',
+    'coaching carousel 4': 'Coaching carousel IV',
     transfers: 'Transfers I',
     transfer: 'Transfers I',
     'transfer stage 1': 'Transfers I',
@@ -408,8 +515,16 @@ function buildScheduleRows(state: any) {
   const userTeam = state?.user_team ?? ''
   const weeks = state?.weeks ?? []
   const results = state?.week_results ?? []
+  const regionMap = teamRegionMap(state)
+  const clsMap = teamClassificationMap(state)
 
-  const rows: Array<{ week: number; opponent: string; played: boolean; scoreLine: string }> = []
+  const rows: Array<{
+    week: number
+    opponent: string
+    played: boolean
+    scoreLine: string
+    isRegionGame: boolean
+  }> = []
 
   for (let wi = 0; wi < weeks.length; wi++) {
     const weekGames = weeks[wi] ?? []
@@ -436,7 +551,13 @@ function buildScheduleRows(state: any) {
         scoreLine = `${outcome}${ot ? ' (OT)' : ''} ${userScore}-${oppScore}`
       }
 
-      rows.push({ week: wi + 1, opponent: String(opponent), played, scoreLine })
+      rows.push({
+        week: wi + 1,
+        opponent: String(opponent),
+        played,
+        scoreLine,
+        isRegionGame: isRegionGame(String(g.home), String(g.away), regionMap, clsMap),
+      })
     }
   }
 
@@ -497,6 +618,8 @@ type TeamScheduleRow = {
   ot: boolean
   /** Win / loss / tie for this team when the game was played */
   result: 'W' | 'L' | 'T' | null
+  /** True for in-region matchups (same classification + same non-empty region). */
+  isRegionGame: boolean
 }
 
 /** One row per game for `teamName` in the regular-season schedule. */
@@ -504,6 +627,8 @@ function buildTeamScheduleRows(state: any, teamName: string): TeamScheduleRow[] 
   if (!teamName) return []
   const weeks = state?.weeks ?? []
   const results = state?.week_results ?? []
+  const regionMap = teamRegionMap(state)
+  const clsMap = teamClassificationMap(state)
   const rows: TeamScheduleRow[] = []
   for (let wi = 0; wi < weeks.length; wi++) {
     const weekGames = weeks[wi] ?? []
@@ -538,6 +663,7 @@ function buildTeamScheduleRows(state: any, teamName: string): TeamScheduleRow[] 
         awayScore,
         ot: Boolean(r?.ot),
         result,
+        isRegionGame: isRegionGame(String(g.home ?? ''), String(g.away ?? ''), regionMap, clsMap),
       })
     }
   }
@@ -556,6 +682,43 @@ function teamClassificationMap(state: any): Map<string, string> {
     m.set(name, c)
   }
   return m
+}
+
+/** Region (e.g. "North", "South", "Region I") for each team in the save. */
+function teamRegionMap(state: any): Map<string, string> {
+  const m = new Map<string, string>()
+  for (const t of state?.teams ?? []) {
+    const name = String(t?.name ?? '').trim()
+    if (!name) continue
+    const r =
+      t?.region != null && String(t.region).trim() !== ''
+        ? String(t.region).trim()
+        : ''
+    m.set(name, r)
+  }
+  return m
+}
+
+/**
+ * True if `home` and `away` are in the same scheduling pod
+ * (same classification AND same non-empty region) — i.e. an in-region game
+ * that counts toward the regional title race. Cross-region matchups
+ * (the "out-of-region" weeks of the schedule) return false.
+ */
+function isRegionGame(
+  home: string,
+  away: string,
+  regionMap: Map<string, string>,
+  classificationMap: Map<string, string>,
+): boolean {
+  const hr = regionMap.get(home) ?? ''
+  const ar = regionMap.get(away) ?? ''
+  if (!hr || !ar) return false
+  if (hr !== ar) return false
+  const hc = classificationMap.get(home) ?? ''
+  const ac = classificationMap.get(away) ?? ''
+  if (!hc || !ac || hc === '—' || ac === '—') return false
+  return hc === ac
 }
 
 function uniqueClassifications(state: any): string[] {
@@ -761,6 +924,45 @@ function formatPlayerYear(year: any) {
   if (n === 11 || n === 3) return 'JR'
   if (n === 12 || n === 4) return 'SR'
   return String(year)
+}
+
+type TopLeaguePlayerRow = {
+  rank: number
+  name: string
+  gradeLabel: string
+  position: string
+  overall: number
+  school: string
+}
+
+/** All rostered players statewide, ranked by composite overall (see `computePlayerOverall`). */
+function buildTopLeaguePlayerRows(state: any, limit = 250): TopLeaguePlayerRow[] {
+  const teams = state?.teams ?? []
+  const pooled: Omit<TopLeaguePlayerRow, 'rank'>[] = []
+  for (const t of teams) {
+    const school = String(t?.name ?? '').trim()
+    const roster = t?.roster
+    if (!school || !Array.isArray(roster)) continue
+    for (const p of roster) {
+      if (!p || typeof p !== 'object') continue
+      const name = String((p as any)?.name ?? '').trim()
+      if (!name) continue
+      pooled.push({
+        name,
+        gradeLabel: formatPlayerYear((p as any)?.year),
+        position: String((p as any)?.position ?? '—').trim() || '—',
+        overall: computePlayerOverall(p),
+        school,
+      })
+    }
+  }
+  pooled.sort(
+    (a, b) =>
+      b.overall - a.overall ||
+      String(a.name).localeCompare(String(b.name)) ||
+      String(a.school).localeCompare(String(b.school)),
+  )
+  return pooled.slice(0, limit).map((r, i) => ({ ...r, rank: i + 1 }))
 }
 
 /** High school year 9 (or legacy 1) = freshman — matches engine `development_system.FRESHMAN_YEAR`. */
@@ -1178,6 +1380,7 @@ function TeamHomePageBody({
   headers,
   saveId,
   saveState,
+  leagueHistory,
   onMainMenu,
   onSimWeek,
   onSaveState,
@@ -1214,6 +1417,9 @@ function TeamHomePageBody({
       setStateMenu('Dashboard')
     }
   }, [phase])
+  useEffect(() => {
+    setLeagueHistYearPick(null)
+  }, [saveId])
   const [offensivePlaybook, setOffensivePlaybook] = useState<string>(() => {
     const t = findTeam(saveState, saveState?.user_team ?? '')
     const off = t?.coach?.offensive_formation
@@ -1236,7 +1442,10 @@ function TeamHomePageBody({
   }, [saveState, userTeam])
   const [showSettings, setShowSettings] = useState(false)
 
-  const { record, rank } = useMemo(() => buildRecordAndRank(saveState), [saveState])
+  const { record, rank, classRank, classification: teamBarClassification } = useMemo(
+    () => buildRecordAndRank(saveState),
+    [saveState],
+  )
   const nextOpponent = useMemo(() => getNextOpponent(saveState), [saveState])
   const last = useMemo(() => getLastOpponentAndScore(saveState), [saveState])
   const playoffRoundDisplay = useMemo(() => playoffRoundLabel(saveState), [saveState])
@@ -1264,8 +1473,14 @@ function TeamHomePageBody({
   const [graduationReportTeam, setGraduationReportTeam] = useState('')
   /** Must be declared before `leagueStatePanel` (Coaching changes view reads this). */
   const [coachingChangesYear, setCoachingChangesYear] = useState<number | 'all'>('all')
+  /** STATE → League History: null = follow default (in-progress season if any, else latest archive). */
+  const [leagueHistYearPick, setLeagueHistYearPick] = useState<'live' | number | null>(null)
   /** Coaching carousel: optional team filter from hot-seat dropdown (highlights row in league table). */
   const [carouselHotSeatTeamFilter, setCarouselHotSeatTeamFilter] = useState('')
+  /** Ranked HC job applications (persisted server-side across carousel rounds I–III). */
+  const [carouselJobApplications, setCarouselJobApplications] = useState<string[]>([])
+  /** Add-vacancy control for carousel application picker. */
+  const [carouselVacancyPick, setCarouselVacancyPick] = useState('')
   /** Playoffs dashboard: which classification bracket to display (multi-class leagues). */
   const [playoffBracketClass, setPlayoffBracketClass] = useState<string>('')
   const prevSaveIdForPlayoffViewRef = useRef<string | null>(null)
@@ -1335,6 +1550,7 @@ function TeamHomePageBody({
   )
   const [teamHistoryLoading, setTeamHistoryLoading] = useState(false)
   const [teamHistoryRows, setTeamHistoryRows] = useState<any[]>([])
+  const [teamHistoryTotals, setTeamHistoryTotals] = useState<TeamProgramTotalsDisplay | null>(null)
   const teamScheduleRows = useMemo(
     () => buildTeamScheduleRows(saveState, teamScheduleTeam),
     [saveState, teamScheduleTeam],
@@ -1390,6 +1606,81 @@ function TeamHomePageBody({
     [saveState, leagueClassFilter],
   )
   const playerStatRows = useMemo(() => buildPlayerStatRows(saveState), [saveState])
+  const leagueRosterPlayerCount = useMemo(() => {
+    let n = 0
+    for (const t of saveState?.teams ?? []) {
+      const r = t?.roster
+      if (Array.isArray(r)) n += r.length
+    }
+    return n
+  }, [saveState?.teams])
+
+  const leagueHistSeasons = useMemo(
+    () => (Array.isArray(leagueHistory?.seasons) ? leagueHistory.seasons : []) as Record<string, unknown>[],
+    [leagueHistory],
+  )
+
+  const leagueHistDefaultYearMode = useMemo((): 'live' | number => {
+    const cy = Number(saveState?.current_year)
+    const hasArchived = Number.isFinite(cy) && leagueHistSeasons.some((s) => Number(s?.year) === cy)
+    if (Number.isFinite(cy) && !hasArchived && (phase === 'regular' || phase === 'playoffs')) {
+      return 'live'
+    }
+    const years = leagueHistSeasons.map((s) => Number(s.year)).filter((y) => Number.isFinite(y)) as number[]
+    if (years.length) return Math.max(...years)
+    return Number.isFinite(cy) ? cy : 0
+  }, [leagueHistSeasons, saveState?.current_year, phase])
+
+  const leagueHistEffectiveMode = leagueHistYearPick ?? leagueHistDefaultYearMode
+
+  const lhArchivedSeasonEntry = useMemo(() => {
+    if (leagueHistEffectiveMode === 'live') return null
+    const y = leagueHistEffectiveMode as number
+    if (!Number.isFinite(y) || y <= 0) return null
+    return findSeasonEntryByCalendarYear(leagueHistSeasons, y)
+  }, [leagueHistEffectiveMode, leagueHistSeasons])
+
+  const lhStandingsForRankings = useMemo(() => {
+    if (leagueHistEffectiveMode === 'live') return saveState?.standings ?? {}
+    return standingsListToRecord(lhArchivedSeasonEntry?.standings)
+  }, [leagueHistEffectiveMode, saveState?.standings, lhArchivedSeasonEntry])
+
+  const lhRankingsFakeState = useMemo(
+    () => ({
+      standings: lhStandingsForRankings,
+      teams: saveState?.teams ?? [],
+      current_week: 999,
+    }),
+    [lhStandingsForRankings, saveState?.teams],
+  )
+
+  const lhPlayoffsByClass = useMemo(() => {
+    if (leagueHistEffectiveMode === 'live') {
+      const bc = normalizePlayoffsByClass(saveState)
+      if (bc && Object.keys(bc).length) {
+        const o: Record<string, Record<string, unknown>> = {}
+        for (const [k, v] of Object.entries(bc)) {
+          if (v && typeof v === 'object') o[k] = v as Record<string, unknown>
+        }
+        return o
+      }
+      return {}
+    }
+    const cmap = teamClassificationMap(saveState)
+    return getHistoricalPlayoffsByClass(lhArchivedSeasonEntry, (nm) => cmap.get(nm) ?? '—')
+  }, [leagueHistEffectiveMode, saveState, lhArchivedSeasonEntry])
+
+  const lhYearDropdownOptions = useMemo(() => {
+    const archivedYears = [
+      ...new Set(leagueHistSeasons.map((s) => Number(s.year)).filter((y) => Number.isFinite(y))),
+    ].sort((a, b) => b - a) as number[]
+    const cy = Number(saveState?.current_year)
+    const hasArchivedCurrent = Number.isFinite(cy) && archivedYears.includes(cy)
+    const showLive = Number.isFinite(cy) && !hasArchivedCurrent && (phase === 'regular' || phase === 'playoffs')
+    return { archivedYears, showLive, currentYear: cy }
+  }, [leagueHistSeasons, saveState?.current_year, phase])
+
+  const topLeaguePlayerRows = useMemo(() => buildTopLeaguePlayerRows(saveState, 250), [saveState])
   const [teamStatsSortKey, setTeamStatsSortKey] = useState<keyof TeamStatRow>('ppg')
   const [teamStatsSortDir, setTeamStatsSortDir] = useState<'asc' | 'desc'>('desc')
   const [playerStatsSide, setPlayerStatsSide] = useState<'offense' | 'defense'>('offense')
@@ -1422,31 +1713,76 @@ function TeamHomePageBody({
 
   useEffect(() => {
     if (stateMenu !== 'Team History') return
+    const team = (teamHistoryTeam || userTeam || '').trim()
     if (isLocalBundle) {
-      setTeamHistoryRows([])
       setTeamHistoryLoading(false)
+      setTeamHistoryRows(buildTeamHistoryFromLeagueHistory(leagueHistory, team, saveState?.teams))
+      const tr = findTeam(saveState, team)
+      const persistedReg = Number((tr as { regional_championships?: number })?.regional_championships ?? 0)
+      setTeamHistoryTotals(
+        mergeInProgressTeamProgramTotals(
+          buildTeamProgramTotalsFromLeagueHistory(leagueHistory, team, persistedReg),
+          team,
+          saveState,
+        ),
+      )
+      onError('')
       return
     }
     if (!apiBase || !headers || !saveId) return
-    const team = (teamHistoryTeam || userTeam || '').trim()
+    let cancelled = false
     setTeamHistoryLoading(true)
     void (async () => {
       try {
         const r = await fetch(`${apiBase}/saves/${saveId}/team-history?team_name=${encodeURIComponent(team)}`, { headers })
         if (!r.ok) throw new Error(await r.text())
         const j = await r.json()
-        setTeamHistoryRows(Array.isArray(j?.history) ? j.history : [])
-        const tn = String(j?.team_name ?? team)
-        if (!teamHistoryTeam && tn) setTeamHistoryTeam(tn)
-        onError('')
+        if (!cancelled) {
+          setTeamHistoryRows(Array.isArray(j?.history) ? j.history : [])
+          const tot = j?.totals && typeof j.totals === 'object' ? (j.totals as Record<string, unknown>) : null
+          if (tot) {
+            const base: TeamProgramTotalsDisplay = {
+              program_wins: Number(tot.program_wins ?? 0),
+              program_losses: Number(tot.program_losses ?? 0),
+              state_championships: Number(tot.state_championships ?? 0),
+              regional_championships: Number(tot.regional_championships ?? 0),
+              playoff_appearances: Number(tot.playoff_appearances ?? 0),
+            }
+            setTeamHistoryTotals(mergeInProgressTeamProgramTotals(base, team, saveState))
+          } else {
+            setTeamHistoryTotals(null)
+          }
+          const tn = String(j?.team_name ?? team)
+          if (!teamHistoryTeam && tn) setTeamHistoryTeam(tn)
+          onError('')
+        }
       } catch (e: any) {
-        onError(e?.message ?? 'Failed to load team history')
+        if (!cancelled) {
+          setTeamHistoryTotals(null)
+          onError(e?.message ?? 'Failed to load team history')
+        }
       } finally {
-        setTeamHistoryLoading(false)
+        if (!cancelled) setTeamHistoryLoading(false)
       }
     })()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stateMenu, apiBase, headers, saveId, teamHistoryTeam, userTeam, isLocalBundle])
+    return () => {
+      cancelled = true
+    }
+    // Refetch when the calendar advances (e.g. playoffs → offseason) so data isn’t stale if this tab stays open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onError identity can churn from parent
+  }, [
+    stateMenu,
+    apiBase,
+    headers,
+    saveId,
+    teamHistoryTeam,
+    userTeam,
+    isLocalBundle,
+    leagueHistory,
+    saveState,
+    saveState?.season_phase,
+    saveState?.current_year,
+  ])
   const sortedPlayerStatRows = useMemo(() => {
     const arr = [...playerStatRows]
     arr.sort((a, b) => {
@@ -1832,6 +2168,50 @@ function TeamHomePageBody({
           )}
         </div>
       </div>
+    ) : stateMenu === 'Top Players' ? (
+      <div className="teamhome-roster-shell">
+        <div className="teamhome-teaminfo-header" style={{ marginBottom: 12 }}>
+          <div className="teamhome-card-title" style={{ marginBottom: 0 }}>
+            Top 250 players
+          </div>
+          <div className="teamhome-small" style={{ marginTop: 8, opacity: 0.9, maxWidth: 560 }}>
+            Statewide rostered athletes ranked by composite overall (same formula as the roster tab). Showing{' '}
+            <b>{topLeaguePlayerRows.length}</b>
+            {leagueRosterPlayerCount > topLeaguePlayerRows.length ? (
+              <>
+                {' '}
+                of <b>{leagueRosterPlayerCount}</b> rostered.
+              </>
+            ) : (
+              ' players.'
+            )}
+          </div>
+        </div>
+        <div className="teamhome-roster-head teamhome-topplayers-row">
+          <div className="teamhome-roster-cell">Rank</div>
+          <div className="teamhome-roster-name">Player</div>
+          <div className="teamhome-roster-cell">Grade</div>
+          <div className="teamhome-roster-cell">Pos</div>
+          <div className="teamhome-roster-cell">OVR</div>
+          <div className="teamhome-roster-name">School</div>
+        </div>
+        <div className="teamhome-roster-table">
+          {topLeaguePlayerRows.length === 0 ? (
+            <div className="teamhome-roster-empty">No player data loaded yet.</div>
+          ) : (
+            topLeaguePlayerRows.map((r) => (
+              <div key={`tp-${r.rank}-${r.school}-${r.name}`} className="teamhome-topplayers-row">
+                <div className="teamhome-roster-cell">{r.rank}</div>
+                <div className="teamhome-roster-name">{r.name}</div>
+                <div className="teamhome-roster-cell">{r.gradeLabel}</div>
+                <div className="teamhome-roster-cell">{r.position}</div>
+                <div className="teamhome-roster-cell">{r.overall}</div>
+                <div className="teamhome-roster-name">{teamWithLogo(r.school)}</div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     ) : stateMenu === 'Team Schedule' ? (
       <div className="teamhome-roster-shell teamhome-schedule-shell">
         <div className="teamhome-schedule-weekbar">
@@ -1872,7 +2252,12 @@ function TeamHomePageBody({
                 <div key={`ts-${g.week}-${g.gameIndex}`} className="teamhome-schedule-row teamhome-schedule-row--team">
                   <div className="teamhome-schedule-cell">{g.week}</div>
                   <div className="teamhome-schedule-cell">{g.userHome ? 'Home' : 'Away'}</div>
-                  <div className="teamhome-schedule-cell teamhome-schedule-team">{teamWithLogo(g.opponent)}</div>
+                  <div className="teamhome-schedule-cell teamhome-schedule-team">
+                    {teamWithLogo(g.opponent)}
+                    {g.isRegionGame ? (
+                      <span className="teamhome-region-mark" title="Region game">*</span>
+                    ) : null}
+                  </div>
                   <div className="teamhome-schedule-cell teamhome-schedule-team">
                     {g.played ? `${userScore}–${oppScore}${g.ot ? ' OT' : ''}` : '—'}
                   </div>
@@ -1918,16 +2303,56 @@ function TeamHomePageBody({
             })
           )}
         </div>
+        {teamScheduleRows.some((g) => g.isRegionGame) ? (
+          <div className="teamhome-schedule-region-legend teamhome-small">
+            <span className="teamhome-region-mark">*</span> Region game
+          </div>
+        ) : null}
       </div>
     ) : stateMenu === 'Team Info' ? (
       (() => {
         const viewTeam = teamInfoTeam || userTeam
         const t = findTeam(saveState, viewTeam)
-        const { record: tiRecord, rank: tiRank } = buildRecordAndRankForTeam(saveState, viewTeam)
+        const { record: tiRecord, rank: tiRank, classRank: tiClassRank, classification: tiClassRankGroup } =
+          buildRecordAndRankForTeam(saveState, viewTeam)
         const coachName = t?.coach?.name != null ? safeStr(t.coach.name) : '—'
-        const seasonWins = Number(t?.wins ?? 0)
-        const seasonLosses = Number(t?.losses ?? 0)
-        const programRecord = `${seasonWins}-${seasonLosses}`
+        const tm = t as Record<string, unknown>
+        const persistedRegional = Number(tm.regional_championships ?? 0)
+        const baseFromTeamsRow: TeamProgramTotalsDisplay | null =
+          viewTeam
+            ? {
+                program_wins: Number(tm.program_wins ?? 0),
+                program_losses: Number(tm.program_losses ?? 0),
+                state_championships: Number(tm.championships ?? 0),
+                regional_championships: persistedRegional,
+                playoff_appearances: Number(tm.playoff_appearances ?? 0),
+              }
+            : null
+        const hasLeagueHistSeasons =
+          Boolean(leagueHistory) &&
+          Array.isArray((leagueHistory as { seasons?: unknown }).seasons) &&
+          ((leagueHistory as { seasons: unknown[] }).seasons?.length ?? 0) > 0
+        const histTotals =
+          viewTeam
+            ? mergeInProgressTeamProgramTotals(
+                hasLeagueHistSeasons
+                  ? buildTeamProgramTotalsFromLeagueHistory(leagueHistory, viewTeam, persistedRegional)
+                  : baseFromTeamsRow!,
+                viewTeam,
+                saveState,
+              )
+            : null
+        const programWins =
+          histTotals?.program_wins ??
+          (typeof tm.program_wins === 'number' ? tm.program_wins : 0)
+        const programLosses =
+          histTotals?.program_losses ??
+          (typeof tm.program_losses === 'number' ? tm.program_losses : 0)
+        const programRecord = `${programWins}-${programLosses}`
+        const playoffAppsRaw =
+          histTotals?.playoff_appearances ??
+          (typeof tm.playoff_appearances === 'number' ? tm.playoff_appearances : 0)
+        const playoffAppearancesStr = String(playoffAppsRaw)
         const nickname =
           t?.nickname != null && String(t.nickname).trim() !== ''
             ? safeStr(t.nickname)
@@ -1940,12 +2365,13 @@ function TeamHomePageBody({
         const classification = t?.classification != null ? safeStr(t.classification) : '—'
         const region =
           t?.region != null && String(t.region).trim() !== '' ? safeStr(t.region) : '—'
-        const regionalTitles = t?.regional_championships != null ? String(t.regional_championships) : '0'
-        const stateTitles = t?.championships != null ? String(t.championships) : '0'
+        const regionalTitles = String(histTotals?.regional_championships ?? tm.regional_championships ?? 0)
+        const stateTitles = String(histTotals?.state_championships ?? tm.championships ?? 0)
         const fac = t?.facilities_grade != null ? String(t.facilities_grade).padStart(2, '0') : '00'
         const cul = t?.culture_grade != null ? String(t.culture_grade).padStart(2, '0') : '00'
         const boost = t?.booster_support != null ? String(t.booster_support).padStart(2, '0') : '00'
         const rankStr = tiRank != null ? String(tiRank) : '—'
+        const classRankStr = tiClassRank != null ? `#${tiClassRank}` : '—'
         return (
           <div className="teamhome-roster-shell teamhome-teaminfo-shell">
             <div className="teamhome-teaminfo-header">
@@ -2001,8 +2427,20 @@ function TeamHomePageBody({
                   <span className="teamhome-teaminfo-value">{tiRecord}</span>
                 </div>
                 <div>
-                  <span className="teamhome-teaminfo-label">Current rank</span>{' '}
+                  <span className="teamhome-teaminfo-label">Current rank (statewide)</span>{' '}
                   <span className="teamhome-teaminfo-value">{rankStr}</span>
+                </div>
+                <div>
+                  <span className="teamhome-teaminfo-label">Class rank</span>{' '}
+                  <span className="teamhome-teaminfo-value">
+                    {classRankStr}
+                    {tiClassRankGroup && tiClassRankGroup !== '—' ? (
+                      <span className="teamhome-small" style={{ opacity: 0.85 }}>
+                        {' '}
+                        ({tiClassRankGroup})
+                      </span>
+                    ) : null}
+                  </span>
                 </div>
                 <div>
                   <span className="teamhome-teaminfo-label">Head coach</span>{' '}
@@ -2015,8 +2453,12 @@ function TeamHomePageBody({
               </div>
               <div className="teamhome-teaminfo-summary-right">
                 <div>
-                  <span className="teamhome-teaminfo-label">Program win–loss (save)</span>{' '}
+                  <span className="teamhome-teaminfo-label">Program win–loss (all seasons + this year)</span>{' '}
                   <span className="teamhome-teaminfo-value">{programRecord}</span>
+                </div>
+                <div>
+                  <span className="teamhome-teaminfo-label">Playoff appearances</span>{' '}
+                  <span className="teamhome-teaminfo-value">{playoffAppearancesStr}</span>
                 </div>
                 <div>
                   <span className="teamhome-teaminfo-label">Regional titles</span>{' '}
@@ -2116,7 +2558,12 @@ function TeamHomePageBody({
           </div>
         </div>
         {(() => {
-          const hist: { year?: number; events?: any[]; hot_seat_by_team?: Record<string, number> }[] = saveState?.coaching_history ?? []
+          const hist: {
+            year?: number
+            events?: any[]
+            hot_seat_by_team?: Record<string, number>
+            carousel_summary?: { headline?: string; bullets?: string[]; counts?: Record<string, number> }
+          }[] = saveState?.coaching_history ?? []
           const liveCarousel = (saveState?.offseason_coach_carousel_last_events ?? []) as any[]
           const showLiveFeed =
             phase === 'offseason' && Array.isArray(liveCarousel) && liveCarousel.length > 0
@@ -2127,8 +2574,9 @@ function TeamHomePageBody({
           if (filtered.length === 0 && !showLiveFeed) {
             return (
               <div className="teamhome-roster-empty">
-                No archived coaching changes yet. During the offseason coaching carousel, moves appear here as you use Continue;
-                full league history is saved after carousel III.
+                No archived coaching changes yet. During the offseason coaching carousel, moves stream on the Dashboard
+                as you Continue; once you finish carousel stage III each year, full detail is archived here — see the summary
+                headline on each Year card when present.
               </div>
             )
           }
@@ -2165,6 +2613,28 @@ function TeamHomePageBody({
                       <b>{entry.hot_seat_by_team[userTeam] ?? '—'}</b>
                     </div>
                   ) : null}
+                  {entry.carousel_summary?.headline ? (
+                    <div className="teamhome-small" style={{ marginBottom: 8, fontWeight: 700, opacity: 0.96 }}>
+                      {entry.carousel_summary.headline}
+                    </div>
+                  ) : null}
+                  {entry.carousel_summary?.bullets && entry.carousel_summary.bullets.length > 0 ? (
+                    <>
+                      <div className="teamhome-small" style={{ opacity: 0.88, marginBottom: 6 }}>
+                        Season snapshot (movement highlights)
+                      </div>
+                      <ul className="teamhome-coaching-events" style={{ textAlign: 'left', paddingLeft: 18, margin: '0 0 12px' }}>
+                        {(entry.carousel_summary.bullets ?? []).slice(-25).map((line: string, i: number) => (
+                          <li key={`csum-${entry.year}-${i}`} style={{ marginBottom: 4 }}>
+                            {line}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : null}
+                  <div className="teamhome-small" style={{ opacity: 0.88, marginBottom: 6 }}>
+                    Event log
+                  </div>
                   <ul className="teamhome-coaching-events" style={{ textAlign: 'left', paddingLeft: 18, margin: 0 }}>
                     {(entry.events ?? []).slice(-30).map((ev: any, i: number) => (
                       <li key={`ev-${entry.year}-${i}`} style={{ marginBottom: 6 }}>
@@ -2186,6 +2656,11 @@ function TeamHomePageBody({
         <div className="teamhome-teaminfo-header">
           <div className="teamhome-card-title" style={{ marginBottom: 0 }}>
             Team History
+          </div>
+          <div className="teamhome-small" style={{ marginTop: 8, marginBottom: 10, opacity: 0.88, maxWidth: 640, lineHeight: 1.45 }}>
+            Rows list each completed year with record, postseason result, and head coach.{' '}
+            <strong>Download</strong> opens a season archive (.txt): full schedule, team and top player stats, and end-of-season
+            roster.
           </div>
           <div className="teamhome-teaminfo-picker">
             <label className="teamhome-teaminfo-picker-label" htmlFor="teamhistory-team-select">
@@ -2211,6 +2686,14 @@ function TeamHomePageBody({
             </select>
           </div>
         </div>
+
+        {teamHistoryTotals != null ? (
+          <div className="teamhome-small" style={{ marginBottom: 12, opacity: 0.92, lineHeight: 1.5 }}>
+            <strong>Career totals</strong> — Historical {teamHistoryTotals.program_wins}-
+            {teamHistoryTotals.program_losses} · Regions {teamHistoryTotals.regional_championships}
+            · States {teamHistoryTotals.state_championships} · Playoffs {teamHistoryTotals.playoff_appearances}
+          </div>
+        ) : null}
 
         {teamHistoryLoading ? (
           <div className="teamhome-roster-empty">Loading team history…</div>
@@ -2273,6 +2756,247 @@ function TeamHomePageBody({
                 </div>
               ))}
             </div>
+          </>
+        )}
+      </div>
+    ) : stateMenu === 'League History' ? (
+      <div className="teamhome-roster-shell teamhome-league-history-root">
+        <div className="teamhome-teaminfo-header">
+          <div className="teamhome-card-title" style={{ marginBottom: 0 }}>
+            League History
+          </div>
+          <div className="teamhome-teaminfo-picker">
+            <label className="teamhome-teaminfo-picker-label" htmlFor="league-history-year-select">
+              Season year
+            </label>
+            <select
+              id="league-history-year-select"
+              className="teamhome-select teamhome-teaminfo-select"
+              value={leagueHistEffectiveMode === 'live' ? 'live' : String(leagueHistEffectiveMode)}
+              onChange={(e) => {
+                const v = e.target.value
+                setLeagueHistYearPick(v === 'live' ? 'live' : Number(v))
+              }}
+              aria-label="League history season year"
+              disabled={
+                lhYearDropdownOptions.archivedYears.length < 1 && !lhYearDropdownOptions.showLive
+              }
+            >
+              {lhYearDropdownOptions.showLive ? (
+                <option value="live">{lhYearDropdownOptions.currentYear} (season in progress)</option>
+              ) : null}
+              {lhYearDropdownOptions.archivedYears.map((y) => (
+                <option key={y} value={String(y)}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {lhYearDropdownOptions.archivedYears.length < 1 && !lhYearDropdownOptions.showLive ? (
+          <div className="teamhome-roster-empty">
+            No league history yet — finish at least one full season (through playoffs and advance to offseason) to archive
+            standings and brackets here.
+          </div>
+        ) : leagueHistEffectiveMode !== 'live' && !lhArchivedSeasonEntry ? (
+          <div className="teamhome-roster-empty">No archived data for this year.</div>
+        ) : (
+          <>
+            {leagueHistEffectiveMode === 'live' ? (
+              <div className="teamhome-small" style={{ marginBottom: 12, opacity: 0.92, lineHeight: 1.45 }}>
+                <strong>Season in progress</strong> — rankings use the live standings sheet. Playoff brackets mirror the STATE
+                playoff brackets (including multiclass leagues). Everything here is finalized in history when you complete
+                playoffs and tap <em>Advance to offseason</em>.
+              </div>
+            ) : (
+              <div className="teamhome-small" style={{ marginBottom: 14, opacity: 0.92, lineHeight: 1.45 }}>
+                <strong>State champion</strong>: {String(lhArchivedSeasonEntry?.state_champion ?? '—')} ·{' '}
+                <strong>Runner-up</strong>: {String(lhArchivedSeasonEntry?.runner_up ?? '—')}
+              </div>
+            )}
+
+            <div className="teamhome-card-title teamhome-league-history-section-head">Rankings · all classes</div>
+            <p className="teamhome-small" style={{ opacity: 0.85, marginTop: -4 }}>
+              Uses each team&apos;s classification on your current save rosters — same cutoff logic as Rankings elsewhere.
+              Composite sort: wins / point differential / scoring.
+            </p>
+            <div className="teamhome-league-history-classes">
+              {uniqueClassifications(saveState).map((cls) => {
+                const rows = buildRankingsRows(lhRankingsFakeState, cls)
+                if (rows.length === 0) return null
+                const cap = rows.slice(0, 24)
+                return (
+                  <div key={`lh-rank-${cls}`} className="teamhome-card teamhome-league-history-class-card">
+                    <div className="teamhome-card-title" style={{ fontSize: '0.92rem', marginBottom: 8 }}>
+                      {cls}{rows.length > cap.length ? ` (top ${cap.length})` : ''}
+                    </div>
+                    <div className="teamhome-roster-head teamhome-rankings-row teamhome-league-history-rank-head">
+                      <div className="teamhome-roster-cell">Rk</div>
+                      <div className="teamhome-roster-name">Team</div>
+                      <div className="teamhome-roster-cell">WL</div>
+                      <div className="teamhome-roster-cell">PF</div>
+                      <div className="teamhome-roster-cell">Diff</div>
+                    </div>
+                    <div className="teamhome-roster-table teamhome-league-history-rank-table">
+                      {cap.map((r: { rank?: number; teamName?: string; wins?: number; losses?: number; pointsFor?: number; diff?: number }) => (
+                        <div key={`lh-${cls}-${r.teamName}`} className="teamhome-rankings-row">
+                          <div className="teamhome-roster-cell">{r.rank}</div>
+                          <div className="teamhome-roster-name">{teamWithLogo(String(r.teamName ?? ''), 20)}</div>
+                          <div className="teamhome-roster-cell">
+                            {(r.wins ?? 0) as number}-{(r.losses ?? 0) as number}
+                          </div>
+                          <div className="teamhome-roster-cell">{r.pointsFor}</div>
+                          <div className="teamhome-roster-cell">{Number(r.diff) >= 0 ? `+${r.diff}` : r.diff}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="teamhome-card-title teamhome-league-history-section-head" style={{ marginTop: 20 }}>
+              Playoffs · condensed brackets
+            </div>
+            {Object.keys(lhPlayoffsByClass).length < 1 ? (
+              <div className="teamhome-roster-empty">
+                No playoff brackets for this year yet
+                {leagueHistEffectiveMode === 'live' && phase === 'regular'
+                  ? ' (playoffs begin after the regular season).'
+                  : '.'}
+              </div>
+            ) : (
+              <div className="teamhome-league-history-playoffs-wrap">
+                {Object.entries(lhPlayoffsByClass)
+                  .sort(([a], [b]) => a.localeCompare(b))
+                  .map(([clsName, pdata]) => {
+                    const inner = pdata as Record<string, unknown>
+                    const gamesRaw = inner?.bracket_results
+                    const games = Array.isArray(gamesRaw) ? (gamesRaw as Record<string, unknown>[]) : []
+                    const seeds = Array.isArray(inner?.seeds) ? (inner.seeds as { seed?: number; team?: string }[]) : []
+                    const qfGames = games.filter((g) => String(g.round) === 'Quarterfinal')
+                    const sfGames = games.filter((g) => String(g.round) === 'Semifinal')
+                    const chGames = games.filter((g) => String(g.round) === 'Championship')
+                    const seedForTeam = (name: string): number | null => {
+                      const row = seeds.find((s) => String(s.team) === name)
+                      const sn = Number(row?.seed)
+                      return Number.isFinite(sn) && sn > 0 ? sn : null
+                    }
+
+                    let qfDisplay
+                    const useSeedsShell = seeds.length >= 8
+                    if (useSeedsShell && qfGames.length < 4) {
+                      const sn = (n: number) => seeds.find((s) => Number(s.seed) === n)?.team ?? `Seed ${n}`
+                      const pairs = [
+                        { home: sn(1), away: sn(8) },
+                        { home: sn(2), away: sn(7) },
+                        { home: sn(3), away: sn(6) },
+                        { home: sn(4), away: sn(5) },
+                      ]
+                      qfDisplay = pairs.map((m) => {
+                        const played =
+                          qfGames.find((g) => (g.home === m.home && g.away === m.away) || (g.home === m.away && g.away === m.home)) ?? null
+                        const ph = played
+                          ? played.home === m.home
+                            ? played.home_score
+                            : played.away_score
+                          : null
+                        const pa = played
+                          ? played.home === m.home
+                            ? played.away_score
+                            : played.home_score
+                          : null
+                        return (
+                          <div key={`lh-qf-${clsName}-${m.home}-${m.away}`} className="teamhome-playoffs-matchup">
+                            {renderPlayoffBracketLine(String(m.home), typeof ph === 'number' ? ph : undefined, {
+                              playoffSeed: seedForTeam(m.home),
+                            })}
+                            {renderPlayoffBracketLine(String(m.away), typeof pa === 'number' ? pa : undefined, {
+                              playoffSeed: seedForTeam(m.away),
+                            })}
+                          </div>
+                        )
+                      })
+                    } else if (qfGames.length > 0) {
+                      qfDisplay = qfGames.map((g) => (
+                        <div key={`lh-qfc-${clsName}-${g.home}-${g.away}`} className="teamhome-playoffs-matchup">
+                          {renderPlayoffBracketLine(String(g.home), Number(g.home_score), {
+                            playoffSeed: seedForTeam(String(g.home)),
+                          })}
+                          {renderPlayoffBracketLine(String(g.away), Number(g.away_score), {
+                            playoffSeed: seedForTeam(String(g.away)),
+                          })}
+                        </div>
+                      ))
+                    } else {
+                      qfDisplay = (
+                        <div className="teamhome-small">Quarterfinal games not archived for this bracket.</div>
+                      )
+                    }
+
+                    return (
+                      <div key={`lh-po-${clsName}`} className="teamhome-card teamhome-league-history-class-card">
+                        <div className="teamhome-card-title" style={{ fontSize: '0.95rem', marginBottom: 8 }}>
+                          {clsName}
+                          {inner.completed !== true ? ' · bracket in progress' : ''}
+                          {typeof inner.champion === 'string' && inner.champion ? (
+                            <span className="teamhome-small teamhome-league-history-champ-pill">{` Champion: ${inner.champion}`}</span>
+                          ) : null}
+                        </div>
+                        <div className="teamhome-playoffs-grid teamhome-league-history-playoffs-grid">
+                          <div className="teamhome-playoffs-microcol">
+                            <div className="teamhome-microcol-title">QF</div>
+                            <div className="teamhome-playoffs-list">{qfDisplay}</div>
+                          </div>
+                          <div className="teamhome-playoffs-microcol">
+                            <div className="teamhome-microcol-title">SF</div>
+                            <div className="teamhome-playoffs-list">
+                              {sfGames.length === 0 && useSeedsShell ? (
+                                <div className="teamhome-small" style={{ opacity: 0.8 }}>
+                                  (Semifinal matchups populate after quarterfinal results.)
+                                </div>
+                              ) : (
+                                sfGames.map((g) => (
+                                  <div key={`lh-sf-${clsName}-${g.home}-${g.away}`} className="teamhome-playoffs-matchup">
+                                    {renderPlayoffBracketLine(String(g.home), Number(g.home_score), {
+                                      playoffSeed: seedForTeam(String(g.home)),
+                                    })}
+                                    {renderPlayoffBracketLine(String(g.away), Number(g.away_score), {
+                                      playoffSeed: seedForTeam(String(g.away)),
+                                    })}
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                          <div className="teamhome-playoffs-microcol">
+                            <div className="teamhome-microcol-title">Final</div>
+                            <div className="teamhome-playoffs-list">
+                              {chGames.length === 0 ? (
+                                <div className="teamhome-small" style={{ opacity: 0.8 }}>
+                                  {(inner.completed === false ? 'Championship pending.' : '')}
+                                </div>
+                              ) : (
+                                chGames.map((g) => (
+                                  <div key={`lh-ch-${clsName}-${g.home}-${g.away}`} className="teamhome-playoffs-matchup">
+                                    {renderPlayoffBracketLine(String(g.home), Number(g.home_score), {
+                                      playoffSeed: seedForTeam(String(g.home)),
+                                    })}
+                                    {renderPlayoffBracketLine(String(g.away), Number(g.away_score), {
+                                      playoffSeed: seedForTeam(String(g.away)),
+                                    })}
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+              </div>
+            )}
           </>
         )}
       </div>
@@ -2345,14 +3069,27 @@ function TeamHomePageBody({
   const isSetDepthChartStage = phase === 'preseason' && preseasonCurrentStage === 'Set Depth Chart'
   const isScrimmageStage = phase === 'preseason' && (preseasonCurrentStage === 'Scrimmage 1' || preseasonCurrentStage === 'Scrimmage 2')
   const isSetGoalsStage = phase === 'preseason' && preseasonCurrentStage === 'Set Goals'
-  const isCoachingCarouselStage =
+  const isCoachingCarouselApplyStage =
     phase === 'offseason' &&
     (offseasonCurrentStage === 'Coaching carousel I' ||
       offseasonCurrentStage === 'Coaching carousel II' ||
       offseasonCurrentStage === 'Coaching carousel III')
+  const isCoachingCarouselSummaryStage = phase === 'offseason' && offseasonCurrentStage === 'Coaching carousel IV'
+  const isCoachingCarouselStage = isCoachingCarouselApplyStage || isCoachingCarouselSummaryStage
   useEffect(() => {
     if (!isCoachingCarouselStage) setCarouselHotSeatTeamFilter('')
   }, [isCoachingCarouselStage])
+  useEffect(() => {
+    if (!isCoachingCarouselApplyStage) return
+    const raw = saveState?.offseason_carousel_job_applications
+    const next =
+      Array.isArray(raw) ? raw.map((x: unknown) => String(x ?? '').trim()).filter(Boolean) : []
+    setCarouselJobApplications(next)
+  }, [
+    isCoachingCarouselApplyStage,
+    offseasonCurrentStage,
+    saveState?.offseason_carousel_job_applications,
+  ])
   const [confirmingPlaybook, setConfirmingPlaybook] = useState(false)
   const [showPlaybookGamePlan, setShowPlaybookGamePlan] = useState(false)
   const [learningSummary, setLearningSummary] = useState<{
@@ -2471,6 +3208,18 @@ function TeamHomePageBody({
   const transferStage1 = saveState?.offseason_transfer_stage_1 ?? null
   const transferStage2 = saveState?.offseason_transfer_stage_2 ?? null
   const transferReview = saveState?.offseason_transfer_review ?? null
+  const transferStage1PendingReview = Boolean(saveState?.offseason_transfer_stage_1_pending_review)
+  const transferStage2PendingReview = Boolean(saveState?.offseason_transfer_stage_2_pending_review)
+  const transferStage1EntriesSorted = useMemo(() => {
+    const e = (saveState?.offseason_transfer_stage_1?.entries ?? []) as Array<Record<string, unknown>>
+    return [...e].sort((a, b) => {
+      const sa = String(a.from_team ?? a.team ?? '')
+      const sb = String(b.from_team ?? b.team ?? '')
+      const bySchool = sa.localeCompare(sb)
+      if (bySchool !== 0) return bySchool
+      return String(a.player ?? '').localeCompare(String(b.player ?? ''))
+    })
+  }, [saveState?.offseason_transfer_stage_1])
   const winterPointsUsed = WINTER_TRAINING_CATEGORIES.reduce((sum, c) => sum + Math.max(0, Number(winterTrainingAllocations[c.key] ?? 0)), 0)
   const winterPointsRemaining = 100 - winterPointsUsed
   const winterAllocationInvalid =
@@ -2478,6 +3227,35 @@ function TeamHomePageBody({
     (offseasonCurrentStage === 'Winter 1' || offseasonCurrentStage === 'Winter 2') &&
     !winterTrainingResult &&
     winterPointsRemaining !== 0
+
+  const improvementsBudget = useMemo(() => {
+    if (phase !== 'offseason' || offseasonCurrentStage !== 'Improvements') {
+      return { invalid: false, projectedRemaining: 0, shortfall: 0, deltaPp: 0, ppRemaining: 0 }
+    }
+    const bank = saveState?.offseason_improvements_bank
+    const ppRemaining = Number(bank?.pp_remaining ?? bank?.pp_total ?? 0)
+    const t = findTeam(saveState, userTeam)
+    const facFrom = clampImprovementLevel(Number(t?.facilities_grade ?? 5), 5)
+    const culFrom = clampImprovementLevel(Number(t?.culture_grade ?? 5), 5)
+    const booFrom = clampImprovementLevel(Number(t?.booster_support ?? 5), 5)
+    const deltaPp =
+      improvementPpDelta(facFrom, improveFacilities) +
+      improvementPpDelta(culFrom, improveCulture) +
+      improvementPpDelta(booFrom, improveBoosters)
+    const projectedRemaining = ppRemaining + deltaPp
+    const invalid = projectedRemaining < 0
+    const shortfall = invalid ? Math.max(0, Math.ceil(-projectedRemaining)) : 0
+    return { invalid, projectedRemaining, shortfall, deltaPp, ppRemaining }
+  }, [
+    phase,
+    offseasonCurrentStage,
+    saveState?.offseason_improvements_bank,
+    saveState,
+    userTeam,
+    improveFacilities,
+    improveCulture,
+    improveBoosters,
+  ])
 
   const offseasonTrainingRowsRaw = useMemo(
     () => (saveState?.offseason_training_results?.players ?? []) as OffseasonTrainingRow[],
@@ -2541,6 +3319,7 @@ function TeamHomePageBody({
         backupReminderFrequency={backupReminderFrequency ?? 'none'}
         onBackupReminderFrequencyChange={onBackupReminderFrequencyChange}
         onBackupNow={onBackupNow}
+        onApplySaveState={onSaveState}
         onClose={() => setShowSettings(false)}
         onError={onError}
         onLogoVersionBump={() => setLogoVersion(Date.now())}
@@ -3027,6 +3806,17 @@ function TeamHomePageBody({
           <div className="teamhome-top-label">RANK</div>
           <div className="teamhome-top-value">{rank ? `#${rank}` : '—'}</div>
         </div>
+        <div className="teamhome-top-group">
+          <div className="teamhome-top-label">CLASS RANK</div>
+          <div className="teamhome-top-value">{classRank != null ? `#${classRank}` : '—'}</div>
+          {teamBarClassification && teamBarClassification !== '—' ? (
+            <div className="teamhome-top-subvalue">{teamBarClassification}</div>
+          ) : (
+            <div className="teamhome-top-subvalue" style={{ opacity: 0.45 }}>
+              —
+            </div>
+          )}
+        </div>
         <div className="teamhome-top-group teamhome-top-group-teamnav">
           <div className="teamhome-top-label">TEAM</div>
           <select
@@ -3054,8 +3844,15 @@ function TeamHomePageBody({
         </div>
         <div className="teamhome-top-group teamhome-top-group-league">
           <div className="teamhome-top-label">STATE</div>
-          <select className="teamhome-select teamhome-select-league" value={stateMenu} onChange={(e) => setStateMenu(e.target.value)}>
+          <select
+            className="teamhome-select teamhome-select-league"
+            value={stateMenu}
+            title="League-wide views (standings, stats, statewide top players, etc.)"
+            aria-label="State league menu"
+            onChange={(e) => setStateMenu(e.target.value)}
+          >
             <option value="Dashboard">Dashboard</option>
+            <option value="Top Players">Top Players (statewide)</option>
             <option value="Standings">Standings</option>
             <option value="Weekly schedule">Weekly schedule</option>
             <option value="Team Schedule">Team Schedule</option>
@@ -3064,6 +3861,7 @@ function TeamHomePageBody({
             <option value="Team Info">Team Info</option>
             <option value="Coaching changes">Coaching changes</option>
             <option value="Team History">Team History</option>
+            <option value="League History">League History</option>
           </select>
         </div>
         <div className="teamhome-top-actions">
@@ -3080,7 +3878,8 @@ function TeamHomePageBody({
               isSetDepthChartStage ||
               isScrimmageStage ||
               isSetGoalsStage ||
-              winterAllocationInvalid
+              winterAllocationInvalid ||
+              (phase === 'offseason' && offseasonCurrentStage === 'Improvements' && improvementsBudget.invalid)
             }
             onClick={async () => {
               try {
@@ -3096,6 +3895,9 @@ function TeamHomePageBody({
                     improve_culture_grade?: number
                     improve_booster_support?: number
                     coach_dev_allocations?: Record<string, number>
+                    carousel_job_applications?: string[]
+                    transfer_stage_1_ack_results?: boolean
+                    transfer_stage_2_ack_results?: boolean
                   } = {}
                   if (offseasonCurrentStage === 'Winter 1' || offseasonCurrentStage === 'Winter 2') {
                     offseasonBody = winterTrainingResult
@@ -3113,6 +3915,20 @@ function TeamHomePageBody({
                     }
                   } else if (offseasonCurrentStage === 'Coach development') {
                     offseasonBody = { coach_dev_allocations: coachDevAllocations }
+                  } else if (
+                    offseasonCurrentStage === 'Coaching carousel I' ||
+                    offseasonCurrentStage === 'Coaching carousel II' ||
+                    offseasonCurrentStage === 'Coaching carousel III'
+                  ) {
+                    offseasonBody = { carousel_job_applications: carouselJobApplications }
+                  } else if (offseasonCurrentStage === 'Transfers I') {
+                    offseasonBody = transferStage1PendingReview
+                      ? { transfer_stage_1_ack_results: true }
+                      : {}
+                  } else if (offseasonCurrentStage === 'Transfers II') {
+                    offseasonBody = transferStage2PendingReview
+                      ? { transfer_stage_2_ack_results: true }
+                      : {}
                   }
                   await onSimWeek({ offseasonBody })
                 } else if (phase === 'preseason' && isPositionChangesStage) {
@@ -3146,23 +3962,27 @@ function TeamHomePageBody({
                 ? 'Playoffs complete — use Advance to offseason below'
                 : phase === 'playoffs'
                   ? 'Simulate the next playoff round (quarterfinals → semifinals → championship)'
-                  : phase === 'offseason'
-                    ? 'Complete the current offseason step and advance'
-                    : isPlaybookSelectStage
-                    ? 'Confirm playbook selection first'
-                    : isPlaySelectionStage
-                      ? 'Confirm game plan first'
-                      : isPlaySelectionResultsStage
-                        ? 'Confirm play selection results first'
-                        : isPositionChangesStage
-                          ? 'Continue to depth chart (CPU teams update positions automatically)'
-                        : isSetDepthChartStage
-                          ? 'Confirm depth chart first'
-                          : isScrimmageStage
-                            ? 'Use Play or Simulate in the panel below'
-                            : isSetGoalsStage
-                              ? 'Confirm goals below'
-                              : 'Simulate the current week and advance'
+                  : phase === 'offseason' &&
+                      offseasonCurrentStage === 'Improvements' &&
+                      improvementsBudget.invalid
+                    ? 'Reduce upgrades or use downgrades until PP is not overspent (see warning on the dashboard).'
+                    : phase === 'offseason'
+                      ? 'Complete the current offseason step and advance'
+                      : isPlaybookSelectStage
+                        ? 'Confirm playbook selection first'
+                        : isPlaySelectionStage
+                          ? 'Confirm game plan first'
+                          : isPlaySelectionResultsStage
+                            ? 'Confirm play selection results first'
+                            : isPositionChangesStage
+                              ? 'Continue to depth chart (CPU teams update positions automatically)'
+                              : isSetDepthChartStage
+                                ? 'Confirm depth chart first'
+                                : isScrimmageStage
+                                  ? 'Use Play or Simulate in the panel below'
+                                  : isSetGoalsStage
+                                    ? 'Confirm goals below'
+                                    : 'Simulate the current week and advance'
             }
           >
             {phase === 'regular' && simmingWeek
@@ -4172,19 +4992,289 @@ function TeamHomePageBody({
                           {Number(saveState.offseason_improvements_bank.breakdown.goal_points ?? 0)})
                         </div>
                       ) : null}
-                      <div className="teamhome-small" style={{ marginTop: 10, opacity: 0.9 }}>
-                        Use <b>Continue</b> to lock in changes and advance.
+                      {improvementsBudget.invalid ? (
+                        <div
+                          className="teamhome-small"
+                          role="alert"
+                          style={{
+                            marginTop: 12,
+                            padding: '10px 12px',
+                            borderRadius: 8,
+                            border: '1px solid rgba(248, 113, 113, 0.55)',
+                            background: 'rgba(127, 29, 29, 0.28)',
+                            color: '#fecaca',
+                          }}
+                        >
+                          <b>PP overspent.</b> These levels would drop your PP bank to{' '}
+                          <b>{improvementsBudget.projectedRemaining}</b> ({improvementsBudget.ppRemaining} now
+                          {improvementsBudget.deltaPp !== 0 ? (
+                            <>
+                              , change from selections <b>{improvementsBudget.deltaPp > 0 ? '+' : ''}</b>
+                              <b>{improvementsBudget.deltaPp}</b>
+                            </>
+                          ) : null}
+                          ). You need{' '}
+                          <b>{improvementsBudget.shortfall}</b> more PP to afford this combo — lower a grade or pick fewer
+                          upgrades. <b>Continue</b> stays off until this balances.
+                        </div>
+                      ) : (
+                        <div className="teamhome-small" style={{ marginTop: 10, opacity: 0.82 }}>
+                          Projected PP after Continue:{' '}
+                          <b>{improvementsBudget.projectedRemaining}</b>
+                          {improvementsBudget.ppRemaining !== improvementsBudget.projectedRemaining ? (
+                            <span style={{ opacity: 0.88 }}>
+                              {' '}
+                              (now {improvementsBudget.ppRemaining}
+                              {improvementsBudget.deltaPp !== 0 ? (
+                                <>
+                                  , net from selections{' '}
+                                  <b>{improvementsBudget.deltaPp > 0 ? '+' : ''}</b>
+                                  <b>{improvementsBudget.deltaPp}</b>
+                                </>
+                              ) : null}
+                              )
+                            </span>
+                          ) : null}
+                        </div>
+                      )}
+                      <div className="teamhome-small" style={{ marginTop: 10, opacity: improvementsBudget.invalid ? 0.75 : 0.9 }}>
+                        {improvementsBudget.invalid ? (
+                          <>
+                            Fix PP above, then use <b>Continue</b>.
+                          </>
+                        ) : (
+                          <>
+                            Use <b>Continue</b> to lock in changes and advance.
+                          </>
+                        )}
                       </div>
                     </div>
                   </>
                 ) : isCoachingCarouselStage ? (
                   <div className="teamhome-coaching-carousel-panel">
                     <div className="teamhome-preseason-title">{offseasonCurrentStage}</div>
-                    <div className="teamhome-preseason-sub">
-                      Retirements, firings, hires, and promotions across the league. Stages I and II fill most openings; stage III
-                      finishes remaining hires and optional scheme changes. CPU schools update when you press Continue.
-                    </div>
+                    {isCoachingCarouselSummaryStage ? (
+                      <div className="teamhome-preseason-sub">
+                        Coaching carousel recap for the offseason that just finished. This summary is archived under{' '}
+                        <b>State → Coaching changes</b> for that season year.
+                      </div>
+                    ) : offseasonCurrentStage === 'Coaching carousel I' ? (
+                      <div className="teamhome-preseason-sub">
+                        Openings after retirements and firings are locked in below. Rank head-coach jobs you want your coach to
+                        pursue, then Continue to run the first hiring wave.
+                      </div>
+                    ) : (
+                      <div className="teamhome-preseason-sub">
+                        Update applications if brand-new openings formed (promotions/poaching), then Continue for the next hiring
+                        wave. Stage IV is a league-wide summary.
+                      </div>
+                    )}
                     <div style={{ marginTop: 14, textAlign: 'left' }}>
+                      {isCoachingCarouselSummaryStage ? (
+                        (() => {
+                          const summ = saveState?.offseason_coaching_changes_summary as
+                            | {
+                                headline?: string
+                                bullets?: string[]
+                                counts?: Record<string, number>
+                              }
+                            | undefined
+                          if (!summ?.headline && !(summ?.bullets && summ.bullets.length)) {
+                            return (
+                              <div className="teamhome-small" style={{ marginBottom: 10 }}>
+                                Summary will appear once you finish stage III — if this is stuck empty, Continue once more from{' '}
+                                <b>stage III</b>.
+                              </div>
+                            )
+                          }
+                          const counts = summ?.counts ?? {}
+                          return (
+                            <div style={{ marginBottom: 16 }}>
+                              {summ.headline ? (
+                                <div className="teamhome-small" style={{ marginBottom: 12, fontWeight: 700 }}>
+                                  {summ.headline}
+                                </div>
+                              ) : null}
+                              <div className="teamhome-small" style={{ marginBottom: 8, opacity: 0.88 }}>
+                                {Object.keys(counts).length > 0
+                                  ? ['retirement', 'resignation', 'firing', 'hire', 'promotion', 'application_hire', 'scheme_change']
+                                      .filter((k) => Number(counts[k] ?? 0) > 0)
+                                      .map((k) => `${k.replace(/_/g, ' ')}: ${counts[k]}`)
+                                      .join(' · ')
+                                  : null}
+                              </div>
+                              <div className="teamhome-small" style={{ opacity: 0.9, marginBottom: 8 }}>
+                                Highlights:
+                              </div>
+                              <ul
+                                className="teamhome-coaching-events teamhome-coaching-carousel-marquee"
+                                style={{ textAlign: 'left', paddingLeft: 18, maxHeight: 360, overflow: 'auto' }}
+                              >
+                                {(summ?.bullets ?? []).map((line: string, i: number) => (
+                                  <li key={`ccs-${i}`} className="teamhome-carousel-event-item" style={{ marginBottom: 6 }}>
+                                    {line}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )
+                        })()
+                      ) : null}
+                      {!isCoachingCarouselSummaryStage && userTeam && findTeam(saveState, userTeam)?.coach
+                        ? (() => {
+                            const blob = saveState?.offseason_coach_carousel as { vacancies?: string[] } | undefined
+                            const vacancySet = new Set(
+                              (Array.isArray(blob?.vacancies) ? blob.vacancies : [])
+                                .map((x: unknown) => String(x ?? '').trim())
+                                .filter(Boolean),
+                            )
+                            const teamsArr = (saveState?.teams ?? []) as Array<{ name?: string; prestige?: number }>
+                            const prestigeOf = (n: string) => {
+                              const row = teamsArr.find((t) => t?.name === n)
+                              return Number(row?.prestige ?? 5)
+                            }
+                            const canAddChoices = [...vacancySet].sort((a, b) => prestigeOf(b) - prestigeOf(a) || a.localeCompare(b))
+                            const availAdd = canAddChoices.filter((n) => !carouselJobApplications.includes(n))
+
+                            function addVacancyPick() {
+                              const choice = carouselVacancyPick.trim()
+                              if (!choice || !vacancySet.has(choice)) return
+                              if (carouselJobApplications.includes(choice)) return
+                              setCarouselJobApplications((prev) => [...prev, choice])
+                              setCarouselVacancyPick('')
+                            }
+
+                            function moveCarouselApp(i: number, dir: -1 | 1) {
+                              setCarouselJobApplications((prev) => {
+                                const j = i + dir
+                                if (j < 0 || j >= prev.length) return prev
+                                const next = [...prev]
+                                ;[next[i], next[j]] = [next[j], next[i]]
+                                return next
+                              })
+                            }
+
+                            if (vacancySet.size === 0) return null
+
+                            return (
+                              <div
+                                style={{
+                                  marginBottom: 16,
+                                  paddingBottom: 12,
+                                  borderBottom: '1px solid rgba(80,88,106,0.45)',
+                                }}
+                              >
+                                <div className="teamhome-small" style={{ marginBottom: 8, fontWeight: 700 }}>
+                                  Apply for open HC jobs ({vacancySet.size} open){' '}
+                                  <span style={{ fontWeight: 400, opacity: 0.85 }}>
+                                    · Your application list persists until the carousel completes
+                                  </span>
+                                </div>
+                                <div className="teamhome-small" style={{ marginBottom: 10 }}>
+                                  Top-ranked schools are prioritized when your coach evaluates offers; you can reorder between
+                                  stages I–III as new vacancies appear.
+                                </div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end', marginBottom: 10 }}>
+                                  <select
+                                    className="teamhome-select teamhome-select-inline"
+                                    aria-label="Add school to application list"
+                                    value={carouselVacancyPick}
+                                    onChange={(e) => setCarouselVacancyPick(e.target.value)}
+                                    style={{ minWidth: 220 }}
+                                  >
+                                    <option value="">Add vacancy…</option>
+                                    {availAdd.map((n) => (
+                                      <option key={n} value={n}>
+                                        {prestigeOf(n)}★ {n}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <button
+                                    type="button"
+                                    className="teamhome-small"
+                                    style={{
+                                      padding: '6px 12px',
+                                      borderRadius: 6,
+                                      border: '1px solid #3b4252',
+                                      background: '#1a2230',
+                                      color: '#d9e0ea',
+                                      cursor: availAdd.length && carouselVacancyPick ? 'pointer' : 'not-allowed',
+                                      opacity: availAdd.length && carouselVacancyPick ? 1 : 0.45,
+                                    }}
+                                    disabled={!carouselVacancyPick || !availAdd.length}
+                                    onClick={addVacancyPick}
+                                  >
+                                    Add to list
+                                  </button>
+                                </div>
+                                {carouselJobApplications.length === 0 ? (
+                                  <div className="teamhome-small" style={{ opacity: 0.8 }}>
+                                    Optional: leave blank to stay put (CPU hiring still runs league-wide).
+                                  </div>
+                                ) : (
+                                  <ul style={{ paddingLeft: 18, margin: 0 }}>
+                                    {carouselJobApplications.map((name, idx) => (
+                                      <li key={`${name}-${idx}`} className="teamhome-small" style={{ marginBottom: 8 }}>
+                                        <b>{idx + 1}.</b> {name}{' '}
+                                        <button
+                                          type="button"
+                                          style={{
+                                            marginLeft: 6,
+                                            padding: '2px 8px',
+                                            fontSize: 12,
+                                            borderRadius: 4,
+                                            border: '1px solid #364152',
+                                            background: '#10151d',
+                                            color: '#c7d2e5',
+                                          }}
+                                          onClick={() => moveCarouselApp(idx, -1)}
+                                          disabled={idx === 0}
+                                        >
+                                          Up
+                                        </button>{' '}
+                                        <button
+                                          type="button"
+                                          style={{
+                                            marginLeft: 4,
+                                            padding: '2px 8px',
+                                            fontSize: 12,
+                                            borderRadius: 4,
+                                            border: '1px solid #364152',
+                                            background: '#10151d',
+                                            color: '#c7d2e5',
+                                          }}
+                                          onClick={() => moveCarouselApp(idx, 1)}
+                                          disabled={idx >= carouselJobApplications.length - 1}
+                                        >
+                                          Down
+                                        </button>{' '}
+                                        <button
+                                          type="button"
+                                          style={{
+                                            marginLeft: 4,
+                                            padding: '2px 8px',
+                                            fontSize: 12,
+                                            borderRadius: 4,
+                                            border: '1px solid #533',
+                                            background: '#1f1212',
+                                            color: '#fecaca',
+                                          }}
+                                          onClick={() =>
+                                            setCarouselJobApplications((prev) => prev.filter((_, j) => j !== idx))
+                                          }
+                                        >
+                                          Remove
+                                        </button>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                            )
+                          })()
+                        : null}
+                      {!isCoachingCarouselSummaryStage ? (
+                      <>
                       <div className="teamhome-small" style={{ marginBottom: 10 }}>
                         <b>Hot seat</b> (your program):{' '}
                         <b>
@@ -4298,7 +5388,7 @@ function TeamHomePageBody({
                         if (n == null) return null
                         return (
                           <div className="teamhome-small" style={{ marginBottom: 10 }}>
-                            Open head-coach jobs (CPU carousel): <b>{n}</b>
+                            Open head-coach jobs: <b>{n}</b>
                           </div>
                         )
                       })()}
@@ -4310,7 +5400,7 @@ function TeamHomePageBody({
                         style={{ textAlign: 'left', paddingLeft: 18, maxHeight: 280, overflow: 'auto' }}
                       >
                         {(saveState?.offseason_coach_carousel_last_events ?? []).length === 0 ? (
-                          <li className="teamhome-small">No events yet — press Continue to run this stage.</li>
+                          <li className="teamhome-small">No moves logged at this carousel step yet — press Continue.</li>
                         ) : (
                           (saveState?.offseason_coach_carousel_last_events ?? []).map((ev: any, i: number) => (
                             <li key={`cc-ev-${i}`} className="teamhome-carousel-event-item" style={{ marginBottom: 6 }}>
@@ -4320,8 +5410,10 @@ function TeamHomePageBody({
                         )}
                       </ul>
                       <div className="teamhome-small" style={{ marginTop: 12 }}>
-                        Review past years under <b>State → Coaching changes</b>.
+                        Review past offseasons under <b>State → Coaching changes</b>.
                       </div>
+                      </>
+                      ) : null}
                     </div>
                   </div>
                 ) : offseasonCurrentStage === 'Winter 1' || offseasonCurrentStage === 'Winter 2' ? (
@@ -4544,31 +5636,70 @@ function TeamHomePageBody({
                   <>
                     <div className="teamhome-preseason-title">Transfers I — Portal entrants</div>
                     <div className="teamhome-preseason-sub">
-                      This stage evaluates transfer pressure and announces who enters the portal. Continue to lock entrants.
+                      First <b>Continue</b> builds the portal class from the season that just ended (using final
+                      standings). Review the list, then <b>Continue</b> again to lock entrants before destinations run
+                      in Transfers II.
                     </div>
                     {transferStage1?.entries?.length ? (
-                      <div style={{ marginTop: 10 }}>
-                        <div className="teamhome-small">
-                          Portal cap: <b>{Number(transferStage1.pool_pct ?? 0).toFixed(1)}%</b> · Entrants:{' '}
+                      <div style={{ marginTop: 12 }}>
+                        <div className="teamhome-small" style={{ marginBottom: 8 }}>
+                          League portal cap: <b>{Number(transferStage1.pool_pct ?? 0).toFixed(1)}%</b> · In portal:{' '}
                           <b>{Number(transferStage1.selected_count ?? 0)}</b>
+                          {transferStage1.eligible_count != null ? (
+                            <>
+                              {' '}
+                              · Candidates considered: <b>{Number(transferStage1.eligible_count)}</b>
+                            </>
+                          ) : null}
                         </div>
-                        <ul className="teamhome-list" style={{ marginTop: 8 }}>
-                          {(transferStage1.entries as any[]).slice(0, 12).map((r: any, i: number) => (
-                            <li key={`tr1-${i}`} className="teamhome-small">
-                              {String(r.player)} ({String(r.position)}) · {String(r.team)} · score {Number(r.score ?? 0).toFixed(1)} · {Number(r.transfer_probability ?? 0).toFixed(1)}%
-                            </li>
-                          ))}
-                        </ul>
+                        <div
+                          className="teamhome-roster-table"
+                          style={{ maxHeight: 320, overflowY: 'auto', marginTop: 8 }}
+                        >
+                          <div className="teamhome-roster-head teamhome-roster-row teamhome-transfer-portal-head">
+                            <div className="teamhome-roster-cell">Player</div>
+                            <div className="teamhome-roster-cell">Pos</div>
+                            <div className="teamhome-roster-cell">Class</div>
+                            <div className="teamhome-roster-cell">From (school)</div>
+                            <div className="teamhome-roster-cell">Region</div>
+                            <div className="teamhome-roster-cell">Pressure</div>
+                          </div>
+                          {transferStage1EntriesSorted.map((r: any, i: number) => {
+                            const fromSchool = String(r.from_team ?? r.team ?? '—')
+                            return (
+                              <div
+                                key={`tr1-${fromSchool}-${String(r.player)}-${i}`}
+                                className="teamhome-roster-row teamhome-transfer-portal-row"
+                              >
+                                <div className="teamhome-roster-cell">{String(r.player ?? '—')}</div>
+                                <div className="teamhome-roster-cell">{String(r.position ?? '—')}</div>
+                                <div className="teamhome-roster-cell">{formatTransferPortalClassYear(r.year)}</div>
+                                <div className="teamhome-roster-cell">{teamWithLogo(fromSchool, 22)}</div>
+                                <div className="teamhome-roster-cell">{String(r.region ?? '—')}</div>
+                                <div className="teamhome-roster-cell">{Number(r.score ?? 0).toFixed(1)}</div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                        <div className="teamhome-small" style={{ marginTop: 10, opacity: 0.85 }}>
+                          Sorted by school, then name. List is everyone in this portal class (not a sample).
+                          {transferStage1PendingReview ? (
+                            <> Press <b>Continue</b> again to lock and advance.</>
+                          ) : null}
+                        </div>
                       </div>
                     ) : (
-                      <div className="teamhome-small" style={{ marginTop: 8 }}>No portal entrants yet. Press Continue to run the evaluation.</div>
+                      <div className="teamhome-small" style={{ marginTop: 8 }}>
+                        Portal class not generated yet. Press <b>Continue</b> once to run the evaluation.
+                      </div>
                     )}
                   </>
                 ) : offseasonCurrentStage === 'Transfers II' ? (
                   <>
                     <div className="teamhome-preseason-title">Transfers II — Destinations</div>
                     <div className="teamhome-preseason-sub">
-                      Finalize portal destinations using school fit and regional movement probabilities.
+                      First <b>Continue</b> resolves destinations from the locked portal class. Review, then{' '}
+                      <b>Continue</b> again to advance.
                     </div>
                     {transferStage2?.entries?.length ? (
                       <div style={{ marginTop: 10 }}>
@@ -4583,9 +5714,16 @@ function TeamHomePageBody({
                             </li>
                           ))}
                         </ul>
+                        {transferStage2PendingReview ? (
+                          <div className="teamhome-small" style={{ marginTop: 10, opacity: 0.85 }}>
+                            Press <b>Continue</b> again to lock and advance.
+                          </div>
+                        ) : null}
                       </div>
                     ) : (
-                      <div className="teamhome-small" style={{ marginTop: 8 }}>No finalized moves yet. Press Continue to resolve destinations.</div>
+                      <div className="teamhome-small" style={{ marginTop: 8 }}>
+                        Destinations not resolved yet. Press <b>Continue</b> once to run resolution.
+                      </div>
                     )}
                   </>
                 ) : offseasonCurrentStage === 'Transfers III' ? (
@@ -4792,11 +5930,20 @@ function TeamHomePageBody({
                         ) : (
                           scheduleRows.map((r) => (
                             <li key={`wk-${r.week}`}>
-                              Week {r.week}: vs {r.opponent} ({r.scoreLine})
+                              Week {r.week}: vs {r.opponent}
+                              {r.isRegionGame ? (
+                                <span className="teamhome-region-mark" title="Region game">*</span>
+                              ) : null}
+                              {' '}({r.scoreLine})
                             </li>
                           ))
                         )}
                       </ul>
+                      {scheduleRows.some((r) => r.isRegionGame) ? (
+                        <div className="teamhome-schedule-region-legend teamhome-small">
+                          <span className="teamhome-region-mark">*</span> Region game
+                        </div>
+                      ) : null}
                       <div className="teamhome-preseason-title" style={{ fontSize: 14, marginTop: 12 }}>
                         Preseason scrimmages
                       </div>
@@ -5047,7 +6194,12 @@ function TeamHomePageBody({
                             {r.opponent && !/^bye$/i.test(String(r.opponent)) ? (
                               <TeamLogo apiBase={apiBase} headers={headers} teamName={r.opponent} logoVersion={logoVersion} size={16} />
                             ) : null}
-                            <span>{r.opponent}</span>
+                            <span>
+                              {r.opponent}
+                              {r.isRegionGame ? (
+                                <span className="teamhome-region-mark" title="Region game">*</span>
+                              ) : null}
+                            </span>
                           </div>
                         </div>
                         <div className="teamhome-small teamhome-schedule-mini-score">{r.played ? r.scoreLine : 'Scheduled'}</div>
@@ -5055,6 +6207,11 @@ function TeamHomePageBody({
                     ))
                 )}
               </div>
+              {scheduleRows.some((r) => r.isRegionGame) ? (
+                <div className="teamhome-schedule-region-legend teamhome-small">
+                  <span className="teamhome-region-mark">*</span> Region game
+                </div>
+              ) : null}
             </div>
 
             <div className="teamhome-card teamhome-card-dark">

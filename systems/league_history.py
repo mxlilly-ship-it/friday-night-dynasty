@@ -178,6 +178,125 @@ def _build_league_leaders(
     return result
 
 
+def team_won_state_in_season_entry(team_name: str, season_entry: Dict[str, Any]) -> bool:
+    """True if this team won a state title in ``season_entry`` (top-level or any multiclass bracket)."""
+    if not team_name or not isinstance(season_entry, dict):
+        return False
+    if str(season_entry.get("state_champion") or "") == team_name:
+        return True
+    pbc = season_entry.get("playoffs_by_class")
+    if isinstance(pbc, dict):
+        for inner in pbc.values():
+            if isinstance(inner, dict) and str(inner.get("champion") or "") == team_name:
+                return True
+    return False
+
+
+def team_had_postseason_bracket_appearance(team_name: str, season_entry: Dict[str, Any]) -> bool:
+    """True if team played in a bracket game, was state champion, or was runner-up for that season."""
+    if not team_name or not isinstance(season_entry, dict):
+        return False
+    if str(season_entry.get("state_champion") or "") == team_name:
+        return True
+    if str(season_entry.get("runner_up") or "") == team_name:
+        return True
+    pl = season_entry.get("playoffs")
+    if isinstance(pl, dict):
+        br = pl.get("bracket_results") or []
+        for g in br:
+            if isinstance(g, dict) and (g.get("home") == team_name or g.get("away") == team_name):
+                return True
+    pbc = season_entry.get("playoffs_by_class")
+    if isinstance(pbc, dict):
+        for inner in pbc.values():
+            if not isinstance(inner, dict):
+                continue
+            if inner.get("champion") == team_name or inner.get("runner_up") == team_name:
+                return True
+            for g in inner.get("bracket_results") or []:
+                if isinstance(g, dict) and (g.get("home") == team_name or g.get("away") == team_name):
+                    return True
+    return False
+
+
+def compute_team_legacy_totals(team_name: str, seasons: List[Dict[str, Any]]) -> Dict[str, int]:
+    """
+    Cumulative program stats from league_history seasons for one team.
+
+    Keys: program_wins, program_losses, state_championships,
+    regional_championships_tracked, playoff_appearances.
+    """
+    cw = cl = st = reg = po = 0
+    for ent in seasons:
+        if not isinstance(ent, dict):
+            continue
+        st_list = ent.get("standings") or []
+        if isinstance(st_list, list):
+            for r in st_list:
+                if isinstance(r, dict) and r.get("team") == team_name:
+                    cw += int(r.get("wins", 0) or 0)
+                    cl += int(r.get("losses", 0) or 0)
+                    break
+        if team_won_state_in_season_entry(team_name, ent):
+            st += 1
+        rc = ent.get("regional_champions")
+        if isinstance(rc, list) and team_name in rc:
+            reg += 1
+        if team_had_postseason_bracket_appearance(team_name, ent):
+            po += 1
+    return {
+        "program_wins": cw,
+        "program_losses": cl,
+        "state_championships": st,
+        "regional_championships_tracked": reg,
+        "playoff_appearances": po,
+    }
+
+
+def _seasons_all_have_regional_champions_key(seasons: List[Dict[str, Any]]) -> bool:
+    """True when every season row includes regional_champion tracking (migration complete)."""
+    if not seasons:
+        return True
+    return all(isinstance(s, dict) and ("regional_champions" in s) for s in seasons)
+
+
+def merge_regional_title_display_from_counts(
+    seasons: List[Dict[str, Any]],
+    regional_from_history: int,
+    persisted_from_save: int,
+) -> int:
+    """
+    Prefer counts from league history when every season recorded ``regional_champions``;
+    otherwise take the greater of persisted in-save totals vs reconstructed (migration).
+    """
+    h = int(regional_from_history or 0)
+    p = int(persisted_from_save or 0)
+    if _seasons_all_have_regional_champions_key(seasons):
+        return h
+    return max(p, h)
+
+
+def build_team_program_totals_display(
+    team_name: str,
+    seasons: List[Dict[str, Any]],
+    persisted_regional_from_save: int,
+) -> Dict[str, int]:
+    """Authoritative display bundle for program stats (matches state injection on load)."""
+    tot = compute_team_legacy_totals(team_name, seasons)
+    reg = merge_regional_title_display_from_counts(
+        seasons,
+        int(tot.get("regional_championships_tracked", 0) or 0),
+        persisted_regional_from_save,
+    )
+    return {
+        "program_wins": int(tot.get("program_wins", 0) or 0),
+        "program_losses": int(tot.get("program_losses", 0) or 0),
+        "state_championships": int(tot.get("state_championships", 0) or 0),
+        "regional_championships": reg,
+        "playoff_appearances": int(tot.get("playoff_appearances", 0) or 0),
+    }
+
+
 def append_season(
     champion: str,
     runner_up: str,
@@ -189,6 +308,8 @@ def append_season(
     bracket_results: Optional[List[Dict[str, Any]]] = None,
     team_coaches: Optional[Dict[str, str]] = None,
     team_recap_files: Optional[Dict[str, str]] = None,
+    regional_champions: Optional[List[str]] = None,
+    playoffs_by_class: Optional[Dict[str, Any]] = None,
     path: Optional[str] = None,
     save_dir: Optional[str] = None,
 ) -> None:
@@ -253,6 +374,7 @@ def append_season(
         "state_champion": champion,
         "runner_up": runner_up,
         "standings": standings_list,
+        "regional_champions": list(regional_champions) if regional_champions else [],
         "playoffs": {"bracket_results": bracket_results or []},
         "player_of_the_year": poy,
         "league_leaders": leaders,
@@ -260,6 +382,8 @@ def append_season(
         "player_stats": player_stats_list,
         "team_recaps": team_recap_files or {},
     }
+    if playoffs_by_class and isinstance(playoffs_by_class, dict) and playoffs_by_class:
+        entry["playoffs_by_class"] = playoffs_by_class
 
     seasons.append(entry)
     save_league_history(data, hist_path)
@@ -285,6 +409,8 @@ def append_season_in_memory(
     bracket_results: Optional[List[Dict[str, Any]]] = None,
     team_coaches: Optional[Dict[str, str]] = None,
     team_recap_files: Optional[Dict[str, str]] = None,
+    regional_champions: Optional[List[str]] = None,
+    playoffs_by_class: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Stateless version of append_season:
@@ -334,6 +460,7 @@ def append_season_in_memory(
         "state_champion": champion,
         "runner_up": runner_up,
         "standings": standings_list,
+        "regional_champions": list(regional_champions) if regional_champions else [],
         "playoffs": {"bracket_results": bracket_results or []},
         "player_of_the_year": poy,
         "league_leaders": leaders,
@@ -341,6 +468,8 @@ def append_season_in_memory(
         "player_stats": player_stats_list,
         "team_recaps": team_recap_files or {},
     }
+    if playoffs_by_class and isinstance(playoffs_by_class, dict) and playoffs_by_class:
+        entry["playoffs_by_class"] = playoffs_by_class
     seasons.append(entry)
 
     from systems.records_system import update_records_from_season

@@ -7,7 +7,17 @@ Offseason transfer system with two-stage flow:
 from __future__ import annotations
 
 import random
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+
+from systems.coach_development import _goal_evaluation, _postseason_tier as _cd_postseason_tier
+
+# Max portal candidates per team before the league-wide cap (not lifetime player cap).
+TRANSFER_PORTAL_MAX_PER_TEAM = 5
+# Max outgoing / incoming moves per team when resolving destinations.
+TRANSFER_MOVES_MAX_OUT_PER_TEAM = 5
+TRANSFER_MOVES_MAX_IN_PER_TEAM = 5
+# League-wide portal size: ~50 entrants per 100 teams (typical total moves ~30–70 after resolution).
+TRANSFER_PORTAL_LEAGUE_SHARE = 0.50
 
 
 def _num(v: Any, default: float = 0.0) -> float:
@@ -40,6 +50,78 @@ def _team_success_score(standings_row: Dict[str, Any]) -> float:
     win_pct = w / g
     # Better teams lower transfer risk.
     return (1.0 - win_pct) * 100.0
+
+
+def _program_expectations_miss(
+    team_name: str,
+    standings_row: Dict[str, Any],
+    team_obj: Any,
+) -> float:
+    """CPU / no-goal case: underperforming vs prestige raises transfer pressure (0–75)."""
+    w = int(_num(standings_row.get("wins", 0), 0))
+    l = int(_num(standings_row.get("losses", 0), 0))
+    g = max(1, w + l)
+    win_pct = w / float(g)
+    prestige = float(_num(getattr(team_obj, "prestige", 5), 5))
+    expected = 0.30 + (prestige / 15.0) * 0.38
+    gap = max(0.0, expected - win_pct)
+    return min(75.0, gap * 115.0)
+
+
+def _user_goal_miss_pressure(
+    team_name: str,
+    standings_row: Dict[str, Any],
+    standings: Dict[str, Any],
+    season_goals: Optional[Dict[str, Any]],
+    user_team: Optional[str],
+    bracket_results: List[Dict[str, Any]],
+    champion: str,
+) -> float:
+    """User team: missed win / stage goals add pressure (0–88)."""
+    if not user_team or team_name != user_team:
+        return 0.0
+    if not isinstance(season_goals, dict):
+        return 0.0
+    has_goal = season_goals.get("win_goal") is not None or str(season_goals.get("stage_goal") or "").strip()
+    if not has_goal:
+        return 0.0
+    w = int(_num(standings_row.get("wins", 0), 0))
+    l = int(_num(standings_row.get("losses", 0), 0))
+    tier = _cd_postseason_tier(team_name, standings, bracket_results, champion or "")
+    achieved_rank = {"none": 0, "playoffs": 1, "semifinal": 2, "championship": 3, "champion": 4}.get(tier, 0)
+    win_ok, stage_ok = _goal_evaluation(season_goals, w, l, achieved_rank)
+    pressure = 0.0
+    if not win_ok:
+        pressure += 24.0
+    if not stage_ok:
+        pressure += 32.0
+    return min(88.0, pressure)
+
+
+def _expectations_pressure(
+    team_name: str,
+    standings_row: Dict[str, Any],
+    team_obj: Any,
+    standings: Dict[str, Any],
+    season_goals: Optional[Dict[str, Any]],
+    user_team: Optional[str],
+    bracket_results: List[Dict[str, Any]],
+    champion: str,
+) -> float:
+    g_user = _user_goal_miss_pressure(
+        team_name, standings_row, standings, season_goals, user_team, bracket_results, champion
+    )
+    g_prog = _program_expectations_miss(team_name, standings_row, team_obj)
+    return max(g_user, g_prog)
+
+
+def _rising_star_upside_pressure(p_ovr: float, top_cut: float, prestige: float) -> float:
+    """Elite players at lower-prestige programs are more likely to test the portal (0–40)."""
+    if p_ovr < top_cut - 0.01:
+        return 0.0
+    gap = min(20.0, max(0.0, p_ovr - top_cut))
+    under = max(0.0, 11.0 - float(prestige)) / 11.0
+    return min(40.0, gap * under * 2.2)
 
 
 def _playing_time_score(team: Any, p: Any) -> float:
@@ -140,8 +222,14 @@ def run_transfer_stage_1(
     standings: Dict[str, Any],
     *,
     current_year: int,
+    season_goals: Optional[Dict[str, Any]] = None,
+    user_team: Optional[str] = None,
+    bracket_results: Optional[List[Dict[str, Any]]] = None,
+    champion: Optional[str] = None,
 ) -> Dict[str, Any]:
     rng = random.Random(int(current_year) * 977 + len(teams))
+    br = list(bracket_results or [])
+    champ = str(champion or "")
     players_by_team: Dict[str, List[Any]] = {tn: list(getattr(t, "roster", []) or []) for tn, t in teams.items()}
     total_players = sum(len(v) for v in players_by_team.values())
     if total_players == 0:
@@ -165,11 +253,21 @@ def run_transfer_stage_1(
         sorted_ovr = sorted((_player_overall_proxy(p) for p in roster), reverse=True)
         top_cut_idx = max(0, int(len(sorted_ovr) * 0.15) - 1)
         top_cut = sorted_ovr[top_cut_idx] if sorted_ovr else 200.0
-        out_count = 0
+        srow = standings.get(team_name, {}) or {}
+        prestige = float(_num(getattr(team, "prestige", 5), 5))
+        expectations = _expectations_pressure(
+            team_name, srow, team, standings, season_goals, user_team, br, champ
+        )
+        team_bucket: List[Dict[str, Any]] = []
 
         for p in roster:
+            # Player.year is HS grade 9–12 for generated rosters (see player_generator).
+            # Legacy saves may use 1–4 (seasons of eligibility); treat 3+ there as upperclass.
             year = int(_num(getattr(p, "year", 0), 0))
-            if year >= 3:
+            if year >= 9:
+                if year >= 12:
+                    continue  # seniors: skip portal for this pass
+            elif year >= 3:
                 continue
             if int(_num(getattr(p, "transfer_count", 0), 0)) >= 1:
                 continue
@@ -179,52 +277,80 @@ def run_transfer_stage_1(
                 continue
             p_ovr = _player_overall_proxy(p)
             playing_time = _playing_time_score(team, p)
-            team_success = _team_success_score(standings.get(team_name, {}))
+            team_success = _team_success_score(srow)
             culture = _culture_score(team)
             region = str(getattr(team, "region", "") or "State")
             proximity = _proximity_opportunity_score(teams, team_name, pos, region, neighbors)
             variance = rng.uniform(0, 100)
+            upside = _rising_star_upside_pressure(p_ovr, top_cut, prestige)
 
             score = (
-                playing_time * 0.38
-                + team_success * 0.20
-                + culture * 0.18
-                + proximity * 0.14
-                + variance * 0.10
+                playing_time * 0.34
+                + team_success * 0.16
+                + culture * 0.14
+                + proximity * 0.12
+                + expectations * 0.12
+                + variance * 0.09
+                + upside * 0.03
             )
-            if p_ovr >= top_cut:
-                score *= 0.82
+            # Slight boost so more players clear the portal gate.
+            score += 4.0
+            # Stars at marquee programs stick; elite players at weaker brands keep exit pressure via `upside`.
+            if p_ovr >= top_cut and prestige >= 11:
+                score *= 0.93
+            elif p_ovr >= top_cut and prestige >= 7:
+                score *= 0.97
 
-            # Gate was 65; lowered so depth-chart starters and average backups still produce portal churn.
-            if score <= 52:
+            # Score gate: higher = more likely to enter portal.
+            if score <= 42:
                 continue
-            if out_count >= 8:
-                continue
-            out_count += 1
-            out_candidates.append(
+            raw = float(score)
+            team_bucket.append(
                 {
                     "player": str(getattr(p, "name", "Unknown")),
                     "team": team_name,
+                    "from_team": team_name,
                     "position": pos,
                     "year": year,
-                    "score": round(float(score), 1),
-                    "priority": "high" if score > 80 else "normal",
+                    "_sort": raw,
                     "region": region,
-                    "transfer_probability": round(min(0.97, max(0.35, score / 100.0)) * 100, 1),
                 }
             )
 
-    cap_pct = rng.uniform(0.09, 0.16)
-    cap = max(2, int(round(total_players * cap_pct)))
+        team_bucket.sort(key=lambda x: -float(x["_sort"]))
+        for row in team_bucket[:TRANSFER_PORTAL_MAX_PER_TEAM]:
+            sc = float(row.pop("_sort"))
+            out_candidates.append(
+                {
+                    "player": row["player"],
+                    "team": row["team"],
+                    "from_team": row["from_team"],
+                    "position": row["position"],
+                    "year": row["year"],
+                    "score": round(sc, 1),
+                    "priority": "high" if sc > 80 else "normal",
+                    "region": row["region"],
+                    "transfer_probability": round(min(0.97, max(0.35, sc / 100.0)) * 100, 1),
+                }
+            )
+
+    # League-sized portal: ~50 entrants per 100 teams, min 1 when multi-team.
+    n_teams = len(teams)
+    cap = max(1, int(round(n_teams * TRANSFER_PORTAL_LEAGUE_SHARE))) if n_teams else 0
+    effective_pool_pct = (cap / total_players * 100.0) if total_players else 0.0
     out_candidates.sort(key=lambda x: (-float(x["score"]), x["team"], x["player"]))
     selected = out_candidates[:cap]
     return {
         "year": int(current_year),
-        "pool_pct": round(cap_pct * 100.0, 2),
+        "pool_pct": round(effective_pool_pct, 2),
         "eligible_count": len(out_candidates),
         "selected_count": len(selected),
         "entries": selected,
-        "summary": f"{len(selected)} players entered the transfer portal ({round(cap_pct * 100.0, 1)}% cap).",
+        "summary": (
+            f"{len(selected)} players entered the transfer portal "
+            f"({cap} league cap, up to {TRANSFER_PORTAL_MAX_PER_TEAM} entrants per team, "
+            f"≈ {round(effective_pool_pct, 1)}% of league roster)."
+        ),
     }
 
 
@@ -252,7 +378,7 @@ def run_transfer_stage_2(
         player_name = str(row.get("player", ""))
         pos = str(row.get("position", ""))
         origin_team = teams.get(origin)
-        if not origin_team or outgoing_count.get(origin, 0) >= 8:
+        if not origin_team or outgoing_count.get(origin, 0) >= TRANSFER_MOVES_MAX_OUT_PER_TEAM:
             blocked += 1
             continue
         roster = list(getattr(origin_team, "roster", []) or [])
@@ -273,7 +399,7 @@ def run_transfer_stage_2(
             for tn, t in teams.items():
                 if tn == origin:
                     continue
-                if incoming_count.get(tn, 0) >= 8:
+                if incoming_count.get(tn, 0) >= TRANSFER_MOVES_MAX_IN_PER_TEAM:
                     continue
                 dest_region = str(getattr(t, "region", "") or "State")
                 if bucket != "any":

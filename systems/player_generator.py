@@ -8,8 +8,9 @@ All-State 76-85 (<10%), Elite 86-95 (<3%), Generational 96+ (very rare).
 Influenced by community type, prestige, classification, and coach player_development.
 Height/weight use broad HS bands (skill vs line), correlated rolls, archetype build hints,
 and community bias (e.g. blue-collar lines / some RBs run heavier).
-Age-14 (incoming ninth grade) players use lower base skills and lighter archetype/floor boosts;
-recruited freshmen also pass recruiting_system dampening so current overalls stay raw vs potential.
+Age-14 (incoming ninth grade) players use lower base skills and modest floor pulls; recruiting_system
+applies additional dampening, tiered caps, and positional overall fitting so most frosh stay sub-starter
+overall with rare high-ceiling draws.
 """
 
 import random
@@ -237,17 +238,40 @@ POTENTIAL_TIER_WEIGHTS = [
 ]
 GENERATIONAL_CHANCE = 0.003  # ~0.3% - may be 0-1 in entire league
 
-# Basic name pools (expand as needed)
+# Name pools: 150 U.S. first names × 150 surnames (generate_name / new players).
 FIRST_NAMES = [
-    "James", "John", "Michael", "David", "William", "Robert", "Christopher",
-    "Matthew", "Daniel", "Anthony", "Mark", "Donald", "Steven", "Paul",
-    "Andrew", "Joshua", "Kenneth", "Kevin", "Brian", "George", "Timothy",
-    "Tyler", "Jacob", "Mason", "Ethan", "Noah", "Lucas", "Logan", "Jackson",
+    "Aaron", "Adam", "Adrian", "Alan", "Alec", "Alexander", "Allen", "Andre", "Andrew", "Angelo",
+    "Anthony", "Antoine", "Antonio", "Ashton", "Austin", "Barrett", "Beau", "Bennett", "Blake", "Brad",
+    "Braden", "Bradley", "Brady", "Brandon", "Brent", "Brett", "Brian", "Brock", "Brooks", "Bruce",
+    "Bryce", "Bryson", "Caleb", "Calvin", "Cameron", "Carl", "Carson", "Carter", "Cedric", "Chandler",
+    "Charles", "Chase", "Chris", "Christian", "Christopher", "Clayton", "Cody", "Cole", "Colin", "Connor",
+    "Cooper", "Cory", "Curtis", "Cyrus", "Dakota", "Dalton", "Damian", "Damon", "Daniel", "Dante",
+    "Darrell", "Darius", "Darnell", "Darren", "David", "Davion", "Dean", "DeMarco", "Derek", "Derrick",
+    "Devin", "Dillon", "Dominic", "Donald", "Donovan", "Drew", "Dustin", "Dylan", "Easton", "Eduardo",
+    "Eli", "Elijah", "Emerson", "Eric", "Ernest", "Ethan", "Evan", "Everett", "Fabian", "Felix",
+    "Fernando", "Francisco", "Gabriel", "Garrett", "Gavin", "George", "Gerald", "Gilbert", "Giovanni", "Grant",
+    "Gregory", "Griffin", "Gunner", "Hayden", "Henry", "Holden", "Hugo", "Ian", "Isaiah", "Ivan",
+    "Jace", "Jalen", "Jared", "Jason", "Javier", "Jed", "Jeremiah", "Jerome", "Jerry", "Jesse",
+    "Joaquin", "Jonah", "Jonathan", "Jorge", "Josiah", "Juan", "Julian", "Julius", "Justin", "Keenan",
+    "Kendall", "Kenneth", "Kevin", "Lamar", "Landon", "Lane", "Lawrence", "Leon", "Levi", "Liam",
+    "Logan", "Luca", "Lucas", "Lukas", "Malik", "Manuel", "Marcos", "Marcus", "Marion", "Mario",
 ]
 LAST_NAMES = [
-    "Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller",
-    "Davis", "Rodriguez", "Martinez", "Wilson", "Anderson", "Taylor",
-    "Thomas", "Moore", "Jackson", "Martin", "Lee", "Thompson", "White",
+    "Adams", "Aguilar", "Alexander", "Allen", "Alvarez", "Andersen", "Anderson", "Andrews", "Armstrong", "Arnold",
+    "Atkins", "Austin", "Bailey", "Baker", "Banks", "Barber", "Barnes", "Bates", "Beck", "Bennett",
+    "Berry", "Bishop", "Blackburn", "Black", "Bowen", "Boyd", "Boyle", "Bradley", "Brady", "Brewer",
+    "Brooks", "Bryant", "Burke", "Burns", "Burton", "Butler", "Byrd", "Campbell", "Carlson", "Carpenter",
+    "Carson", "Carter", "Castillo", "Chandler", "Chapman", "Chen", "Clark", "Clayton", "Cobb", "Coleman",
+    "Collins", "Conner", "Conway", "Cook", "Cooper", "Cox", "Crawford", "Crosby", "Cunningham", "Curtis",
+    "Dalton", "Daniels", "Davidson", "Davis", "Dawson", "Dean", "Diaz", "Dixon", "Douglas", "Doyle",
+    "Drake", "Duncan", "Dunn", "Edwards", "Elliott", "Ellis", "Espinoza", "Evans", "Farmer", "Ferguson",
+    "Fields", "Finch", "Fisher", "Fleming", "Fletcher", "Ford", "Fowler", "Fox", "Franklin", "Freeman",
+    "Fuller", "Gardner", "Garrett", "Gibson", "Gilbert", "Gomez", "Gonzales", "Gordon", "Graham", "Graves",
+    "Gray", "Greene", "Griffin", "Guzman", "Hall", "Hamilton", "Hanson", "Hardy", "Harmon", "Harper",
+    "Harrison", "Hart", "Hayes", "Henderson", "Hernandez", "Hicks", "Hogan", "Hoffman", "Holland", "Horton",
+    "Howard", "Hughes", "Hull", "Hunt", "Hutchinson", "Irving", "Jackson", "Jacobs", "Jennings", "Jensen",
+    "Johnston", "Jones", "Kelley", "Kennedy", "King", "Klein", "Lambert", "Lancaster", "Larson", "Lawrence",
+    "Lee", "Leonard", "Lewis", "Little", "Logan", "Long", "Lopez", "Love", "Lynch", "Lyons",
 ]
 
 
@@ -332,8 +356,9 @@ def _apply_weak_program_depth_tail(
 
 
 # Size bands (inches / lbs), aligned with broad HS ranges:
-# Skill (RB/CB/S/K/P): 5'4"-6'7" (64-79), 135-245 lb — lots of body-type variety.
-# WR is intentionally narrower to avoid unrealistic tall outliers in bulk generation.
+# Skill (K/P): broad height band; RB/WR/CB/S get position-specific rolls (see roll_height_weight_for_position).
+# CB/S (~90% in 5'7"-6'1"): DBs taller than ~6'2" are intentionally rare vs uniform 64–79.
+# WR stays narrower to avoid unrealistic tall outliers in bulk generation.
 # QB: same height band; weight floor a bit higher (typical QB builds).
 # Linemen (OL/DE/DT): 5'7"-6'6" (67-78), 205-350 lb.
 # LB / TE: intermediate "tweener" bands.
@@ -344,8 +369,9 @@ _POSITION_SIZE_BOUNDS: Dict[str, Tuple[int, int, int, int]] = {
     "RB": (64, 76, 135, 245),
     # Most HS WRs should cluster around 5'9"–6'1", with a rare 6'3"+ tail.
     "WR": (65, 76, 145, 225),
-    "CB": (64, 79, 135, 245),
-    "S": (64, 79, 135, 245),
+    # Hard cap modest (6'4"); primary roll targets 67–73 (5'7"–6'1") ~90%.
+    "CB": (64, 76, 135, 245),
+    "S": (64, 76, 135, 245),
     "K": (64, 79, 135, 245),
     "P": (64, 79, 135, 245),
     "OL": (67, 78, 205, 350),
@@ -378,7 +404,7 @@ _ARCHETYPE_SIZE_DELTAS: Dict[str, Tuple[Tuple[int, int], Tuple[int, int]]] = {
     "Coverage LB": ((-1, 1), (-8, 4)),
     "Run Stopper LB": ((0, 1), (6, 22)),
     "Blitzer LB": ((0, 1), (2, 14)),
-    "Shutdown CB": ((0, 2), (4, 16)),
+    "Shutdown CB": ((0, 1), (4, 16)),
     "Man Corner": ((0, 1), (-4, 10)),
     "Zone Corner": ((0, 1), (-2, 8)),
     "Kicker": ((-1, 1), (-10, 4)),
@@ -442,8 +468,8 @@ def _apply_community_size_bias(
         elif position == "RB" and random.random() < 0.38:
             w += random.randint(6, 22)
     elif community_type == CommunityType.FOOTBALL_FACTORY:
-        # Slightly more "prototype" length on perimeter / edge
-        if position in ("WR", "CB", "S", "TE", "DE") and random.random() < 0.24:
+        # Slightly more "prototype" length on perimeter / edge (not CB/S — keep DB height grounded)
+        if position in ("WR", "TE", "DE") and random.random() < 0.24:
             h += 1
         if position in ("WR", "CB", "DE", "TE"):
             w += random.randint(-4, 12)
@@ -491,6 +517,26 @@ def roll_height_weight_for_position(
             height = random.randint(73, 74)  # 6'1" - 6'2" uncommon
         else:
             height = random.randint(75, 76)  # 6'3" - 6'4" rare
+        span_w = w_max - w_min
+        if span_w <= 0:
+            weight = w_min
+        else:
+            t_h = (height - h_min) / max(1, (h_max - h_min))
+            center_w = w_min + t_h * span_w
+            sigma = max(5.5, span_w * 0.17)
+            weight = int(random.gauss(center_w, sigma))
+            weight = max(w_min, min(w_max, weight))
+    elif position in ("CB", "S"):
+        # Primary band 5'7"–6'1" (archetype / community nudges pull a few out; target ~90% final).
+        # Safeties often use LB-style archetypes with +height; extra bulk weight vs corners.
+        bulk_p = 0.978 if position == "S" else 0.955
+        r = random.random()
+        if r < bulk_p:
+            height = random.randint(67, 73)
+        elif r < 0.99:
+            height = random.randint(64, 66)
+        else:
+            height = random.randint(74, 76)
         span_w = w_max - w_min
         if span_w <= 0:
             weight = w_min
@@ -556,10 +602,12 @@ def generate_player(
     # Base attributes: center shifts by prestige + talent; low prestige sits lower (more 10–39 bodies).
     talent = get_community_rating(community_type, "talent_pool")
     if young_freshman:
-        # HS freshmen: mostly not game-ready; keep current skills well below varsity starters.
-        base = 38 + int((team_prestige - 5) * 0.32) + int((talent - 5) * 0.3)
-        base = max(22, min(46, base))
-        talent_weight = 0.32
+        # HS freshmen: raw ninth graders — most sit JV/frosh level until development (& recruiting caps).
+        # Center pulled down so ninth-grade OVR clusters in the 30-45 band; only the band trim in
+        # ``_incoming_freshman_overall_band`` (+ later development) ever pushes a frosh higher.
+        base = 32 + int((team_prestige - 5) * 0.34) + int((talent - 5) * 0.30)
+        base = max(22, min(43, base))
+        talent_weight = 0.30
     else:
         base = 45 + int((team_prestige - 5) * 2.65) + int((talent - 5) * 0.55)
         base = max(24, min(59, base))
@@ -579,7 +627,8 @@ def generate_player(
     ]
     var_boost = max(0, 7 - min(team_prestige, 7)) * 2
     for attr in skill_attrs:
-        val = _roll_base(base, variance=(18 + var_boost // 2) if young_freshman else (14 + var_boost))
+        vf = (15 + var_boost // 2) if young_freshman else (14 + var_boost)
+        val = _roll_base(base, variance=vf)
         val = _apply_community_modifier(val, community_type, talent_weight=talent_weight)
         b = boosts.get(attr, 0)
         if young_freshman:
@@ -615,15 +664,18 @@ def generate_player(
         "K": ["kick_power", "kick_accuracy"],
         "P": ["kick_power", "kick_accuracy"],
     }
-    pos_boost_hi = 4 if young_freshman else 8
+    pos_boost_hi = 2 if young_freshman else 8
     for attr in pos_emphasis.get(position, []):
         attrs[attr] = min(RATING_ATTR_MAX, attrs[attr] + random.randint(0, pos_boost_hi))
 
     # Prestige floor: stronger programs pull lows toward a higher bar; weak programs leave more room for tails.
     prestige_floor = max(0, min(12, int((team_prestige - 2) * 1.6)))
     if young_freshman:
-        prestige_floor = min(5, prestige_floor // 2)
-        floor_target = 40 + min(4, max(0, team_prestige - 3))
+        # Very light pull off the basement only — nowhere near varsity starter floors.
+        # (Freshmen stay raw; they earn varsity reps via development, not generation.)
+        prestige_floor = min(2, prestige_floor // 4)
+        floor_target = 24 + min(7, max(0, team_prestige - 3))
+        floor_target = min(36, int(floor_target))
     else:
         floor_target = 42 + (max(0, team_prestige - 3) * 5) // 4
         floor_target = min(52, int(floor_target))
@@ -653,8 +705,9 @@ def generate_player(
         if position in ("K", "P"):
             pass  # already boosted by archetype
         else:
-            attrs["kick_power"] = min(RATING_ATTR_MAX, attrs["kick_power"] + random.randint(5, 20))
-            attrs["kick_accuracy"] = min(RATING_ATTR_MAX, attrs["kick_accuracy"] + random.randint(5, 20))
+            k_lo, k_hi = (3, 10) if young_freshman else (5, 20)
+            attrs["kick_power"] = min(RATING_ATTR_MAX, attrs["kick_power"] + random.randint(k_lo, k_hi))
+            attrs["kick_accuracy"] = min(RATING_ATTR_MAX, attrs["kick_accuracy"] + random.randint(k_lo, k_hi))
 
     # Build Player
     rating_attrs = {k: v for k, v in attrs.items() if k not in ("height", "weight", "peak_age")}

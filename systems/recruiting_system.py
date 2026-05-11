@@ -2,12 +2,12 @@
 Recruiting system for incoming ninth-grade freshmen.
 Controls quality of incoming players based on program attractiveness, coach recruiting,
 community type (talent pipelines), prestige, recent success, and program stability.
-Rare "golden generation" allows bad programs to occasionally land a great player.
+Golden-generation rolls mostly juice potential; varsity-ready frosh outliers are driven by rare overall bands.
 """
 
 import random
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from models.community import CommunityType, get_community_rating
 from models.player import RATING_ATTR_MAX, RATING_ATTR_MIN
@@ -17,8 +17,11 @@ if TYPE_CHECKING:
     from models.team import Team
 
 
-# Golden generation: bad program lands a great player (very rare)
-GOLDEN_GENERATION_CHANCE = 0.005  # 0.5% per recruit for programs with low recruiting score
+# Golden generation: bad program lands unusually high-ceiling freshmen (potential-heavy; stays raw physically)
+GOLDEN_GENERATION_CHANCE = 0.005  # 0.5% per recruit when recruiting_score is low enough
+
+# Stochastic overall ceiling (applied after dampening): ~once per ten league-years at ~1.2k freshmen/year
+GENERATIONAL_HS_FRESHMAN_CHANCE = 1.0 / 12000.0
 
 
 @dataclass
@@ -146,8 +149,8 @@ def compute_recruiting_context(
     talent_mod = int((score - 50) / 5)  # 50=0, 80=+6, 20=-6
     talent_mod = max(-8, min(10, talent_mod))
 
-    # Current-skill modifier: keep small so freshmen stay raw; ceiling mostly lives in potential.
-    attr_mod = max(-6, min(3, talent_mod // 4))
+    # Current-skill modifier stays tiny — development carries long-term upside.
+    attr_mod = max(-7, min(2, talent_mod // 5))
 
     # Golden generation: only for low-score programs, very rare
     golden_chance = 0.0
@@ -174,13 +177,13 @@ def apply_recruiting_modifiers(
     Apply recruiting modifiers to a freshly generated player.
     Updates player in place (potential, attributes).
     """
-    # Golden generation: bad program gets a star
+    # Golden generation: bad program steals a developmental gem (mostly upside, not varsity-ready bodies)
     if context.golden_generation_roll > 0 and random.random() < context.golden_generation_roll:
-        player.potential = min(RATING_ATTR_MAX, player.potential + random.randint(15, 25))
+        player.potential = min(RATING_ATTR_MAX, player.potential + random.randint(15, 26))
         for attr in ["speed", "agility", "strength", "football_iq"]:
             if hasattr(player, attr):
                 v = getattr(player, attr)
-                setattr(player, attr, min(RATING_ATTR_MAX, v + random.randint(4, 9)))
+                setattr(player, attr, min(RATING_ATTR_MAX, v + random.randint(1, 3)))
 
     # Normal modifiers
     player.potential = max(40, min(RATING_ATTR_MAX, player.potential + context.talent_modifier))
@@ -204,6 +207,22 @@ def apply_recruiting_modifiers(
                 setattr(player, attr, new_v)
 
 
+# Attributes that meaningfully move `calculate_player_overall` when nudged (trim/boost).
+_OVERALL_LEVER_ATTRS: Dict[str, Tuple[str, ...]] = {
+    "QB": ("throw_power", "throw_accuracy", "decisions", "football_iq", "speed", "agility", "elusiveness"),
+    "RB": ("speed", "agility", "acceleration", "vision", "break_tackle", "ball_security", "catching", "strength"),
+    "WR": ("speed", "agility", "acceleration", "catching", "route_running", "ball_security", "vision"),
+    "OL": ("run_blocking", "pass_blocking", "strength", "agility", "balance"),
+    "TE": ("catching", "run_blocking", "strength", "speed", "route_running", "vision"),
+    "DE": ("pass_rush", "run_defense", "block_shedding", "strength", "speed", "tackling"),
+    "DT": ("strength", "run_defense", "block_shedding", "pass_rush", "tackling"),
+    "LB": ("tackling", "pursuit", "coverage", "run_defense", "speed", "strength"),
+    "CB": ("coverage", "speed", "agility", "acceleration", "tackling"),
+    "S": ("coverage", "tackling", "speed", "agility", "football_iq", "pursuit"),
+    "K": ("kick_power", "kick_accuracy"),
+    "P": ("kick_power", "kick_accuracy"),
+}
+
 # Attributes that define "how good they are now" — dampen for incoming freshmen only (not potential / dev traits).
 _FRESHMAN_DAMPEN_ATTRS = (
     "speed", "agility", "acceleration", "strength", "balance", "jumping",
@@ -220,23 +239,168 @@ _FRESHMAN_DAMPEN_ATTRS = (
 
 def _dampen_incoming_freshman_skills(player: "Player", recruiting_score: float = 50.0) -> None:
     """
-    Compress current ratings toward a raw ninth-grader profile so few are varsity-ready.
-    Top programs get a slightly higher ceiling; still almost nobody should play like a senior starter.
+    Compress ninth-grade current ratings toward JV / freshman-ball — most overalls stay under ~45 after trim.
+    Top programs widen slightly; varsity-starting freshmen are scarce and handled via overall cap rolls.
     Does not change potential, growth_rate, or bloomer traits.
     """
-    anchor = 32
-    # 0.40 (weak) .. 0.52 (elite recruiting) — keeps most overalls in the 30s–50s
-    scale = 0.46 + (recruiting_score - 50.0) / 450.0
-    scale = max(0.40, min(0.52, scale))
-    cap = 72 + int(max(0.0, min(100.0, recruiting_score) - 50.0) / 12.0)
-    cap = min(78, max(70, cap))
+    # JV / ninth-grade readiness. Scale + cap are intentionally tight so most freshmen
+    # land 30-50 OVR; only the rare overall-band tier (and Winter/Spring development on top
+    # of those) can ever push a freshman past the mid-60s.
+    anchor = 30
+    scale = 0.32 + (recruiting_score - 50.0) / 280.0
+    scale = max(0.27, min(0.42, scale))
+    recruit = max(0.0, min(100.0, recruiting_score))
+    cap = max(42, min(54, int(41 + recruit / 8.5)))
     for attr in _FRESHMAN_DAMPEN_ATTRS:
         if not hasattr(player, attr):
             continue
         v = int(getattr(player, attr))
         v = max(anchor, v)
-        new_v = anchor + int((v - anchor) * scale)
-        setattr(player, attr, max(22, min(cap, new_v)))
+        new_v = anchor + int(round((v - anchor) * scale))
+        setattr(player, attr, max(RATING_ATTR_MIN, min(cap, new_v)))
+
+
+def _incoming_freshman_overall_band(team: "Team") -> Tuple[Optional[int], int]:
+    """
+    (optional_floor, ceiling) tier for freshmen overall.
+    Most draws only set a ceiling (floor None) — raw JV bodies stay low.
+    Rare tiers also set a floor so standouts can crack JV+/varsity bands occasionally.
+
+    Distribution targets (per league per offseason, ~2k freshmen):
+      - ~80%   land 10-50 (raw JV bodies, the clear majority)
+      - ~15-18% land in the 50-60s ("better ones" — fringe varsity / JV+ talent)
+      - ~1-2%  touch the low 60s; only a true outlier above 70 via the
+               generational unicorn roll (≈1 per league per decade)
+    Above 75 should always feel like a special talent, not a "tier-2 freshman".
+    """
+    comm = getattr(team, "community_type", None)
+    ff = aff = False
+    if comm == CommunityType.FOOTBALL_FACTORY:
+        ff = True
+    elif comm == CommunityType.AFFLUENT:
+        aff = True
+
+    r = random.random()
+    geo = random.randint(0, 4) if ff else (random.randint(0, 2) if aff else 0)
+
+    # Ultra-rare unicorn — the only path that can cross 75 OVR (≈1 per league per decade).
+    if r < GENERATIONAL_HS_FRESHMAN_CHANCE:
+        floor = random.randint(70, 74) + min(geo // 3, 2)
+        ceil = min(80, floor + random.randint(2, 6))
+        if ceil <= floor:
+            ceil = floor + random.randint(2, 4)
+        return floor, ceil
+
+    # "Headline" frosh — best in their class for the year. Deliberately rare: ~0.30%.
+    # ~5-7 across a full league per offseason; tops out in the low 70s.
+    if r < 0.003:
+        floor = random.randint(60, 65) + min(geo // 2, 2)
+        ceil = min(72, floor + random.randint(3, 7))
+        if ceil <= floor + 2:
+            ceil = floor + random.randint(3, 6)
+        return floor, ceil
+
+    # JV+ tier — clearly above-average, lands mid-50s to low 60s. ~1.7% incremental.
+    if r < 0.020:
+        floor = random.randint(52, 58) + min(geo // 2, 2)
+        ceil = min(64, floor + random.randint(3, 8))
+        if ceil <= floor + 2:
+            ceil = floor + random.randint(3, 6)
+        return max(RATING_ATTR_MIN + 12, floor), ceil
+
+    # "Better ones" — the meaningful 50-60s tier the user described. ~13% incremental.
+    if r < 0.150:
+        floor = random.randint(44, 51) + min(geo // 2, 2)
+        spread = random.randint(4, random.randint(6, 10))
+        ceil = min(60, floor + spread)
+        if ceil <= floor + 4:
+            ceil = floor + random.randint(4, 8)
+        return max(RATING_ATTR_MIN + 10, floor), ceil
+
+    # Clear majority stay developmental (10-50 overall dominates).
+    if r < 0.93:
+        return None, min(50, random.randint(28, 46) + min(geo + 2, 5))
+    # Slightly broader tail for the long-shot "might catch on by JV" frosh.
+    return None, min(54, random.randint(32, 50) + min(geo + 2, 5))
+
+
+def _freshman_boost_attr_ceiling(lo: Optional[int]) -> int:
+    """Per-attribute ceiling used by the OVR-band boost loop.
+
+    Tighter than RATING_ATTR_MAX so the boost loop can't quietly push individual
+    attrs into the 80s/90s when nudging a frosh up to a tier floor.
+    """
+    if lo is None:
+        return 56
+    if lo >= 70:
+        # Unicorn: a couple of premier attrs can sit in the high 70s/low 80s,
+        # but most still cluster lower so OVR caps where the band says.
+        return 80
+    if lo >= 58:
+        return 70
+    if lo >= 50:
+        return 64
+    return 58
+
+
+def _apply_incoming_freshman_overall_band(player: "Player", lo: Optional[int], hi: int) -> None:
+    """Trim down above hi; if lo is set, raise positional overall toward the band floor efficiently."""
+    from systems.team_ratings import calculate_player_overall
+
+    pos = str(getattr(player, "position", "") or "")
+    base = _OVERALL_LEVER_ATTRS.get(pos, ())
+    pool = [a for a in base if hasattr(player, a)]
+    if not pool:
+        pool = [a for a in _FRESHMAN_DAMPEN_ATTRS if hasattr(player, a)]
+    if not pool:
+        return
+
+    ceil_attr = _freshman_boost_attr_ceiling(lo)
+    stall = 0
+    step_down = 0
+    cur = calculate_player_overall(player)
+
+    while cur > hi and step_down < 320:
+        step_down += 1
+        attr = random.choice(pool)
+        v = int(getattr(player, attr))
+        if v > RATING_ATTR_MIN + 1:
+            setattr(player, attr, v - 1)
+            stall = 0
+        else:
+            stall += 1
+            if stall > 140:
+                break
+        prev = cur
+        cur = calculate_player_overall(player)
+        if cur == prev and step_down > 200:
+            break
+
+    if lo is None:
+        return
+
+    target_lo = max(RATING_ATTR_MIN + 11, lo)
+    cur = calculate_player_overall(player)
+    stall = 0
+    step_up = 0
+    while cur < target_lo and step_up < 420:
+        step_up += 1
+        attr = random.choice(pool)
+        v = int(getattr(player, attr))
+        gap = target_lo - cur
+        bump = 1 + (1 if gap > 10 else 0) + (1 if gap > 18 else 0)
+        bump = min(bump, max(1, ceil_attr - v))
+        if bump > 0 and v < ceil_attr:
+            setattr(player, attr, min(ceil_attr, v + bump))
+            stall = 0
+        else:
+            stall += 1
+            if stall > 120:
+                break
+        prev = cur
+        cur = calculate_player_overall(player)
+        if cur == prev and step_up > 160:
+            break
 
 
 def _load_league_history_safe() -> Dict[str, Any]:
@@ -281,4 +445,6 @@ def generate_recruited_freshman(
 
     apply_recruiting_modifiers(player, team, position, context)
     _dampen_incoming_freshman_skills(player, recruiting_score=recruit_score)
+    band = _incoming_freshman_overall_band(team)
+    _apply_incoming_freshman_overall_band(player, band[0], band[1])
     return player

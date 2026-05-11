@@ -148,12 +148,26 @@ def generate_team_roster(
     Returns list of generated players. Team.roster is also populated.
     Players are generated with primary position first; two-way players have
     secondary_position set.
+
+    Year-9 freshmen are routed through the recruiting-system band logic so the
+    initial roster's freshman class follows the same OVR distribution as the
+    per-year offseason intake (most 10-50, "better ones" 50-60s, 75+ very rare).
     """
+    # Local import to avoid a circular import at module load.
+    from systems.recruiting_system import (
+        _apply_incoming_freshman_overall_band,
+        _dampen_incoming_freshman_skills,
+        _incoming_freshman_overall_band,
+        compute_recruiting_score,
+    )
+
     roster_size = calculate_roster_size(team, enrollment, classification)
     position_counts = _scale_position_counts(roster_size)
 
     team.roster.clear()
     players: List["Player"] = []
+
+    recruit_score_cache: Optional[float] = None
 
     for position, count in position_counts.items():
         for _ in range(count):
@@ -172,6 +186,17 @@ def generate_team_roster(
                 classification=team.classification,
                 coach=team.coach,
             )
+            if int(getattr(player, "year", 0) or 0) == 9:
+                # Mirror the per-year freshman intake pipeline so initial-roster freshmen
+                # land in the same OVR band (most 10-50, rare 50-60s, very rare 70+).
+                if recruit_score_cache is None:
+                    try:
+                        recruit_score_cache = float(compute_recruiting_score(team))
+                    except Exception:
+                        recruit_score_cache = 50.0
+                _dampen_incoming_freshman_skills(player, recruiting_score=recruit_score_cache)
+                lo, hi = _incoming_freshman_overall_band(team)
+                _apply_incoming_freshman_overall_band(player, lo, hi)
             players.append(player)
             team.add_player(player)
 

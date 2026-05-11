@@ -1,3 +1,4 @@
+import copy
 import logging
 import os
 import random
@@ -14,7 +15,19 @@ from systems.save_system import (
     team_from_dict,
     team_to_dict,
 )
-from systems.teams_loader import build_teams_from_json, build_teams_from_configs
+from systems.teams_loader import (
+    build_teams_from_json,
+    build_teams_from_configs,
+    load_league_config_from_json,
+    playoff_system_id_from_config,
+)
+from systems.playoff_systems import (
+    DEFAULT_PLAYOFF_SYSTEM_ID,
+    PlayoffSystemConfig,
+    ensure_playoff_system_in_state,
+    get_playoff_system,
+    get_state_playoff_system,
+)
 from models.coach import apply_coach_config_dict
 from models.team import Team
 from systems.league_structure import (
@@ -23,8 +36,28 @@ from systems.league_structure import (
     playoff_pool_team_names,
 )
 from run_season import init_season_stats, parse_scores_from_final_line, run_game_silent, run_scrimmage_game
-from systems.playoff_system import run_next_playoff_round_8, run_playoff, seed_teams
-from systems.league_history import append_season
+from systems.playoff_system import (
+    PLAYOFF_ROUND_PRIORITY,
+    REGIONAL_ROUND_NAMES,
+    _regional_state_sf_pairings,
+    _teams_per_region_from_seeds,
+    next_playoff_round_name,
+    next_regional_round_name,
+    regional_in_region_round_names,
+    round_names_for_bracket,
+    round_pairings_for_size,
+    run_next_playoff_round,
+    run_next_playoff_round_8,
+    run_next_playoff_round_regional,
+    run_playoff,
+    seed_teams,
+    seed_teams_regional,
+)
+from systems.league_history import (
+    append_season,
+    load_league_history,
+    build_team_program_totals_display,
+)
 from systems.prestige_system import update_prestige
 from systems.development_system import (
     build_ai_winter_training_allocations,
@@ -35,7 +68,6 @@ from systems.development_system import (
 )
 from systems.offseason_manager import reset_team_season_stats, run_offseason_roster_turnover
 from systems.team_ratings import calculate_player_overall
-from systems.league_history import load_league_history
 from systems.save_system import league_history_path
 from systems.win_path_io import (
     io_path_candidates,
@@ -51,11 +83,15 @@ from systems.coach_development import (
     COACH_DEV_SKILLS,
     apply_ai_coach_season_development,
     apply_coach_development,
+    build_bulk_sim_coach_dev_body,
     build_offseason_coach_dev_banks_for_league,
     compute_coach_development_bank,
 )
 from systems.position_changes import apply_position_changes_to_team, run_ai_position_changes_for_team
-from systems.regional_titles import award_regular_season_regional_titles
+from systems.regional_titles import (
+    award_regular_season_regional_titles,
+    compute_regular_season_regional_champions,
+)
 from systems.play_selection import (
     run_play_selection_for_team,
     run_play_selection_results_for_team,
@@ -164,7 +200,10 @@ def format_recap_schedule_line(
     return f"Week {week_index_0 + 1}: {loc} {opp} — {wl} {my}-{opps}{ot_s}"
 
 
-_RECAP_PLAYOFF_ROUND_ORDER = {"Quarterfinal": 1, "Semifinal": 2, "Championship": 3}
+# Round priority used to order a team's playoff games on the season recap.
+# Larger value = deeper run. Sourced from systems.playoff_system so adding new
+# round names (e.g. "Round of 16" / "Round of 32") only changes one place.
+_RECAP_PLAYOFF_ROUND_ORDER = dict(PLAYOFF_ROUND_PRIORITY)
 
 
 def format_recap_playoff_line(team_name: str, game: Dict[str, Any]) -> str:
@@ -218,11 +257,143 @@ def _classification_of_team(teams: Dict[str, Any], name: Optional[str]) -> str:
     return str(c).strip() or "UNK"
 
 
+def _playoffs_inner_for_class(
+    playoffs_by_class: Any, classification: str
+) -> Optional[Dict[str, Any]]:
+    if not isinstance(playoffs_by_class, dict) or not playoffs_by_class:
+        return None
+    cls = str(classification or "").strip()
+    if cls in playoffs_by_class and isinstance(playoffs_by_class[cls], dict):
+        return playoffs_by_class[cls]
+    low = cls.lower()
+    for k, v in playoffs_by_class.items():
+        if str(k).strip().lower() == low and isinstance(v, dict):
+            return v
+    return None
+
+
+def _bracket_depth_label(team_n: str, bracket_results: Any) -> str:
+    """Furthest round a team reached without winning it (Quarterfinalist /
+    Semifinalist / Round-of-16 finalist / Regional Finalist / etc.)."""
+    order = PLAYOFF_ROUND_PRIORITY
+    best_rnd: Optional[str] = None
+    best_v: Optional[int] = None
+    for g in bracket_results or []:
+        if not isinstance(g, dict):
+            continue
+        if g.get("home") != team_n and g.get("away") != team_n:
+            continue
+        rnd = str(g.get("round") or "")
+        v = order.get(rnd)
+        if v and (best_v is None or v > best_v):
+            best_v = v
+            best_rnd = rnd
+    if best_rnd == "Semifinal":
+        return "Semifinalist"
+    if best_rnd == "Quarterfinal":
+        return "Quarterfinalist"
+    if best_rnd == "Regional Final":
+        return "Regional Finalist"
+    if best_rnd == "Regional Semifinal":
+        return "Regional Semifinalist"
+    if best_rnd == "Regional Quarterfinal":
+        return "Regional Quarterfinalist"
+    if best_rnd and best_rnd.startswith("Round of "):
+        # e.g. "Round of 16" -> "Round of 16 finalist"
+        return f"{best_rnd} finalist"
+    return "—"
+
+
+def _postseason_label_archived(
+    team_n: str, season_entry: Dict[str, Any], teams_map: Dict[str, Any]
+) -> str:
+    """Postseason chip for one team on a finished season row (multiclass-aware)."""
+    pbc = season_entry.get("playoffs_by_class")
+    cls = _classification_of_team(teams_map, team_n)
+    inner = _playoffs_inner_for_class(pbc, cls) if pbc else None
+    if isinstance(inner, dict):
+        if team_n == inner.get("champion"):
+            return "State Champion"
+        if team_n == inner.get("runner_up"):
+            return "Runner-up"
+        return _bracket_depth_label(team_n, inner.get("bracket_results"))
+    if team_n == season_entry.get("state_champion"):
+        return "State Champion"
+    if team_n == season_entry.get("runner_up"):
+        return "Runner-up"
+    playoffs = (
+        season_entry.get("playoffs")
+        if isinstance(season_entry.get("playoffs"), dict)
+        else {}
+    )
+    br = playoffs.get("bracket_results") or []
+    return _bracket_depth_label(team_n, br)
+
+
+def _recap_postseason_line_label_for_team(
+    team_n: str,
+    *,
+    state: Dict[str, Any],
+    season_entry_top_champion: str,
+    season_entry_top_runner_up: str,
+    br_flat: List[Dict[str, Any]],
+    teams_map: Dict[str, Any],
+) -> str:
+    """Postseason line for per-team recap .txt (multiclass-aware; matches archived history labels)."""
+    synthetic: Dict[str, Any] = {
+        "state_champion": season_entry_top_champion,
+        "runner_up": season_entry_top_runner_up,
+        "playoffs": {"bracket_results": list(br_flat or [])},
+    }
+    snap = _playoffs_by_class_snapshot(state)
+    if snap:
+        synthetic["playoffs_by_class"] = snap
+    return _postseason_label_archived(team_n, synthetic, teams_map)
+
+
 def _team_names_by_classification(teams: Dict[str, Any]) -> Dict[str, List[str]]:
     out: Dict[str, List[str]] = {}
     for name in teams:
         c = _classification_of_team(teams, name)
         out.setdefault(c, []).append(name)
+    for k in out:
+        out[k] = sorted(out[k])
+    return out
+
+
+def _region_of_team(teams: Dict[str, Any], name: Optional[str]) -> str:
+    """Region label for a team (e.g. ``"North"``, ``"East"``).
+
+    Empty / missing region is normalized to ``""`` so callers can treat that
+    as "no region info" and skip regional bucketing.  Mirrors the shape of
+    :func:`_classification_of_team`.
+    """
+    if not name or name not in teams:
+        return ""
+    t = teams[name]
+    if isinstance(t, dict):
+        r = t.get("region")
+    else:
+        r = getattr(t, "region", None)
+    return str(r).strip() if r is not None else ""
+
+
+def _team_names_by_region_within_class(
+    teams: Dict[str, Any], classification: str
+) -> Dict[str, List[str]]:
+    """Group team names by region for a single classification.
+
+    Used when seeding regional brackets — each region's pool is sorted
+    independently and the top-N from each region make the playoff field.
+    Teams without a region are bucketed under an empty key so the caller
+    can detect "this class has no region splits" and skip the regional
+    seeding.
+    """
+    out: Dict[str, List[str]] = {}
+    for name in teams:
+        if _classification_of_team(teams, name) != classification:
+            continue
+        out.setdefault(_region_of_team(teams, name), []).append(name)
     for k in out:
         out[k] = sorted(out[k])
     return out
@@ -263,48 +434,87 @@ def _ensure_playoffs_migrated(state: Dict[str, Any], teams: Dict[str, Any]) -> D
 
 
 def _init_playoffs_multiclass(state: Dict[str, Any], teams: Dict[str, Any], standings: Dict[str, Any]) -> Dict[str, Any]:
-    """One 8-team bracket per classification with at least 8 schools."""
-    groups = _team_names_by_classification(teams)
+    """Build the postseason bracket(s) for the active playoff system.
+
+    The bracket size, scope (per-classification vs state-wide), seeding mode
+    (overall vs regional), and minimum team count come from the league's
+    :class:`PlayoffSystemConfig`, so adding a new state system only requires
+    registering it in ``playoff_systems.py``.
+    """
+    cfg = get_state_playoff_system(state)
+    bracket_size = int(cfg.bracket_size)
+    min_teams = int(cfg.min_teams)
+    is_regional = cfg.seeding_mode == "regional"
     by_class: Dict[str, Any] = {}
-    for cls, names in groups.items():
-        if len(names) < 8:
-            continue
-        seeded = seed_teams(names, standings, top_n=8)
-        by_class[cls] = {
-            "num_teams": 8,
+
+    def _overall_bracket_entry(seeded) -> Dict[str, Any]:
+        return {
+            "num_teams": bracket_size,
             "seeds": [{"seed": int(seed), "team": str(name)} for (seed, name) in seeded],
             "bracket_results": [],
             "completed": False,
             "champion": None,
             "runner_up": None,
         }
+
+    def _regional_bracket_entry(seed_dicts: List[Dict[str, Any]]) -> Dict[str, Any]:
+        return {
+            "num_teams": bracket_size,
+            "seeds": list(seed_dicts),
+            "bracket_results": [],
+            "completed": False,
+            "champion": None,
+            "runner_up": None,
+        }
+
+    def _build_regional_seeds_for_pool(pool_class: str) -> Optional[List[Dict[str, Any]]]:
+        """Try to build a regional seed list for one classification; return
+        None if any region lacks enough teams (caller falls back to overall
+        seeding so the bracket still runs)."""
+        regions = _team_names_by_region_within_class(teams, pool_class)
+        # Drop the no-region bucket — those teams are not eligible for a
+        # regional bracket because they have no region to qualify out of.
+        regions = {r: ns for r, ns in regions.items() if r}
+        if len(regions) < cfg.regions_per_class:
+            return None
+        # Pick the top ``regions_per_class`` regions by team count for stable
+        # bracket layout when a class happens to have extra regions defined.
+        chosen = dict(sorted(regions.items())[: cfg.regions_per_class])
+        seeds = seed_teams_regional(chosen, standings, teams_per_region=cfg.teams_per_region)
+        if len(seeds) != bracket_size:
+            return None
+        return seeds
+
+    if cfg.per_classification:
+        groups = _team_names_by_classification(teams)
+        for cls, names in groups.items():
+            if len(names) < min_teams:
+                continue
+            if is_regional:
+                regional_seeds = _build_regional_seeds_for_pool(cls)
+                if regional_seeds is not None:
+                    by_class[cls] = _regional_bracket_entry(regional_seeds)
+                    continue
+                # Regional layout couldn't be built (fewer than 4 regions or
+                # an under-filled region). Fall back to overall seeding for
+                # this class so they still get a bracket.
+            seeded = seed_teams(names, standings, top_n=bracket_size)
+            by_class[cls] = _overall_bracket_entry(seeded)
     ut = state.get("user_team")
     uc = _classification_of_team(teams, ut) if ut else None
-    if uc and uc not in by_class:
+    if cfg.per_classification and uc and uc not in by_class:
         pool = _playoff_pool_team_names(state, teams)
-        if len(pool) >= 8:
-            seeded = seed_teams(pool, standings, top_n=8)
-            by_class[uc] = {
-                "num_teams": 8,
-                "seeds": [{"seed": int(seed), "team": str(name)} for (seed, name) in seeded],
-                "bracket_results": [],
-                "completed": False,
-                "champion": None,
-                "runner_up": None,
-            }
+        if len(pool) >= min_teams:
+            seeded = seed_teams(pool, standings, top_n=bracket_size)
+            by_class[uc] = _overall_bracket_entry(seeded)
     if not by_class:
+        # Either the active system is state-wide (per_classification=False) or
+        # no classification had enough teams; fall back to the full eligible pool.
         pool = _playoff_pool_team_names(state, teams)
-        if len(pool) >= 8:
-            seeded = seed_teams(pool, standings, top_n=8)
+        if len(pool) >= min_teams:
+            seeded = seed_teams(pool, standings, top_n=bracket_size)
             key = uc or "UNK"
-            by_class[key] = {
-                "num_teams": 8,
-                "seeds": [{"seed": int(seed), "team": str(name)} for (seed, name) in seeded],
-                "bracket_results": [],
-                "completed": False,
-                "champion": None,
-                "runner_up": None,
-            }
+            by_class[key] = _overall_bracket_entry(seeded)
             uc = key
     return {
         "by_class": by_class,
@@ -316,38 +526,71 @@ def _init_playoffs_multiclass(state: Dict[str, Any], teams: Dict[str, Any], stan
 def _ensure_all_eligible_playoff_brackets(
     state: Dict[str, Any], teams: Dict[str, Any], standings: Dict[str, Any]
 ) -> None:
-    """Ensure ``playoffs.by_class`` has a bracket for every classification with ≥8 teams.
+    """Ensure ``playoffs.by_class`` has a bracket for every eligible classification.
 
-    Idempotent: does not remove or reset brackets that already have seeds or any played games.
-    Needed because legacy migration and early init only stored the user's class, so other classes
-    never received a ``by_class`` entry even when eligible.
+    Eligibility (bracket size + minimum team count + per-class scope) is read
+    from the active :class:`PlayoffSystemConfig`, so per-classification systems
+    like WV ("≥8 teams in the class") and future variants (different bracket
+    sizes, single state-wide bracket) all flow through the same path.
+
+    Idempotent: does not remove or reset brackets that already have seeds or
+    any played games. Needed because legacy migration and early init only
+    stored the user's class, so other classes never received a ``by_class``
+    entry even when eligible.
     """
+    cfg = get_state_playoff_system(state)
+    bracket_size = int(cfg.bracket_size)
+    min_teams = int(cfg.min_teams)
+    is_regional = cfg.seeding_mode == "regional"
+
     playoffs = state.setdefault("playoffs", {})
     if not isinstance(playoffs, dict):
         state["playoffs"] = {}
         playoffs = state["playoffs"]
-    groups = _team_names_by_classification(teams)
     bc = playoffs.setdefault("by_class", {})
-    for cls, names in groups.items():
-        if len(names) < 8:
-            continue
-        if cls in bc and isinstance(bc[cls], dict):
-            sub = bc[cls]
-            seeds = sub.get("seeds")
-            br = sub.get("bracket_results") or []
-            if isinstance(seeds, list) and len(seeds) >= 1:
+    if cfg.per_classification:
+        groups = _team_names_by_classification(teams)
+        for cls, names in groups.items():
+            if len(names) < min_teams:
                 continue
-            if isinstance(br, list) and len(br) > 0:
+            if cls in bc and isinstance(bc[cls], dict):
+                sub = bc[cls]
+                seeds = sub.get("seeds")
+                br = sub.get("bracket_results") or []
+                if isinstance(seeds, list) and len(seeds) >= 1:
+                    continue
+                if isinstance(br, list) and len(br) > 0:
+                    continue
+            built_regional = False
+            if is_regional:
+                regions = _team_names_by_region_within_class(teams, cls)
+                regions = {r: ns for r, ns in regions.items() if r}
+                if len(regions) >= cfg.regions_per_class:
+                    chosen = dict(sorted(regions.items())[: cfg.regions_per_class])
+                    seed_dicts = seed_teams_regional(
+                        chosen, standings, teams_per_region=cfg.teams_per_region
+                    )
+                    if len(seed_dicts) == bracket_size:
+                        bc[cls] = {
+                            "num_teams": bracket_size,
+                            "seeds": list(seed_dicts),
+                            "bracket_results": [],
+                            "completed": False,
+                            "champion": None,
+                            "runner_up": None,
+                        }
+                        built_regional = True
+            if built_regional:
                 continue
-        seeded = seed_teams(names, standings, top_n=8)
-        bc[cls] = {
-            "num_teams": 8,
-            "seeds": [{"seed": int(seed), "team": str(name)} for (seed, name) in seeded],
-            "bracket_results": [],
-            "completed": False,
-            "champion": None,
-            "runner_up": None,
-        }
+            seeded = seed_teams(names, standings, top_n=bracket_size)
+            bc[cls] = {
+                "num_teams": bracket_size,
+                "seeds": [{"seed": int(seed), "team": str(name)} for (seed, name) in seeded],
+                "bracket_results": [],
+                "completed": False,
+                "champion": None,
+                "runner_up": None,
+            }
     playoffs["by_class"] = bc
     ut = state.get("user_team")
     if ut and not playoffs.get("user_class"):
@@ -375,6 +618,126 @@ def _recap_merged_bracket_results(state: Dict[str, Any], bracket_results: List[D
         if flat:
             return flat
     return [g for g in (bracket_results or []) if isinstance(g, dict)]
+
+
+def _playoffs_by_class_snapshot(state: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Deep copy multiclass playoff brackets for league_history (UI: per-class postseason archive)."""
+    import copy
+
+    po = state.get("playoffs")
+    if not isinstance(po, dict):
+        return None
+    bc = po.get("by_class")
+    if not isinstance(bc, dict) or not bc:
+        return None
+    try:
+        return copy.deepcopy(bc)
+    except Exception:
+        return None
+
+
+def _standings_for_transfer_portal(state: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Transfer portal pressure uses the season that just ended.
+    After ``finish_season``, ``state['standings']`` is reset to 0-0 for the new year — use the snapshot.
+    """
+    snap = state.get("offseason_transfer_snapshot_standings")
+    if isinstance(snap, dict) and snap:
+        return snap
+    raw = state.get("standings")
+    return raw if isinstance(raw, dict) else {}
+
+
+def _clear_offseason_transfer_ui_state(state: Dict[str, Any]) -> None:
+    for k in (
+        "offseason_transfer_stage_1",
+        "offseason_transfer_stage_2",
+        "offseason_transfer_review",
+        "offseason_transfer_stage_1_pending_review",
+        "offseason_transfer_stage_2_pending_review",
+    ):
+        state.pop(k, None)
+
+
+def _transfer_stage_1_apply_news(state: Dict[str, Any], payload: Dict[str, Any]) -> None:
+    transfer_events: List[Dict[str, Any]] = []
+    for i, row in enumerate(payload.get("entries") or []):
+        tpl = TRANSFER_NEWS_TEMPLATES[i % 15]
+        detail = _transfer_render(
+            tpl,
+            {
+                "PLAYER": row.get("player", "Player"),
+                "TEAM": row.get("team", "Team"),
+                "POSITION": row.get("position", "ATH"),
+                "REGION": row.get("region", "State"),
+                "DEST_TEAM": "TBD",
+            },
+        )
+        transfer_events.append(
+            {
+                "type": "transfer_portal",
+                "player": row.get("player"),
+                "team": row.get("team"),
+                "position": row.get("position"),
+                "region": row.get("region"),
+                "detail": detail,
+            }
+        )
+    _append_transfer_news_events(state, transfer_events)
+
+
+def _transfer_stage_2_apply_news_and_review(state: Dict[str, Any], payload: Dict[str, Any]) -> None:
+    state["offseason_transfer_stage_2"] = payload
+    moved_entries = [r for r in list(payload.get("entries") or []) if r.get("to_team")]
+    state["offseason_transfer_review"] = {
+        "entries": moved_entries,
+        "moved_count": len(moved_entries),
+        "blocked_count": int(payload.get("blocked_count", 0) or 0),
+    }
+    transfer_events: List[Dict[str, Any]] = []
+    for i, row in enumerate(payload.get("entries") or []):
+        tpl = TRANSFER_NEWS_TEMPLATES[15 + (i % 15)]
+        detail = _transfer_render(
+            tpl,
+            {
+                "PLAYER": row.get("player", "Player"),
+                "TEAM": row.get("from_team", "Team"),
+                "POSITION": row.get("position", "ATH"),
+                "REGION": row.get("to_region", row.get("from_region", "State")),
+                "DEST_TEAM": row.get("to_team", "Team"),
+            },
+        )
+        transfer_events.append(
+            {
+                "type": "transfer_commit",
+                "player": row.get("player"),
+                "team": row.get("from_team"),
+                "to_team": row.get("to_team"),
+                "position": row.get("position"),
+                "region": row.get("to_region", row.get("from_region")),
+                "detail": detail,
+            }
+        )
+    _append_transfer_news_events(state, transfer_events)
+
+
+def _transfer_playoff_snapshot(state: Dict[str, Any]) -> Tuple[str, List[Dict[str, Any]]]:
+    """Champion + bracket games from the last resolved playoffs (for goal / tier evaluation in transfers)."""
+    p = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else {}
+    br = list(p.get("bracket_results") or [])
+    if not br:
+        br = _flatten_playoff_bracket_results(p)
+    ch = str(p.get("champion") or "")
+    if not ch:
+        bc = p.get("by_class")
+        if isinstance(bc, dict):
+            for sub in bc.values():
+                if isinstance(sub, dict) and sub.get("champion"):
+                    ch = str(sub.get("champion") or "")
+                    if not br:
+                        br = list(sub.get("bracket_results") or [])
+                    break
+    return ch, br
 
 
 _LOGO_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp")
@@ -528,6 +891,7 @@ OFFSEASON_UI_STAGES: List[str] = [
     "Coaching carousel I",
     "Coaching carousel II",
     "Coaching carousel III",
+    "Coaching carousel IV",
     "Schedule Release",
 ]
 
@@ -540,6 +904,8 @@ def _normalize_offseason_stage_name(raw: Any) -> str:
     compact = "".join(ch for ch in lowered if ch.isalnum())
     if compact in ("coachdevelopment", "coachingdevelopment"):
         return "Coach development"
+    if compact in ("coachingcarouseliv", "coachingcarousel4"):
+        return "Coaching carousel IV"
     if compact in ("transfers", "transfer"):
         return "Transfers I"
     if compact in ("transfersi", "transferi", "transferstage1"):
@@ -548,6 +914,12 @@ def _normalize_offseason_stage_name(raw: Any) -> str:
         return "Transfers II"
     if compact in ("transfersiii", "transferiii", "transferstage3", "transferreview"):
         return "Transfers III"
+    if compact in ("coachingcarouseli", "coachingcarousel1"):
+        return "Coaching carousel I"
+    if compact in ("coachingcarouselii", "coachingcarousel2"):
+        return "Coaching carousel II"
+    if compact in ("coachingcarouseliii", "coachingcarousel3"):
+        return "Coaching carousel III"
     return s
 
 
@@ -563,6 +935,18 @@ def _winter_allocations_from_legacy_strength_pct(strength_pct: int) -> Dict[str,
         "football_iq": 0,
     }
     return normalize_winter_training_allocations(alloc)
+
+
+def _clamp_program_grade(raw: Any, fallback: int) -> int:
+    """1–10 inclusive; survives bad client/API input without raising."""
+    try:
+        n = int(raw) if raw is not None else int(fallback)
+    except (TypeError, ValueError):
+        try:
+            n = int(fallback)
+        except (TypeError, ValueError):
+            n = 5
+    return max(1, min(10, n))
 
 
 def _improvement_pp_delta(from_level: int, to_level: int) -> int:
@@ -595,9 +979,11 @@ def _postseason_tier_for_team(team_name: str, standings: Dict[str, Any], bracket
         isinstance(g, dict) and (g.get("home") == team_name or g.get("away") == team_name)
         for g in (bracket_results or [])
     )
-    # Determine furthest round reached from bracket results
+    # Determine furthest round reached from bracket results.
     best = 0
-    order = {"Quarterfinal": 1, "Semifinal": 2, "Championship": 3}
+    order = PLAYOFF_ROUND_PRIORITY
+    champ_v = order.get("Championship", 0)
+    semi_v = order.get("Semifinal", 0)
     for g in bracket_results or []:
         if not isinstance(g, dict):
             continue
@@ -605,9 +991,9 @@ def _postseason_tier_for_team(team_name: str, standings: Dict[str, Any], bracket
             continue
         rnd = str(g.get("round") or "")
         best = max(best, int(order.get(rnd, 0)))
-    if best >= 3:
+    if best >= champ_v:
         return "championship"
-    if best >= 2:
+    if best >= semi_v:
         return "semifinal"
     if made_playoffs:
         return "playoffs"
@@ -624,20 +1010,20 @@ def _season_pp_awards_for_team(
     """
     Award points earned during the season that can be spent on Improvements.
 
-    Rules (as requested):
-    - win: +0.5
-    - loss: -0.5
-    - postseason bonus (max tier):
-      playoffs: +1, semifinal: +2, championship: +4, champion: +6
-    - fail to make a goal: -2 (evaluated for win goal and stage goal independently)
+    Tuned for slower PP swings (harder to bank big years, gentler penalties on average years):
+    - win: +0.33, loss: -0.33 (was ±0.5)
+    - postseason (max tier): playoffs +1, semifinal +2, championship appearance +3, champion +5
+      (was 1 / 2 / 4 / 6)
+    - missed goal component: -1 each (was -2) for missed win-target and missed stage-target
     """
+    record_pp_per_side = 0.33  # soften W/L swings vs ±0.5 previously
     srow = (standings or {}).get(team_name) or {}
     wins = int(srow.get("wins", 0) or 0)
     losses = int(srow.get("losses", 0) or 0)
-    wl_points = 0.5 * wins - 0.5 * losses
+    wl_points = record_pp_per_side * wins - record_pp_per_side * losses
 
     tier = _postseason_tier_for_team(team_name, standings, bracket_results, champion)
-    tier_points_map = {"none": 0, "playoffs": 1, "semifinal": 2, "championship": 4, "champion": 6}
+    tier_points_map = {"none": 0, "playoffs": 1, "semifinal": 2, "championship": 3, "champion": 5}
     postseason_points = float(tier_points_map.get(tier, 0))
 
     # Goals
@@ -675,7 +1061,8 @@ def _season_pp_awards_for_team(
         elif achieved_rank < goal_rank:
             goal_fail += 1
 
-    goal_points = -2.0 * float(goal_fail)
+    goal_penalty_pp = -1.0  # softer than -2 when goals are missed
+    goal_points = goal_penalty_pp * float(goal_fail)
     total = wl_points + postseason_points + goal_points
     # Store PP as integer (allow halves by rounding to nearest int, with .5 up)
     pp_total = int(round(total))
@@ -692,6 +1079,47 @@ def _season_pp_awards_for_team(
         "total_raw": total,
         "pp_total": pp_total,
     }
+
+
+def _ensure_user_coach_and_firing_defaults(state: Dict[str, Any]) -> None:
+    """Backfill user_coach_name / allow_user_coach_firing for older league_save.json files."""
+    if "allow_user_coach_firing" not in state:
+        state["allow_user_coach_firing"] = True
+    else:
+        state["allow_user_coach_firing"] = bool(state.get("allow_user_coach_firing"))
+    ucn = state.get("user_coach_name")
+    if isinstance(ucn, str) and ucn.strip():
+        state["user_coach_name"] = ucn.strip()
+        return
+    ut = state.get("user_team")
+    for t in state.get("teams") or []:
+        if isinstance(t, dict) and t.get("name") == ut:
+            c = t.get("coach")
+            if isinstance(c, dict):
+                nm = str(c.get("name") or "").strip()
+                if nm:
+                    state["user_coach_name"] = nm
+            break
+
+
+def _carousel_opts_from_state(state: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+    allow_fire = bool(state.get("allow_user_coach_firing", True))
+    raw = state.get("user_coach_name")
+    ucn = str(raw).strip() if isinstance(raw, str) else None
+    return allow_fire, ucn if ucn else None
+
+
+def _sync_user_team_with_saved_coach(state: Dict[str, Any], teams: Dict[str, Team]) -> None:
+    """Point user_team at the school employing the saved user coach (after carousel moves)."""
+    raw = state.get("user_coach_name")
+    if not (isinstance(raw, str) and raw.strip()):
+        return
+    key = raw.strip().lower()
+    for name, tm in teams.items():
+        coach = getattr(tm, "coach", None)
+        if coach and str(coach.name or "").strip().lower() == key:
+            state["user_team"] = name
+            return
 
 
 def normalize_offseason_stages(state: Dict[str, Any]) -> bool:
@@ -813,6 +1241,10 @@ def _finalize_offseason_to_preseason(state: Dict[str, Any], teams: Dict[str, Any
     state.pop("offseason_coach_carousel", None)
     state.pop("offseason_coach_carousel_last_events", None)
     state.pop("offseason_coach_carousel_hot_seat", None)
+    state.pop("offseason_coaching_changes_summary", None)
+    state.pop("offseason_carousel_job_applications", None)
+    state.pop("offseason_transfer_snapshot_standings", None)
+    _clear_offseason_transfer_ui_state(state)
 
 
 def _empty_coach_dev_bank() -> Dict[str, Any]:
@@ -840,23 +1272,81 @@ def _merge_user_coach_development_body(bank: Dict[str, Any], body: Optional[Dict
     return out
 
 
-def _apply_coaching_carousel_stage(
+def _merge_carousel_job_applications(state: Dict[str, Any], body: Optional[Dict[str, Any]]) -> None:
+    """Persist user's ranked HC job preferences from the offseason advance POST body."""
+    if not isinstance(body, dict):
+        return
+    if "carousel_job_applications" not in body:
+        return
+    raw = body.get("carousel_job_applications")
+    team_names = {str(t.get("name")) for t in (state.get("teams") or []) if isinstance(t, dict) and t.get("name")}
+    out: List[str] = []
+    if isinstance(raw, list):
+        for x in raw:
+            s = str(x).strip() if x is not None else ""
+            if s and s in team_names and s not in out:
+                out.append(s)
+                if len(out) >= 12:
+                    break
+    state["offseason_carousel_job_applications"] = out
+
+
+def _apply_coaching_carousel_churn(
     state: Dict[str, Any],
     teams: Dict[str, Any],
     league_history: Dict[str, Any],
-    step_name: str,
 ) -> None:
-    """Run one coaching carousel step; mutates teams and state. Clears carousel blob after step III."""
+    """Engine step 1: retire/resign/fire only; establishes carousel persist for UI round I."""
     from systems.coach_carousel import run_coach_carousel_step
 
     sg = state.get("season_goals") if isinstance(state.get("season_goals"), dict) else None
     ut = state.get("user_team")
     carousel_year = max(1, int(state.get("current_year", 1)))
-    step_map = {"Coaching carousel I": 1, "Coaching carousel II": 2, "Coaching carousel III": 3}
+    state.pop("offseason_carousel_job_applications", None)
+    state.pop("offseason_coaching_changes_summary", None)
+    allow_fire, user_coach_key = _carousel_opts_from_state(state)
+    persist, events, _cc, hs = run_coach_carousel_step(
+        teams,
+        league_history,
+        state.get("standings"),
+        1,
+        None,
+        ut,
+        sg,
+        carousel_year,
+        None,
+        allow_user_coach_firing=allow_fire,
+        user_coach_name=user_coach_key,
+    )
+    _sync_user_team_with_saved_coach(state, teams)
+    state["offseason_coach_carousel"] = persist
+    state["offseason_coach_carousel_last_events"] = (events or [])[-40:]
+    state["offseason_coach_carousel_hot_seat"] = hs or {}
+
+
+def _apply_coaching_carousel_stage(
+    state: Dict[str, Any],
+    teams: Dict[str, Any],
+    league_history: Dict[str, Any],
+    step_name: str,
+    body: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Run carousel hiring rounds (engine steps 2–4); step III UI runs final engine step with schemes + prestige."""
+    from systems.coach_carousel import build_carousel_season_archive, run_coach_carousel_step
+
+    _merge_carousel_job_applications(state, body)
+
+    sg = state.get("season_goals") if isinstance(state.get("season_goals"), dict) else None
+    ut = state.get("user_team")
+    carousel_year = max(1, int(state.get("current_year", 1)))
+    job_apps = list(state.get("offseason_carousel_job_applications") or [])
+    step_map = {"Coaching carousel I": 2, "Coaching carousel II": 3, "Coaching carousel III": 4}
     step = step_map[step_name]
-    persist_in = None if step == 1 else state.get("offseason_coach_carousel")
-    if step > 1 and persist_in is None:
+    persist_in = state.get("offseason_coach_carousel")
+    if persist_in is None:
         raise ValueError("Coaching carousel state is missing; reload your save or continue from Improvements.")
+
+    allow_fire, user_coach_key = _carousel_opts_from_state(state)
     persist, events, cc, hs = run_coach_carousel_step(
         teams,
         league_history,
@@ -866,16 +1356,29 @@ def _apply_coaching_carousel_stage(
         ut,
         sg,
         carousel_year,
+        job_apps,
+        allow_user_coach_firing=allow_fire,
+        user_coach_name=user_coach_key,
     )
+    _sync_user_team_with_saved_coach(state, teams)
     state["offseason_coach_carousel"] = persist
     state["offseason_coach_carousel_last_events"] = (events or [])[-40:]
     state["offseason_coach_carousel_hot_seat"] = hs or {}
-    if step == 3:
-        update_prestige(teams, league_history, coach_changes=cc)
+    if step == 4:
+        update_prestige(teams, league_history, coach_changes=cc, coach_turnover_only=True)
         season_year = max(1, int(state.get("current_year", 1)) - 1)
         ch = list(state.get("coaching_history") or [])
-        ch.append({"year": season_year, "events": list(events or []), "hot_seat_by_team": dict(hs or {})})
+        archive = build_carousel_season_archive(season_year, list(events or []), dict(hs or {}))
+        ch.append(
+            {
+                "year": season_year,
+                "events": list(events or []),
+                "hot_seat_by_team": dict(hs or {}),
+                "carousel_summary": archive,
+            }
+        )
         state["coaching_history"] = ch[-100:]
+        state["offseason_coaching_changes_summary"] = archive
         state.pop("offseason_coach_carousel", None)
 
 
@@ -1068,12 +1571,12 @@ def advance_offseason(
             fac_to = body.get("improve_facilities_grade")
             cul_to = body.get("improve_culture_grade")
             boo_to = body.get("improve_booster_support")
-            fac_from = int(getattr(ut, "facilities_grade", 5) or 5)
-            cul_from = int(getattr(ut, "culture_grade", 5) or 5)
-            boo_from = int(getattr(ut, "booster_support", 5) or 5)
-            fac_to_i = fac_from if fac_to is None else max(1, min(10, int(fac_to)))
-            cul_to_i = cul_from if cul_to is None else max(1, min(10, int(cul_to)))
-            boo_to_i = boo_from if boo_to is None else max(1, min(10, int(boo_to)))
+            fac_from = _clamp_program_grade(getattr(ut, "facilities_grade", None), 5)
+            cul_from = _clamp_program_grade(getattr(ut, "culture_grade", None), 5)
+            boo_from = _clamp_program_grade(getattr(ut, "booster_support", None), 5)
+            fac_to_i = fac_from if fac_to is None else _clamp_program_grade(fac_to, fac_from)
+            cul_to_i = cul_from if cul_to is None else _clamp_program_grade(cul_to, cul_from)
+            boo_to_i = boo_from if boo_to is None else _clamp_program_grade(boo_to, boo_from)
 
             delta_pp = 0
             delta_pp += _improvement_pp_delta(fac_from, fac_to_i)
@@ -1081,12 +1584,31 @@ def advance_offseason(
             delta_pp += _improvement_pp_delta(boo_from, boo_to_i)
 
             new_remaining = pp_remaining + int(delta_pp)
+            # Bulk sim builds the body from a prior load_state snapshot; grades or pp_remaining can
+            # change before advance_offseason reloads. Re-enforce against live from-levels and bank.
+            if new_remaining < 0 and body.get("_bulk_cpu_pp_clamp"):
+                fac_to_i, cul_to_i, boo_to_i = _bulk_enforce_improvement_pp_budget(
+                    fac_from,
+                    cul_from,
+                    boo_from,
+                    fac_to_i,
+                    cul_to_i,
+                    boo_to_i,
+                    pp_remaining,
+                )
+                delta_pp = (
+                    _improvement_pp_delta(fac_from, fac_to_i)
+                    + _improvement_pp_delta(cul_from, cul_to_i)
+                    + _improvement_pp_delta(boo_from, boo_to_i)
+                )
+                new_remaining = pp_remaining + int(delta_pp)
             if new_remaining < 0:
                 raise ValueError("Not enough PP for those improvements.")
 
             ut.facilities_grade = fac_to_i
             ut.culture_grade = cul_to_i
             ut.booster_support = boo_to_i
+            ut._clamp_values()
 
             bank["pp_remaining"] = new_remaining
             bank["applied"] = {
@@ -1125,75 +1647,70 @@ def advance_offseason(
 
     elif current in ("Coaching carousel I", "Coaching carousel II", "Coaching carousel III"):
         lh = load_league_history(league_history_path(save_dir))
-        _apply_coaching_carousel_stage(state, teams, lh, current)
+        _apply_coaching_carousel_stage(state, teams, lh, current, body)
+
+    elif current == "Coaching carousel IV":
+        pass
 
     elif current == "Transfers I":
-        payload = run_transfer_stage_1(teams, state.get("standings") or {}, current_year=max(1, int(state.get("current_year", 1))))
-        state["offseason_transfer_stage_1"] = payload
-        transfer_events: List[Dict[str, Any]] = []
-        for i, row in enumerate(payload.get("entries") or []):
-            tpl = TRANSFER_NEWS_TEMPLATES[i % 15]
-            detail = _transfer_render(
-                tpl,
-                {
-                    "PLAYER": row.get("player", "Player"),
-                    "TEAM": row.get("team", "Team"),
-                    "POSITION": row.get("position", "ATH"),
-                    "REGION": row.get("region", "State"),
-                    "DEST_TEAM": "TBD",
-                },
+        pending = bool(state.get("offseason_transfer_stage_1_pending_review"))
+        ack = bool(body.get("transfer_stage_1_ack_results"))
+        st_xfer = _standings_for_transfer_portal(state)
+        stage1_existing = state.get("offseason_transfer_stage_1") if isinstance(state.get("offseason_transfer_stage_1"), dict) else None
+
+        if pending:
+            if not ack:
+                raise ValueError("Review the transfer portal entrants, then press Continue again to lock and advance.")
+            state.pop("offseason_transfer_stage_1_pending_review", None)
+        elif isinstance(stage1_existing, dict) and stage1_existing.get("entries") is not None:
+            pass
+        else:
+            tph, tbr = _transfer_playoff_snapshot(state)
+            sg_tr = state.get("season_goals") if isinstance(state.get("season_goals"), dict) else None
+            payload = run_transfer_stage_1(
+                teams,
+                st_xfer,
+                current_year=max(1, int(state.get("current_year", 1))),
+                season_goals=sg_tr,
+                user_team=str(state.get("user_team") or "") or None,
+                bracket_results=tbr,
+                champion=tph,
             )
-            transfer_events.append(
-                {
-                    "type": "transfer_portal",
-                    "player": row.get("player"),
-                    "team": row.get("team"),
-                    "position": row.get("position"),
-                    "region": row.get("region"),
-                    "detail": detail,
-                }
-            )
-        _append_transfer_news_events(state, transfer_events)
+            state["offseason_transfer_stage_1"] = payload
+            _transfer_stage_1_apply_news(state, payload)
+            state["offseason_transfer_stage_1_pending_review"] = True
+            state["offseason_stage_index"] = idx
+            state["teams"] = [team_to_dict(t) for t in teams.values()]
+            save_state(user_id, save_id, state, save_dir)
+            return {"state": state}
     elif current == "Transfers II":
-        stage1 = state.get("offseason_transfer_stage_1") if isinstance(state.get("offseason_transfer_stage_1"), dict) else {}
-        payload = run_transfer_stage_2(
-            teams,
-            state.get("standings") or {},
-            stage1,
-            current_year=max(1, int(state.get("current_year", 1))),
-        )
-        state["offseason_transfer_stage_2"] = payload
-        moved_entries = [r for r in list(payload.get("entries") or []) if r.get("to_team")]
-        state["offseason_transfer_review"] = {
-            "entries": moved_entries,
-            "moved_count": len(moved_entries),
-            "blocked_count": int(payload.get("blocked_count", 0) or 0),
-        }
-        transfer_events = []
-        for i, row in enumerate(payload.get("entries") or []):
-            tpl = TRANSFER_NEWS_TEMPLATES[15 + (i % 15)]
-            detail = _transfer_render(
-                tpl,
-                {
-                    "PLAYER": row.get("player", "Player"),
-                    "TEAM": row.get("from_team", "Team"),
-                    "POSITION": row.get("position", "ATH"),
-                    "REGION": row.get("to_region", row.get("from_region", "State")),
-                    "DEST_TEAM": row.get("to_team", "Team"),
-                },
+        pending = bool(state.get("offseason_transfer_stage_2_pending_review"))
+        ack = bool(body.get("transfer_stage_2_ack_results"))
+        st_xfer = _standings_for_transfer_portal(state)
+        stage2_existing = state.get("offseason_transfer_stage_2") if isinstance(state.get("offseason_transfer_stage_2"), dict) else None
+
+        if pending:
+            if not ack:
+                raise ValueError("Review transfer commitments, then press Continue again to advance.")
+            state.pop("offseason_transfer_stage_2_pending_review", None)
+        elif isinstance(stage2_existing, dict) and (
+            stage2_existing.get("entries") is not None or stage2_existing.get("moved_count") is not None
+        ):
+            pass
+        else:
+            stage1 = state.get("offseason_transfer_stage_1") if isinstance(state.get("offseason_transfer_stage_1"), dict) else {}
+            payload = run_transfer_stage_2(
+                teams,
+                st_xfer,
+                stage1,
+                current_year=max(1, int(state.get("current_year", 1))),
             )
-            transfer_events.append(
-                {
-                    "type": "transfer_commit",
-                    "player": row.get("player"),
-                    "team": row.get("from_team"),
-                    "to_team": row.get("to_team"),
-                    "position": row.get("position"),
-                    "region": row.get("to_region", row.get("from_region")),
-                    "detail": detail,
-                }
-            )
-        _append_transfer_news_events(state, transfer_events)
+            _transfer_stage_2_apply_news_and_review(state, payload)
+            state["offseason_transfer_stage_2_pending_review"] = True
+            state["offseason_stage_index"] = idx
+            state["teams"] = [team_to_dict(t) for t in teams.values()]
+            save_state(user_id, save_id, state, save_dir)
+            return {"state": state}
     elif current in ("Transfers III", "7 on 7", "Graduation"):
         pass
 
@@ -1234,14 +1751,12 @@ def advance_offseason(
     elif current == "Schedule Release":
         pass
 
-    # QoL: advancing from Improvements also executes Coaching carousel I immediately,
-    # so users do not need an extra click just to start the carousel.
+    # Carousel churn (retire/fire) runs when leaving Improvements, then Coaching carousel I is first interactive round.
     if current == "Improvements":
         lh = load_league_history(league_history_path(save_dir))
-        _apply_coaching_carousel_stage(state, teams, lh, "Coaching carousel I")
-        state["offseason_stage_index"] = idx + 2
-    else:
-        state["offseason_stage_index"] = idx + 1
+        _apply_coaching_carousel_churn(state, teams, lh)
+
+    state["offseason_stage_index"] = idx + 1
     if current == "Spring Ball":
         state.pop("offseason_spring_ball_results", None)
     if current in ("Winter 1", "Winter 2"):
@@ -1524,6 +2039,7 @@ def create_save(
     *,
     start_year: Optional[int] = None,
     teams_data: Optional[Dict[str, Any]] = None,
+    allow_user_coach_firing: bool = True,
 ) -> Dict[str, Any]:
     provided_rows = None
     if isinstance(teams_data, dict):
@@ -1532,8 +2048,15 @@ def create_save(
             provided_rows = [r for r in maybe_rows if isinstance(r, dict)]
     if provided_rows is not None:
         teams = build_teams_from_configs(provided_rows, generate_roster=True, two_way_chance=0.55, assign_coaches=True)
+        # Pull the playoff system from the caller-provided league config so an
+        # in-app league editor can pick a non-default system. Falls back to WV.
+        playoff_system_id = playoff_system_id_from_config(teams_data)
     else:
         teams = build_teams_from_json(generate_roster=True, two_way_chance=0.55, assign_coaches=True)
+        # Read the league JSON header (currently data/teams.json) for its
+        # ``playoff_system`` field so the save records which postseason
+        # structure it should use. Falls back to the default if missing.
+        playoff_system_id = playoff_system_id_from_config(load_league_config_from_json())
     if user_team not in teams:
         raise ValueError("user_team not found")
 
@@ -1561,6 +2084,9 @@ def create_save(
     weeks, week_results = _regular_season_week_boards(teams, stub_state)
     standings = {name: {"wins": 0, "losses": 0, "points_for": 0, "points_against": 0} for name in team_names}
 
+    uc = teams[user_team].coach
+    user_coach_name = str(uc.name).strip() if uc and getattr(uc, "name", None) else None
+
     save_dir = _user_save_dir(user_id, save_name)
     try:
         makedirs_with_path_fallback(os.path.abspath(os.path.normpath(save_dir)))
@@ -1577,6 +2103,8 @@ def create_save(
         teams,
         current_year,
         user_team=user_team,
+        user_coach_name=user_coach_name,
+        allow_user_coach_firing=bool(allow_user_coach_firing),
         current_week=1,
         season_phase="regular",
         weeks=weeks,
@@ -1609,6 +2137,11 @@ def create_save(
     state["preseason_stages"] = list(PRESEASON_STAGES)
     state["preseason_stage_index"] = 0
     state["season_goals"] = state.get("season_goals") or []
+    # Stamp the chosen postseason structure on the save state so the rest of
+    # the app can branch on it without re-reading the league JSON. Persists
+    # for the life of this save (immutable across the dynasty for now).
+    state["playoff_system"] = playoff_system_id
+    ensure_playoff_system_in_state(state)
     save_state(user_id, save_id, state, _save_dir)
 
     return {"save_id": save_id}
@@ -1683,6 +2216,40 @@ def _ensure_scrimmage_opponents(state: Dict[str, Any], team_names: List[str], us
     return True
 
 
+def apply_team_program_totals_to_serialized_team_rows(
+    seasons: List[Dict[str, Any]],
+    teams_rows: Optional[List[Any]] = None,
+    *,
+    state: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Write program totals from season entries onto serialized team dicts (mutates in place)."""
+    rows = teams_rows
+    if rows is None and state is not None:
+        rows = state.get("teams")
+    if not isinstance(rows, list):
+        return
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        nm = row.get("name")
+        if not nm:
+            continue
+        persisted_reg = int(row.get("regional_championships", 0) or 0)
+        bundle = build_team_program_totals_display(nm, seasons, persisted_reg)
+        row["program_wins"] = bundle["program_wins"]
+        row["program_losses"] = bundle["program_losses"]
+        row["playoff_appearances"] = bundle["playoff_appearances"]
+        row["championships"] = bundle["state_championships"]
+        row["regional_championships"] = bundle["regional_championships"]
+
+
+def apply_team_program_totals_from_history_to_state(save_dir: str, state: Dict[str, Any]) -> None:
+    """Align program totals on each serialized team dict with league_history.json on disk."""
+    hist = load_league_history(league_history_path(save_dir))
+    seasons = hist.get("seasons") or []
+    apply_team_program_totals_to_serialized_team_rows(seasons, state=state)
+
+
 def get_save(user_id: str, save_id: str) -> Dict[str, Any]:
     with db() as conn:
         row = conn.execute(
@@ -1725,6 +2292,9 @@ def get_save(user_id: str, save_id: str) -> Dict[str, Any]:
         if _ensure_scrimmage_opponents(state, team_names, user_team_name):
             save_state(user_id, save_id, state, save_dir)
 
+    # Align program wins/losses, titles, playoff counts on each team with league_history.json (fixes stale file rows).
+    apply_team_program_totals_from_history_to_state(save_dir, state)
+
     return {"save_id": row["id"], "save_name": row["save_name"], "state": state}
 
 
@@ -1739,6 +2309,55 @@ def _get_save_row(user_id: str, save_id: str) -> Dict[str, Any]:
     return {"save_id": row["id"], "save_name": row["save_name"], "save_dir": row["save_dir"]}
 
 
+def _backfill_last_completed_standings(state: Dict[str, Any], save_dir: str) -> None:
+    """Populate ``state['last_completed_standings']`` for old saves missing the snapshot.
+
+    Pulls the most recent archived season from league_history.json so the UI can show
+    last season's record across non-regular phases instead of the freshly-reset 0-0
+    standings. No-op when the snapshot is already present or no archives exist.
+    """
+    if isinstance(state.get("last_completed_standings"), dict) and state["last_completed_standings"]:
+        return
+    try:
+        hist = load_league_history(league_history_path(save_dir))
+    except Exception:
+        return
+    seasons = hist.get("seasons") or []
+    if not isinstance(seasons, list) or not seasons:
+        return
+    latest = max(
+        (s for s in seasons if isinstance(s, dict)),
+        key=lambda s: int(s.get("year") or s.get("season") or 0),
+        default=None,
+    )
+    if not isinstance(latest, dict):
+        return
+    standings_list = latest.get("standings") or []
+    if not isinstance(standings_list, list) or not standings_list:
+        return
+    snap: Dict[str, Dict[str, int]] = {}
+    for r in standings_list:
+        if not isinstance(r, dict):
+            continue
+        team = str(r.get("team") or "").strip()
+        if not team:
+            continue
+        snap[team] = {
+            "wins": int(r.get("wins", 0) or 0),
+            "losses": int(r.get("losses", 0) or 0),
+            "points_for": int(r.get("points_for", 0) or 0),
+            "points_against": int(r.get("points_against", 0) or 0),
+        }
+    if snap:
+        state["last_completed_standings"] = snap
+        year_val = latest.get("year")
+        if year_val is not None:
+            try:
+                state["last_completed_year"] = int(year_val)
+            except (TypeError, ValueError):
+                pass
+
+
 def load_state(user_id: str, save_id: str) -> Tuple[Dict[str, Any], str]:
     row = _get_save_row(user_id, save_id)
     import json
@@ -1749,10 +2368,16 @@ def load_state(user_id: str, save_id: str) -> Tuple[Dict[str, Any], str]:
 
     with open_text_with_path_fallback(_league_save_plain_path(save_dir), "r") as f:
         state = json.load(f)
+    _ensure_user_coach_and_firing_defaults(state)
     normalize_offseason_stages(state)
     ensure_league_structure_in_state(state)
+    # Migration: legacy saves predate the playoff_system field. Stamp the
+    # default (WV) so callers can always read a valid id from state.
+    ensure_playoff_system_in_state(state)
 
     _migrate_save_dir_if_changed(user_id, save_id, save_dir, stored_dir)
+    apply_team_program_totals_from_history_to_state(save_dir, state)
+    _backfill_last_completed_standings(state, save_dir)
     return state, save_dir
 
 
@@ -2192,30 +2817,6 @@ def get_team_history(user_id: str, save_id: str, team_name: str) -> Dict[str, An
     hist = load_league_history(league_history_path(save_dir))
     seasons = hist.get("seasons") or []
 
-    def postseason_label(team_n: str, season_entry: Dict[str, Any]) -> str:
-        if team_n == season_entry.get("state_champion"):
-            return "State Champion"
-        if team_n == season_entry.get("runner_up"):
-            return "Runner-up"
-        playoffs = season_entry.get("playoffs") if isinstance(season_entry.get("playoffs"), dict) else {}
-        br = playoffs.get("bracket_results") or []
-        order = {"Quarterfinal": 1, "Semifinal": 2, "Championship": 3}
-        best = None
-        for g in br or []:
-            if not isinstance(g, dict):
-                continue
-            if g.get("home") != team_n and g.get("away") != team_n:
-                continue
-            rnd = str(g.get("round") or "")
-            v = order.get(rnd)
-            if v and (best is None or v > best):
-                best = v
-        if best == 2:
-            return "Semifinalist"
-        if best == 1:
-            return "Quarterfinalist"
-        return "—"
-
     rows: List[Dict[str, Any]] = []
     for s in seasons:
         if not isinstance(s, dict):
@@ -2237,13 +2838,22 @@ def get_team_history(user_id: str, save_id: str, team_name: str) -> Dict[str, An
             "year": year,
             "wins": int(st_row.get("wins", 0) or 0),
             "losses": int(st_row.get("losses", 0) or 0),
-            "postseason": postseason_label(team, s),
+            "postseason": _postseason_label_archived(team, s, teams),
             "coach": coach or "—",
             "has_recap": bool(recap_path),
         })
 
     rows.sort(key=lambda r: int(r.get("year", 0) or 0), reverse=True)
-    return {"team_name": team, "team_names": names, "history": rows}
+    persisted_regional = next(
+        (
+            int(r.get("regional_championships", 0) or 0)
+            for r in (state.get("teams") or [])
+            if isinstance(r, dict) and r.get("name") == team
+        ),
+        0,
+    )
+    totals = build_team_program_totals_display(team, seasons, persisted_regional)
+    return {"team_name": team, "team_names": names, "history": rows, "totals": totals}
 
 
 def get_coach_history(user_id: str, save_id: str, coach_name: str) -> Dict[str, Any]:
@@ -2257,30 +2867,6 @@ def get_coach_history(user_id: str, save_id: str, coach_name: str) -> Dict[str, 
 
     hist = load_league_history(league_history_path(save_dir))
     seasons = hist.get("seasons") or []
-
-    def postseason_label(team_n: str, season_entry: Dict[str, Any]) -> str:
-        if team_n == season_entry.get("state_champion"):
-            return "State Champion"
-        if team_n == season_entry.get("runner_up"):
-            return "Runner-up"
-        playoffs = season_entry.get("playoffs") if isinstance(season_entry.get("playoffs"), dict) else {}
-        br = playoffs.get("bracket_results") or []
-        order = {"Quarterfinal": 1, "Semifinal": 2, "Championship": 3}
-        best = None
-        for g in br or []:
-            if not isinstance(g, dict):
-                continue
-            if g.get("home") != team_n and g.get("away") != team_n:
-                continue
-            rnd = str(g.get("round") or "")
-            v = order.get(rnd)
-            if v and (best is None or v > best):
-                best = v
-        if best == 2:
-            return "Semifinalist"
-        if best == 1:
-            return "Quarterfinalist"
-        return "—"
 
     rows: List[Dict[str, Any]] = []
     for s in seasons:
@@ -2306,7 +2892,7 @@ def get_coach_history(user_id: str, save_id: str, coach_name: str) -> Dict[str, 
                 "team": team_n,
                 "wins": int(st_row.get("wins", 0) or 0),
                 "losses": int(st_row.get("losses", 0) or 0),
-                "postseason": postseason_label(team_n, s),
+                "postseason": _postseason_label_archived(team_n, s, teams),
                 "coach": c.strip() or "—",
                 "has_recap": bool(recap_path),
             })
@@ -2671,36 +3257,28 @@ def sim_playoffs_state(state: Dict[str, Any]) -> Dict[str, Any]:
     ):
         raise ValueError("Playoffs already in progress.")
     season_player_stats: Dict[int, Any] = dict(state.get("playoff_season_player_stats") or {})
-    output_lines: List[str] = []
     by_class = playoffs.setdefault("by_class", {})
     uc = playoffs.get("user_class")
     user_champ = ""
+    cfg = get_state_playoff_system(state)
+    default_bracket_size = int(cfg.bracket_size)
+    default_min_teams = int(cfg.min_teams)
     for cls, pdata in list(by_class.items()):
         if not isinstance(pdata, dict):
             continue
+        bracket_size = int(pdata.get("num_teams") or default_bracket_size)
+        min_teams = max(default_min_teams, bracket_size)
         names_in_class = _team_names_by_classification(teams).get(cls) or []
-        if len(names_in_class) < 8:
+        if len(names_in_class) < min_teams:
             continue
-        pool = names_in_class
-        champion, bracket_results = run_playoff(teams, standings, pool, output_lines, season_player_stats, num_teams=8)
-        runner_up = ""
-        if bracket_results:
-            champ_game = bracket_results[-1]
-            runner_up = champ_game["away"] if champ_game["winner"] == champ_game["home"] else champ_game["home"]
-        seeded = seed_teams(pool, standings, top_n=8)
-        pdata.update(
-            {
-                "num_teams": 8,
-                "seeds": [{"seed": int(seed), "team": str(name)} for (seed, name) in seeded],
-                "bracket_results": bracket_results,
-                "completed": True,
-                "champion": champion,
-                "runner_up": runner_up,
-            }
-        )
+        # Seeds were populated by _init_playoffs_multiclass /
+        # _ensure_all_eligible_playoff_brackets above (regional or standard).
+        # The dispatcher reads them and runs the matching round-runner until
+        # the bracket is fully decided.
+        _simulate_full_bracket_to_completion(pdata, teams, standings, season_player_stats)
         by_class[cls] = pdata
         if cls == uc:
-            user_champ = champion or ""
+            user_champ = pdata.get("champion") or ""
     playoffs["by_class"] = by_class
     playoffs["completed"] = _playoffs_global_completed(playoffs)
     playoffs["champion"] = user_champ or next((by_class[c].get("champion") for c in by_class if by_class[c].get("champion")), None)
@@ -2943,22 +3521,39 @@ def advance_offseason_state(
             fac_to = body.get("improve_facilities_grade")
             cul_to = body.get("improve_culture_grade")
             boo_to = body.get("improve_booster_support")
-            fac_from = int(getattr(ut, "facilities_grade", 5) or 5)
-            cul_from = int(getattr(ut, "culture_grade", 5) or 5)
-            boo_from = int(getattr(ut, "booster_support", 5) or 5)
-            fac_to_i = fac_from if fac_to is None else max(1, min(10, int(fac_to)))
-            cul_to_i = cul_from if cul_to is None else max(1, min(10, int(cul_to)))
-            boo_to_i = boo_from if boo_to is None else max(1, min(10, int(boo_to)))
+            fac_from = _clamp_program_grade(getattr(ut, "facilities_grade", None), 5)
+            cul_from = _clamp_program_grade(getattr(ut, "culture_grade", None), 5)
+            boo_from = _clamp_program_grade(getattr(ut, "booster_support", None), 5)
+            fac_to_i = fac_from if fac_to is None else _clamp_program_grade(fac_to, fac_from)
+            cul_to_i = cul_from if cul_to is None else _clamp_program_grade(cul_to, cul_from)
+            boo_to_i = boo_from if boo_to is None else _clamp_program_grade(boo_to, boo_from)
             delta_pp = 0
             delta_pp += _improvement_pp_delta(fac_from, fac_to_i)
             delta_pp += _improvement_pp_delta(cul_from, cul_to_i)
             delta_pp += _improvement_pp_delta(boo_from, boo_to_i)
             new_remaining = pp_remaining + int(delta_pp)
+            if new_remaining < 0 and body.get("_bulk_cpu_pp_clamp"):
+                fac_to_i, cul_to_i, boo_to_i = _bulk_enforce_improvement_pp_budget(
+                    fac_from,
+                    cul_from,
+                    boo_from,
+                    fac_to_i,
+                    cul_to_i,
+                    boo_to_i,
+                    pp_remaining,
+                )
+                delta_pp = (
+                    _improvement_pp_delta(fac_from, fac_to_i)
+                    + _improvement_pp_delta(cul_from, cul_to_i)
+                    + _improvement_pp_delta(boo_from, boo_to_i)
+                )
+                new_remaining = pp_remaining + int(delta_pp)
             if new_remaining < 0:
                 raise ValueError("Not enough PP for those improvements.")
             ut.facilities_grade = fac_to_i
             ut.culture_grade = cul_to_i
             ut.booster_support = boo_to_i
+            ut._clamp_values()
             bank["pp_remaining"] = new_remaining
             bank["applied"] = {
                 "facilities_grade": {"from": fac_from, "to": fac_to_i},
@@ -2969,7 +3564,9 @@ def advance_offseason_state(
             state["offseason_improvements_bank"] = bank
     elif current in ("Coaching carousel I", "Coaching carousel II", "Coaching carousel III"):
         lh = league_history if isinstance(league_history, dict) else {"seasons": []}
-        _apply_coaching_carousel_stage(state, teams, lh, current)
+        _apply_coaching_carousel_stage(state, teams, lh, current, body)
+    elif current == "Coaching carousel IV":
+        pass
     elif current == "Coach development":
         banks_cd = state.get("offseason_coach_dev_banks")
         if not isinstance(banks_cd, dict):
@@ -2996,72 +3593,62 @@ def advance_offseason_state(
                 state["offseason_coach_dev_bank"] = ub
         state["offseason_coach_dev_banks"] = banks_cd
     elif current == "Transfers I":
-        payload = run_transfer_stage_1(teams, state.get("standings") or {}, current_year=max(1, int(state.get("current_year", 1))))
-        state["offseason_transfer_stage_1"] = payload
-        transfer_events: List[Dict[str, Any]] = []
-        for i, row in enumerate(payload.get("entries") or []):
-            tpl = TRANSFER_NEWS_TEMPLATES[i % 15]
-            detail = _transfer_render(
-                tpl,
-                {
-                    "PLAYER": row.get("player", "Player"),
-                    "TEAM": row.get("team", "Team"),
-                    "POSITION": row.get("position", "ATH"),
-                    "REGION": row.get("region", "State"),
-                    "DEST_TEAM": "TBD",
-                },
+        pending = bool(state.get("offseason_transfer_stage_1_pending_review"))
+        ack = bool(body.get("transfer_stage_1_ack_results"))
+        st_xfer = _standings_for_transfer_portal(state)
+        stage1_existing = state.get("offseason_transfer_stage_1") if isinstance(state.get("offseason_transfer_stage_1"), dict) else None
+
+        if pending:
+            if not ack:
+                raise ValueError("Review the transfer portal entrants, then press Continue again to lock and advance.")
+            state.pop("offseason_transfer_stage_1_pending_review", None)
+        elif isinstance(stage1_existing, dict) and stage1_existing.get("entries") is not None:
+            pass
+        else:
+            tph, tbr = _transfer_playoff_snapshot(state)
+            sg_tr = state.get("season_goals") if isinstance(state.get("season_goals"), dict) else None
+            payload = run_transfer_stage_1(
+                teams,
+                st_xfer,
+                current_year=max(1, int(state.get("current_year", 1))),
+                season_goals=sg_tr,
+                user_team=str(state.get("user_team") or "") or None,
+                bracket_results=tbr,
+                champion=tph,
             )
-            transfer_events.append(
-                {
-                    "type": "transfer_portal",
-                    "player": row.get("player"),
-                    "team": row.get("team"),
-                    "position": row.get("position"),
-                    "region": row.get("region"),
-                    "detail": detail,
-                }
-            )
-        _append_transfer_news_events(state, transfer_events)
+            state["offseason_transfer_stage_1"] = payload
+            _transfer_stage_1_apply_news(state, payload)
+            state["offseason_transfer_stage_1_pending_review"] = True
+            state["offseason_stage_index"] = idx
+            state["teams"] = [team_to_dict(t) for t in teams.values()]
+            return state
     elif current == "Transfers II":
-        stage1 = state.get("offseason_transfer_stage_1") if isinstance(state.get("offseason_transfer_stage_1"), dict) else {}
-        payload = run_transfer_stage_2(
-            teams,
-            state.get("standings") or {},
-            stage1,
-            current_year=max(1, int(state.get("current_year", 1))),
-        )
-        state["offseason_transfer_stage_2"] = payload
-        moved_entries = [r for r in list(payload.get("entries") or []) if r.get("to_team")]
-        state["offseason_transfer_review"] = {
-            "entries": moved_entries,
-            "moved_count": len(moved_entries),
-            "blocked_count": int(payload.get("blocked_count", 0) or 0),
-        }
-        transfer_events = []
-        for i, row in enumerate(payload.get("entries") or []):
-            tpl = TRANSFER_NEWS_TEMPLATES[15 + (i % 15)]
-            detail = _transfer_render(
-                tpl,
-                {
-                    "PLAYER": row.get("player", "Player"),
-                    "TEAM": row.get("from_team", "Team"),
-                    "POSITION": row.get("position", "ATH"),
-                    "REGION": row.get("to_region", row.get("from_region", "State")),
-                    "DEST_TEAM": row.get("to_team", "Team"),
-                },
+        pending = bool(state.get("offseason_transfer_stage_2_pending_review"))
+        ack = bool(body.get("transfer_stage_2_ack_results"))
+        st_xfer = _standings_for_transfer_portal(state)
+        stage2_existing = state.get("offseason_transfer_stage_2") if isinstance(state.get("offseason_transfer_stage_2"), dict) else None
+
+        if pending:
+            if not ack:
+                raise ValueError("Review transfer commitments, then press Continue again to advance.")
+            state.pop("offseason_transfer_stage_2_pending_review", None)
+        elif isinstance(stage2_existing, dict) and (
+            stage2_existing.get("entries") is not None or stage2_existing.get("moved_count") is not None
+        ):
+            pass
+        else:
+            stage1 = state.get("offseason_transfer_stage_1") if isinstance(state.get("offseason_transfer_stage_1"), dict) else {}
+            payload = run_transfer_stage_2(
+                teams,
+                st_xfer,
+                stage1,
+                current_year=max(1, int(state.get("current_year", 1))),
             )
-            transfer_events.append(
-                {
-                    "type": "transfer_commit",
-                    "player": row.get("player"),
-                    "team": row.get("from_team"),
-                    "to_team": row.get("to_team"),
-                    "position": row.get("position"),
-                    "region": row.get("to_region", row.get("from_region")),
-                    "detail": detail,
-                }
-            )
-        _append_transfer_news_events(state, transfer_events)
+            _transfer_stage_2_apply_news_and_review(state, payload)
+            state["offseason_transfer_stage_2_pending_review"] = True
+            state["offseason_stage_index"] = idx
+            state["teams"] = [team_to_dict(t) for t in teams.values()]
+            return state
     elif current in ("Transfers III", "7 on 7", "Graduation", "Freshman Class", "Schedule Release"):
         pass
     elif current == "Training Results":
@@ -3088,13 +3675,11 @@ def advance_offseason_state(
                 )
         state["offseason_training_results"] = {"players": deltas}
 
-    # QoL parity with save-backed flow: Improvements also runs carousel stage I.
     if current == "Improvements":
         lh = league_history if isinstance(league_history, dict) else {"seasons": []}
-        _apply_coaching_carousel_stage(state, teams, lh, "Coaching carousel I")
-        state["offseason_stage_index"] = idx + 2
-    else:
-        state["offseason_stage_index"] = idx + 1
+        _apply_coaching_carousel_churn(state, teams, lh)
+
+    state["offseason_stage_index"] = idx + 1
     if current == "Spring Ball":
         state.pop("offseason_spring_ball_results", None)
     if current in ("Winter 1", "Winter 2"):
@@ -3132,12 +3717,29 @@ def finish_season_state(state: Dict[str, Any], league_history: Dict[str, Any], r
                 break
             state = _advance_playoff_one_round_state(state)
     else:
-        pool = _playoff_pool_team_names(state, teams)
-        champion, bracket_results = run_playoff(teams, standings, pool, output_lines, run_playoff_stats, num_teams=8)
-        runner_up = ""
-        if bracket_results:
-            champ_game = bracket_results[-1]
-            runner_up = champ_game["away"] if champ_game["winner"] == champ_game["home"] else champ_game["home"]
+        # Fallback: finish_season called from outside the playoffs phase.
+        # Build the bracket(s) from scratch using the active playoff system
+        # config (which may be regional) and run each to completion. Yields
+        # a champion + runner_up for the user's classification.
+        _ensure_playoffs_migrated(state, teams)
+        if not isinstance(state.get("playoffs"), dict) or not (state.get("playoffs") or {}).get("by_class"):
+            state["playoffs"] = _init_playoffs_multiclass(state, teams, standings)
+        _ensure_all_eligible_playoff_brackets(state, teams, standings)
+        playoffs = state["playoffs"]
+        by_class = playoffs.setdefault("by_class", {})
+        for cls, pdata in list(by_class.items()):
+            if not isinstance(pdata, dict) or pdata.get("completed"):
+                continue
+            _simulate_full_bracket_to_completion(pdata, teams, standings, run_playoff_stats)
+            by_class[cls] = pdata
+        playoffs["completed"] = _playoffs_global_completed(playoffs)
+        uc = playoffs.get("user_class")
+        if uc and uc in by_class:
+            playoffs["champion"] = by_class[uc].get("champion")
+            playoffs["runner_up"] = by_class[uc].get("runner_up")
+        champion = str(playoffs.get("champion") or "")
+        runner_up = str(playoffs.get("runner_up") or "")
+        bracket_results = _flatten_playoff_bracket_results(playoffs)
 
     standings = state.get("standings") or standings
     teams = {t["name"]: team_from_dict(t) for t in state.get("teams", [])}
@@ -3206,30 +3808,6 @@ def finish_season_state(state: Dict[str, Any], league_history: Dict[str, Any], r
                 out.append(format_recap_schedule_line(wi, team_name, h, a, played, hs, as_, ot))
         return out
 
-    def _postseason_label(team_name: str, br: List[Dict[str, Any]]) -> str:
-        if not team_name:
-            return "—"
-        if team_name == champion:
-            return "State Champion"
-        if team_name == runner_up:
-            return "Runner-up"
-        best = None
-        order = {"Quarterfinal": 1, "Semifinal": 2, "Championship": 3}
-        for g in br or []:
-            if not isinstance(g, dict):
-                continue
-            if g.get("home") != team_name and g.get("away") != team_name:
-                continue
-            rnd = str(g.get("round") or "")
-            v = order.get(rnd)
-            if v and (best is None or v > best):
-                best = v
-        if best == 2:
-            return "Semifinalist"
-        if best == 1:
-            return "Quarterfinalist"
-        return "—"
-
     # Recaps stored in-memory
     season_recaps: Dict[str, str] = {}
     team_recap_files: Dict[str, str] = {}
@@ -3241,7 +3819,14 @@ def finish_season_state(state: Dict[str, Any], league_history: Dict[str, Any], r
         w = int(srow.get("wins", 0) or 0)
         l = int(srow.get("losses", 0) or 0)
         coach_name = team_coaches.get(team_name, "") or "—"
-        postseason = _postseason_label(team_name, br_for_history)
+        postseason = _recap_postseason_line_label_for_team(
+            team_name,
+            state=state,
+            season_entry_top_champion=champion,
+            season_entry_top_runner_up=runner_up,
+            br_flat=br_for_history,
+            teams_map=teams,
+        )
         totals = _season_team_totals(team_name)
         player_rows = [ps for ps in season_player_stats.values() if getattr(ps, "team_name", None) == team_name]
         player_rows.sort(key=lambda ps: -(getattr(ps, "pass_yds", 0) + getattr(ps, "rush_yds", 0) + getattr(ps, "rec_yds", 0)))
@@ -3307,6 +3892,8 @@ def finish_season_state(state: Dict[str, Any], league_history: Dict[str, Any], r
 
     from systems.league_history import append_season_in_memory
 
+    regional_champions = compute_regular_season_regional_champions(state)
+    p_bc_snap_fs = _playoffs_by_class_snapshot(state)
     out_hist = append_season_in_memory(
         league_history,
         records,
@@ -3319,9 +3906,12 @@ def finish_season_state(state: Dict[str, Any], league_history: Dict[str, Any], r
         bracket_results=br_for_history,
         team_coaches=team_coaches,
         team_recap_files=team_recap_files,
+        regional_champions=regional_champions,
+        playoffs_by_class=p_bc_snap_fs,
     )
     league_history = out_hist.get("league_history") or league_history
     records = out_hist.get("records") or records
+    update_prestige(teams, league_history)
 
     graduation_report: Dict[str, List[Dict[str, Any]]] = {}
     for t in teams.values():
@@ -3406,8 +3996,27 @@ def finish_season_state(state: Dict[str, Any], league_history: Dict[str, Any], r
     wk, wr = _regular_season_week_boards(teams, state)
     state["weeks"] = wk
     state["week_results"] = wr
+    try:
+        state["offseason_transfer_snapshot_standings"] = copy.deepcopy(standings)
+    except Exception:
+        state["offseason_transfer_snapshot_standings"] = {
+            str(k): dict(v) if isinstance(v, dict) else v for k, v in dict(standings or {}).items()
+        }
+    # Persistent snapshot of the just-finished season's standings.
+    # Survives into preseason + regular season (only overwritten at next finish_season),
+    # so the UI can render "last season's record" instead of the new year's reset 0-0
+    # on Team Info / Coach profile / dashboards while the new year hasn't started.
+    try:
+        state["last_completed_standings"] = copy.deepcopy(standings)
+    except Exception:
+        state["last_completed_standings"] = {
+            str(k): dict(v) if isinstance(v, dict) else v for k, v in dict(standings or {}).items()
+        }
+    state["last_completed_year"] = year_num
+    _clear_offseason_transfer_ui_state(state)
     state["standings"] = {n: {"wins": 0, "losses": 0, "points_for": 0, "points_against": 0} for n in team_names}
     state["teams"] = [team_to_dict(t) for t in teams.values()]
+    apply_team_program_totals_to_serialized_team_rows(league_history.get("seasons") or [], state=state)
     _assign_scrimmage_opponents_for_state(state)
     state.pop("playoffs", None)
     state.pop("playoff_season_player_stats", None)
@@ -3703,68 +4312,173 @@ def _playoff_row_same_teams(home: Any, away: Any, team_a: str, team_b: str) -> b
     return (h == team_a and a == team_b) or (h == team_b and a == team_a)
 
 
+def _ranking_key_for_state(state: Dict[str, Any], standings: Dict[str, Dict[str, Any]], name: str) -> Tuple[int, int]:
+    """(-wins, -point_diff) for ranking a team. Mirrors playoff_system._ranking_key."""
+    s = standings.get(name, {})
+    return (
+        -int(s.get("wins", 0)),
+        -(int(s.get("points_for", 0)) - int(s.get("points_against", 0))),
+    )
+
+
+def _resolve_regional_user_matchup(
+    sub: Dict[str, Any],
+    standings: Dict[str, Dict[str, Any]],
+    user_team: str,
+) -> Optional[Tuple[str, str]]:
+    """Find the user's next regional-bracket game (home, away) in slot order.
+
+    Walks the regional bracket the same way the runner does, for any
+    supported region size:
+      * In-region rounds (1..N depending on ``teams_per_region``) use
+        adjacent-pair pairings on the slot list.
+      * State semifinal re-seeds the regional champions by overall record
+        (highest vs lowest, middle vs middle).
+      * Championship pairs the two state SF winners.
+    """
+    seeds = sorted(sub.get("seeds") or [], key=lambda x: int(x.get("seed", 0)))
+    if not seeds:
+        return None
+    bracket_size = int(sub.get("num_teams") or len(seeds))
+    if bracket_size != len(seeds):
+        return None
+    teams_per_region = _teams_per_region_from_seeds(seeds)
+    if teams_per_region < 2 or (teams_per_region & (teams_per_region - 1)):
+        return None
+    names = [str(s["team"]) for s in seeds]
+    results = list(sub.get("bracket_results") or [])
+
+    # If the user team has lost any game, there's no next game for them.
+    for g in results:
+        if g.get("home") == user_team or g.get("away") == user_team:
+            if g.get("winner") and g.get("winner") != user_team:
+                return None
+
+    # ---- In-region rounds: adjacent-pair walking on the slot list ----
+    in_region_rounds = regional_in_region_round_names(teams_per_region)
+    current_slots: List[str] = list(names)
+    for round_name in in_region_rounds:
+        pairs = [(i, i + 1) for i in range(0, len(current_slots), 2)]
+        round_done = [r for r in results if r.get("round") == round_name]
+        if len(round_done) < len(pairs):
+            for hi, ai in pairs:
+                hn, an = current_slots[hi], current_slots[ai]
+                if user_team not in (hn, an):
+                    continue
+                played = any(
+                    _playoff_row_same_teams(r.get("home"), r.get("away"), hn, an) for r in round_done
+                )
+                if not played:
+                    return (hn, an)
+            return None
+        winners_this_round: List[str] = []
+        for hi, ai in pairs:
+            hn, an = current_slots[hi], current_slots[ai]
+            found = next(
+                (r for r in round_done
+                 if _playoff_row_same_teams(r.get("home"), r.get("away"), hn, an)),
+                None,
+            )
+            if not found or not found.get("winner"):
+                return None
+            winners_this_round.append(str(found["winner"]))
+        current_slots = winners_this_round
+
+    regional_champs = current_slots
+
+    # ---- State SF: re-seed regional champions by overall record ----
+    state_ranked = sorted(regional_champs, key=lambda n: _ranking_key_for_state(None, standings, n))  # type: ignore[arg-type]
+    sf_pairs = _regional_state_sf_pairings(len(state_ranked))
+    sf_done = [r for r in results if r.get("round") == "Semifinal"]
+    if len(sf_done) < len(sf_pairs):
+        for hi, ai in sf_pairs:
+            hn, an = state_ranked[hi], state_ranked[ai]
+            if user_team not in (hn, an):
+                continue
+            played = any(_playoff_row_same_teams(r.get("home"), r.get("away"), hn, an) for r in sf_done)
+            if not played:
+                return (hn, an)
+        return None
+    sf_winners: List[str] = []
+    for hi, ai in sf_pairs:
+        hn, an = state_ranked[hi], state_ranked[ai]
+        found = next((r for r in sf_done if _playoff_row_same_teams(r.get("home"), r.get("away"), hn, an)), None)
+        if not found or not found.get("winner"):
+            return None
+        sf_winners.append(str(found["winner"]))
+
+    # ---- Championship ----
+    ch_done = [r for r in results if r.get("round") == "Championship"]
+    if not ch_done and len(sf_winners) >= 2:
+        wh, wa = sf_winners[0], sf_winners[1]
+        if user_team in (wh, wa):
+            return (wh, wa)
+    return None
+
+
 def resolve_playoff_coach_matchup(state: Dict[str, Any], user_team: str) -> Optional[Tuple[str, str]]:
-    """Next playoff game for the user team as (home, away) in engine order, or None if none."""
+    """Next playoff game for the user team as (home, away) in engine order, or None if none.
+
+    Works for both standard fixed brackets (any power-of-two size) and the
+    regional bracket (4 regions x top 4). For standard brackets the function
+    walks rounds in order, building each round's slot list from the prior
+    round's recorded winners. For regional brackets it dispatches to a
+    dedicated walker that knows about the in-region pairings and the
+    re-seeding step at the state-semifinal stage.
+    """
     teams = {t["name"]: team_from_dict(t) for t in state.get("teams", [])}
     p = _ensure_playoffs_migrated(state, teams) if isinstance(state.get("playoffs"), dict) else None
     if not p or not user_team or _playoffs_global_completed(p):
         return None
     uc = p.get("user_class") or _classification_of_team(teams, user_team)
     sub = (p.get("by_class") or {}).get(uc) if isinstance(p.get("by_class"), dict) else None
-    if not isinstance(sub, dict):
+    if not isinstance(sub, dict) or sub.get("completed"):
         return None
-    if sub.get("completed"):
-        return None
+
+    if _bracket_is_regional(sub):
+        standings = state.get("standings") or {}
+        return _resolve_regional_user_matchup(sub, standings, user_team)
+
     seeds = sorted(sub.get("seeds") or [], key=lambda x: int(x.get("seed", 0)))
     names = [str(s["team"]) for s in seeds]
     results = list(sub.get("bracket_results") or [])
-    qf = [r for r in results if r.get("round") == "Quarterfinal"]
-    sf = [r for r in results if r.get("round") == "Semifinal"]
-    ch = [r for r in results if r.get("round") == "Championship"]
+    bracket_size = int(sub.get("num_teams") or len(names) or get_state_playoff_system(state).bracket_size)
+    if bracket_size <= 0 or len(names) != bracket_size:
+        return None
 
+    # Once the user team has lost a game in this bracket, there's nothing next.
     for g in results:
         if g.get("home") == user_team or g.get("away") == user_team:
             if g.get("winner") and g.get("winner") != user_team:
                 return None
 
-    if len(qf) < 4:
-        pairings = [(0, 7), (1, 6), (2, 5), (3, 4)]
-        for hi, ai in pairings:
-            hn, an = names[hi], names[ai]
-            if user_team not in (hn, an):
-                continue
-            played = any(_playoff_row_same_teams(r.get("home"), r.get("away"), hn, an) for r in qf)
-            if not played:
-                return (hn, an)
-        return None
-
-    if len(sf) < 2:
-        qf_pairs = [(0, 7), (1, 6), (2, 5), (3, 4)]
+    round_names = round_names_for_bracket(bracket_size)
+    current_slots = list(names)
+    for round_name in round_names:
+        pairings = round_pairings_for_size(len(current_slots))
+        round_results = [r for r in results if r.get("round") == round_name]
+        if len(round_results) < len(pairings):
+            for hi, ai in pairings:
+                hn, an = current_slots[hi], current_slots[ai]
+                if user_team not in (hn, an):
+                    continue
+                played = any(_playoff_row_same_teams(r.get("home"), r.get("away"), hn, an) for r in round_results)
+                if not played:
+                    return (hn, an)
+            return None
+        # Round is fully recorded — collect winners in slot order to feed the next round.
         winners: List[str] = []
-        for hi, ai in qf_pairs:
-            hn, an = names[hi], names[ai]
-            found = next((r for r in qf if _playoff_row_same_teams(r.get("home"), r.get("away"), hn, an)), None)
+        for hi, ai in pairings:
+            hn, an = current_slots[hi], current_slots[ai]
+            found = next(
+                (r for r in round_results if _playoff_row_same_teams(r.get("home"), r.get("away"), hn, an)),
+                None,
+            )
             if not found or not found.get("winner"):
                 return None
             winners.append(str(found["winner"]))
-        sf_pairs = [(0, 3), (1, 2)]
-        for wi, wj in sf_pairs:
-            wh, wa = winners[wi], winners[wj]
-            if user_team not in (wh, wa):
-                continue
-            played = any(_playoff_row_same_teams(r.get("home"), r.get("away"), wh, wa) for r in sf)
-            if not played:
-                return (wh, wa)
-        return None
+        current_slots = winners
 
-    if not ch:
-        w1 = sf[0]["winner"]
-        w2 = sf[1]["winner"]
-        if user_team not in (w1, w2):
-            return None
-        if any(r.get("round") == "Championship" for r in results):
-            return None
-        return (w1, w2)
     return None
 
 
@@ -4053,14 +4767,14 @@ def finish_coach_playoff_state(state: Dict[str, Any], game: Any) -> Dict[str, An
     as_ = int(gs.get("score_away", 0))
     ot = bool(gs.get("ot_winner"))
     winner = home_name if hs > as_ else away_name
-    round_name = "Quarterfinal"
     teams = {t["name"]: team_from_dict(t) for t in state.get("teams", [])}
     playoffs = _ensure_playoffs_migrated(state, teams)
     uc = playoffs.get("user_class") or _classification_of_team(teams, state.get("user_team"))
+    cfg = get_state_playoff_system(state)
     sub = playoffs.setdefault("by_class", {}).setdefault(
         uc,
         {
-            "num_teams": 8,
+            "num_teams": int(cfg.bracket_size),
             "seeds": [],
             "bracket_results": [],
             "completed": False,
@@ -4068,16 +4782,18 @@ def finish_coach_playoff_state(state: Dict[str, Any], game: Any) -> Dict[str, An
             "runner_up": None,
         },
     )
+    bracket_size = int(sub.get("num_teams") or cfg.bracket_size)
     bracket_results = list(sub.get("bracket_results") or [])
-    # Determine round by how many results exist
-    qf_before = len([r for r in bracket_results if r.get("round") == "Quarterfinal"])
-    sf_before = len([r for r in bracket_results if r.get("round") == "Semifinal"])
-    if qf_before < 4:
-        round_name = "Quarterfinal"
-    elif sf_before < 2:
-        round_name = "Semifinal"
+    # Round name (Regional SF / Regional Final / R16 / QF / SF / Championship)
+    # is derived from how many games are already recorded for the active
+    # bracket. Regional brackets and standard brackets use different round
+    # name sequences so we dispatch on the bracket's seed shape.
+    if _bracket_is_regional(sub):
+        round_name = next_regional_round_name(
+            bracket_results, sub.get("seeds") or []
+        )
     else:
-        round_name = "Championship"
+        round_name = next_playoff_round_name(bracket_results, bracket_size)
 
     bracket_results.append(
         {
@@ -4305,10 +5021,11 @@ def finish_coach_playoff(user_id: str, save_id: str, game_id: str) -> Dict[str, 
     teams_fm = {t["name"]: team_from_dict(t) for t in state.get("teams", [])}
     playoffs = _ensure_playoffs_migrated(state, teams_fm)
     uc = playoffs.get("user_class") or _classification_of_team(teams_fm, user_team_name)
+    cfg = get_state_playoff_system(state)
     sub = playoffs.setdefault("by_class", {}).setdefault(
         uc,
         {
-            "num_teams": 8,
+            "num_teams": int(cfg.bracket_size),
             "seeds": [],
             "bracket_results": [],
             "completed": False,
@@ -4316,6 +5033,7 @@ def finish_coach_playoff(user_id: str, save_id: str, game_id: str) -> Dict[str, 
             "runner_up": None,
         },
     )
+    bracket_size = int(sub.get("num_teams") or cfg.bracket_size)
     bracket_results = list(sub.get("bracket_results") or [])
     for g in bracket_results:
         if _playoff_row_same_teams(g.get("home"), g.get("away"), eh, ea):
@@ -4335,14 +5053,16 @@ def finish_coach_playoff(user_id: str, save_id: str, game_id: str) -> Dict[str, 
 
     loser = away_name if winner == home_name else home_name
 
-    qf_before = len([r for r in bracket_results if r.get("round") == "Quarterfinal"])
-    sf_before = len([r for r in bracket_results if r.get("round") == "Semifinal"])
-    if qf_before < 4:
-        round_name = "Quarterfinal"
-    elif sf_before < 2:
-        round_name = "Semifinal"
+    # Round name is derived from the games already recorded against the
+    # active bracket size. Regional brackets use a different round-name
+    # sequence (Regional SF / Regional Final / SF / Championship) so we
+    # dispatch on the bracket's seed shape.
+    if _bracket_is_regional(sub):
+        round_name = next_regional_round_name(
+            bracket_results, sub.get("seeds") or []
+        )
     else:
-        round_name = "Championship"
+        round_name = next_playoff_round_name(bracket_results, bracket_size)
 
     standings = state.get("standings") or {}
     team_names = [t.get("name") for t in state.get("teams", []) if isinstance(t, dict) and t.get("name")]
@@ -4464,8 +5184,103 @@ def finish_coach_scrimmage(
     return {"state": state}
 
 
+def _bracket_is_regional(pdata: Dict[str, Any]) -> bool:
+    """True if this bracket was seeded with regional metadata (the
+    ``seeds[*]['region']`` key only appears on regional brackets).
+
+    Detected from the bracket data itself rather than the active config so a
+    save that switched its ``playoff_system`` mid-bracket would still finish
+    the in-flight bracket using the runner it was started with.
+    """
+    seeds = pdata.get("seeds") if isinstance(pdata, dict) else None
+    if not isinstance(seeds, list) or not seeds:
+        return False
+    first = seeds[0]
+    return isinstance(first, dict) and bool(first.get("region"))
+
+
+def _advance_one_bracket(
+    pdata: Dict[str, Any],
+    teams: Dict[str, Any],
+    standings: Dict[str, Dict[str, Any]],
+    season_player_stats: Optional[Dict[int, Any]],
+) -> None:
+    """Advance one classification bracket by exactly one round, in-place.
+
+    Dispatches to the regional or standard fixed-bracket round runner based on
+    the bracket's seed shape so callers don't need to special-case the
+    playoff system. Updates ``pdata`` keys: ``bracket_results``, ``completed``,
+    ``champion``, ``runner_up``.
+    """
+    bracket_results = list(pdata.get("bracket_results") or [])
+    seeds_raw = pdata.get("seeds") or []
+    bracket_size = int(pdata.get("num_teams") or len(seeds_raw))
+
+    if _bracket_is_regional(pdata):
+        # Regional runner consumes the seed dicts directly so it can read
+        # the per-team region info even after a reload.
+        seeded_sorted = sorted(seeds_raw, key=lambda x: int(x.get("seed", 0)))
+        if len(seeded_sorted) != bracket_size:
+            return
+        champion, done = run_next_playoff_round_regional(
+            teams, standings, seeded_sorted, bracket_results, season_player_stats, None
+        )
+    else:
+        seeded_sorted = sorted(seeds_raw, key=lambda x: int(x.get("seed", 0)))
+        seeded_names = [str(x["team"]) for x in seeded_sorted]
+        if len(seeded_names) != bracket_size:
+            return
+        champion, done = run_next_playoff_round(
+            teams, standings, seeded_names, bracket_results, season_player_stats, None
+        )
+
+    runner_up = ""
+    if done and bracket_results:
+        cg = bracket_results[-1]
+        runner_up = cg["away"] if cg["winner"] == cg["home"] else cg["home"]
+    pdata["num_teams"] = bracket_size
+    pdata["bracket_results"] = bracket_results
+    pdata["completed"] = done
+    pdata["champion"] = champion if done else None
+    pdata["runner_up"] = runner_up if done else None
+
+
+def _simulate_full_bracket_to_completion(
+    pdata: Dict[str, Any],
+    teams: Dict[str, Any],
+    standings: Dict[str, Dict[str, Any]],
+    season_player_stats: Optional[Dict[int, Any]],
+) -> None:
+    """Advance one bracket round-by-round until a champion is crowned.
+
+    Used by the all-at-once postseason sims (``sim_playoffs_state``,
+    ``finish_season`` when called outside the playoffs phase).  log2(bracket_size)
+    rounds is the upper bound; safety bound prevents an infinite loop if a
+    runner ever returns ``done=False`` without recording new games.
+    """
+    bracket_size = int(pdata.get("num_teams") or len(pdata.get("seeds") or []) or 0)
+    if bracket_size < 2:
+        return
+    safety = bracket_size  # generous: log2(bracket_size) rounds is the real bound
+    while not pdata.get("completed") and safety > 0:
+        safety -= 1
+        before = len(pdata.get("bracket_results") or [])
+        _advance_one_bracket(pdata, teams, standings, season_player_stats)
+        after = len(pdata.get("bracket_results") or [])
+        if after <= before:
+            # Defensive: if the runner reported "not done" but added no games
+            # we're stuck — bail rather than loop forever.
+            break
+
+
 def _advance_playoff_one_round_state(state: Dict[str, Any]) -> Dict[str, Any]:
-    """Simulate the next playoff round in-place for every classification bracket. Used by sim_playoff_round and finish_season."""
+    """Simulate the next playoff round in-place for every classification bracket.
+
+    Used by ``sim_playoff_round`` and ``finish_season``. Bracket shape (size,
+    seeding mode, completion check) comes from the bracket's stored seeds /
+    the active playoff system config, so 8-team / 16-team / regional systems
+    all flow through one path.
+    """
     teams = {t["name"]: team_from_dict(t) for t in state.get("teams", [])}
     team_names = list(teams.keys())
     standings = state.get("standings") or {
@@ -4480,33 +5295,27 @@ def _advance_playoff_one_round_state(state: Dict[str, Any]) -> Dict[str, Any]:
     by_class = playoffs.setdefault("by_class", {})
     if not by_class:
         raise ValueError("No playoff brackets configured")
+    cfg = get_state_playoff_system(state)
+    default_bracket_size = int(cfg.bracket_size)
+    default_min_teams = int(cfg.min_teams)
     for cls, pdata in list(by_class.items()):
         if not isinstance(pdata, dict) or pdata.get("completed"):
             continue
+        # Per-bracket size: prefer what was stored at init time (so an in-flight
+        # bracket keeps its shape) and fall back to the active system config.
+        bracket_size = int(pdata.get("num_teams") or default_bracket_size)
+        min_teams = max(default_min_teams, bracket_size)
         seeds_raw = pdata.get("seeds") or []
         if not seeds_raw:
             names_in_class = _team_names_by_classification(teams).get(cls) or []
-            if len(names_in_class) < 8:
+            if len(names_in_class) < min_teams:
                 continue
-            seeded = seed_teams(names_in_class, standings, top_n=8)
+            seeded = seed_teams(names_in_class, standings, top_n=bracket_size)
             seeds_raw = [{"seed": int(seed), "team": str(name)} for (seed, name) in seeded]
             pdata["seeds"] = seeds_raw
-        seeded_sorted = sorted(seeds_raw, key=lambda x: int(x.get("seed", 0)))
-        seeded_names = [str(x["team"]) for x in seeded_sorted]
-        if len(seeded_names) != 8:
+        if len(seeds_raw) != bracket_size:
             continue
-        bracket_results = list(pdata.get("bracket_results") or [])
-        champion, done = run_next_playoff_round_8(teams, standings, seeded_names, bracket_results, sp, None)
-        runner_up = ""
-        if done and bracket_results:
-            cg = bracket_results[-1]
-            runner_up = cg["away"] if cg["winner"] == cg["home"] else cg["home"]
-        pdata["num_teams"] = 8
-        pdata["seeds"] = seeds_raw
-        pdata["bracket_results"] = bracket_results
-        pdata["completed"] = done
-        pdata["champion"] = champion if done else None
-        pdata["runner_up"] = runner_up if done else None
+        _advance_one_bracket(pdata, teams, standings, sp)
         by_class[cls] = pdata
     playoffs["by_class"] = by_class
     playoffs["completed"] = _playoffs_global_completed(playoffs)
@@ -4542,12 +5351,29 @@ def finish_season(user_id: str, save_id: str) -> Dict[str, Any]:
                 break
             state = _advance_playoff_one_round_state(state)
     else:
-        pool = _playoff_pool_team_names(state, teams)
-        champion, bracket_results = run_playoff(teams, standings, pool, output_lines, run_playoff_stats, num_teams=8)
-        runner_up = ""
-        if bracket_results:
-            champ_game = bracket_results[-1]
-            runner_up = champ_game["away"] if champ_game["winner"] == champ_game["home"] else champ_game["home"]
+        # Fallback: finish_season called from outside the playoffs phase.
+        # Build the bracket(s) from scratch using the active playoff system
+        # config (which may be regional) and run each to completion. Yields
+        # a champion + runner_up for the user's classification.
+        _ensure_playoffs_migrated(state, teams)
+        if not isinstance(state.get("playoffs"), dict) or not (state.get("playoffs") or {}).get("by_class"):
+            state["playoffs"] = _init_playoffs_multiclass(state, teams, standings)
+        _ensure_all_eligible_playoff_brackets(state, teams, standings)
+        playoffs = state["playoffs"]
+        by_class = playoffs.setdefault("by_class", {})
+        for cls, pdata in list(by_class.items()):
+            if not isinstance(pdata, dict) or pdata.get("completed"):
+                continue
+            _simulate_full_bracket_to_completion(pdata, teams, standings, run_playoff_stats)
+            by_class[cls] = pdata
+        playoffs["completed"] = _playoffs_global_completed(playoffs)
+        uc = playoffs.get("user_class")
+        if uc and uc in by_class:
+            playoffs["champion"] = by_class[uc].get("champion")
+            playoffs["runner_up"] = by_class[uc].get("runner_up")
+        champion = str(playoffs.get("champion") or "")
+        runner_up = str(playoffs.get("runner_up") or "")
+        bracket_results = _flatten_playoff_bracket_results(playoffs)
 
     standings = state.get("standings") or standings
     teams = {t["name"]: team_from_dict(t) for t in state.get("teams", [])}
@@ -4628,31 +5454,6 @@ def finish_season(user_id: str, save_id: str) -> Dict[str, Any]:
                 out.append(format_recap_schedule_line(wi, team_name, h, a, played, hs, as_, ot))
         return out
 
-    def _postseason_label(team_name: str, br: List[Dict[str, Any]]) -> str:
-        if not team_name:
-            return "—"
-        if team_name == champion:
-            return "State Champion"
-        if team_name == runner_up:
-            return "Runner-up"
-        # If bracket results available, infer furthest round.
-        best = None
-        order = {"Quarterfinal": 1, "Semifinal": 2, "Championship": 3}
-        for g in br or []:
-            if not isinstance(g, dict):
-                continue
-            if g.get("home") != team_name and g.get("away") != team_name:
-                continue
-            rnd = str(g.get("round") or "")
-            v = order.get(rnd)
-            if v and (best is None or v > best):
-                best = v
-        if best == 2:
-            return "Semifinalist"
-        if best == 1:
-            return "Quarterfinalist"
-        return "—"
-
     # Make recap files per team. Store relative paths in history.
     team_recap_files: Dict[str, str] = {}
     br_for_history = _recap_merged_bracket_results(state, list(bracket_results or []))
@@ -4663,7 +5464,14 @@ def finish_season(user_id: str, save_id: str) -> Dict[str, Any]:
         w = int(srow.get("wins", 0) or 0)
         l = int(srow.get("losses", 0) or 0)
         coach_name = team_coaches.get(team_name, "") or "—"
-        postseason = _postseason_label(team_name, br_for_history)
+        postseason = _recap_postseason_line_label_for_team(
+            team_name,
+            state=state,
+            season_entry_top_champion=champion,
+            season_entry_top_runner_up=runner_up,
+            br_flat=br_for_history,
+            teams_map=teams,
+        )
         totals = _season_team_totals(team_name)
         player_rows = [ps for ps in season_player_stats.values() if getattr(ps, "team_name", None) == team_name]
         player_rows.sort(key=lambda ps: -(getattr(ps, "pass_yds", 0) + getattr(ps, "rush_yds", 0) + getattr(ps, "rec_yds", 0)))
@@ -4732,6 +5540,8 @@ def finish_season(user_id: str, save_id: str) -> Dict[str, Any]:
             # If writing fails, just skip this team
             continue
 
+    regional_champions = compute_regular_season_regional_champions(state)
+    p_bc_snap = _playoffs_by_class_snapshot(state)
     append_season(
         champion=champion,
         runner_up=runner_up,
@@ -4742,10 +5552,13 @@ def finish_season(user_id: str, save_id: str) -> Dict[str, Any]:
         bracket_results=br_for_history,
         team_coaches=team_coaches,
         team_recap_files=team_recap_files,
+        regional_champions=regional_champions,
+        playoffs_by_class=p_bc_snap,
         save_dir=save_dir,
     )
 
     league_history = load_league_history(league_history_path(save_dir))
+    update_prestige(teams, league_history)
 
     graduation_report: Dict[str, List[Dict[str, Any]]] = {}
     for t in teams.values():
@@ -4826,8 +5639,26 @@ def finish_season(user_id: str, save_id: str) -> Dict[str, Any]:
     wk, wr = _regular_season_week_boards(teams, state)
     state["weeks"] = wk
     state["week_results"] = wr
+    try:
+        state["offseason_transfer_snapshot_standings"] = copy.deepcopy(standings)
+    except Exception:
+        state["offseason_transfer_snapshot_standings"] = {
+            str(k): dict(v) if isinstance(v, dict) else v for k, v in dict(standings or {}).items()
+        }
+    # See finish_season_state: keep a persistent snapshot of the just-finished season
+    # so the UI can show last season's record across offseason/preseason/regular-week-1
+    # instead of the freshly-reset 0-0 standings.
+    try:
+        state["last_completed_standings"] = copy.deepcopy(standings)
+    except Exception:
+        state["last_completed_standings"] = {
+            str(k): dict(v) if isinstance(v, dict) else v for k, v in dict(standings or {}).items()
+        }
+    state["last_completed_year"] = year_num
+    _clear_offseason_transfer_ui_state(state)
     state["standings"] = {n: {"wins": 0, "losses": 0, "points_for": 0, "points_against": 0} for n in team_names}
     state["teams"] = [team_to_dict(t) for t in teams.values()]
+    apply_team_program_totals_to_serialized_team_rows(league_history.get("seasons") or [], state=state)
     _assign_scrimmage_opponents_for_state(state)
     state.pop("playoffs", None)
     state.pop("playoff_season_player_stats", None)
@@ -4887,32 +5718,26 @@ def sim_playoffs(user_id: str, save_id: str) -> Dict[str, Any]:
     uc = playoffs.get("user_class")
     user_champ = ""
     champion = ""
+    cfg = get_state_playoff_system(state)
+    default_bracket_size = int(cfg.bracket_size)
+    default_min_teams = int(cfg.min_teams)
+    last_champion: Optional[str] = None
     for cls, pdata in list(by_class.items()):
         if not isinstance(pdata, dict):
             continue
+        bracket_size = int(pdata.get("num_teams") or default_bracket_size)
+        min_teams = max(default_min_teams, bracket_size)
         names_in_class = _team_names_by_classification(teams).get(cls) or []
-        if len(names_in_class) < 8:
+        if len(names_in_class) < min_teams:
             continue
-        pool = names_in_class
-        champion, bracket_results = run_playoff(teams, standings, pool, output_lines, season_player_stats, num_teams=8)
-        runner_up = ""
-        if bracket_results:
-            champ_game = bracket_results[-1]
-            runner_up = champ_game["away"] if champ_game["winner"] == champ_game["home"] else champ_game["home"]
-        seeded = seed_teams(pool, standings, top_n=8)
-        pdata.update(
-            {
-                "num_teams": 8,
-                "seeds": [{"seed": int(seed), "team": str(name)} for (seed, name) in seeded],
-                "bracket_results": bracket_results,
-                "completed": True,
-                "champion": champion,
-                "runner_up": runner_up,
-            }
-        )
+        # Seeds were populated by _ensure_all_eligible_playoff_brackets
+        # above (regional or standard); the dispatcher reads them and runs
+        # the matching round-runner until the bracket is fully decided.
+        _simulate_full_bracket_to_completion(pdata, teams, standings, season_player_stats)
         by_class[cls] = pdata
+        last_champion = pdata.get("champion") or last_champion
         if cls == uc:
-            user_champ = champion or ""
+            user_champ = pdata.get("champion") or ""
     playoffs["by_class"] = by_class
     playoffs["completed"] = _playoffs_global_completed(playoffs)
     playoffs["champion"] = user_champ or next((by_class[c].get("champion") for c in by_class if by_class[c].get("champion")), None)
@@ -4925,5 +5750,392 @@ def sim_playoffs(user_id: str, save_id: str) -> Dict[str, Any]:
         save_state(user_id, save_id, state, save_dir)
         return finish_season(user_id, save_id)
     save_state(user_id, save_id, state, save_dir)
-    return {"state": state, "champion": playoffs.get("champion") or champion}
+    return {"state": state, "champion": playoffs.get("champion") or last_champion or ""}
+
+
+BULK_SIMULATE_SEASONS_OPTIONS: Tuple[int, ...] = (1, 5, 10, 20)
+
+
+def _bulk_enforce_improvement_pp_budget(
+    f0: int,
+    c0: int,
+    b0: int,
+    f1: int,
+    c1: int,
+    b1: int,
+    pp_remaining: int,
+) -> Tuple[int, int, int]:
+    """
+    Ensure improvement triple matches Advance Offseason accounting exactly.
+    If the plan overspends PP, walk back one grade at a time (tallest pillar first).
+    """
+    f = _clamp_program_grade(f1, 5)
+    c = _clamp_program_grade(c1, 5)
+    b = _clamp_program_grade(b1, 5)
+    f0i = _clamp_program_grade(f0, 5)
+    c0i = _clamp_program_grade(c0, 5)
+    b0i = _clamp_program_grade(b0, 5)
+    for _ in range(64):
+        td = (
+            _improvement_pp_delta(f0i, f)
+            + _improvement_pp_delta(c0i, c)
+            + _improvement_pp_delta(b0i, b)
+        )
+        if int(pp_remaining) + int(td) >= 0:
+            return (f, c, b)
+        triples: List[Tuple[int, int, str]] = [
+            (f, f0i, "f"),
+            (c, c0i, "c"),
+            (b, b0i, "b"),
+        ]
+        candidates = [(cur, base, nm) for cur, base, nm in triples if cur > base]
+        if not candidates:
+            return (f0i, c0i, b0i)
+        cur, _base, nm = max(candidates, key=lambda x: x[0])
+        if nm == "f":
+            f = cur - 1
+        elif nm == "c":
+            c = cur - 1
+        else:
+            b = cur - 1
+    return (f0i, c0i, b0i)
+
+
+def _bulk_compute_ai_improvement_targets(
+    facilities: int,
+    culture: int,
+    booster: int,
+    pp_remaining: int,
+) -> Tuple[int, int, int]:
+    """
+    Spend improvement PP like a CPU AD: greedy cheapest marginal upgrades.
+
+    Optional rebalance rounds if one program pillar is far above the weakest pillar,
+    downgrade the highest once to refund PP toward cheaper upgrades elsewhere.
+    """
+    f0i = _clamp_program_grade(facilities, 5)
+    c0i = _clamp_program_grade(culture, 5)
+    b0i = _clamp_program_grade(booster, 5)
+    f = f0i
+    c = c0i
+    b_s = b0i
+    budget = max(0, int(pp_remaining))
+
+    def greedy_upgrades() -> None:
+        nonlocal f, c, b_s, budget
+        while budget > 0:
+            options: List[Tuple[int, str]] = []
+            for dim, lv in [("fac", f), ("cul", c), ("boo", b_s)]:
+                if lv >= 10:
+                    continue
+                dpp = _improvement_pp_delta(lv, lv + 1)
+                if dpp >= 0:
+                    continue
+                cost = -int(dpp)
+                if cost <= budget:
+                    options.append((cost, dim))
+            if not options:
+                break
+            options.sort(key=lambda x: x[0])
+            cost, dim = options[0]
+            if dim == "fac":
+                f += 1
+            elif dim == "cul":
+                c += 1
+            else:
+                b_s += 1
+            budget -= cost
+
+    def try_rebalance_downgrade() -> bool:
+        """Downgrade tallest pillar one level when spread is wide; refunds PP."""
+        nonlocal f, c, b_s, budget
+        vals = [("fac", f), ("cul", c), ("boo", b_s)]
+        hi_name, hi_lv = max(vals, key=lambda x: x[1])
+        lo_lv = min(x[1] for x in vals)
+        if hi_lv - lo_lv < 4 or hi_lv <= 1:
+            return False
+        refund = _improvement_pp_delta(hi_lv, hi_lv - 1)
+        if refund <= 0:
+            return False
+        budget += int(refund)
+        if hi_name == "fac":
+            f = hi_lv - 1
+        elif hi_name == "cul":
+            c = hi_lv - 1
+        else:
+            b_s = hi_lv - 1
+        return True
+
+    for _ in range(24):
+        greedy_upgrades()
+        if budget <= 0:
+            break
+        if not try_rebalance_downgrade():
+            break
+    greedy_upgrades()
+    return _bulk_enforce_improvement_pp_budget(
+        f0i,
+        c0i,
+        b0i,
+        _clamp_program_grade(f, 5),
+        _clamp_program_grade(c, 5),
+        _clamp_program_grade(b_s, 5),
+        int(pp_remaining),
+    )
+
+
+def _bulk_carousel_job_prefs_for_state(state: Dict[str, Any]) -> List[str]:
+    """
+    Ranked HC vacancy applications for bulk sim (higher prestige schools first).
+
+    Mirrors seeking bigger jobs during carousel rounds — only vacancies still open in carousel state."""
+    ut = str(state.get("user_team") or "").strip()
+    persist = state.get("offseason_coach_carousel") if isinstance(state.get("offseason_coach_carousel"), dict) else None
+    if not persist or not ut:
+        return []
+    vac_raw = list(persist.get("vacancies") or [])
+    vac = sorted(
+        {
+            str(v).strip()
+            for v in vac_raw
+            if isinstance(v, str) and str(v).strip() and str(v).strip() != ut
+        }
+    )
+    if not vac:
+        return []
+    teams_rows = [
+        team_from_dict(t) for t in (state.get("teams") or []) if isinstance(t, dict) and t.get("name")
+    ]
+    by_name = {tm.name: tm for tm in teams_rows}
+
+    def prestige(nm: str) -> int:
+        t_obj = by_name.get(nm)
+        return int(getattr(t_obj, "prestige", 5) or 5) if t_obj else 5
+
+    vac.sort(key=lambda n: (-prestige(n), n))
+    return vac[:12]
+
+
+def _bulk_playoffs_bracket_started(state: Dict[str, Any]) -> bool:
+    playoffs = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else {}
+    bc = playoffs.get("by_class")
+    if isinstance(bc, dict):
+        for sub in bc.values():
+            if isinstance(sub, dict) and len(list(sub.get("bracket_results") or [])) > 0:
+                return True
+    return len(list(playoffs.get("bracket_results") or [])) > 0
+
+
+def _bulk_cpu_offseason_advance_body(state: Dict[str, Any]) -> Dict[str, Any]:
+    stages: List[str] = list(state.get("offseason_stages") or OFFSEASON_UI_STAGES)
+    idx = int(state.get("offseason_stage_index", 0))
+    if idx < 0 or idx >= len(stages):
+        return {}
+    current = _normalize_offseason_stage_name(stages[idx])
+    body: Dict[str, Any] = {"_bulk_cpu_pp_clamp": True}
+    if current in ("Winter 1", "Winter 2"):
+        winter_results = state.get("offseason_winter_training_results")
+        if (
+            isinstance(winter_results, dict)
+            and str(winter_results.get("stage") or "") == current
+        ):
+            body["winter_training_ack_results"] = True
+    elif current == "Spring Ball":
+        if isinstance(state.get("offseason_spring_ball_results"), dict):
+            body["spring_ball_ack_results"] = True
+    elif current == "Improvements":
+        teams_m = {
+            str(t["name"]): team_from_dict(t)
+            for t in (state.get("teams") or [])
+            if isinstance(t, dict) and t.get("name")
+        }
+        ut_name = state.get("user_team")
+        ut_team = teams_m.get(str(ut_name or "").strip())
+        bank = (
+            state.get("offseason_improvements_bank")
+            if isinstance(state.get("offseason_improvements_bank"), dict)
+            else {}
+        )
+        if ut_team is not None:
+            pp_rem = int(bank.get("pp_remaining", bank.get("pp_total", 0)) or 0)
+            fac_from = _clamp_program_grade(getattr(ut_team, "facilities_grade", None), 5)
+            cul_from = _clamp_program_grade(getattr(ut_team, "culture_grade", None), 5)
+            boo_from = _clamp_program_grade(getattr(ut_team, "booster_support", None), 5)
+            fac_to, cul_to, boo_to = _bulk_compute_ai_improvement_targets(
+                fac_from,
+                cul_from,
+                boo_from,
+                pp_rem,
+            )
+            body["improve_facilities_grade"] = fac_to
+            body["improve_culture_grade"] = cul_to
+            body["improve_booster_support"] = boo_to
+    elif current == "Coach development":
+        teams_m = {
+            str(t["name"]): team_from_dict(t)
+            for t in (state.get("teams") or [])
+            if isinstance(t, dict) and t.get("name")
+        }
+        ut_name = str(state.get("user_team") or "").strip()
+        ut_team = teams_m.get(ut_name) if ut_name else None
+        coach_o = getattr(ut_team, "coach", None) if ut_team is not None else None
+        if coach_o is not None:
+            banks_cd = state.get("offseason_coach_dev_banks") if isinstance(state.get("offseason_coach_dev_banks"), dict) else {}
+            cd_bank = banks_cd.get(ut_name) if isinstance(banks_cd.get(ut_name), dict) else None
+            if cd_bank is None:
+                legacy = state.get("offseason_coach_dev_bank") if isinstance(state.get("offseason_coach_dev_bank"), dict) else None
+                if isinstance(legacy, dict):
+                    cd_bank = legacy
+            if isinstance(cd_bank, dict):
+                body.update(build_bulk_sim_coach_dev_body(coach_o, cd_bank))
+    elif current in ("Coaching carousel I", "Coaching carousel II", "Coaching carousel III"):
+        jp = _bulk_carousel_job_prefs_for_state(state)
+        if jp:
+            body["carousel_job_applications"] = jp
+    elif current == "Transfers I":
+        if bool(state.get("offseason_transfer_stage_1_pending_review")):
+            body["transfer_stage_1_ack_results"] = True
+    elif current == "Transfers II":
+        if bool(state.get("offseason_transfer_stage_2_pending_review")):
+            body["transfer_stage_2_ack_results"] = True
+    return body
+
+
+def _bulk_run_offseason_autopilot(
+    user_id: str,
+    save_id: str,
+    *,
+    max_iterations: int = 8000,
+) -> None:
+    for _ in range(max_iterations):
+        state, _save_dir = load_state(user_id, save_id)
+        if str(state.get("season_phase") or "").strip().lower() != "offseason":
+            return
+        advance_offseason(user_id, save_id, _bulk_cpu_offseason_advance_body(state))
+    raise RuntimeError(
+        "Bulk simulate seasons: offseason autopilot exceeded iteration limit — save may need manual advancement."
+    )
+
+
+def _bulk_run_preseason_autopilot(
+    user_id: str,
+    save_id: str,
+    *,
+    max_iterations: int = 250,
+) -> None:
+    for _ in range(max_iterations):
+        state, _save_dir = load_state(user_id, save_id)
+        ph = str(state.get("season_phase") or "").strip().lower()
+        if ph == "regular":
+            return
+        if ph != "preseason":
+            raise ValueError(
+                f"Bulk simulate seasons: expected preseason phase, got {ph!r}."
+            )
+        advance_preseason(user_id, save_id, {})
+    raise RuntimeError(
+        "Bulk simulate seasons: preseason autopilot exceeded iteration limit — reload the save."
+    )
+
+
+def _bulk_sim_regular_until_playoffs(
+    user_id: str,
+    save_id: str,
+    *,
+    max_iterations: int = 320,
+) -> None:
+    for _ in range(max_iterations):
+        state, _save_dir = load_state(user_id, save_id)
+        ph = str(state.get("season_phase") or "").strip().lower()
+        if ph == "playoffs":
+            return
+        if ph != "regular":
+            raise ValueError(
+                f"Bulk simulate seasons: expected regular season, got {ph!r}."
+            )
+        weeks = state.get("weeks") or []
+        cw = int(state.get("current_week", 1))
+        if cw > len(weeks):
+            return
+        sim_week(user_id, save_id)
+    raise RuntimeError(
+        "Bulk simulate seasons: regular season exceeded iteration limit (unexpected schedule length)."
+    )
+
+
+def _bulk_complete_playoffs_and_finish_season(
+    user_id: str,
+    save_id: str,
+    *,
+    max_iterations: int = 96,
+) -> None:
+    for _ in range(max_iterations):
+        state, _save_dir = load_state(user_id, save_id)
+        ph = str(state.get("season_phase") or "").strip().lower()
+        if ph != "playoffs":
+            return
+        playoffs = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else {}
+        if _playoffs_global_completed(playoffs):
+            finish_season(user_id, save_id)
+            return
+        if not _bulk_playoffs_bracket_started(state):
+            sim_playoffs(user_id, save_id)
+        else:
+            sim_playoff_round(user_id, save_id)
+    raise RuntimeError(
+        "Bulk simulate seasons: playoffs did not resolve — try advancing playoffs manually once."
+    )
+
+
+def simulate_seasons_forward(user_id: str, save_id: str, seasons: int) -> Dict[str, Any]:
+    """
+    Fast-forward the save by completing N full football years (remainder of current year if needed,
+    then offseason autoplay, preseason autoplay, repeat). Ends at regular season Week 1 after the last year.
+
+    Coaching carousel: firings/hires/promotions run as normal; the user's coach also submits ranked job
+    preferences to open vacancies (high prestige first) so application-based moves can occur.
+
+    Improvements: spends program points on AI-picked upgrades (and may rebalance by downgrading an
+    over-built pillar to fund weaker grades). Coach development: uses the same allocation math as CPU coaches.
+    """
+    seasons_i = int(seasons)
+    if seasons_i not in BULK_SIMULATE_SEASONS_OPTIONS:
+        raise ValueError("seasons must be 1, 5, 10, or 20")
+
+    for _ in range(seasons_i):
+        guard = 0
+        while True:
+            guard += 1
+            if guard > 120:
+                raise RuntimeError(
+                    "Bulk simulate seasons: main loop stalled — save may be in an unexpected phase."
+                )
+            state, _save_dir = load_state(user_id, save_id)
+            phase = str(state.get("season_phase") or "").strip().lower()
+            if phase == "done":
+                raise ValueError(
+                    "This save is archived or marked complete; bulk simulation is unavailable."
+                )
+            if phase in ("offseason", "preseason"):
+                if phase == "offseason":
+                    _bulk_run_offseason_autopilot(user_id, save_id)
+                _bulk_run_preseason_autopilot(user_id, save_id)
+                continue
+
+            if phase == "regular":
+                _bulk_sim_regular_until_playoffs(user_id, save_id)
+                continue
+
+            if phase == "playoffs":
+                _bulk_complete_playoffs_and_finish_season(user_id, save_id)
+                _bulk_run_offseason_autopilot(user_id, save_id)
+                _bulk_run_preseason_autopilot(user_id, save_id)
+                break
+
+            raise ValueError(
+                f"Cannot simulate seasons from season_phase={phase!r}; advance the save in-game first."
+            )
+
+    state_out, _save_dir = load_state(user_id, save_id)
+    return {"state": state_out, "seasons_simulated": seasons_i}
 

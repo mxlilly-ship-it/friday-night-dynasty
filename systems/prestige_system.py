@@ -187,6 +187,8 @@ def update_prestige(
     league_history: Optional[Dict[str, Any]] = None,
     path: Optional[str] = None,
     coach_changes: Optional[Dict[str, Tuple[float, float]]] = None,
+    *,
+    coach_turnover_only: bool = False,
 ) -> None:
     """
     Update each team's prestige based on league history.
@@ -195,10 +197,28 @@ def update_prestige(
     - league_history: From load_league_history(). If None, loads from path.
     - path: Path to league_history.json (used if league_history is None)
     - coach_changes: Optional {team_name: (old_coach_skill, new_coach_skill)}
+    - coach_turnover_only: If True, only apply ``coach_changes`` turnover penalties to prestige
+      (no season deltas or championship increment). Used when season prestige was already
+      applied at season finalize and carousel III should only reflect coaching moves.
     """
     from systems.league_history import load_league_history
 
     data = league_history if league_history is not None else load_league_history(path)
+
+    if coach_turnover_only:
+        if not coach_changes:
+            return
+        for name, team in teams.items():
+            if name not in coach_changes:
+                continue
+            old_skill, new_skill = coach_changes[name]
+            delta = _coach_turnover_penalty(old_skill, new_skill)
+            prestige = getattr(team, "prestige", 5) or 5
+            new_prestige = max(1, min(15, round(prestige + delta)))
+            team.prestige = new_prestige
+            team._clamp_values()
+        return
+
     seasons = data.get("seasons") or []
     if not seasons:
         return
@@ -215,13 +235,6 @@ def update_prestige(
         )
         new_prestige = max(1, min(15, round(prestige + delta)))
         team.prestige = new_prestige
-        team._clamp_values()
-
-    # Increment championships for state champion
-    champion = latest.get("state_champion") or ""
-    if champion and champion in teams:
-        team = teams[champion]
-        team.championships = getattr(team, "championships", 0) + 1
         team._clamp_values()
 
 

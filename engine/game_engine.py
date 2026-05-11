@@ -20,39 +20,6 @@ def _tri_int(lo: int, hi: int, mode: int) -> int:
     return int(round(random.triangular(lo, hi, mode)))
 
 
-def regulation_dead_ball_clock_seconds() -> int:
-    """Clock runoff for punt, FG, change of possession, TD celebration, legacy auto-4th."""
-    return _tri_int(14, 30, 22)
-
-
-def regulation_kneel_clock_seconds() -> int:
-    """Clock burned on a victory formation kneel."""
-    return _tri_int(26, 40, 33)
-
-
-def regulation_scrimmage_clock_seconds(
-    offense_choice: str,
-    *,
-    incomplete_pass: bool,
-    sack: bool = False,
-    scramble: bool = False,
-) -> int:
-    """
-    Seconds burned on one regulation scrimmage snap.
-    Pass completions (and sacks) tick faster than runs; incompletes do not run the main clock
-    (extra snaps → higher play volume for pass-heavy games).
-    """
-    if incomplete_pass:
-        return 0
-    if sack:
-        return _tri_int(16, 34, 24)
-    if scramble:
-        return _tri_int(15, 32, 23)
-    if offense_choice == "1":
-        return _tri_int(22, 40, 31)
-    return _tri_int(14, 32, 23)
-
-
 def _normalize_offense_choice(choice):
     """Convert Play object to legacy '1' (run) or '2' (pass). Pass-through for str."""
     if choice is None:
@@ -108,11 +75,83 @@ def _defense_play_label(choice):
 # yards from the current offense's own goal toward the opponent's goal line.
 KICKOFF_TEE_YARDS = 40
 
+# Regulation: HS-style **12:00 quarters** always. Snap volume (~40–60 offensive plays per team, ~51 mean)
+# is tuned by scaling per-play runoff, not shortening the quarter clock (incompletions still burn 0).
+REGULATION_QUARTER_SECONDS = 12 * 60
+
+# HS-style mercy / running clock: when one team leads by RUNNING_CLOCK_LEAD_THRESHOLD or more
+# during regulation, incomplete forward passes also drain the clock (instead of stopping it).
+# All other plays already drain time; this matches NFHS-style "running clock" mercy conventions
+# used by the WV / many state high-school associations once the lead reaches 35.
+RUNNING_CLOCK_LEAD_THRESHOLD = 35
+_PRIOR_TUNING_COMBINED_SCRIM_SNAP_MID = (135 + 160) / 2  # combined regulation scrimmage @ 810s/qtr-era comment
+_TARGET_COMBINED_SCRIMMAGE_SNAPS_REG = 102  # ~51 per offense per regulation game
+_PRIOR_TUNING_SECONDS_PER_QUARTER = 810
+REGULATION_PLAY_CLOCK_MULTIPLIER = (_PRIOR_TUNING_COMBINED_SCRIM_SNAP_MID * REGULATION_QUARTER_SECONDS) / (
+    _TARGET_COMBINED_SCRIMMAGE_SNAPS_REG * _PRIOR_TUNING_SECONDS_PER_QUARTER
+)
+
+
+def scaled_regulation_clock_drain(raw_seconds: int) -> int:
+    """
+    Scale a raw sampled runoff (seconds) after the ball is dead. Used for scrimmage, punts,
+    turnovers, PAT-adjacent kickoff cadence (engine), etc. Incomplete passes bypass this by using 0
+    inside regulation_scrimmage_clock_seconds().
+    """
+    if raw_seconds <= 0:
+        return raw_seconds
+    return max(1, int(round(raw_seconds * REGULATION_PLAY_CLOCK_MULTIPLIER)))
+
+
+def regulation_dead_ball_clock_seconds() -> int:
+    """Clock runoff for punt, FG, change of possession, TD celebration, legacy auto-4th."""
+    return scaled_regulation_clock_drain(_tri_int(12, 26, 19))
+
+
+def regulation_kneel_clock_seconds() -> int:
+    """Clock burned on a victory formation kneel."""
+    return scaled_regulation_clock_drain(_tri_int(24, 37, 30))
+
+
+def regulation_scrimmage_clock_seconds(
+    offense_choice: str,
+    *,
+    incomplete_pass: bool,
+    sack: bool = False,
+    scramble: bool = False,
+) -> int:
+    """
+    Seconds burned on one regulation scrimmage snap after the ball is dead.
+    Incomplete forward passes should not consume game clock — callers pass ``incomplete_pass=True``
+    or skip runoff entirely (Fed/NFHS-style: clock starts on the next snap).
+    Runs, completions, sacks, and scrambles consume clock here.
+    """
+    if incomplete_pass:
+        return 0
+    if sack:
+        return scaled_regulation_clock_drain(_tri_int(14, 30, 21))
+    if scramble:
+        return scaled_regulation_clock_drain(_tri_int(13, 29, 20))
+    if offense_choice == "1":
+        return scaled_regulation_clock_drain(_tri_int(19, 35, 27))
+    return scaled_regulation_clock_drain(_tri_int(12, 28, 20))
+
+
+# --- Scoring efficiency (high school realism) ---
+# Lowers points via finishing drives (RZ yards), turnovers, procedural penalties, FG/PAT make rates;
+# explosive probabilities at a spot are separate from play-clock tempo scaling above.
+RZ_YARD_MULTIPLIER_HIGH = 0.904  # ball 80–94 (opp 20 down to ~6): harder to pound in / finish
+RZ_YARD_MULTIPLIER_GOAL = 0.865  # ball 95+ (inside ~opp 5)
+OFFENSIVE_PENALTY_BASE_CHANCE = 0.026
+OFFENSIVE_PENALTY_RZ_BOOST = 0.020  # ball 80+
+OFFENSIVE_PENALTY_SCORING_ZONE_BOOST = 0.009  # ball 58+ (past midfield-ish)
+EFFICIENCY_TO_GAIN_MULT = 1.062  # INT / fumble / strip-sack knobs (fractional uplift)
+
 
 class Game:
     def __init__(self, offense_rating=60, defense_rating=60, run_rating=60, pass_rating=60):
         self.quarter = 1
-        self.time_remaining = 12 * 60
+        self.time_remaining = REGULATION_QUARTER_SECONDS
         self.ball_position = 25
         self.down = 1
         self.yards_to_go = 10
@@ -153,6 +192,22 @@ class Game:
         self.pending_pat = False
         # Who received the opening kickoff ("home" or "away") — other team receives 2nd-half kickoff
         self.opening_kickoff_receiver = "home"
+
+        # Running-clock (mercy rule) bookkeeping. ``running_clock_announced`` flips to True the
+        # first time the lead reaches RUNNING_CLOCK_LEAD_THRESHOLD so callers can emit a one-time
+        # "RUNNING CLOCK IN EFFECT" log line. Resets back to False if a comeback drops the
+        # margin under the threshold so a swing back can re-announce.
+        self.running_clock_announced = False
+
+    def is_running_clock_active(self) -> bool:
+        """True when HS-style running clock applies (regulation + lead ≥ threshold).
+
+        While active, ``run_play()`` will burn time on incomplete forward passes too,
+        instead of stopping the clock. Overtime never uses a running clock.
+        """
+        if getattr(self, "is_overtime", False):
+            return False
+        return abs(int(self.score_home) - int(self.score_away)) >= RUNNING_CLOCK_LEAD_THRESHOLD
 
     def switch_possession(self):
         self.possession = "away" if self.possession == "home" else "home"
@@ -245,7 +300,9 @@ class Game:
         if not meta.get("kickoff_td"):
             self.down = 1
             self.yards_to_go = 10
-        self.time_remaining = max(0, self.time_remaining - random.randint(5, 14))
+        self.time_remaining = max(
+            0, self.time_remaining - scaled_regulation_clock_drain(random.randint(5, 14))
+        )
         return meta
 
     def attempt_extra_point_kick(self, defense_pat_choice: str = "return"):
@@ -259,9 +316,9 @@ class Game:
                 _safe_engine_print("EXTRA POINT BLOCKED!")
                 blocked = True
                 return {"pat_kick": True, "pat_success": False, "blocked": True, "missed": False}
-            make_chance = 0.88
+            make_chance = 0.81
         else:
-            make_chance = 0.945
+            make_chance = 0.884
 
         if random.random() < make_chance:
             _safe_engine_print("EXTRA POINT IS GOOD!")
@@ -389,13 +446,13 @@ class Game:
         _safe_engine_print(f"Field Goal Attempt from {kick_distance} yards!")
 
         if kick_distance <= 35:
-            success_chance = 0.95
+            success_chance = 0.88
         elif kick_distance <= 45:
-            success_chance = 0.85
+            success_chance = 0.76
         elif kick_distance <= 55:
-            success_chance = 0.65
+            success_chance = 0.56
         else:
-            success_chance = 0.40
+            success_chance = 0.32
 
         if defense_fg_block:
             if random.random() < 0.09:
@@ -644,6 +701,8 @@ class Game:
         offense_choice = _normalize_offense_choice(offense_choice)
         defense_choice = _normalize_defense_choice(defense_choice)
 
+        ball_at_snap = int(self.ball_position)
+
         # Formation-aware defensive ratings (DL/LB/DB counts on this snap vs team baseline)
         def_eff_defense = self.defense_rating
         def_eff_coverage = self.def_coverage_rating
@@ -688,8 +747,8 @@ class Game:
 
         # -------- RUN --------
         if offense_choice == "1":
-            # Base 4-7 YPC (slight uptick); better run O gets more, strong run D/poor OL stuffs
-            base_yards = random.randint(4, 7)
+            # Base ~5–8 YPC band; better run O gets more, strong run D/poor OL stuffs
+            base_yards = random.randint(5, 8)
             rating_bonus = (off_eff_run - def_eff_defense) // 7
             yards = base_yards + rating_bonus
 
@@ -704,11 +763,11 @@ class Game:
             adv = off_eff_run - def_eff_defense
             roll = random.random()
             # Chunk run 10-18 yd
-            chunk_chance = 0.165 + max(0, adv) / 330
+            chunk_chance = 0.175 + max(0, adv) / 330
             if roll < chunk_chance:
                 yards = random.randint(10, 18)
             # Breakaway 18-45 yd
-            elif roll < chunk_chance + (0.093 + max(0, adv) / 138):
+            elif roll < chunk_chance + (0.098 + max(0, adv) / 138):
                 max_break = min(45, 99 - self.ball_position)
                 if max_break >= 18:
                     yards = random.randint(18, max_break)
@@ -733,7 +792,7 @@ class Game:
             off_to_quality = (self.qb_decision_rating + self.ball_security_rating + self.off_discipline_rating) / 3.0
             to_scale = 1.5 - off_to_quality / 72.0
             to_scale = max(0.48, min(1.12, to_scale))
-            fumble_chance *= to_scale * 1.08
+            fumble_chance *= to_scale * 1.08 * EFFICIENCY_TO_GAIN_MULT
             if random.random() < fumble_chance:
                 _safe_engine_print("FUMBLE!")
                 fumble = True
@@ -749,8 +808,9 @@ class Game:
             explosive_chance = 0.0  # set in pass-resolution block; 0 when sack/scramble
             # Sack: strong pass rush vs weak pass protection / bad QB = disaster
             pressure_boost = (def_eff_pass_rush - off_eff_pass) / 350.0
-            sack_chance = max(0.06, 0.20 - ((off_eff_pass - def_eff_defense) / 220))
-            sack_chance = max(0.05, min(0.32, sack_chance + pressure_boost))
+            # Target ~fewer sacks/game so EDGE/LB sack stats cluster ~1–2 for stars (individual stat spread).
+            sack_chance = max(0.048, 0.145 - ((off_eff_pass - def_eff_defense) / 220))
+            sack_chance = max(0.045, min(0.205, sack_chance + pressure_boost * 0.78))
             if defense_choice == "2" and random.random() < sack_chance:
                 _safe_engine_print("SACK! Loss of 7 yards")
                 yards = -7
@@ -765,7 +825,7 @@ class Game:
                 scramble_chance = max(0.02, min(0.25, scramble_chance))
                 if random.random() < scramble_chance:
                     # QB run; good DL contains (reduces yards)
-                    base_yards = random.randint(2, 9)
+                    base_yards = random.randint(3, 10)
                     rating_bonus = (off_eff_run - def_eff_defense) // 8
                     yards = base_yards + rating_bonus
                     yards = max(0, min(25, yards))  # cap scramble gains; good D can stuff
@@ -777,22 +837,22 @@ class Game:
                 # Yardage by concept. Avg 120-150/game; variance 75 (bad) to 300+ (great matchup)
                 adv = off_eff_pass - def_eff_coverage
                 if pass_concept == "SHORT_PASS":
-                    base_yards = random.randint(2, 10)
-                    explosive_chance = 0.078 + max(0, adv) / 380  # YAC explosion
+                    base_yards = random.randint(3, 11)
+                    explosive_chance = 0.082 + max(0, adv) / 380  # YAC explosion
                 elif pass_concept == "MEDIUM_PASS":
-                    base_yards = random.randint(4, 14)
-                    explosive_chance = 0.162 + max(0, adv) / 265
+                    base_yards = random.randint(5, 15)
+                    explosive_chance = 0.168 + max(0, adv) / 265
                 elif pass_concept == "LONG_PASS":
-                    base_yards = random.randint(6, 24)
-                    explosive_chance = 0.268 + max(0, adv) / 142
+                    base_yards = random.randint(7, 26)
+                    explosive_chance = 0.275 + max(0, adv) / 142
                     if adv >= 12 and random.random() < 0.12:
                         base_yards += random.randint(10, 28)
                 elif pass_concept == "PLAY_ACTION":
-                    base_yards = random.randint(3, 14)
-                    explosive_chance = 0.152 + max(0, adv) / 305
+                    base_yards = random.randint(4, 15)
+                    explosive_chance = 0.158 + max(0, adv) / 305
                 else:
-                    base_yards = random.randint(2, 10)
-                    explosive_chance = 0.185 + max(0, adv) / 265  # Legacy/default
+                    base_yards = random.randint(3, 11)
+                    explosive_chance = 0.192 + max(0, adv) / 265  # Legacy/default
 
                 rating_bonus = (off_eff_pass - def_eff_defense) // 7
                 coverage_penalty = max(0, (def_eff_coverage - off_eff_pass) // 12)
@@ -840,7 +900,7 @@ class Game:
             # Season target: good teams 8-14 TO, bad teams 20-35. Scale by offense ball security.
             _off_to = (self.qb_decision_rating + self.ball_security_rating + self.off_discipline_rating) / 3.0
             _to_scale = max(0.48, min(1.12, 1.5 - _off_to / 72.0))
-            int_chance *= _to_scale * 1.08
+            int_chance *= _to_scale * 1.08 * EFFICIENCY_TO_GAIN_MULT
             if not sack and not scramble and random.random() < int_chance:
                 _safe_engine_print("INTERCEPTION!")
                 interception = True
@@ -858,7 +918,7 @@ class Game:
             def_strip = (def_eff_pass_rush * 0.65) + (def_eff_tackling * 0.35)
             strip_fumble_chance = 0.0046 + ((def_strip - off_sack_security) / 1500.0)
             strip_fumble_chance = max(0.0012, min(0.022, strip_fumble_chance))
-            strip_fumble_chance *= _to_scale * 1.08
+            strip_fumble_chance *= _to_scale * 1.08 * EFFICIENCY_TO_GAIN_MULT
             if sack and not interception and random.random() < strip_fumble_chance:
                 _safe_engine_print("STRIP SACK FUMBLE!")
                 fumble = True
@@ -892,6 +952,24 @@ class Game:
             yards = max(-4, min(99, yards))
         except Exception:
             pass
+
+        # -------- RZ FINISHING + PROCEDURAL PENALTIES (efficiency-only; explosives rolls unchanged above) --------
+        if offense_choice in ("1", "2") and not self.is_overtime:
+            if yards > 0 and not interception and not sack and not incomplete_pass:
+                if ball_at_snap >= 95:
+                    yards = int(round(yards * RZ_YARD_MULTIPLIER_GOAL))
+                elif ball_at_snap >= 80:
+                    yards = int(round(yards * RZ_YARD_MULTIPLIER_HIGH))
+                yards = max(-4, min(99, yards))
+            if not interception and not incomplete_pass and not sack:
+                p_pen = OFFENSIVE_PENALTY_BASE_CHANCE
+                if ball_at_snap >= 80:
+                    p_pen += OFFENSIVE_PENALTY_RZ_BOOST
+                if ball_at_snap >= 58:
+                    p_pen += OFFENSIVE_PENALTY_SCORING_ZONE_BOOST
+                if random.random() < p_pen:
+                    yards -= random.choices([5, 10], weights=[82, 18])[0]
+                    yards = max(-4, min(99, yards))
 
         # -------- APPLY YARDS --------
         self.ball_position += yards
@@ -994,25 +1072,26 @@ class Game:
             return {"yards": yards, "touchdown": False, "turnover": True, "sack": sack, "scramble": scramble, "interception": interception, "incomplete_pass": incomplete_pass, "clock_elapsed": clock_elapsed, "first_down": False, "fumble": False}
 
         # -------- CLOCK --------
-        # Tuned for ~120-130 regulation snaps total: shorter per snap than old 32-52s; passes tick faster than runs.
-        run_clock = offense_choice == "1" or not incomplete_pass
-        clock_elapsed = (
-            regulation_scrimmage_clock_seconds(
+        # Incomplete forward pass: clock stops — no regulation runoff this snap.
+        # EXCEPTION: HS-style running clock (35+ point lead, regulation only) keeps the clock
+        # rolling on incompletions too, matching NFHS mercy-rule conventions.
+        # Pace targets ~102 combined regulation scrimmage snaps (~51/side avg) via scaled runoff × 12:00 quarters.
+        running_clock = self.is_running_clock_active()
+        if incomplete_pass and not running_clock:
+            clock_elapsed = 0
+        else:
+            clock_elapsed = regulation_scrimmage_clock_seconds(
                 offense_choice,
-                incomplete_pass=incomplete_pass,
+                incomplete_pass=False,
                 sack=sack,
                 scramble=scramble,
             )
-            if run_clock
-            else 0
-        )
-        if run_clock:
             self.time_remaining -= clock_elapsed
             if self.time_remaining < 0:
                 self.time_remaining = 0
 
         self.display_status(yards)
-        return {"yards": yards, "touchdown": False, "turnover": False, "sack": sack, "scramble": scramble, "interception": interception, "incomplete_pass": incomplete_pass, "clock_elapsed": clock_elapsed, "first_down": first_down, "fumble": False}
+        return {"yards": yards, "touchdown": False, "turnover": False, "sack": sack, "scramble": scramble, "interception": interception, "incomplete_pass": incomplete_pass, "clock_elapsed": clock_elapsed, "first_down": first_down, "fumble": False, "running_clock": running_clock}
 
     # ------------------ DISPLAY ------------------
     def display_status(self, last_play_yards=None):
@@ -1053,7 +1132,7 @@ class Game:
                 ended_quarter = self.quarter
                 self.quarter += 1
                 if self.quarter <= 4:
-                    self.time_remaining = 12 * 60
+                    self.time_remaining = REGULATION_QUARTER_SECONDS
                     if ended_quarter == 2:
                         # Halftime only: new kickoff (not after Q1 or Q3).
                         # Interactive coach games use pending_kickoff flow from game_service.

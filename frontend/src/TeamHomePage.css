@@ -16,9 +16,9 @@
   /* Above .teamhome-secondbar + scrollable league panels — otherwise the second bar paints on top when scrolled and steals clicks from TEAM / STATE. */
   z-index: 40;
   display: grid;
-  /* Row 1: logo + stats + both dropdowns. Row 2: actions full width — avoids overlap with selects. */
+  /* Row 1: logo + name + record + rank + class + TEAM + STATE. Row 2: actions full width — avoids overlap with selects. */
   grid-template-columns:
-    120px minmax(0, 1.2fr) minmax(0, 0.85fr) minmax(0, 0.75fr) minmax(120px, 1fr) minmax(120px, 1fr);
+    120px minmax(0, 1.2fr) minmax(0, 0.85fr) minmax(0, 0.75fr) minmax(120px, 1fr) minmax(120px, 1fr) minmax(120px, 1fr);
   grid-template-rows: auto auto;
   align-items: end;
   gap: 8px 16px;
@@ -223,13 +223,20 @@
 .teamhome-roster-head.teamhome-roster-row,
 .teamhome-roster-head.teamhome-standings-row,
 .teamhome-roster-head.teamhome-rankings-row,
-.teamhome-roster-head.teamhome-stats-row {
+.teamhome-roster-head.teamhome-stats-row,
+.teamhome-roster-head.teamhome-topplayers-row {
   border-bottom: 2px solid rgba(220, 224, 234, 0.5);
 }
 
 .teamhome-roster-head.teamhome-schedule-row {
   border-bottom: 2px solid rgba(220, 224, 234, 0.5);
   margin-top: 8px;
+}
+
+/* Transfers I — portal table (5 columns; do not reuse default 8-col roster grid). */
+.teamhome-transfer-portal-head.teamhome-roster-row,
+.teamhome-roster-row.teamhome-transfer-portal-row {
+  grid-template-columns: minmax(130px, 1.1fr) 48px 44px minmax(150px, 1fr) minmax(72px, 0.65fr) 56px;
 }
 
 .teamhome-roster-table {
@@ -269,6 +276,19 @@
 }
 
 .teamhome-rankings-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.teamhome-topplayers-row {
+  display: grid;
+  grid-template-columns: 52px minmax(140px, 1fr) 52px 56px 56px minmax(180px, 1.2fr);
+  gap: 8px;
+  align-items: center;
+  padding: 9px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.teamhome-topplayers-row:hover {
   background: rgba(255, 255, 255, 0.04);
 }
 
@@ -755,6 +775,26 @@ td .teamhome-roster-name--profile {
 .teamhome-schedule-mini-score {
   white-space: nowrap;
   padding-top: 2px;
+}
+
+/* Region-game asterisk: small, gold, kerned tight to the opponent name. */
+.teamhome-region-mark {
+  color: #d4a017;
+  font-weight: 900;
+  margin-left: 2px;
+  cursor: help;
+}
+
+.teamhome-schedule-region-legend {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0.85;
+}
+
+.teamhome-schedule-region-legend .teamhome-region-mark {
+  margin-left: 0;
 }
 
 .teamhome-small {
@@ -1634,7 +1674,7 @@ td .teamhome-roster-name--profile {
 
 @media (max-width: 1100px) {
   .teamhome-topbar {
-    grid-template-columns: 120px repeat(5, minmax(0, 1fr));
+    grid-template-columns: 120px repeat(6, minmax(0, 1fr));
     grid-template-rows: auto auto;
   }
   .teamhome-top-actions {
@@ -1672,6 +1712,10 @@ td .teamhome-roster-name--profile {
   }
   .teamhome-stats-row {
     grid-template-columns: minmax(160px, 1fr) 66px 66px 66px 90px 100px 110px;
+    font-size: 0.84rem;
+  }
+  .teamhome-topplayers-row {
+    grid-template-columns: 48px minmax(120px, 1fr) 48px 48px 48px minmax(140px, 1.1fr);
     font-size: 0.84rem;
   }
   .teamhome-teamstats-row {
@@ -1848,6 +1892,62 @@ td .teamhome-roster-name--profile {
     grid-template-columns: 1fr;
   }
   .teamhome-teaminfo-grades {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* STATE → League History */
+.teamhome-league-history-root .teamhome-league-history-section-head {
+  margin-top: 12px;
+}
+.teamhome-league-history-classes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+  margin-top: 10px;
+}
+.teamhome-league-history-class-card .teamhome-roster-cell,
+.teamhome-league-history-class-card .teamhome-roster-name {
+  font-size: 0.82rem;
+}
+.teamhome-league-history-rank-head {
+  font-size: 0.78rem;
+}
+.teamhome-league-history-rank-table {
+  max-height: 320px;
+  overflow-y: auto;
+}
+.teamhome-league-history-playoffs-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 10px;
+}
+.teamhome-league-history-playoffs-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+.teamhome-playoffs-microcol {
+  min-width: 0;
+}
+.teamhome-microcol-title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.62;
+  margin-bottom: 8px;
+}
+.teamhome-league-history-champ-pill {
+  display: inline-block;
+  margin-left: 8px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+@media (max-width: 900px) {
+  .teamhome-league-history-playoffs-grid {
     grid-template-columns: 1fr;
   }
 }

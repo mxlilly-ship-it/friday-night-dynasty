@@ -247,6 +247,8 @@ def build_league_state(
     save_name: str,
     *,
     user_team: Optional[str] = None,
+    user_coach_name: Optional[str] = None,
+    allow_user_coach_firing: bool = True,
     current_week: int = 1,
     season_phase: str = "regular",  # "regular" | "playoffs" | "offseason" | "done"
     weeks: Optional[List[List[Dict[str, str]]]] = None,  # week -> [{home, away}]
@@ -266,7 +268,10 @@ def build_league_state(
         "week_results": week_results or [],
         "standings": standings or {},
         "teams": [team_to_dict(t) for t in teams.values()],
+        "allow_user_coach_firing": bool(allow_user_coach_firing),
     }
+    if user_coach_name is not None and str(user_coach_name).strip():
+        out["user_coach_name"] = str(user_coach_name).strip()
     if league_structure is not None:
         out["league_structure"] = league_structure
     return out
@@ -278,6 +283,8 @@ def save_league(
     current_year: int,
     *,
     user_team: Optional[str] = None,
+    user_coach_name: Optional[str] = None,
+    allow_user_coach_firing: bool = True,
     current_week: int = 1,
     season_phase: str = "regular",
     weeks: Optional[List[List[Dict[str, str]]]] = None,
@@ -297,6 +304,8 @@ def save_league(
         current_year,
         save_name,
         user_team=user_team,
+        user_coach_name=user_coach_name,
+        allow_user_coach_firing=allow_user_coach_firing,
         current_week=current_week,
         season_phase=season_phase,
         weeks=weeks,

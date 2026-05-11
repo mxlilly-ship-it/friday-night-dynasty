@@ -25,24 +25,26 @@ from systems.save_system import coach_from_dict, coach_to_dict
 
 def _random_exit_chance(coach: Coach, hot_seat: int, prestige: int) -> float:
     """
-    Chance a coach steps away for non-firing reasons (burnout/life change).
-    This is intentionally modest and biased upward by pressure/age.
+    Chance a coach steps away for non-firing reasons (burnout / life change /
+    lateral move / family). Tuned so stage-1 carousel churn averages roughly
+    8-12 openings per year on a ~108-team league (was ~3-4 at base 0.025).
+    Pressure and age still bias the distribution upward.
     """
-    chance = 0.025
+    chance = 0.075
     age = int(getattr(coach, "age", 50) or 50)
     if age >= 67:
-        chance += 0.03
+        chance += 0.05
     elif age >= 62:
-        chance += 0.018
+        chance += 0.03
     elif age >= 57:
-        chance += 0.01
+        chance += 0.018
 
     # Extra churn when pressure is elevated even if not fired.
-    chance += max(0.0, (float(hot_seat) - 55.0) * 0.0012)
+    chance += max(0.0, (float(hot_seat) - 55.0) * 0.0022)
 
     # Lower-prestige jobs tend to be less stable over time.
-    chance += max(0.0, (5.0 - float(prestige)) * 0.004)
-    return max(0.01, min(0.2, chance))
+    chance += max(0.0, (5.0 - float(prestige)) * 0.0065)
+    return max(0.015, min(0.28, chance))
 
 
 def _standings_row_for_team(
@@ -154,12 +156,19 @@ def _maybe_fire_coach(
     vacancies: List[str],
     coach_changes: Dict[str, Tuple[float, float]],
     hot_seat_by_team: Dict[str, int],
+    *,
+    allow_user_coach_firing: bool = True,
 ) -> bool:
     prestige = getattr(team, "prestige", 5) or 5
     hs = compute_hot_seat(name, seasons, standings_row, season_goals if name == user_team else None)
     coach.hot_seat = hs
     hot_seat_by_team[name] = hs
-    threshold = 88 if name == user_team else 92
+    if name == user_team and str(user_team or "") and not allow_user_coach_firing:
+        return False
+    # Lowered thresholds (88→78, 92→82) so year-2+ stage-1 churn also lifts a bit and
+    # genuinely under-pressure coaches get axed; year-1 hot-seats top out around 30
+    # (no losing streak yet) so this only matters once history accumulates.
+    threshold = 78 if name == user_team else 82
     if _should_fire(name, prestige, seasons) or hs >= threshold:
         events.append(
             {
@@ -179,6 +188,89 @@ def _maybe_fire_coach(
     return False
 
 
+def _pop_unemployed_user_coach(unemployed: List[Coach], user_coach_name: Optional[str]) -> Optional[Coach]:
+    """Remove and return the user's coach from the unemployed list (after a firing)."""
+    if not user_coach_name or not isinstance(unemployed, list):
+        return None
+    tgt = str(user_coach_name).strip().lower()
+    if not tgt:
+        return None
+    for idx, c in enumerate(unemployed):
+        if c and str(c.name or "").strip().lower() == tgt:
+            return unemployed.pop(idx)
+    return None
+
+
+def _try_user_application_hire(
+    vacancy: str,
+    team_by_name: Dict[str, Any],
+    employed_coaches: Dict[str, Tuple[str, Coach]],
+    coach_changes: Dict[str, Tuple[float, float]],
+    events: List[Dict[str, Any]],
+    vacancies: List[str],
+    job_applications: List[str],
+    user_team: str,
+    hiring_team: Any,
+    hiring_prestige: int,
+    unemployed: List[Coach],
+    user_coach_name: Optional[str],
+) -> bool:
+    """
+    User applies to vacant HC jobs ranked in job_applications (destination schools).
+    Resolved before CPU promotion logic for this vacancy.
+    """
+    if user_team == vacancy:
+        return False
+    try:
+        rank = job_applications.index(vacancy)
+    except ValueError:
+        return False
+
+    poach_team = team_by_name.get(user_team)
+    if not poach_team:
+        return False
+    hired_coach = getattr(poach_team, "coach", None)
+    if hired_coach is None:
+        hired_coach = _pop_unemployed_user_coach(unemployed, user_coach_name)
+
+    if hired_coach is None:
+        return False
+
+    home_prestige = getattr(poach_team, "prestige", 5) or 5
+    # Earlier in the preference list modestly boosts perceived fit / AD interest.
+    rank_bonus = 0.04 * max(0.0, float(len(job_applications) - rank - 1))
+    accept = PROMOTION_ACCEPT_BASE + (float(hiring_prestige) - float(home_prestige)) * 0.055 + rank_bonus
+    accept = max(0.14, min(0.93, accept))
+    if random.random() > accept:
+        return False
+
+    poach_old_skill = get_coach_skill_sum(hired_coach)
+    hiring_team.coach = hired_coach
+    hired_coach.years_at_school = 0
+    hired_coach.years_since_scheme_change = getattr(hired_coach, "years_since_scheme_change", 0)
+    if getattr(poach_team, "coach", None) is hired_coach:
+        poach_team.coach = None
+    if user_team in employed_coaches:
+        del employed_coaches[user_team]
+    employed_coaches[vacancy] = (vacancy, hired_coach)
+    new_skill = get_coach_skill_sum(hired_coach)
+    old_skill = coach_changes.get(vacancy, (3.0, 3.0))[0]
+    coach_changes[vacancy] = (old_skill, new_skill)
+    coach_changes[user_team] = (poach_old_skill, 3.0)
+    events.append(
+        {
+            "type": "application_hire",
+            "team": vacancy,
+            "coach": hired_coach.name,
+            "from_school": user_team,
+            "detail": f"{hired_coach.name} accepts the {vacancy} job (user application — leaves {user_team})",
+        }
+    )
+    if user_team not in vacancies:
+        vacancies.append(user_team)
+    return True
+
+
 def _hiring_iteration(
     vacancy: str,
     team_by_name: Dict[str, Any],
@@ -189,9 +281,29 @@ def _hiring_iteration(
     events: List[Dict[str, Any]],
     vacancies: List[str],
     current_year: int,
+    job_applications: Optional[List[str]] = None,
+    user_team: Optional[str] = None,
+    user_coach_name: Optional[str] = None,
 ) -> None:
     hiring_team = team_by_name[vacancy]
     hiring_prestige = getattr(hiring_team, "prestige", 5) or 5
+    ja = job_applications or []
+    if user_team and ja and _try_user_application_hire(
+        vacancy,
+        team_by_name,
+        employed_coaches,
+        coach_changes,
+        events,
+        vacancies,
+        ja,
+        user_team,
+        hiring_team,
+        hiring_prestige,
+        unemployed,
+        user_coach_name,
+    ):
+        return
+
     candidates: List[Tuple[float, str, Coach]] = []
     for school, (_, coach) in list(employed_coaches.items()):
         if not coach:
@@ -239,7 +351,17 @@ def _hiring_iteration(
         return
 
     if unemployed:
-        new_coach = unemployed.pop()
+        new_coach = None
+        skip = str(user_coach_name or "").strip().lower() or None
+        for idx in range(len(unemployed) - 1, -1, -1):
+            c = unemployed[idx]
+            if skip and str(c.name or "").strip().lower() == skip:
+                continue
+            new_coach = unemployed.pop(idx)
+            break
+        if new_coach is None:
+            new_coach = generate_coach_for_team(hiring_team)
+            new_coach.last_preferred_playbook_change_year = max(1, int(current_year))
     else:
         new_coach = generate_coach_for_team(hiring_team)
         new_coach.last_preferred_playbook_change_year = max(1, int(current_year))
@@ -261,6 +383,17 @@ def _rebuild_employed(teams: Dict[str, Any]) -> Dict[str, Tuple[str, Coach]]:
     }
 
 
+def _job_apps_open_only(vacancies: List[str], job_applications: Optional[List[str]]) -> List[str]:
+    if not job_applications:
+        return []
+    open_set = set(vacancies)
+    seen: List[str] = []
+    for name in job_applications:
+        if name in open_set and name not in seen:
+            seen.append(name)
+    return seen
+
+
 def _hiring_loop(
     teams: Dict[str, Any],
     vacancies: List[str],
@@ -270,6 +403,10 @@ def _hiring_loop(
     events: List[Dict[str, Any]],
     max_fills: Optional[int],
     current_year: int,
+    *,
+    job_applications: Optional[List[str]] = None,
+    user_team: Optional[str] = None,
+    user_coach_name: Optional[str] = None,
 ) -> Tuple[List[str], List[Coach]]:
     team_by_name = {name: team for name, team in teams.items()}
     employed_coaches = _rebuild_employed(teams)
@@ -280,6 +417,8 @@ def _hiring_loop(
             break
         vac.sort(key=lambda v: (-(getattr(team_by_name[v], "prestige", 5) or 5), v))
         vacancy = vac.pop(0)
+        # Re-evaluate prefs each iteration as the open set evolves.
+        ja_eff = _job_apps_open_only(vac + [vacancy], job_applications)
         _hiring_iteration(
             vacancy,
             team_by_name,
@@ -290,10 +429,48 @@ def _hiring_loop(
             events,
             vac,
             current_year,
+            ja_eff,
+            user_team,
+            user_coach_name,
         )
         fills += 1
         employed_coaches = _rebuild_employed(teams)
     return vac, unemployed
+
+
+def build_carousel_season_archive(
+    seasons_year: int, events: List[Dict[str, Any]], hot_seat_by_team: Dict[str, int]
+) -> Dict[str, Any]:
+    """Compact coaching carousel recap for saves / UI (shown in postseason history)."""
+    ev = list(events or [])
+    counts = {
+        "retirement": 0,
+        "resignation": 0,
+        "firing": 0,
+        "hire": 0,
+        "promotion": 0,
+        "application_hire": 0,
+        "scheme_change": 0,
+    }
+    bullets: List[str] = []
+    stop = {"retirement", "resignation", "firing", "hire", "promotion", "application_hire", "scheme_change"}
+    for e in ev:
+        t = str(e.get("type") or "")
+        if t in counts:
+            counts[t] += 1
+        if t in stop and isinstance(e.get("detail"), str) and str(e["detail"]).strip():
+            bullets.append(str(e["detail"]).strip())
+
+    headline = (
+        f"Year {seasons_year}: {counts['retirement'] + counts['resignation'] + counts['firing']} openings, "
+        f"{counts['hire'] + counts['promotion'] + counts['application_hire']} hires"
+    )
+    return {
+        "year": seasons_year,
+        "headline": headline,
+        "counts": counts,
+        "bullets": bullets[-80:],
+    }
 
 
 def _serialize_cc(cc: Dict[str, Tuple[float, float]]) -> Dict[str, List[float]]:
@@ -353,6 +530,8 @@ def _carousel_init(
     standings: Optional[Dict[str, Dict[str, Any]]],
     user_team: Optional[str],
     season_goals: Optional[Dict[str, Any]],
+    *,
+    allow_user_coach_firing: bool = True,
 ) -> Tuple[List[str], List[Coach], List[Dict[str, Any]], Dict[str, Tuple[float, float]], Dict[str, int]]:
     events: List[Dict[str, Any]] = []
     coach_changes: Dict[str, Tuple[float, float]] = {}
@@ -429,6 +608,7 @@ def _carousel_init(
             vacancies,
             coach_changes,
             hot_seat_by_team,
+            allow_user_coach_firing=allow_user_coach_firing,
         )
 
     for name, team in teams.items():
@@ -452,10 +632,21 @@ def run_coach_carousel_step(
     user_team: Optional[str],
     season_goals: Optional[Dict[str, Any]],
     current_year: int = 1,
+    job_applications: Optional[List[str]] = None,
+    *,
+    allow_user_coach_firing: bool = True,
+    user_coach_name: Optional[str] = None,
 ) -> Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]], Dict[str, Tuple[float, float]], Dict[str, int]]:
     """
-    carousel_step: 1, 2, or 3.
-    persisted: carry between advances; None = run init (age/retire/fire) then first hiring slice.
+    carousel_step:
+      1 — churn only (retire/resign/fire + vacancy list; no hires).
+      2 — hiring round one (caps by half the opening count).
+      3 — hiring round two (same cap rule).
+      4 — finish all hires + optional scheme changes.
+
+    persisted: carry between advances; None only for step 1 (runs init).
+
+    job_applications: ordered school names where the user's coach seeks an HC vacancy (applied in rounds 2–4).
     """
     from systems.league_history import load_league_history
 
@@ -470,7 +661,7 @@ def run_coach_carousel_step(
 
     if persisted is None:
         vacancies, unemployed, events, coach_changes, hot_seat_by_team = _carousel_init(
-            teams, seasons, standings, user_team, season_goals
+            teams, seasons, standings, user_team, season_goals, allow_user_coach_firing=allow_user_coach_firing
         )
     else:
         vacancies = list(persisted.get("vacancies") or [])
@@ -480,12 +671,9 @@ def run_coach_carousel_step(
         hot_seat_by_team = dict(persisted.get("hot_seat_by_team") or {})
 
     if carousel_step == 1:
-        n = len(vacancies)
-        max_f = max(1, n // 2) if n else None
-        vac, unemp = _hiring_loop(teams, vacancies, unemployed, seasons, coach_changes, events, max_f, current_year)
         out = {
-            "vacancies": vac,
-            "unemployed": [coach_to_dict(c) for c in unemp],
+            "vacancies": vacancies,
+            "unemployed": [coach_to_dict(c) for c in unemployed],
             "events": events,
             "coach_changes": _serialize_cc(coach_changes),
             "hot_seat_by_team": hot_seat_by_team,
@@ -495,7 +683,19 @@ def run_coach_carousel_step(
     if carousel_step == 2:
         n = len(vacancies)
         max_f = max(1, n // 2) if n else None
-        vac, unemp = _hiring_loop(teams, vacancies, unemployed, seasons, coach_changes, events, max_f, current_year)
+        vac, unemp = _hiring_loop(
+            teams,
+            vacancies,
+            unemployed,
+            seasons,
+            coach_changes,
+            events,
+            max_f,
+            current_year,
+            job_applications=job_applications,
+            user_team=user_team,
+            user_coach_name=user_coach_name,
+        )
         out = {
             "vacancies": vac,
             "unemployed": [coach_to_dict(c) for c in unemp],
@@ -505,8 +705,45 @@ def run_coach_carousel_step(
         }
         return out, events, coach_changes, hot_seat_by_team
 
-    # Step 3: finish hires + scheme
-    vac, unemp = _hiring_loop(teams, vacancies, unemployed, seasons, coach_changes, events, None, current_year)
+    if carousel_step == 3:
+        n = len(vacancies)
+        max_f = max(1, n // 2) if n else None
+        vac, unemp = _hiring_loop(
+            teams,
+            vacancies,
+            unemployed,
+            seasons,
+            coach_changes,
+            events,
+            max_f,
+            current_year,
+            job_applications=job_applications,
+            user_team=user_team,
+            user_coach_name=user_coach_name,
+        )
+        out = {
+            "vacancies": vac,
+            "unemployed": [coach_to_dict(c) for c in unemp],
+            "events": events,
+            "coach_changes": _serialize_cc(coach_changes),
+            "hot_seat_by_team": hot_seat_by_team,
+        }
+        return out, events, coach_changes, hot_seat_by_team
+
+    # Step 4: finish hires + scheme
+    vac, unemp = _hiring_loop(
+        teams,
+        vacancies,
+        unemployed,
+        seasons,
+        coach_changes,
+        events,
+        None,
+        current_year,
+        job_applications=job_applications,
+        user_team=user_team,
+        user_coach_name=user_coach_name,
+    )
     for team in teams.values():
         coach = getattr(team, "coach", None)
         if not coach or not _consider_scheme_change(coach):
@@ -537,11 +774,11 @@ def run_carousel_full(
     *,
     current_year: int = 1,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Tuple[float, float]]]:
-    """Single-shot all three steps (scripts / tests)."""
+    """Single-shot all four carousel engine steps (scripts / legacy callers)."""
     p: Optional[Dict[str, Any]] = None
     ev: List[Dict[str, Any]] = []
     cc: Dict[str, Tuple[float, float]] = {}
-    for step in (1, 2, 3):
+    for step in (1, 2, 3, 4):
         p, ev, cc, _hs = run_coach_carousel_step(
             teams,
             league_history,
@@ -551,5 +788,6 @@ def run_carousel_full(
             user_team,
             season_goals,
             current_year,
+            None,
         )
     return ev, cc

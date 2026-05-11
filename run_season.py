@@ -4,7 +4,6 @@ Output everything to season_results.txt
 """
 
 import sys
-import time
 import os
 import threading
 
@@ -18,6 +17,7 @@ from systems.teams_loader import build_teams_from_json
 from systems import calculate_team_ratings, calculate_turnover_profile
 from systems.playoff_system import run_playoff
 from systems.league_history import append_season, load_league_history
+from systems.regional_titles import compute_regular_season_regional_champions_from_team_objects
 from systems.prestige_system import update_prestige
 from systems.coach_career_system import run_coach_career_phase
 from systems.depth_chart import build_depth_chart
@@ -415,7 +415,6 @@ def run_game(
         if game.ot_2pt_mode:
             result = game.run_play_2pt_shootout()
             game.advance_quarter()
-            time.sleep(0.01)
             continue
 
         # 4th down: punt / FG / go-for-it (engine) before normal play call.
@@ -430,7 +429,6 @@ def run_game(
                 pass
             result = game.run_play()
             if isinstance(result, dict) and (result.get("first_down") is False) and (result.get("yards") == 0) and game.down != 4:
-                time.sleep(0.01)
                 continue
 
         # Choose exact plays from each team's playbook (silent sim).
@@ -530,7 +528,6 @@ def run_game(
         if result.get("needs_pat"):
             game.attempt_extra_point_kick(defense_pat_choice="return")
             game.finish_pat_and_kickoff()
-            time.sleep(0.01)
             continue
 
         if result.get("needs_2pt"):
@@ -546,7 +543,6 @@ def run_game(
             game.attempt_two_point(offense_call, defense_call)
             game.setup_ot_possession()
             game.check_ot_period_end()
-            time.sleep(0.01)
             continue
 
         yards = result.get("yards", 0)
@@ -600,7 +596,6 @@ def run_game(
                     home_stamina.recover_halftime(home_team.roster)
                 if away_team.roster:
                     away_stamina.recover_halftime(away_team.roster)
-        time.sleep(0.01)
 
     season_stats[home_name]["interceptions"] += game.interceptions_home
     season_stats[away_name]["interceptions"] += game.interceptions_away
@@ -744,6 +739,7 @@ def run_one_season(teams, save_dir, current_year, write_output_to_save_dir=True)
         runner_up = champ_game["away"] if champ_game["winner"] == champ_game["home"] else champ_game["home"]
 
     # Append to league history (pass save_dir when running as part of a saved league)
+    regional_champions = compute_regular_season_regional_champions_from_team_objects(teams, standings)
     append_season(
         champion=champion,
         runner_up=runner_up,
@@ -752,6 +748,7 @@ def run_one_season(teams, save_dir, current_year, write_output_to_save_dir=True)
         season_player_stats=season_player_stats,
         year=current_year if save_dir else None,
         save_dir=save_dir,
+        regional_champions=regional_champions,
     )
 
     # Coach career phase (retirement, hire/fire, promotion, scheme changes)

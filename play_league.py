@@ -22,6 +22,7 @@ from systems.offseason_manager import run_offseason_all_teams
 from systems.schedule_system import build_weeks_10_game
 from systems.playoff_system import run_playoff
 from systems.league_history import append_season
+from systems.regional_titles import compute_regular_season_regional_champions_from_team_objects
 from systems.prestige_system import update_prestige
 from systems.coach_career_system import run_coach_career_phase
 from systems.game_stats import format_season_player_stats
@@ -134,6 +135,7 @@ def _finish_season_and_advance_year(teams, save_dir, save_name, current_year, st
         champ_game = bracket_results[-1]
         runner_up = champ_game["away"] if champ_game["winner"] == champ_game["home"] else champ_game["home"]
 
+    regional_champions = compute_regular_season_regional_champions_from_team_objects(teams, standings)
     append_season(
         champion=champion,
         runner_up=runner_up,
@@ -142,6 +144,7 @@ def _finish_season_and_advance_year(teams, save_dir, save_name, current_year, st
         season_player_stats=season_player_stats,
         year=current_year,
         save_dir=save_dir,
+        regional_champions=regional_champions,
     )
 
     league_history = load_league_history(league_history_path(save_dir))

@@ -239,75 +239,96 @@ def _pick_receiver(dc: DepthChart) -> Optional["Player"]:
     return random.choices(players, weights=weights, k=1)[0]
 
 
-def _pick_run_tackler(dc: DepthChart, yards: int) -> Optional["Player"]:
+def _spread_weight_for_stat(stats_map: Dict[int, PlayerGameStats], player: "Player", base_weight: float, stat_attr: str) -> float:
     """
-    Pick tackler on run play. Spread by run distance:
-    - Short (0–4 yds): DL and LB at line
-    - Medium (5–8): LB and S
-    - Long (9+): S and CB (downfield)
+    Down-weight players already piling up tackles/sacks so box scores spread across the defense.
+    Tuned so elite games land ~15–18 tackles / ~1–2 sacks rather than one MIKE dominating.
+    """
+    st = stats_map.get(id(player))
+    n = int(getattr(st, stat_attr, 0) or 0) if st else 0
+    if stat_attr == "sacks":
+        # Stronger concentration fight (few sack events per game).
+        soften = 1.0 / (2.25 + float(n) * 1.35 + (float(max(n - 1, 0)) ** 1.2) * 0.95)
+        return float(base_weight) * soften
+    soften = 1.0 / (2.05 + float(n) * 0.48 + (float(n) ** 1.12) * 0.28)
+    return float(base_weight) * soften
+
+
+def _pick_weighted_defender(
+    dc: DepthChart,
+    weighted_slots: List[Tuple[str, int, float]],
+    stats_map: Dict[int, PlayerGameStats],
+    stat_attr: str,
+) -> Optional["Player"]:
+    """Pick one defender from (position, depth_slot, weight) rows using spread-adjusted weights."""
+    out: List[Tuple["Player", float]] = []
+    for pos, slot, base_w in weighted_slots:
+        if base_w <= 0:
+            continue
+        p = dc.get_starter(pos, "defense", slot)
+        if p is None:
+            continue
+        w = _spread_weight_for_stat(stats_map, p, base_w, stat_attr)
+        if w > 0:
+            out.append((p, w))
+    if not out:
+        return None
+    players, weights = zip(*out)
+    return random.choices(players, weights=weights, k=1)[0]
+
+
+def _pick_run_tackler(
+    dc: DepthChart, yards: int, stats_map: Dict[int, PlayerGameStats],
+) -> Optional["Player"]:
+    """
+    Pick tackler on run play. Spread by run distance; weights kept fairly flat so
+    DL/LB/S/CB all get realistic shares (targets: most defenders <10 tkl/game, stars mid-teens).
     """
     if yards <= 4:
-        candidates = [
-            ("DE", 0, 22), ("DE", 1, 18), ("DT", 0, 20), ("LB", 0, 18), ("LB", 1, 12),
-            ("S", 0, 6), ("CB", 0, 4),
+        weighted_slots = [
+            ("DE", 0, 14), ("DE", 1, 14), ("DE", 2, 10),
+            ("DT", 0, 14), ("DT", 1, 13),
+            ("LB", 0, 13), ("LB", 1, 13), ("LB", 2, 10),
+            ("S", 0, 10), ("S", 1, 9),
+            ("CB", 0, 9), ("CB", 1, 8),
         ]
     elif yards <= 8:
-        candidates = [
-            ("LB", 0, 24), ("LB", 1, 20), ("S", 0, 22), ("S", 1, 14),
-            ("DE", 0, 8), ("DT", 0, 6), ("CB", 0, 6),
+        weighted_slots = [
+            ("LB", 0, 14), ("LB", 1, 14), ("LB", 2, 11),
+            ("S", 0, 14), ("S", 1, 13),
+            ("DE", 0, 10), ("DE", 1, 9), ("DT", 0, 9), ("DT", 1, 8),
+            ("CB", 0, 10), ("CB", 1, 9),
         ]
     else:
-        candidates = [
-            ("S", 0, 28), ("S", 1, 22), ("CB", 0, 22), ("CB", 1, 16),
-            ("LB", 0, 8), ("LB", 1, 4),
+        weighted_slots = [
+            ("S", 0, 16), ("S", 1, 15),
+            ("CB", 0, 16), ("CB", 1, 15),
+            ("LB", 0, 12), ("LB", 1, 11), ("LB", 2, 9),
+            ("DE", 0, 6), ("DT", 0, 6),
         ]
-    out: List[Tuple["Player", float]] = []
-    for pos, slot, weight in candidates:
-        p = dc.get_starter(pos, "defense", slot)
-        if p is not None:
-            out.append((p, weight))
-    if not out:
-        return None
-    players, weights = zip(*out)
-    return random.choices(players, weights=weights, k=1)[0]
+    return _pick_weighted_defender(dc, weighted_slots, stats_map, "tackles")
 
 
-def _pick_pass_tackler(dc: DepthChart) -> Optional["Player"]:
-    """
-    Pick tackler on pass completion. DBs and LBs get more; spread across positions.
-    """
-    candidates = [
-        ("LB", 0, 24), ("LB", 1, 18), ("S", 0, 22), ("S", 1, 16),
-        ("CB", 0, 14), ("CB", 1, 10), ("DE", 0, 8), ("DT", 0, 4),
+def _pick_pass_tackler(dc: DepthChart, stats_map: Dict[int, PlayerGameStats]) -> Optional["Player"]:
+    """Tackler on completed pass — flat weights across second level and perimeter."""
+    weighted_slots = [
+        ("CB", 0, 14), ("CB", 1, 14),
+        ("S", 0, 14), ("S", 1, 13),
+        ("LB", 0, 14), ("LB", 1, 13), ("LB", 2, 11),
+        ("DE", 0, 11), ("DE", 1, 10),
+        ("DT", 0, 10), ("DT", 1, 9),
     ]
-    out: List[Tuple["Player", float]] = []
-    for pos, slot, weight in candidates:
-        p = dc.get_starter(pos, "defense", slot)
-        if p is not None:
-            out.append((p, weight))
-    if not out:
-        return None
-    players, weights = zip(*out)
-    return random.choices(players, weights=weights, k=1)[0]
+    return _pick_weighted_defender(dc, weighted_slots, stats_map, "tackles")
 
 
-def _pick_sacker(dc: DepthChart) -> Optional["Player"]:
-    """
-    Pick sacker. DL and blitzing LB get sacks; spread across DE, DT, LB.
-    """
-    candidates = [
-        ("DE", 0, 26), ("DE", 1, 22), ("LB", 0, 20), ("LB", 1, 16),
-        ("DT", 0, 12), ("DT", 1, 4),
+def _pick_sacker(dc: DepthChart, stats_map: Dict[int, PlayerGameStats]) -> Optional["Player"]:
+    """Sack credit — deliberately flat so no single EDGE hoovers ~all sacks."""
+    weighted_slots = [
+        ("DE", 0, 17), ("DE", 1, 17), ("DE", 2, 13),
+        ("DT", 0, 16), ("DT", 1, 15),
+        ("LB", 0, 16), ("LB", 1, 14), ("LB", 2, 11),
     ]
-    out: List[Tuple["Player", float]] = []
-    for pos, slot, weight in candidates:
-        p = dc.get_starter(pos, "defense", slot)
-        if p is not None:
-            out.append((p, weight))
-    if not out:
-        return None
-    players, weights = zip(*out)
-    return random.choices(players, weights=weights, k=1)[0]
+    return _pick_weighted_defender(dc, weighted_slots, stats_map, "sacks")
 
 
 def _pick_interceptor(dc: DepthChart) -> Optional["Player"]:
@@ -378,6 +399,7 @@ def record_play(
     sack = result.get("sack", False)
     interception = result.get("interception", False)
     incomplete = result.get("incomplete_pass", False)
+    scramble = result.get("scramble", False)
 
     if possession == "home":
         off_team, off_dc, def_team, def_dc = home_team, home_dc, away_team, away_dc
@@ -395,7 +417,7 @@ def record_play(
             s.rush_yds += yards
             if touchdown:
                 s.rush_td += 1
-        tackler = _pick_run_tackler(def_dc, yards)
+        tackler = _pick_run_tackler(def_dc, yards, stats_map)
         if tackler is not None:
             s = _get_or_create(stats_map, tackler, def_name)
             s.tackles += 1
@@ -409,7 +431,7 @@ def record_play(
             qb_s.att += 1
             if sack:
                 # Sack: no completion, QB gets attempt only; defense gets sack (+ TFL)
-                sacker = _pick_sacker(def_dc)
+                sacker = _pick_sacker(def_dc, stats_map)
                 if sacker is not None:
                     ss = _get_or_create(stats_map, sacker, def_name)
                     ss.sacks += 1
@@ -437,9 +459,9 @@ def record_play(
                 rs.rec_yds += yards
                 if touchdown:
                     rs.rec_td += 1
-        # Defense tackle on completion (if not already credited INT/sack)
+        # Defense tackle on completion or QB scramble (treat scramble stop like run fits)
         if not interception and not sack:
-            tackler = _pick_pass_tackler(def_dc)
+            tackler = _pick_run_tackler(def_dc, yards, stats_map) if scramble else _pick_pass_tackler(def_dc, stats_map)
             if tackler is not None:
                 ts = _get_or_create(stats_map, tackler, def_name)
                 ts.tackles += 1

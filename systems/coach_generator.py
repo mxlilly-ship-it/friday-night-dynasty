@@ -10,31 +10,15 @@ from typing import TYPE_CHECKING, List, Optional
 from models.coach import Coach, OffensiveStyle, DefensiveStyle
 from models.community import get_community_rating
 from systems.playbook_system import DEFENSIVE_PLAYBOOK_KEYS, OFFENSIVE_PLAYBOOK_VALUES
+from systems.player_generator import generate_name
 
 if TYPE_CHECKING:
     from models.team import Team
 
-# First names commonly used for coaches
-COACH_FIRST_NAMES = [
-    "Mike", "Jim", "Bill", "Dave", "Tom", "Steve", "Mark", "Chris", "Dan", "Jeff",
-    "Bob", "Rick", "Tony", "Joe", "Gary", "Ken", "Greg", "Scott", "Brian", "Kevin",
-    "Matt", "Brad", "Todd", "Andy", "Jason", "Eric", "Ryan", "Adam", "Josh", "Nick",
-]
-
-# Last names for coaches
-COACH_LAST_NAMES = [
-    "Johnson", "Smith", "Williams", "Brown", "Jones", "Davis", "Miller", "Wilson",
-    "Moore", "Taylor", "Anderson", "Thomas", "Jackson", "Martin", "Lee", "Thompson",
-    "White", "Harris", "Clark", "Lewis", "Robinson", "Walker", "Hall", "Young",
-    "King", "Wright", "Scott", "Green", "Baker", "Adams", "Nelson", "Carter",
-    "Mitchell", "Perez", "Roberts", "Turner", "Phillips", "Campbell", "Parker",
-    "Evans", "Edwards", "Collins", "Stewart", "Morris", "Rogers", "Reed", "Cook",
-]
-
 
 def generate_coach_name() -> str:
-    """Generate a random coach name."""
-    return f"{random.choice(COACH_FIRST_NAMES)} {random.choice(COACH_LAST_NAMES)}"
+    """Generate a random coach name (same pools as players)."""
+    return generate_name()
 
 
 def _roll_skill(base: int = 5, variance: int = 2) -> int:

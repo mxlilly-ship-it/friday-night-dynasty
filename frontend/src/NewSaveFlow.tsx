@@ -58,6 +58,7 @@ export function NewSaveFlow({
     DEFENSIVE_PLAYBOOK_TO_FORMATIONS as Record<string, string[]>,
   )
   const [creating, setCreating] = useState(false)
+  const [allowCoachFiring, setAllowCoachFiring] = useState(true)
   const [teamSource, setTeamSource] = useState<'default' | 'upload'>('default')
   const [uploadedFileName, setUploadedFileName] = useState('')
 
@@ -264,6 +265,7 @@ export function NewSaveFlow({
           coach_config: coachConfig,
           start_year: startYear,
           teams_data: teamSource === 'upload' ? teamsData : undefined,
+          allow_user_coach_firing: allowCoachFiring,
         }),
       })
       if (!r.ok) {
@@ -352,6 +354,23 @@ export function NewSaveFlow({
               />
             </div>
           </div>
+          <label
+            style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 16, cursor: 'pointer' }}
+          >
+            <input
+              type="checkbox"
+              checked={allowCoachFiring}
+              onChange={(e) => setAllowCoachFiring(e.target.checked)}
+              style={{ marginTop: 3 }}
+            />
+            <span>
+              <strong>My coach can be fired</strong>
+              <span className="newsave-sub" style={{ display: 'block', marginTop: 4 }}>
+                Uncheck if you want a stable job—the school will not fire your head coach for performance. (You can still
+                leave for another school if you apply.)
+              </span>
+            </span>
+          </label>
           <div style={{ marginTop: 14 }}>
             <div className="newsave-sub" style={{ marginBottom: 8 }}>
               Team dataset source

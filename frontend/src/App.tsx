@@ -485,6 +485,9 @@ export default function App() {
       improve_culture_grade?: number
       improve_booster_support?: number
       coach_dev_allocations?: Record<string, number>
+      carousel_job_applications?: string[]
+      transfer_stage_1_ack_results?: boolean
+      transfer_stage_2_ack_results?: boolean
     }
   }): Promise<boolean> {
     if (!saveId) {
