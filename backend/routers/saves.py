@@ -136,6 +136,9 @@ class AdvanceOffseasonBody(BaseModel):
     coach_dev_allocations: Optional[Dict[str, Any]] = None
     # Coaching carousel (stages I–III): user's ranked HC job applications (team names).
     carousel_job_applications: Optional[List[str]] = None
+    # Transfer portal: second Continue on Transfers I / II after reviewing results.
+    transfer_stage_1_ack_results: Optional[bool] = None
+    transfer_stage_2_ack_results: Optional[bool] = None
 
 
 class StartCoachGameBody(BaseModel):

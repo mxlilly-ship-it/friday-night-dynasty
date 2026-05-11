@@ -459,8 +459,8 @@ function ingestCarousel(prev: any, next: any, center: ReturnType<typeof getNewsC
 }
 
 function ingestTransfers(prev: any, next: any, center: ReturnType<typeof getNewsCenter>) {
-  const pa = (prev?.offseason_transfer_news_events ?? []) as any[]
-  const na = (next?.offseason_transfer_news_events ?? []) as any[]
+  const pa = (Array.isArray(prev?.offseason_transfer_news_events) ? prev.offseason_transfer_news_events : []) as any[]
+  const na = (Array.isArray(next?.offseason_transfer_news_events) ? next.offseason_transfer_news_events : []) as any[]
   const prevSet = new Set(pa.map((e) => JSON.stringify(e)))
   for (const e of na) {
     const k = JSON.stringify(e)

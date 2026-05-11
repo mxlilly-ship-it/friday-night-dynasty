@@ -173,12 +173,51 @@
 
 .gameplay-main {
   display: grid;
-  grid-template-columns: 280px 1fr 240px;
+  grid-template-columns: 230px 1fr 280px;
   gap: 16px;
   align-items: start;
   flex: 1;
   padding: 16px;
   min-height: 0;
+}
+
+.gameplay-left-panel.gameplay-left-panel--stats {
+  min-height: 0;
+}
+
+.gameplay-stats.gameplay-stats--sidebar {
+  max-width: none;
+  margin: 0;
+}
+
+.gameplay-sim-row {
+  display: flex;
+  gap: 10px;
+}
+
+.gameplay-sim-row-btn {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.25);
+  color: rgba(230, 230, 234, 0.85);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.gameplay-sim-row-btn:hover:not(:disabled) {
+  border-color: rgba(59, 130, 246, 0.45);
+  color: #93c5fd;
+}
+
+.gameplay-sim-row-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .gameplay-center-stack {

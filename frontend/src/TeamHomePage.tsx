@@ -3211,7 +3211,8 @@ function TeamHomePageBody({
   const transferStage1PendingReview = Boolean(saveState?.offseason_transfer_stage_1_pending_review)
   const transferStage2PendingReview = Boolean(saveState?.offseason_transfer_stage_2_pending_review)
   const transferStage1EntriesSorted = useMemo(() => {
-    const e = (saveState?.offseason_transfer_stage_1?.entries ?? []) as Array<Record<string, unknown>>
+    const raw = saveState?.offseason_transfer_stage_1?.entries
+    const e = (Array.isArray(raw) ? raw : []) as Array<Record<string, unknown>>
     return [...e].sort((a, b) => {
       const sa = String(a.from_team ?? a.team ?? '')
       const sb = String(b.from_team ?? b.team ?? '')

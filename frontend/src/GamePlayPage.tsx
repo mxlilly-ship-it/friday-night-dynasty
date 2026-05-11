@@ -1,6 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './GamePlayPage.css'
+import './GameplayCallsheet.css'
 import TeamLogo from './TeamLogo'
+import {
+  type CallsheetBucket,
+  type CallsheetPlayRow,
+  type CallsheetSide,
+  CALLSHEET_BUCKET_ORDER,
+  buildDefenseCallsheet,
+  buildOffenseCallsheet,
+  buildSpecialCallsheet,
+  callsheetHeaderClass,
+  callsheetHeaderTitle,
+  createEmptyCallsheet,
+} from './gameplayCallsheet'
 
 type GameState = {
   quarter: number
@@ -101,7 +114,9 @@ export default function GamePlayPage({
   const [localGame, setLocalGame] = useState<any>(null)
   const [options, setOptions] = useState<PlayOptions | null>(null)
   const [selectedPlay, setSelectedPlay] = useState<PlayOption | null>(null)
-  const [selectedCategory, setSelectedCategory] = useState<string>('')
+  /** Call sheet column key for "PLAY TYPE" display (matches game_interface playType). */
+  const [callsheetBucket, setCallsheetBucket] = useState<string>('')
+  const [callsheetSide, setCallsheetSide] = useState<CallsheetSide>('offense')
   const [previousPlay, setPreviousPlay] = useState<string | null>(null)
   const [previousOpponentPlay, setPreviousOpponentPlay] = useState<string | null>(null)
   const [lastResult, setLastResult] = useState<string | null>(null)
@@ -156,15 +171,14 @@ export default function GamePlayPage({
       if (opts) {
         const userOff = userTeam === opts.offense_team
         const plays = (userOff ? opts.offense_plays : opts.defense_plays) as PlayOption[]
-        const catLabels = plays.map((p) => String(p.category || 'Other'))
-        const cats = [...new Set(catLabels)].sort((a, b) => a.localeCompare(b))
         const fourthCat = 'FOURTH_DOWN_SPECIAL'
-        const preferFourth =
-          userOff && state.down === 4 && !state.is_overtime && cats.includes(fourthCat)
-        const cat = preferFourth ? fourthCat : cats[0] ?? ''
-        const inCat = plays.filter((p: PlayOption) => (p.category || 'Other') === cat)
-        setSelectedCategory(cat)
-        setSelectedPlay(inCat[0] || plays[0] || null)
+        const hasFourth = plays.some((p) => (p.category || '') === fourthCat)
+        const preferFourth = userOff && state.down === 4 && !state.is_overtime && hasFourth
+        const pick =
+          preferFourth ? plays.find((p) => (p.category || '') === fourthCat) : plays[0]
+        setSelectedPlay(pick || plays[0] || null)
+        setCallsheetBucket('')
+        setCallsheetSide(userOff ? 'offense' : 'defense')
       }
     } catch (e: unknown) {
       onError(e instanceof Error ? e.message : 'Failed to load options')
@@ -183,6 +197,10 @@ export default function GamePlayPage({
   useEffect(() => {
     if (!gameOver) fetchOptions()
   }, [gameId, saveId, gameOver, state.possession, state.down, state.ball_position, state.pending_pat, fetchOptions])
+
+  useEffect(() => {
+    setCallsheetSide(isUserOnOffense ? 'offense' : 'defense')
+  }, [isUserOnOffense])
 
   useEffect(() => {
     setPlayFeed([])
@@ -339,26 +357,70 @@ export default function GamePlayPage({
     }
   }
 
-  const plays = options ? (isUserOnOffense ? options.offense_plays : options.defense_plays) : []
-  const byCategory = plays.reduce<Record<string, PlayOption[]>>((acc, p) => {
-    const cat = p.category || 'Other'
-    if (!acc[cat]) acc[cat] = []
-    acc[cat].push(p)
-    return acc
-  }, {})
-  const categories = Object.keys(byCategory).sort((a, b) => {
-    const pri = (c: string) => {
-      if (c.startsWith('AFTER_TOUCHDOWN')) return 0
-      if (c === 'FOURTH_DOWN_SPECIAL') return 0.25
-      if (c.includes('SPECIAL_TEAMS')) return 1
-      return 9
+  const gridPlays = useMemo(() => {
+    if (!options) return createEmptyCallsheet()
+    if (callsheetSide === 'offense') {
+      return buildOffenseCallsheet(
+        options.offense_plays,
+        isUserOnOffense,
+        state.ball_position,
+        state.down,
+        state.yards_to_go,
+      )
     }
-    const pa = pri(a)
-    const pb = pri(b)
-    if (pa !== pb) return pa - pb
-    return a.localeCompare(b)
-  })
-  const playsInCategory = selectedCategory ? (byCategory[selectedCategory] || []) : []
+    if (callsheetSide === 'defense') {
+      return buildDefenseCallsheet(
+        options.defense_plays,
+        isUserOnOffense,
+        state.ball_position,
+        state.down,
+        state.yards_to_go,
+      )
+    }
+    return buildSpecialCallsheet(
+      options.offense_plays,
+      options.defense_plays,
+      isUserOnOffense,
+      state.ball_position,
+      state.down,
+      state.yards_to_go,
+    )
+  }, [
+    options,
+    callsheetSide,
+    isUserOnOffense,
+    state.ball_position,
+    state.down,
+    state.yards_to_go,
+  ])
+
+  const tagClass: Record<string, string> = {
+    base: 'tag-base',
+    'red-zone': 'tag-red-zone',
+    third: 'tag-third',
+    trick: 'tag-trick',
+  }
+  const tagLabel: Record<string, string> = {
+    base: 'BASE',
+    'red-zone': 'RZ',
+    third: '3RD',
+    trick: 'TRK',
+  }
+
+  const selectCallsheetPlay = (row: CallsheetPlayRow, bucket: CallsheetBucket) => {
+    if (!options || gameOver) return
+    const userPool = isUserOnOffense ? options.offense_plays : options.defense_plays
+    const inUserList = userPool.some((p) => p.id === row.id)
+    const canSelect =
+      (callsheetSide === 'offense' && isUserOnOffense) ||
+      (callsheetSide === 'defense' && !isUserOnOffense) ||
+      (callsheetSide === 'special' && inUserList)
+    if (!canSelect) return
+    const full = [...options.offense_plays, ...options.defense_plays].find((p) => p.id === row.id)
+    if (!full) return
+    setSelectedPlay(full)
+    setCallsheetBucket(bucket.toUpperCase())
+  }
 
   const hs = state.team_stats?.[homeTeam]
   const as = state.team_stats?.[awayTeam]
@@ -445,134 +507,9 @@ export default function GamePlayPage({
       </div>
 
       <div className="gameplay-main">
-        <div className="gameplay-left-panel">
-          <div className="gameplay-panel-title">Play Type: Category</div>
-          <select
-            className="gameplay-category-select"
-            value={selectedCategory}
-            onChange={(e) => {
-              const cat = e.target.value
-              setSelectedCategory(cat)
-              const list = byCategory[cat] || []
-              setSelectedPlay(list[0] || null)
-            }}
-            disabled={gameOver || categories.length === 0}
-          >
-            {categories.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat === 'FOURTH_DOWN_SPECIAL' ? '4th down — punt / field goal' : cat.replace(/_/g, ' ')}
-              </option>
-            ))}
-          </select>
-          <div className="gameplay-playbook">
-            {playsInCategory.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                className={`gameplay-play-btn ${selectedPlay?.id === p.id ? 'selected' : ''}`}
-                onClick={() => setSelectedPlay(p)}
-                disabled={gameOver}
-              >
-                <span className="gameplay-play-name">{p.name}</span>
-                {p.formation && <span className="gameplay-play-formation">({p.formation})</span>}
-              </button>
-            ))}
-          </div>
-          <div className="gameplay-selected-label">Play Selected</div>
-          <div className="gameplay-selected-box">
-            {selectedPlay ? (
-              <>
-                {selectedPlay.name}
-                {selectedPlay.formation && <span className="gameplay-play-formation"> ({selectedPlay.formation})</span>}
-              </>
-            ) : (
-              '—'
-            )}
-          </div>
-          <div className="gameplay-actions">
-            <button
-              type="button"
-              className="gameplay-action-btn gameplay-run"
-              onClick={runPlay}
-              disabled={!selectedPlay || loading || gameOver}
-            >
-              {loading ? '…' : '▶'} Run Play
-            </button>
-            <button
-              type="button"
-              className="gameplay-action-btn gameplay-sim"
-              onClick={() => simAction('sim-next')}
-              disabled={!!simulating || gameOver}
-            >
-              {simulating === 'sim-next' ? '…' : '▶'} Sim to Next Play
-            </button>
-            <button
-              type="button"
-              className="gameplay-action-btn gameplay-sim"
-              onClick={() => simAction('sim-to-half')}
-              disabled={!!simulating || gameOver}
-            >
-              {simulating === 'sim-to-half' ? '…' : '▶'} Sim to Half
-            </button>
-            <button
-              type="button"
-              className="gameplay-action-btn gameplay-sim"
-              onClick={() => simAction('sim-to-end')}
-              disabled={!!simulating || gameOver}
-            >
-              {simulating === 'sim-to-end' ? '…' : '▶'} Sim to End
-            </button>
-          </div>
-        </div>
-
-        <div className="gameplay-center-stack">
-          <div className="gameplay-field-wrap">
-            <div className="gameplay-field" role="img" aria-label="Football field, ball position by yard line">
-              <div className="gameplay-field-layer gameplay-field-turf" aria-hidden />
-              <div className="gameplay-field-layer gameplay-field-endzone gameplay-field-endzone--home" aria-hidden>
-                <span className="gameplay-field-endzone-text">END ZONE</span>
-              </div>
-              <div className="gameplay-field-layer gameplay-field-endzone gameplay-field-endzone--away" aria-hidden>
-                <span className="gameplay-field-endzone-text">END ZONE</span>
-              </div>
-              <div className="gameplay-field-layer gameplay-field-yardlines-major" aria-hidden />
-              <div className="gameplay-field-layer gameplay-field-goal-lines" aria-hidden />
-              {FIELD_MINOR_YARD_PCTS.map((pct) => (
-                <div key={pct} className="gameplay-yard-tick-minor" style={{ left: `${pct}%` }} aria-hidden />
-              ))}
-              <div className="gameplay-field-layer gameplay-field-hashes gameplay-field-hashes--upper" aria-hidden />
-              <div className="gameplay-field-layer gameplay-field-hashes gameplay-field-hashes--lower" aria-hidden />
-              <div className="gameplay-field-content">
-                {FIELD_YARD_MARKERS.map((m) => (
-                  <div key={m.leftPct} className="gameplay-yardline-marker" style={{ left: `${m.leftPct}%` }}>
-                    <span className="gameplay-yardline-num">{m.label}</span>
-                  </div>
-                ))}
-                {driveArrows.map((arr, i) => {
-                  const min = Math.min(arr.from, arr.to)
-                  const width = Math.abs(arr.to - arr.from)
-                  return (
-                    <div
-                      key={i}
-                      className="gameplay-drive-arrow"
-                      style={{
-                        left: `${min}%`,
-                        width: `${width}%`,
-                        transform: arr.to >= arr.from ? 'translateY(-50%)' : 'translateY(-50%) scaleX(-1)',
-                      }}
-                    />
-                  )
-                })}
-                <div
-                  className="gameplay-ball"
-                  style={{ left: `${absoluteFieldPct(state.possession, state.ball_position)}%` }}
-                  title="Ball"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="gameplay-stats gameplay-stats-under-field gameplay-stats-vertical">
+        <div className="gameplay-left-panel gameplay-left-panel--stats">
+          <div className="gameplay-panel-title">Game stats</div>
+          <div className="gameplay-stats gameplay-stats-under-field gameplay-stats-vertical gameplay-stats--sidebar">
             <div className="gameplay-stats-vertical-head">
               <div className="gameplay-stats-team-col">
                 <span className="gameplay-stats-team-abbr" title={homeTeam}>
@@ -635,11 +572,107 @@ export default function GamePlayPage({
           </div>
         </div>
 
+        <div className="gameplay-center-stack">
+          <div className="gameplay-field-wrap">
+            <div className="gameplay-field" role="img" aria-label="Football field, ball position by yard line">
+              <div className="gameplay-field-layer gameplay-field-turf" aria-hidden />
+              <div className="gameplay-field-layer gameplay-field-endzone gameplay-field-endzone--home" aria-hidden>
+                <span className="gameplay-field-endzone-text">END ZONE</span>
+              </div>
+              <div className="gameplay-field-layer gameplay-field-endzone gameplay-field-endzone--away" aria-hidden>
+                <span className="gameplay-field-endzone-text">END ZONE</span>
+              </div>
+              <div className="gameplay-field-layer gameplay-field-yardlines-major" aria-hidden />
+              <div className="gameplay-field-layer gameplay-field-goal-lines" aria-hidden />
+              {FIELD_MINOR_YARD_PCTS.map((pct) => (
+                <div key={pct} className="gameplay-yard-tick-minor" style={{ left: `${pct}%` }} aria-hidden />
+              ))}
+              <div className="gameplay-field-layer gameplay-field-hashes gameplay-field-hashes--upper" aria-hidden />
+              <div className="gameplay-field-layer gameplay-field-hashes gameplay-field-hashes--lower" aria-hidden />
+              <div className="gameplay-field-content">
+                {FIELD_YARD_MARKERS.map((m) => (
+                  <div key={m.leftPct} className="gameplay-yardline-marker" style={{ left: `${m.leftPct}%` }}>
+                    <span className="gameplay-yardline-num">{m.label}</span>
+                  </div>
+                ))}
+                {driveArrows.map((arr, i) => {
+                  const min = Math.min(arr.from, arr.to)
+                  const width = Math.abs(arr.to - arr.from)
+                  return (
+                    <div
+                      key={i}
+                      className="gameplay-drive-arrow"
+                      style={{
+                        left: `${min}%`,
+                        width: `${width}%`,
+                        transform: arr.to >= arr.from ? 'translateY(-50%)' : 'translateY(-50%) scaleX(-1)',
+                      }}
+                    />
+                  )
+                })}
+                <div
+                  className="gameplay-ball"
+                  style={{ left: `${absoluteFieldPct(state.possession, state.ball_position)}%` }}
+                  title="Ball"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="gameplay-playbar-strip">
+            <label htmlFor="gameplay-selected-play-display">PLAY SELECTED:</label>
+            <div id="gameplay-selected-play-display" className="gameplay-play-display">
+              {selectedPlay
+                ? `${selectedPlay.name}${selectedPlay.formation ? ` (${selectedPlay.formation})` : ''}`
+                : '—'}
+            </div>
+            <button
+              type="button"
+              className="gameplay-btn-action"
+              onClick={() => void runPlay()}
+              disabled={!selectedPlay || loading || gameOver}
+            >
+              RUN PLAY
+            </button>
+            <button
+              type="button"
+              className="gameplay-btn-action gameplay-btn-action--alt"
+              onClick={() => void simAction('sim-next')}
+              disabled={!!simulating || gameOver}
+            >
+              SIM TO NEXT PLAY
+            </button>
+          </div>
+        </div>
+
         <div className="gameplay-right-panel">
+          <div className="gameplay-sim-row">
+            <button
+              type="button"
+              className="gameplay-sim-row-btn"
+              onClick={() => void simAction('sim-to-half')}
+              disabled={!!simulating || gameOver}
+            >
+              {simulating === 'sim-to-half' ? '…' : 'Sim to Half'}
+            </button>
+            <button
+              type="button"
+              className="gameplay-sim-row-btn"
+              onClick={() => void simAction('sim-to-end')}
+              disabled={!!simulating || gameOver}
+            >
+              {simulating === 'sim-to-end' ? '…' : 'Sim to End'}
+            </button>
+          </div>
           <div className="gameplay-panel-title">Previous Play</div>
           <div className="gameplay-history-box">{previousPlay ?? '—'}</div>
           <div className="gameplay-panel-title">Previous Opponent Play</div>
           <div className="gameplay-history-box">{previousOpponentPlay ?? '—'}</div>
+          <div className="gameplay-panel-title">Play Type</div>
+          <div className="gameplay-history-box">
+            {callsheetBucket ||
+              (selectedPlay?.category ? String(selectedPlay.category).replace(/_/g, ' ') : '—')}
+          </div>
           <div className="gameplay-panel-title">Play Result</div>
           <div className="gameplay-result-box">{lastResult ?? '—'}</div>
           <div className="gameplay-panel-title">Play-by-play</div>
@@ -655,6 +688,78 @@ export default function GamePlayPage({
             )}
             <div ref={playFeedEndRef} />
           </div>
+        </div>
+      </div>
+
+      <div className="callsheet-section">
+        <div className="callsheet-header">
+          <h2>📋 Call Sheet</h2>
+          <button
+            type="button"
+            className={`cs-tab ${callsheetSide === 'offense' ? 'active' : ''}`}
+            onClick={() => setCallsheetSide('offense')}
+          >
+            OFFENSE
+          </button>
+          <button
+            type="button"
+            className={`cs-tab ${callsheetSide === 'defense' ? 'active' : ''}`}
+            onClick={() => setCallsheetSide('defense')}
+          >
+            DEFENSE
+          </button>
+          <button
+            type="button"
+            className={`cs-tab ${callsheetSide === 'special' ? 'active' : ''}`}
+            onClick={() => setCallsheetSide('special')}
+          >
+            SPECIAL TEAMS
+          </button>
+        </div>
+
+        <div className="callsheet-grid">
+          {CALLSHEET_BUCKET_ORDER.map((bucket) => (
+            <div key={bucket} className="cs-category">
+              <div className={`cs-cat-header ${callsheetHeaderClass(bucket)}`}>{callsheetHeaderTitle(bucket)}</div>
+              <div className="cs-plays">
+                {(gridPlays[bucket] ?? []).map((row) => {
+                  const userPool = options
+                    ? isUserOnOffense
+                      ? options.offense_plays
+                      : options.defense_plays
+                    : []
+                  const inUserList = userPool.some((p) => p.id === row.id)
+                  const canSelect =
+                    (callsheetSide === 'offense' && isUserOnOffense) ||
+                    (callsheetSide === 'defense' && !isUserOnOffense) ||
+                    (callsheetSide === 'special' && inUserList)
+                  const disabled = gameOver || !options || !canSelect
+                  const tc = tagClass[row.tag] || 'tag-base'
+                  const tl = tagLabel[row.tag] || 'BASE'
+                  return (
+                    <div
+                      key={row.id}
+                      role="button"
+                      tabIndex={0}
+                      className={`cs-play ${selectedPlay?.id === row.id ? 'selected' : ''} ${disabled ? 'cs-play--disabled' : ''}`}
+                      onClick={() => !disabled && selectCallsheetPlay(row, bucket)}
+                      onKeyDown={(e) => {
+                        if (disabled) return
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          selectCallsheetPlay(row, bucket)
+                        }
+                      }}
+                    >
+                      <div className="play-dot" />
+                      <span>{row.name}</span>
+                      <span className={`play-tag ${tc}`}>{tl}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 

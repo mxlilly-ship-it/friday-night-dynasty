@@ -50,6 +50,45 @@ def list_saves() -> List[str]:
 # Serialize / deserialize models
 # -------------------------
 
+
+def _num_from_save(d: Dict[str, Any], key: str, default: int) -> int:
+    """
+    Read an int rating from JSON. Keys present with null must not pass through as None —
+    Player._clamp_ratings compares to ints and would raise TypeError.
+    """
+    if not isinstance(d, dict):
+        return default
+    v = d.get(key, default)
+    if v is None:
+        return default
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return default
+
+
+def _optional_int_from_save(d: Dict[str, Any], key: str) -> Optional[int]:
+    if not isinstance(d, dict) or key not in d:
+        return None
+    v = d[key]
+    if v is None:
+        return None
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _optional_str_from_save(d: Dict[str, Any], key: str) -> Optional[str]:
+    if not isinstance(d, dict) or key not in d:
+        return None
+    v = d[key]
+    if v is None:
+        return None
+    s = str(v).strip()
+    return s if s else None
+
+
 def player_to_dict(p: Player) -> Dict[str, Any]:
     """Player to JSON-serializable dict."""
     return {
@@ -80,29 +119,64 @@ def player_to_dict(p: Player) -> Dict[str, Any]:
 
 def player_from_dict(d: Dict[str, Any]) -> Player:
     """Dict to Player."""
+    if not isinstance(d, dict):
+        d = {}
+    nm = d.get("name", "Unknown")
+    if nm is None or (isinstance(nm, str) and not nm.strip()):
+        nm = "Unknown"
     return Player(
-        name=d.get("name", "Unknown"),
-        speed=d.get("speed", 50), agility=d.get("agility", 50), acceleration=d.get("acceleration", 50),
-        strength=d.get("strength", 50), balance=d.get("balance", 50), jumping=d.get("jumping", 50),
-        stamina=d.get("stamina", 50), injury=d.get("injury", 50), frame=d.get("frame", 50),
-        height=d.get("height", 70), weight=d.get("weight", 180),
-        toughness=d.get("toughness", 50), effort=d.get("effort", 50), football_iq=d.get("football_iq", 50),
-        coachability=d.get("coachability", 50), confidence=d.get("confidence", 50),
-        discipline=d.get("discipline", 50), leadership=d.get("leadership", 50), composure=d.get("composure", 50),
-        throw_power=d.get("throw_power", 50), throw_accuracy=d.get("throw_accuracy", 50), decisions=d.get("decisions", 50),
-        catching=d.get("catching", 50), run_blocking=d.get("run_blocking", 50), pass_blocking=d.get("pass_blocking", 50),
-        vision=d.get("vision", 50), ball_security=d.get("ball_security", 50), break_tackle=d.get("break_tackle", 50),
-        elusiveness=d.get("elusiveness", 50), route_running=d.get("route_running", 50),
-        coverage=d.get("coverage", 50), blitz=d.get("blitz", 50), pass_rush=d.get("pass_rush", 50),
-        run_defense=d.get("run_defense", 50), pursuit=d.get("pursuit", 50), tackling=d.get("tackling", 50),
-        block_shedding=d.get("block_shedding", 50),
-        kick_power=d.get("kick_power", 50), kick_accuracy=d.get("kick_accuracy", 50),
-        potential=d.get("potential", 50), growth_rate=d.get("growth_rate", 50), peak_age=d.get("peak_age", 16),
-        consistency=d.get("consistency", 50), late_bloomer=d.get("late_bloomer", 50), early_bloomer=d.get("early_bloomer", 50),
-        age=d.get("age"), position=d.get("position"), secondary_position=d.get("secondary_position"),
-        year=d.get("year"),
-        home_region=d.get("home_region"),
-        transfer_count=int(d.get("transfer_count", 0) or 0),
+        name=str(nm),
+        speed=_num_from_save(d, "speed", 50),
+        agility=_num_from_save(d, "agility", 50),
+        acceleration=_num_from_save(d, "acceleration", 50),
+        strength=_num_from_save(d, "strength", 50),
+        balance=_num_from_save(d, "balance", 50),
+        jumping=_num_from_save(d, "jumping", 50),
+        stamina=_num_from_save(d, "stamina", 50),
+        injury=_num_from_save(d, "injury", 50),
+        frame=_num_from_save(d, "frame", 50),
+        height=_num_from_save(d, "height", 70),
+        weight=_num_from_save(d, "weight", 180),
+        toughness=_num_from_save(d, "toughness", 50),
+        effort=_num_from_save(d, "effort", 50),
+        football_iq=_num_from_save(d, "football_iq", 50),
+        coachability=_num_from_save(d, "coachability", 50),
+        confidence=_num_from_save(d, "confidence", 50),
+        discipline=_num_from_save(d, "discipline", 50),
+        leadership=_num_from_save(d, "leadership", 50),
+        composure=_num_from_save(d, "composure", 50),
+        throw_power=_num_from_save(d, "throw_power", 50),
+        throw_accuracy=_num_from_save(d, "throw_accuracy", 50),
+        decisions=_num_from_save(d, "decisions", 50),
+        catching=_num_from_save(d, "catching", 50),
+        run_blocking=_num_from_save(d, "run_blocking", 50),
+        pass_blocking=_num_from_save(d, "pass_blocking", 50),
+        vision=_num_from_save(d, "vision", 50),
+        ball_security=_num_from_save(d, "ball_security", 50),
+        break_tackle=_num_from_save(d, "break_tackle", 50),
+        elusiveness=_num_from_save(d, "elusiveness", 50),
+        route_running=_num_from_save(d, "route_running", 50),
+        coverage=_num_from_save(d, "coverage", 50),
+        blitz=_num_from_save(d, "blitz", 50),
+        pass_rush=_num_from_save(d, "pass_rush", 50),
+        run_defense=_num_from_save(d, "run_defense", 50),
+        pursuit=_num_from_save(d, "pursuit", 50),
+        tackling=_num_from_save(d, "tackling", 50),
+        block_shedding=_num_from_save(d, "block_shedding", 50),
+        kick_power=_num_from_save(d, "kick_power", 50),
+        kick_accuracy=_num_from_save(d, "kick_accuracy", 50),
+        potential=_num_from_save(d, "potential", 50),
+        growth_rate=_num_from_save(d, "growth_rate", 50),
+        peak_age=_num_from_save(d, "peak_age", 16),
+        consistency=_num_from_save(d, "consistency", 50),
+        late_bloomer=_num_from_save(d, "late_bloomer", 50),
+        early_bloomer=_num_from_save(d, "early_bloomer", 50),
+        age=_optional_int_from_save(d, "age"),
+        position=_optional_str_from_save(d, "position"),
+        secondary_position=_optional_str_from_save(d, "secondary_position"),
+        year=_optional_int_from_save(d, "year"),
+        home_region=_optional_str_from_save(d, "home_region"),
+        transfer_count=_num_from_save(d, "transfer_count", 0),
     )
 
 
@@ -209,7 +283,9 @@ def team_to_dict(t: Team) -> Dict[str, Any]:
 def team_from_dict(d: Dict[str, Any]) -> Team:
     """Dict to Team."""
     community = _community_from_value(d.get("community_type", "suburban"))
-    roster = [player_from_dict(p) for p in d.get("roster", [])]
+    roster_raw = d.get("roster", []) if isinstance(d, dict) else []
+    roster_list = roster_raw if isinstance(roster_raw, list) else []
+    roster = [player_from_dict(p) for p in roster_list if isinstance(p, dict)]
     coach = coach_from_dict(d["coach"]) if d.get("coach") else None
     t = Team(
         name=d.get("name", ""),
