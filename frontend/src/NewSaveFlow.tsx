@@ -18,9 +18,11 @@ const STEPS = ['Save slot', 'Coach', 'Attributes', 'Your school'] as const
 type Props = {
   apiBase: string
   headers: Record<string, string>
+  getAuthHeaders?: () => Promise<Record<string, string>>
   onBack: () => void
   onCreated: (saveId: string) => void
   onError: (msg: string) => void
+  onSessionExpired?: () => void
   defaultCoachName?: string
 }
 
@@ -33,9 +35,11 @@ type PlaybooksDataResponse = {
 export function NewSaveFlow({
   apiBase,
   headers,
+  getAuthHeaders,
   onBack,
   onCreated,
   onError,
+  onSessionExpired,
   defaultCoachName,
 }: Props) {
   const [step, setStep] = useState(0)
@@ -58,7 +62,7 @@ export function NewSaveFlow({
     DEFENSIVE_PLAYBOOK_TO_FORMATIONS as Record<string, string[]>,
   )
   const [creating, setCreating] = useState(false)
-  const [allowCoachFiring, setAllowCoachFiring] = useState(true)
+  const [allowCoachFiring, setAllowCoachFiring] = useState(false)
   const [teamSource, setTeamSource] = useState<'default' | 'upload'>('default')
   const [uploadedFileName, setUploadedFileName] = useState('')
 
@@ -256,9 +260,14 @@ export function NewSaveFlow({
     setCreating(true)
     onError('')
     try {
+      const auth = getAuthHeaders ? await getAuthHeaders() : headers
+      if (!auth.Authorization) {
+        onSessionExpired?.()
+        return
+      }
       const r = await fetch(`${apiBase}/saves`, {
         method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
+        headers: { ...auth, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           save_name: saveName.trim(),
           user_team: userTeam,
@@ -269,6 +278,10 @@ export function NewSaveFlow({
         }),
       })
       if (!r.ok) {
+        if (r.status === 401) {
+          onSessionExpired?.()
+          return
+        }
         // FastAPI errors are often JSON: { detail: "..." }
         try {
           const maybe = await r.json()
@@ -364,10 +377,10 @@ export function NewSaveFlow({
               style={{ marginTop: 3 }}
             />
             <span>
-              <strong>My coach can be fired</strong>
+              <strong>My coach can be fired or forced out</strong>
               <span className="newsave-sub" style={{ display: 'block', marginTop: 4 }}>
-                Uncheck if you want a stable job—the school will not fire your head coach for performance. (You can still
-                leave for another school if you apply.)
+                Leave unchecked for a stable job: the school will not fire, bench, or auto-resign your head coach. You can
+                still leave for another school only if you rank that job during the coaching carousel.
               </span>
             </span>
           </label>

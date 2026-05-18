@@ -175,11 +175,44 @@ export default function App() {
     setToken('')
   }
 
+  function expireSession(message: string = STALE_SESSION_MSG) {
+    clearStaleSession()
+    setError(message)
+  }
+
+  async function validateSession(currentToken?: string): Promise<boolean> {
+    const t = (currentToken ?? token).trim()
+    if (!t) return false
+    try {
+      const r = await fetch(`${API_BASE}/auth/session`, {
+        headers: { Authorization: `Bearer ${t}` },
+      })
+      return r.ok
+    } catch {
+      return false
+    }
+  }
+
+  /** Fresh bearer headers for protected API calls (re-logs in if token is stale). */
+  async function getAuthHeaders(): Promise<Record<string, string>> {
+    const stored = (localStorage.getItem('fnd_token') ?? token).trim()
+    if (stored && (await validateSession(stored))) {
+      return { Authorization: `Bearer ${stored}` }
+    }
+    if (stored) clearStaleSession()
+    const ok = await devLogin()
+    const fresh = (localStorage.getItem('fnd_token') ?? '').trim()
+    if (!ok || !fresh) {
+      expireSession()
+      return {}
+    }
+    return { Authorization: `Bearer ${fresh}` }
+  }
+
   /** If response is 401, clears stored token and sets a friendly message. Returns true = caller should stop. */
   async function consumeUnauthorized(r: Response): Promise<boolean> {
     if (r.status !== 401) return false
-    clearStaleSession()
-    setError(STALE_SESSION_MSG)
+    expireSession()
     return true
   }
 
@@ -795,6 +828,9 @@ export default function App() {
 
   async function onNewSaveClick() {
     setError('')
+    if (token && !(await validateSession())) {
+      expireSession()
+    }
     setScreen('new')
   }
 
@@ -819,8 +855,18 @@ export default function App() {
   }
 
   async function onContinueNew() {
-    await devLogin()
+    setError('')
+    const h = await getAuthHeaders()
+    if (!h.Authorization) setScreen('new')
   }
+
+  useEffect(() => {
+    if (!token) return
+    void validateSession(token).then((ok) => {
+      if (!ok) clearStaleSession()
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- validate stored token once on load
+  }, [])
 
   useEffect(() => {
     if (!USE_LOCAL_BUNDLES && token && screen === 'load') loadSaves()
@@ -1109,8 +1155,10 @@ export default function App() {
           <NewSaveFlow
             apiBase={API_BASE}
             headers={headers}
+            getAuthHeaders={getAuthHeaders}
             onBack={goTitle}
             onError={setError}
+            onSessionExpired={() => expireSession()}
             defaultCoachName={username}
             onCreated={async (id) => {
               await loadSaves()
