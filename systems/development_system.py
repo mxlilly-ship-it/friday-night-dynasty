@@ -3,6 +3,9 @@ Player development year-to-year and in-season.
 Based on potential, facilities, coach development ability, growth_rate,
 peak_age, late_bloomer / early_bloomer, and year in school.
 Also handles senior removal (graduation) and advancing age/year for multi-season sims.
+
+HS freshmen (year 9) skip winter training, spring ball, and the Training Results development
+pass for the offseason they enter on; first offseason gains apply as sophomores (year 10+).
 """
 
 import random
@@ -112,6 +115,11 @@ def _get_player_year(player: "Player") -> int:
     age = player.age if player.age is not None else 15
     # 14->9, 15->10, 16->11, 17-18->12
     return min(SENIOR_YEAR, FRESHMAN_YEAR + max(0, age - 14))
+
+
+def _player_receives_offseason_training(player: "Player") -> bool:
+    """Freshmen (9th) skip winter, spring ball, and training-results growth; first gains are sophomore year onward."""
+    return _get_player_year(player) > FRESHMAN_YEAR
 
 
 def _get_player_age(player: "Player") -> int:
@@ -403,6 +411,8 @@ def run_winter_training_session(
     category_totals = {c: 0.0 for c in WINTER_TRAINING_CATEGORIES}
 
     for player in list(team.roster):
+        if not _player_receives_offseason_training(player):
+            continue
         p_name = str(getattr(player, "name", "Player"))
         p_pos = str(getattr(player, "position", "") or "")
         p_tag = WINTER_POSITIONAL_TAGS.get(p_pos, "hybrid")
@@ -637,6 +647,8 @@ def run_spring_ball_development(team: "Team") -> dict:
     ovr_pop_players: List[str] = []
 
     for player in list(team.roster):
+        if not _player_receives_offseason_training(player):
+            continue
         player_name = getattr(player, "name", "Player")
         pos_candidates = [str(getattr(player, "position", "") or "")]
         sec = str(getattr(player, "secondary_position", "") or "")
@@ -711,6 +723,8 @@ def run_spring_ball_development(team: "Team") -> dict:
 def run_offseason_development(team: "Team") -> None:
     """Training Results: full offseason development for every player (main growth period)."""
     for player in list(team.roster):
+        if not _player_receives_offseason_training(player):
+            continue
         develop_player(player, team, is_offseason=True)
 
 

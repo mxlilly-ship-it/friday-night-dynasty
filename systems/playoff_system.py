@@ -16,12 +16,18 @@ Round names are derived algorithmically from the bracket size:
 Player game stats are tracked and appended to output when output_lines is provided.
 """
 
+import random
 from typing import Any, Dict, List, Optional, Tuple
 
 from engine.game_engine import Game
 from systems.team_ratings import calculate_team_ratings
 from systems.depth_chart import build_depth_chart
 from systems.game_stats import create_game_stats, record_play, format_game_box_score, merge_game_stats_into_season
+from systems.program_progression import (
+    apply_program_delta_to_team,
+    game_progression_delta,
+    team_composite_strength,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -776,8 +782,10 @@ def run_playoff_game(
                     game.fourth_down_go_for_it_max_ytg = go_max
             except Exception:
                 pass
-            result = game.run_play()
-            if isinstance(result, dict) and (result.get("first_down") is False) and (result.get("yards") == 0) and game.down != 4:
+            if game.fourth_down_decision() in ("punt", "fg"):
+                result = game.run_play()
+                if isinstance(result, dict) and (result.get("first_down") is False) and (result.get("yards") == 0) and game.down != 4:
+                    continue
                 continue
 
         offense_call = game.get_ai_play_call()
@@ -804,6 +812,19 @@ def run_playoff_game(
             game.check_ot_period_end()
 
         game.advance_quarter()
+
+    sh, sa = int(game.score_home), int(game.score_away)
+    h_str = team_composite_strength(home_ratings)
+    a_str = team_composite_strength(away_ratings)
+    rng = random.Random()
+    d_home = game_progression_delta(
+        team_score=sh, opp_score=sa, team_strength=h_str, opp_strength=a_str, rng=rng
+    )
+    d_away = game_progression_delta(
+        team_score=sa, opp_score=sh, team_strength=a_str, opp_strength=h_str, rng=rng
+    )
+    apply_program_delta_to_team(home_team, d_home)
+    apply_program_delta_to_team(away_team, d_away)
 
     return (game.score_home, game.score_away, game.ot_winner, stats_map)
 

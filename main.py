@@ -87,8 +87,11 @@ for home, away in schedule:
             continue
 
         if game.down == 4 and not getattr(game, "is_overtime", False):
-            result = game.run_play()
-            if isinstance(result, dict) and (result.get("first_down") is False) and (result.get("yards") == 0) and game.down != 4:
+            if game.fourth_down_decision() in ("punt", "fg"):
+                result = game.run_play()
+                if isinstance(result, dict) and (result.get("first_down") is False) and (result.get("yards") == 0) and game.down != 4:
+                    time.sleep(0.05)
+                    continue
                 time.sleep(0.05)
                 continue
 

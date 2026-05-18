@@ -593,6 +593,15 @@ def _apply_game_situation_adjustments(
         out[OffensivePlayCategory.PLAY_ACTION] *= 1.10
         out[OffensivePlayCategory.LONG_PASS] *= 0.60
 
+    # Mercy / running-clock lead (35+, regulation): match engine grind — heavy run, few bombs
+    if situation.quarter <= 4 and score_margin >= 35:
+        out[OffensivePlayCategory.INSIDE_RUN] *= 2.15
+        out[OffensivePlayCategory.OUTSIDE_RUN] *= 1.85
+        out[OffensivePlayCategory.PLAY_ACTION] *= 1.12
+        out[OffensivePlayCategory.SHORT_PASS] *= 0.72
+        out[OffensivePlayCategory.MEDIUM_PASS] *= 0.42
+        out[OffensivePlayCategory.LONG_PASS] *= 0.18
+
     # Red zone tends to compress vertical game
     if situation.ball_position >= 80:
         out[OffensivePlayCategory.LONG_PASS] *= 0.60

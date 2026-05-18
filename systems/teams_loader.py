@@ -141,10 +141,15 @@ def build_teams_from_configs(
         enrollment = cfg.get("enrollment")
         facilities_grade = int(cfg.get("facilities_grade", 5))
 
+        from systems.prestige_system import default_team_points_for_prestige, prestige_from_team_points
+
+        start_tp = default_team_points_for_prestige(prestige)
         team = Team(
             name=name,
             nickname=nickname,
-            prestige=prestige,
+            prestige=prestige_from_team_points(start_tp),
+            team_points=start_tp,
+            team_points_last_delta=0.0,
             community_type=community,
             classification=classification if classification else None,
             region=region,

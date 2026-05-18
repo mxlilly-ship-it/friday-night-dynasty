@@ -22,12 +22,22 @@ from systems.coach_career_system import (
 from systems.prestige_system import get_coach_skill_sum
 from systems.save_system import coach_from_dict, coach_to_dict
 
+# Max retirements + resignations + firings when carousel step 1 runs (_carousel_init).
+STAGE1_MAX_CHURN_OPENINGS = 20
+
+# User fired / between jobs: application accept floor and step-down bonus.
+USER_UNEMPLOYED_APPLICATION_ACCEPT_BASE = 0.84
+USER_UNEMPLOYED_APPLICATION_ACCEPT_FLOOR = 0.72
+
+
+def _churn_cap_reached(vacancies: List[str]) -> bool:
+    return len(vacancies) >= STAGE1_MAX_CHURN_OPENINGS
+
 
 def _random_exit_chance(coach: Coach, hot_seat: int, prestige: int) -> float:
     """
     Chance a coach steps away for non-firing reasons (burnout / life change /
-    lateral move / family). Tuned so stage-1 carousel churn averages roughly
-    8-12 openings per year on a ~108-team league (was ~3-4 at base 0.025).
+    lateral move / family). Stage-1 openings are hard-capped at STAGE1_MAX_CHURN_OPENINGS.
     Pressure and age still bias the distribution upward.
     """
     chance = 0.075
@@ -188,17 +198,117 @@ def _maybe_fire_coach(
     return False
 
 
-def _pop_unemployed_user_coach(unemployed: List[Coach], user_coach_name: Optional[str]) -> Optional[Coach]:
-    """Remove and return the user's coach from the unemployed list (after a firing)."""
+def _user_coach_name_key(user_coach_name: Optional[str]) -> str:
+    return str(user_coach_name or "").strip().lower()
+
+
+def _coach_matches_user(coach: Optional[Coach], user_coach_name: Optional[str]) -> bool:
+    if not coach or not user_coach_name:
+        return False
+    return str(coach.name or "").strip().lower() == _user_coach_name_key(user_coach_name)
+
+
+def _find_unemployed_user_coach(
+    unemployed: List[Coach], user_coach_name: Optional[str]
+) -> Tuple[Optional[Coach], Optional[int]]:
+    """Locate the user's coach in the unemployed pool without removing them."""
     if not user_coach_name or not isinstance(unemployed, list):
-        return None
-    tgt = str(user_coach_name).strip().lower()
+        return None, None
+    tgt = _user_coach_name_key(user_coach_name)
     if not tgt:
-        return None
+        return None, None
     for idx, c in enumerate(unemployed):
         if c and str(c.name or "").strip().lower() == tgt:
-            return unemployed.pop(idx)
-    return None
+            return c, idx
+    return None, None
+
+
+def _pop_unemployed_user_coach(unemployed: List[Coach], user_coach_name: Optional[str]) -> Optional[Coach]:
+    """Remove and return the user's coach from the unemployed list (after a firing)."""
+    coach, idx = _find_unemployed_user_coach(unemployed, user_coach_name)
+    if coach is None or idx is None:
+        return None
+    return unemployed.pop(idx)
+
+
+def _user_coach_is_employed(teams: Dict[str, Any], user_coach_name: Optional[str]) -> bool:
+    if not user_coach_name:
+        return False
+    for team in teams.values():
+        coach = getattr(team, "coach", None)
+        if _coach_matches_user(coach, user_coach_name):
+            return True
+    return False
+
+
+def _application_accept_chance(
+    *,
+    hired_coach: Coach,
+    user_coach_name: Optional[str],
+    poach_team: Any,
+    hiring_prestige: int,
+    rank_bonus: float,
+) -> float:
+    """Accept probability for the user's HC application (higher when unemployed / stepping down)."""
+    on_staff = bool(getattr(poach_team, "coach", None) is hired_coach)
+    unemployed_user = _coach_matches_user(hired_coach, user_coach_name) and not on_staff
+    home_prestige = int(getattr(poach_team, "prestige", 5) or 5)
+
+    if unemployed_user:
+        accept = USER_UNEMPLOYED_APPLICATION_ACCEPT_BASE + rank_bonus
+        if hiring_prestige < home_prestige:
+            accept += 0.05 * min(4.0, float(home_prestige - hiring_prestige))
+        return max(USER_UNEMPLOYED_APPLICATION_ACCEPT_FLOOR, min(0.96, accept))
+
+    accept = PROMOTION_ACCEPT_BASE + (float(hiring_prestige) - float(home_prestige)) * 0.055 + rank_bonus
+    if hiring_prestige < home_prestige:
+        accept += 0.03 * min(3.0, float(home_prestige - hiring_prestige))
+    return max(0.22, min(0.93, accept))
+
+
+def _complete_user_application_hire(
+    vacancy: str,
+    hired_coach: Coach,
+    poach_team: Any,
+    user_team: str,
+    hiring_team: Any,
+    employed_coaches: Dict[str, Tuple[str, Coach]],
+    coach_changes: Dict[str, Tuple[float, float]],
+    events: List[Dict[str, Any]],
+    vacancies: List[str],
+    *,
+    unemployed_idx: Optional[int] = None,
+    unemployed: Optional[List[Coach]] = None,
+    detail_suffix: str = "",
+) -> None:
+    if unemployed is not None and unemployed_idx is not None:
+        unemployed.pop(unemployed_idx)
+
+    poach_old_skill = get_coach_skill_sum(hired_coach)
+    hiring_team.coach = hired_coach
+    hired_coach.years_at_school = 0
+    hired_coach.years_since_scheme_change = getattr(hired_coach, "years_since_scheme_change", 0)
+    if getattr(poach_team, "coach", None) is hired_coach:
+        poach_team.coach = None
+    if user_team in employed_coaches:
+        del employed_coaches[user_team]
+    employed_coaches[vacancy] = (vacancy, hired_coach)
+    new_skill = get_coach_skill_sum(hired_coach)
+    old_skill = coach_changes.get(vacancy, (3.0, 3.0))[0]
+    coach_changes[vacancy] = (old_skill, new_skill)
+    coach_changes[user_team] = (poach_old_skill, 3.0)
+    suffix = detail_suffix or ""
+    events.append(
+        {
+            "type": "application_hire",
+            "team": vacancy,
+            "coach": hired_coach.name,
+            "from_school": user_team,
+            "detail": f"{hired_coach.name} accepts the {vacancy} job (user application — leaves {user_team}){suffix}",
+        }
+    )
+    if user_team not in vacancies:
+        vacancies.append(user_team)
 
 
 def _try_user_application_hire(
@@ -230,44 +340,38 @@ def _try_user_application_hire(
     if not poach_team:
         return False
     hired_coach = getattr(poach_team, "coach", None)
+    unemployed_idx: Optional[int] = None
     if hired_coach is None:
-        hired_coach = _pop_unemployed_user_coach(unemployed, user_coach_name)
+        hired_coach, unemployed_idx = _find_unemployed_user_coach(unemployed, user_coach_name)
 
     if hired_coach is None:
         return False
 
-    home_prestige = getattr(poach_team, "prestige", 5) or 5
     # Earlier in the preference list modestly boosts perceived fit / AD interest.
     rank_bonus = 0.04 * max(0.0, float(len(job_applications) - rank - 1))
-    accept = PROMOTION_ACCEPT_BASE + (float(hiring_prestige) - float(home_prestige)) * 0.055 + rank_bonus
-    accept = max(0.14, min(0.93, accept))
+    accept = _application_accept_chance(
+        hired_coach=hired_coach,
+        user_coach_name=user_coach_name,
+        poach_team=poach_team,
+        hiring_prestige=hiring_prestige,
+        rank_bonus=rank_bonus,
+    )
     if random.random() > accept:
         return False
 
-    poach_old_skill = get_coach_skill_sum(hired_coach)
-    hiring_team.coach = hired_coach
-    hired_coach.years_at_school = 0
-    hired_coach.years_since_scheme_change = getattr(hired_coach, "years_since_scheme_change", 0)
-    if getattr(poach_team, "coach", None) is hired_coach:
-        poach_team.coach = None
-    if user_team in employed_coaches:
-        del employed_coaches[user_team]
-    employed_coaches[vacancy] = (vacancy, hired_coach)
-    new_skill = get_coach_skill_sum(hired_coach)
-    old_skill = coach_changes.get(vacancy, (3.0, 3.0))[0]
-    coach_changes[vacancy] = (old_skill, new_skill)
-    coach_changes[user_team] = (poach_old_skill, 3.0)
-    events.append(
-        {
-            "type": "application_hire",
-            "team": vacancy,
-            "coach": hired_coach.name,
-            "from_school": user_team,
-            "detail": f"{hired_coach.name} accepts the {vacancy} job (user application — leaves {user_team})",
-        }
+    _complete_user_application_hire(
+        vacancy,
+        hired_coach,
+        poach_team,
+        user_team,
+        hiring_team,
+        employed_coaches,
+        coach_changes,
+        events,
+        vacancies,
+        unemployed_idx=unemployed_idx,
+        unemployed=unemployed,
     )
-    if user_team not in vacancies:
-        vacancies.append(user_team)
     return True
 
 
@@ -303,6 +407,27 @@ def _hiring_iteration(
         user_coach_name,
     ):
         return
+
+    # Second chance: if the user listed this vacancy, hire them when still unemployed.
+    if user_team and user_coach_name and ja and vacancy in ja:
+        waitlist_coach, waitlist_idx = _find_unemployed_user_coach(unemployed, user_coach_name)
+        poach_team = team_by_name.get(user_team)
+        if waitlist_coach and poach_team:
+            _complete_user_application_hire(
+                vacancy,
+                waitlist_coach,
+                poach_team,
+                user_team,
+                hiring_team,
+                employed_coaches,
+                coach_changes,
+                events,
+                vacancies,
+                unemployed_idx=waitlist_idx,
+                unemployed=unemployed,
+                detail_suffix=" (waitlist)",
+            )
+            return
 
     candidates: List[Tuple[float, str, Coach]] = []
     for school, (_, coach) in list(employed_coaches.items()):
@@ -438,6 +563,95 @@ def _hiring_loop(
     return vac, unemployed
 
 
+def _ensure_user_coach_landed(
+    teams: Dict[str, Any],
+    unemployed: List[Coach],
+    coach_changes: Dict[str, Tuple[float, float]],
+    events: List[Dict[str, Any]],
+    job_applications: Optional[List[str]],
+    user_team: Optional[str],
+    user_coach_name: Optional[str],
+) -> List[Coach]:
+    """
+    After the final hiring round, guarantee the user's coach has a program if they were fired.
+    Prefers ranked applications, then open jobs, then the lowest-prestige opening available.
+    """
+    if not user_coach_name or _user_coach_is_employed(teams, user_coach_name):
+        return unemployed
+
+    coach, idx = _find_unemployed_user_coach(unemployed, user_coach_name)
+    if coach is None or idx is None:
+        return unemployed
+
+    team_by_name = {name: team for name, team in teams.items()}
+    ut = str(user_team or "").strip()
+    apps = [str(a).strip() for a in (job_applications or []) if str(a).strip()]
+
+    def _prestige(name: str) -> int:
+        return int(getattr(team_by_name.get(name), "prestige", 5) or 5)
+
+    dest: Optional[str] = None
+    for name in apps:
+        if name == ut:
+            continue
+        t = team_by_name.get(name)
+        if t and not getattr(t, "coach", None):
+            dest = name
+            break
+
+    if not dest:
+        open_slots = [
+            (_prestige(n), n)
+            for n, t in team_by_name.items()
+            if n != ut and not getattr(t, "coach", None)
+        ]
+        open_slots.sort()
+        if open_slots:
+            dest = open_slots[0][1]
+
+    if not dest:
+        ranked = [(_prestige(n), n) for n in team_by_name if n != ut]
+        ranked.sort()
+        if ranked:
+            dest = ranked[0][1]
+
+    if not dest:
+        return unemployed
+
+    hiring_team = team_by_name[dest]
+    displaced = getattr(hiring_team, "coach", None)
+    if displaced and not _coach_matches_user(displaced, user_coach_name):
+        unemployed.append(displaced)
+
+    unemployed.pop(idx)
+    from_school = ut or dest
+    poach_team = team_by_name.get(from_school)
+    if poach_team is None:
+        class _FormerProgram:
+            coach = None
+            prestige = 5
+
+        poach_team = _FormerProgram()
+
+    employed_coaches = _rebuild_employed(teams)
+    vacancies: List[str] = []
+    _complete_user_application_hire(
+        dest,
+        coach,
+        poach_team,
+        from_school,
+        hiring_team,
+        employed_coaches,
+        coach_changes,
+        events,
+        vacancies,
+        detail_suffix=" (offseason landing spot)",
+    )
+    if from_school and from_school not in vacancies and not getattr(team_by_name.get(from_school), "coach", None):
+        vacancies.append(from_school)
+    return unemployed
+
+
 def build_carousel_season_archive(
     seasons_year: int, events: List[Dict[str, Any]], hot_seat_by_team: Dict[str, int]
 ) -> Dict[str, Any]:
@@ -546,7 +760,12 @@ def _carousel_init(
             coach.years_at_school = getattr(coach, "years_at_school", 0) + 1
             coach.years_since_scheme_change = getattr(coach, "years_since_scheme_change", 0) + 1
 
-    for name, team in teams.items():
+    team_items = list(teams.items())
+    random.shuffle(team_items)
+
+    for name, team in team_items:
+        if _churn_cap_reached(vacancies):
+            break
         coach = getattr(team, "coach", None)
         if not coach:
             continue
@@ -565,7 +784,10 @@ def _carousel_init(
             coach_changes[name] = (old_skill, 3.0)
 
     # Random voluntary exits (burnout/life change) to keep carousel turnover realistic.
-    for name, team in list(teams.items()):
+    random.shuffle(team_items)
+    for name, team in team_items:
+        if _churn_cap_reached(vacancies):
+            break
         coach = getattr(team, "coach", None)
         if not coach or name in vacancies:
             continue
@@ -589,7 +811,10 @@ def _carousel_init(
             vacancies.append(name)
             coach_changes[name] = (old_skill, 3.0)
 
-    for name, team in list(teams.items()):
+    random.shuffle(team_items)
+    for name, team in team_items:
+        if _churn_cap_reached(vacancies):
+            break
         coach = getattr(team, "coach", None)
         if not coach or name in vacancies:
             continue
@@ -761,6 +986,16 @@ def run_coach_carousel_step(
         evt = {"type": "scheme_change", "team": team.name, "coach": coach.name, "detail": detail}
         evt.update(change_info)
         events.append(evt)
+
+    unemp = _ensure_user_coach_landed(
+        teams,
+        unemp,
+        coach_changes,
+        events,
+        job_applications,
+        user_team,
+        user_coach_name,
+    )
 
     return None, events, coach_changes, hot_seat_by_team
 

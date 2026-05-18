@@ -58,13 +58,27 @@ from systems.league_history import (
     load_league_history,
     build_team_program_totals_display,
 )
-from systems.prestige_system import update_prestige
+from systems.coach_career_log import (
+    append_season_to_coach_career_log,
+    coach_history_rows_from_career_log,
+    norm_coach_key,
+    rebuild_coach_career_log_from_league_history,
+)
+from systems.prestige_system import migrate_state_team_points_fields, update_prestige
 from systems.development_system import (
     build_ai_winter_training_allocations,
     normalize_winter_training_allocations,
     run_offseason_development,
     run_spring_ball_development,
     run_winter_training_session,
+)
+from systems.program_pp_economics import compute_season_program_pp_awards
+from systems.program_progression import (
+    PILLAR_CUMULATIVE_PP_MAX,
+    clamp_progress_points,
+    pillar_cumulative_pp_value,
+    pillar_state_from_cumulative_pp_value,
+    pp_delta_for_level_change,
 )
 from systems.offseason_manager import reset_team_season_stats, run_offseason_roster_turnover
 from systems.team_ratings import calculate_player_overall
@@ -111,6 +125,13 @@ from systems.playbook_system import (
     normalize_coach_offensive_playbook,
 )
 from systems.transfer_system import run_transfer_stage_1, run_transfer_stage_2
+from systems.coach_email_system import (
+    ensure_coach_inbox,
+    generate_playoff_round_emails,
+    generate_week_sim_emails,
+    mark_emails_read,
+    resolve_email_choice,
+)
 from backend.services.game_service import create_game as create_game_record
 from backend.services.game_service import game_state_dict, build_coach_postgame_box_assets
 from systems.game_stats import (
@@ -127,6 +148,53 @@ from systems.gameplan_v2 import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _coach_sim_emails_enabled() -> bool:
+    """Week sim + playoff batch coach inbox. Disable with FND_DISABLE_WEEK_SIM_EMAILS=1/true/yes."""
+    v = (os.environ.get("FND_DISABLE_WEEK_SIM_EMAILS") or "").strip().lower()
+    return v not in ("1", "true", "yes")
+
+
+def _maybe_coach_playoff_round_emails(state: Dict[str, Any]) -> None:
+    if _coach_sim_emails_enabled():
+        generate_playoff_round_emails(state)
+
+
+def _hydrate_coach_inbox_persist_if_needed(user_id: str, save_id: str, state: Dict[str, Any], save_dir: str) -> None:
+    """Ensure ``coach_inbox`` + starter mail exists; write league_save.json if new messages were appended."""
+    inbox = state.get("coach_inbox")
+    n_before = 0
+    if isinstance(inbox, dict) and isinstance(inbox.get("emails"), list):
+        n_before = len(inbox["emails"])
+    ensure_coach_inbox(state)
+    inbox2 = state.get("coach_inbox")
+    n_after = 0
+    if isinstance(inbox2, dict) and isinstance(inbox2.get("emails"), list):
+        n_after = len(inbox2["emails"])
+    if n_after > n_before:
+        save_state(user_id, save_id, state, save_dir)
+
+
+def patch_coach_inbox(
+    user_id: str,
+    save_id: str,
+    *,
+    mark_read: Optional[List[str]] = None,
+    choose: Optional[Dict[str, str]] = None,
+) -> Dict[str, Any]:
+    """Mark messages read and/or resolve a choice; persists state."""
+    state, save_dir = load_state(user_id, save_id)
+    inbox = ensure_coach_inbox(state)
+    if mark_read:
+        mark_emails_read(inbox, [str(x) for x in mark_read if x])
+    if choose and isinstance(choose, dict):
+        eid = choose.get("email_id")
+        cid = choose.get("choice_id")
+        if eid and cid:
+            resolve_email_choice(inbox, str(eid), str(cid))
+    save_state(user_id, save_id, state, save_dir)
+    return {"state": state}
 
 
 def _apply_user_preseason_playbook_payload(
@@ -404,6 +472,44 @@ def _playoffs_global_completed(playoffs: Dict[str, Any]) -> bool:
     if isinstance(bc, dict) and bc:
         return all(bool(x.get("completed")) for x in bc.values() if isinstance(x, dict))
     return bool(playoffs.get("completed"))
+
+
+def _sync_playoff_top_level_champion_runner(playoffs: Dict[str, Any]) -> None:
+    """Stamp top-level champion/runner_up from ``by_class`` (same idea as ``sim_playoffs``).
+
+    ``_advance_playoff_one_round_state`` used to only copy when ``user_class`` finished, so multiclass
+    saves could end with ``completed`` true but a missing top-level ``champion``. That broke the
+    ``finish_season`` fast-path and could spin in the playoff-advance loop — and confused clients.
+    """
+    if not isinstance(playoffs, dict):
+        return
+    bc = playoffs.get("by_class")
+    if not isinstance(bc, dict) or not bc:
+        return
+    uc = playoffs.get("user_class")
+    user_champ = ""
+    user_ru = ""
+    if uc and isinstance(bc.get(uc), dict):
+        inner = bc[uc]
+        user_champ = str(inner.get("champion") or "").strip()
+        user_ru = str(inner.get("runner_up") or "").strip()
+    fb_champ = ""
+    fb_ru = ""
+    for c in sorted(bc.keys()):
+        inner = bc.get(c)
+        if not isinstance(inner, dict):
+            continue
+        ch = str(inner.get("champion") or "").strip()
+        if ch:
+            fb_champ = ch
+            fb_ru = str(inner.get("runner_up") or "").strip()
+            break
+    top_c = user_champ or fb_champ
+    if top_c:
+        playoffs["champion"] = top_c
+    top_ru = user_ru if user_champ else fb_ru
+    if top_ru:
+        playoffs["runner_up"] = top_ru
 
 
 def _ensure_playoffs_migrated(state: Dict[str, Any], teams: Dict[str, Any]) -> Dict[str, Any]:
@@ -816,6 +922,50 @@ def get_team_logo_path(user_id: str, team_name: str) -> Optional[str]:
     return None
 
 
+def _get_user_stadium_dir(user_id: str) -> str:
+    safe_user = _safe_path_segment(user_id, default="user")
+    return os.path.join(_saves_base_dir(), safe_user, "_stadiums")
+
+
+def save_team_stadium(user_id: str, team_name: str, data: bytes, extension: str) -> str:
+    """Write stadium image for ``team_name`` (same extensions as logos). Replaces any prior file for that team."""
+    ext = str(extension or "").lower().strip()
+    if ext not in _LOGO_EXTENSIONS:
+        raise ValueError("Unsupported stadium image type. Use PNG, JPG, JPEG, or WEBP.")
+    if not data:
+        raise ValueError("Stadium file is empty.")
+    safe_name = _safe_logo_name(team_name)
+    stadium_dir = _get_user_stadium_dir(user_id)
+    stadium_dir_abs = os.path.abspath(os.path.normpath(stadium_dir))
+    try:
+        makedirs_with_path_fallback(stadium_dir_abs)
+    except OSError:
+        os.makedirs(stadium_dir, exist_ok=True)
+    for old_ext in _LOGO_EXTENSIONS:
+        unlink_if_exists_any(os.path.abspath(os.path.join(stadium_dir, f"{safe_name}{old_ext}")))
+    out_plain = os.path.abspath(os.path.join(stadium_dir, f"{safe_name}{ext}"))
+    f = open_binary_with_path_fallback(out_plain, "wb")
+    try:
+        f.write(data)
+        return f.name
+    finally:
+        f.close()
+
+
+def get_team_stadium_path(user_id: str, team_name: str) -> Optional[str]:
+    safe_name = _safe_logo_name(team_name)
+    stadium_dir = _get_user_stadium_dir(user_id)
+    for ext in _LOGO_EXTENSIONS:
+        plain = os.path.abspath(os.path.join(stadium_dir, f"{safe_name}{ext}"))
+        for p in io_path_candidates(plain):
+            try:
+                if os.path.isfile(p):
+                    return p
+            except OSError:
+                continue
+    return None
+
+
 def _stem_variants_for_logo_match(stem: str) -> List[str]:
     """Try filename stems with common suffixes stripped (e.g. Martinsburg_logo → Martinsburg)."""
     stem = str(stem or "").strip()
@@ -950,21 +1100,128 @@ def _clamp_program_grade(raw: Any, fallback: int) -> int:
 
 
 def _improvement_pp_delta(from_level: int, to_level: int) -> int:
-    """
-    Compute PP delta for moving a single program grade between levels.
-    Upgrades cost PP; downgrades refund PP.
+    """PP delta for integer-only grade change (matches ``pp_delta_for_level_change`` cost table)."""
+    return pp_delta_for_level_change(int(from_level or 1), int(to_level or 1))
 
-    Cost pattern: 1→2 = 20, 2→3 = 40, ..., 9→10 = 180 (20 * current level).
-    """
-    a = max(1, min(10, int(from_level or 1)))
-    b = max(1, min(10, int(to_level or 1)))
-    if b == a:
-        return 0
-    if b > a:
-        cost = sum(20 * k for k in range(a, b))
-        return -int(cost)
-    refund = sum(20 * k for k in range(b, a))
-    return int(refund)
+
+def _normalize_team_program_pillars(ut: Team) -> None:
+    """Collapse illegal grade/progress pairs into canonical cumulative form."""
+    for gk, pk in (
+        ("facilities_grade", "facilities_progress_pts"),
+        ("culture_grade", "culture_progress_pts"),
+        ("booster_support", "boosters_progress_pts"),
+    ):
+        lv = _clamp_program_grade(getattr(ut, gk, None), 5)
+        pt = clamp_progress_points(getattr(ut, pk, 0))
+        v = pillar_cumulative_pp_value(lv, pt)
+        nlv, npt = pillar_state_from_cumulative_pp_value(v)
+        setattr(ut, gk, nlv)
+        setattr(ut, pk, npt)
+    if hasattr(ut, "_clamp_values"):
+        ut._clamp_values()
+
+
+def _resolve_offseason_improvement_pillar(
+    body: Dict[str, Any],
+    ut: Team,
+    *,
+    grade_attr: str,
+    pts_attr: str,
+    cumulative_key: str,
+    grade_body_key: str,
+    pts_body_key: str,
+) -> Tuple[int, int, int, int]:
+    from_lv = _clamp_program_grade(getattr(ut, grade_attr, None), 5)
+    from_pts = clamp_progress_points(getattr(ut, pts_attr, 0))
+    raw_c = body.get(cumulative_key)
+    if raw_c is not None:
+        try:
+            tv = max(0, min(int(PILLAR_CUMULATIVE_PP_MAX), int(raw_c)))
+        except (TypeError, ValueError):
+            tv = pillar_cumulative_pp_value(from_lv, from_pts)
+        to_lv, to_pts = pillar_state_from_cumulative_pp_value(tv)
+        return from_lv, from_pts, to_lv, to_pts
+    raw_g = body.get(grade_body_key)
+    to_lv = from_lv if raw_g is None else _clamp_program_grade(raw_g, from_lv)
+    raw_p = body.get(pts_body_key)
+    if raw_p is not None:
+        to_pts = clamp_progress_points(raw_p)
+    else:
+        to_pts = from_pts
+    v = pillar_cumulative_pp_value(to_lv, to_pts)
+    to_lv, to_pts = pillar_state_from_cumulative_pp_value(v)
+    return from_lv, from_pts, to_lv, to_pts
+
+
+def _apply_user_team_program_improvements(ut: Team, bank: Dict[str, Any], body: Dict[str, Any]) -> None:
+    """Spend flex PP bank on the three program pillars (grades + partial progress)."""
+    pp_remaining = int(bank.get("pp_remaining", bank.get("pp_total", 0)) or 0)
+    ff0, fp0, ff1, fp1 = _resolve_offseason_improvement_pillar(
+        body,
+        ut,
+        grade_attr="facilities_grade",
+        pts_attr="facilities_progress_pts",
+        cumulative_key="improve_facilities_cumulative_pp",
+        grade_body_key="improve_facilities_grade",
+        pts_body_key="improve_facilities_progress_pts",
+    )
+    cf0, cp0, cf1, cp1 = _resolve_offseason_improvement_pillar(
+        body,
+        ut,
+        grade_attr="culture_grade",
+        pts_attr="culture_progress_pts",
+        cumulative_key="improve_culture_cumulative_pp",
+        grade_body_key="improve_culture_grade",
+        pts_body_key="improve_culture_progress_pts",
+    )
+    bf0, bp0, bf1, bp1 = _resolve_offseason_improvement_pillar(
+        body,
+        ut,
+        grade_attr="booster_support",
+        pts_attr="boosters_progress_pts",
+        cumulative_key="improve_boosters_cumulative_pp",
+        grade_body_key="improve_booster_support",
+        pts_body_key="improve_boosters_progress_pts",
+    )
+    delta_pp = (
+        pillar_cumulative_pp_value(ff0, fp0)
+        - pillar_cumulative_pp_value(ff1, fp1)
+        + pillar_cumulative_pp_value(cf0, cp0)
+        - pillar_cumulative_pp_value(cf1, cp1)
+        + pillar_cumulative_pp_value(bf0, bp0)
+        - pillar_cumulative_pp_value(bf1, bp1)
+    )
+    new_remaining = pp_remaining + int(delta_pp)
+    if new_remaining < 0 and body.get("_bulk_cpu_pp_clamp"):
+        ff1, cf1, bf1 = _bulk_enforce_improvement_pp_budget(ff0, cf0, bf0, ff1, cf1, bf1, pp_remaining)
+        fp1 = cp1 = bp1 = 0
+        delta_pp = (
+            pillar_cumulative_pp_value(ff0, fp0)
+            - pillar_cumulative_pp_value(ff1, fp1)
+            + pillar_cumulative_pp_value(cf0, cp0)
+            - pillar_cumulative_pp_value(cf1, cp1)
+            + pillar_cumulative_pp_value(bf0, bp0)
+            - pillar_cumulative_pp_value(bf1, bp1)
+        )
+        new_remaining = pp_remaining + int(delta_pp)
+    if new_remaining < 0:
+        raise ValueError("Not enough PP for those improvements.")
+
+    ut.facilities_grade = ff1
+    ut.facilities_progress_pts = fp1
+    ut.culture_grade = cf1
+    ut.culture_progress_pts = cp1
+    ut.booster_support = bf1
+    ut.boosters_progress_pts = bp1
+    _normalize_team_program_pillars(ut)
+
+    bank["pp_remaining"] = new_remaining
+    bank["applied"] = {
+        "facilities_grade": {"from": ff0, "to": int(ut.facilities_grade), "from_pts": fp0, "to_pts": int(ut.facilities_progress_pts)},
+        "culture_grade": {"from": cf0, "to": int(ut.culture_grade), "from_pts": cp0, "to_pts": int(ut.culture_progress_pts)},
+        "booster_support": {"from": bf0, "to": int(ut.booster_support), "from_pts": bp0, "to_pts": int(ut.boosters_progress_pts)},
+        "pp_delta": int(delta_pp),
+    }
 
 
 def _postseason_tier_for_team(team_name: str, standings: Dict[str, Any], bracket_results: List[Dict[str, Any]], champion: str) -> str:
@@ -1006,79 +1263,22 @@ def _season_pp_awards_for_team(
     bracket_results: List[Dict[str, Any]],
     champion: str,
     season_goals: Optional[Dict[str, Any]],
+    weeks: Optional[Any] = None,
+    week_results: Optional[Any] = None,
 ) -> Dict[str, Any]:
-    """
-    Award points earned during the season that can be spent on Improvements.
-
-    Tuned for slower PP swings (harder to bank big years, gentler penalties on average years):
-    - win: +0.33, loss: -0.33 (was ±0.5)
-    - postseason (max tier): playoffs +1, semifinal +2, championship appearance +3, champion +5
-      (was 1 / 2 / 4 / 6)
-    - missed goal component: -1 each (was -2) for missed win-target and missed stage-target
-    """
-    record_pp_per_side = 0.33  # soften W/L swings vs ±0.5 previously
-    srow = (standings or {}).get(team_name) or {}
-    wins = int(srow.get("wins", 0) or 0)
-    losses = int(srow.get("losses", 0) or 0)
-    wl_points = record_pp_per_side * wins - record_pp_per_side * losses
+    """Season-end Improvements PP (see ``systems.program_pp_economics`` constants + docstring)."""
 
     tier = _postseason_tier_for_team(team_name, standings, bracket_results, champion)
-    tier_points_map = {"none": 0, "playoffs": 1, "semifinal": 2, "championship": 3, "champion": 5}
-    postseason_points = float(tier_points_map.get(tier, 0))
-
-    # Goals
-    goal_fail = 0
-    win_goal = None
-    stage_goal = None
-    if isinstance(season_goals, dict):
-        try:
-            win_goal = int(season_goals.get("win_goal")) if season_goals.get("win_goal") is not None else None
-        except Exception:
-            win_goal = None
-        stage_goal = str(season_goals.get("stage_goal") or "").strip() or None
-
-    if win_goal is not None and wins < win_goal:
-        goal_fail += 1
-
-    achieved_rank = {"none": 0, "playoffs": 1, "semifinal": 2, "championship": 3, "champion": 4}.get(tier, 0)
-    goal_rank = None
-    if stage_goal:
-        # Map UI goal strings to a comparable rank.
-        if stage_goal == "Winning Season":
-            # "Winning season" = at least .500
-            goal_rank = 0 if wins >= losses else 999
-        elif stage_goal == "Playoffs":
-            goal_rank = 1
-        elif stage_goal == "Semifinal":
-            goal_rank = 2
-        elif stage_goal == "State Championship":
-            goal_rank = 3
-        elif stage_goal == "Title Winner":
-            goal_rank = 4
-    if goal_rank is not None:
-        if goal_rank == 999:
-            goal_fail += 1
-        elif achieved_rank < goal_rank:
-            goal_fail += 1
-
-    goal_penalty_pp = -1.0  # softer than -2 when goals are missed
-    goal_points = goal_penalty_pp * float(goal_fail)
-    total = wl_points + postseason_points + goal_points
-    # Store PP as integer (allow halves by rounding to nearest int, with .5 up)
-    pp_total = int(round(total))
-
-    return {
-        "team": team_name,
-        "wins": wins,
-        "losses": losses,
-        "wl_points": wl_points,
-        "postseason_tier": tier,
-        "postseason_points": postseason_points,
-        "goal_fail_count": goal_fail,
-        "goal_points": goal_points,
-        "total_raw": total,
-        "pp_total": pp_total,
-    }
+    return compute_season_program_pp_awards(
+        team_name=team_name,
+        standings=standings,
+        bracket_results=bracket_results,
+        champion=champion,
+        season_goals=season_goals,
+        weeks=weeks,
+        week_results=week_results,
+        postseason_tier=tier,
+    )
 
 
 def _ensure_user_coach_and_firing_defaults(state: Dict[str, Any]) -> None:
@@ -1109,17 +1309,99 @@ def _carousel_opts_from_state(state: Dict[str, Any]) -> Tuple[bool, Optional[str
     return allow_fire, ucn if ucn else None
 
 
+def _coach_name_normalized_key(raw: Optional[Any]) -> str:
+    """Lowercase + collapse internal whitespace for stable coach-name comparisons."""
+    s = str(raw or "").strip()
+    if not s:
+        return ""
+    return " ".join(s.lower().split())
+
+
 def _sync_user_team_with_saved_coach(state: Dict[str, Any], teams: Dict[str, Team]) -> None:
     """Point user_team at the school employing the saved user coach (after carousel moves)."""
     raw = state.get("user_coach_name")
     if not (isinstance(raw, str) and raw.strip()):
         return
-    key = raw.strip().lower()
+    key = _coach_name_normalized_key(raw)
+    if not key:
+        return
     for name, tm in teams.items():
         coach = getattr(tm, "coach", None)
-        if coach and str(coach.name or "").strip().lower() == key:
+        if coach and _coach_name_normalized_key(getattr(coach, "name", None)) == key:
             state["user_team"] = name
             return
+
+
+def _sync_user_team_from_carousel_events(state: Dict[str, Any], events: List[Any]) -> None:
+    """Set ``user_team`` from carousel hire events when the user's coach moved schools.
+
+    Complements :func:`_sync_user_team_with_saved_coach` (team scan) when names match loosely
+    or when the scan would otherwise miss an ``application_hire`` / ``promotion``.
+    """
+    _, ukey = _carousel_opts_from_state(state)
+    ulow = _coach_name_normalized_key(ukey)
+    if not ulow:
+        return
+    team_names = {str(t.get("name")) for t in (state.get("teams") or []) if isinstance(t, dict) and t.get("name")}
+    for ev in reversed(list(events or [])):
+        if not isinstance(ev, dict):
+            continue
+        if _coach_name_normalized_key(ev.get("coach")) != ulow:
+            continue
+        et = str(ev.get("type") or "").strip().lower()
+        if et in ("application_hire", "promotion"):
+            dest = str(ev.get("team") or "").strip()
+            if dest and dest in team_names:
+                state["user_team"] = dest
+                return
+
+
+def _repair_user_team_from_serialized_teams(state: Dict[str, Any]) -> None:
+    """If ``user_coach_name`` is employed at a school other than ``user_team``, fix the pointer.
+
+    Repairs saves written before carousel hire events updated ``user_team`` (e.g. after an
+    application hire to a new school while ``user_team`` still named the old program).
+    """
+    raw = state.get("user_coach_name")
+    if not (isinstance(raw, str) and raw.strip()):
+        return
+    key = _coach_name_normalized_key(raw)
+    if not key:
+        return
+    for t in state.get("teams") or []:
+        if not isinstance(t, dict):
+            continue
+        c = t.get("coach")
+        if not isinstance(c, dict):
+            continue
+        if _coach_name_normalized_key(c.get("name")) != key:
+            continue
+        nm = str(t.get("name") or "").strip()
+        if nm:
+            state["user_team"] = nm
+            return
+
+
+def _refresh_user_coach_unemployed_flag(state: Dict[str, Any]) -> None:
+    """True when ``user_coach_name`` is set but no serialized team lists that coach as HC."""
+    raw = state.get("user_coach_name")
+    if not (isinstance(raw, str) and raw.strip()):
+        state.pop("user_coach_unemployed", None)
+        return
+    key = _coach_name_normalized_key(raw)
+    if not key:
+        state.pop("user_coach_unemployed", None)
+        return
+    for t in state.get("teams") or []:
+        if not isinstance(t, dict):
+            continue
+        c = t.get("coach")
+        if not isinstance(c, dict):
+            continue
+        if _coach_name_normalized_key(c.get("name")) == key:
+            state.pop("user_coach_unemployed", None)
+            return
+    state["user_coach_unemployed"] = True
 
 
 def normalize_offseason_stages(state: Dict[str, Any]) -> bool:
@@ -1361,6 +1643,7 @@ def _apply_coaching_carousel_stage(
         user_coach_name=user_coach_key,
     )
     _sync_user_team_with_saved_coach(state, teams)
+    _sync_user_team_from_carousel_events(state, events)
     state["offseason_coach_carousel"] = persist
     state["offseason_coach_carousel_last_events"] = (events or [])[-40:]
     state["offseason_coach_carousel_hot_seat"] = hs or {}
@@ -1518,7 +1801,7 @@ def advance_offseason(
             state["offseason_stage_index"] = idx
             state["teams"] = [team_to_dict(t) for t in teams.values()]
             save_state(user_id, save_id, state, save_dir)
-            return {"state": state}
+            return _attach_league_history_to_result(save_dir, {"state": state})
 
     elif current == "Spring Ball":
         so = body.get("spring_offense_focus")
@@ -1559,64 +1842,11 @@ def advance_offseason(
             return {"state": state}
 
     elif current == "Improvements":
-        if not ut:
-            pass
-        else:
+        if ut:
             bank = state.get("offseason_improvements_bank")
             if not isinstance(bank, dict):
                 bank = {"pp_total": 0, "pp_remaining": 0, "breakdown": None, "applied": {}}
-            pp_remaining = int(bank.get("pp_remaining", bank.get("pp_total", 0)) or 0)
-
-            # Desired target levels (optional; default to current)
-            fac_to = body.get("improve_facilities_grade")
-            cul_to = body.get("improve_culture_grade")
-            boo_to = body.get("improve_booster_support")
-            fac_from = _clamp_program_grade(getattr(ut, "facilities_grade", None), 5)
-            cul_from = _clamp_program_grade(getattr(ut, "culture_grade", None), 5)
-            boo_from = _clamp_program_grade(getattr(ut, "booster_support", None), 5)
-            fac_to_i = fac_from if fac_to is None else _clamp_program_grade(fac_to, fac_from)
-            cul_to_i = cul_from if cul_to is None else _clamp_program_grade(cul_to, cul_from)
-            boo_to_i = boo_from if boo_to is None else _clamp_program_grade(boo_to, boo_from)
-
-            delta_pp = 0
-            delta_pp += _improvement_pp_delta(fac_from, fac_to_i)
-            delta_pp += _improvement_pp_delta(cul_from, cul_to_i)
-            delta_pp += _improvement_pp_delta(boo_from, boo_to_i)
-
-            new_remaining = pp_remaining + int(delta_pp)
-            # Bulk sim builds the body from a prior load_state snapshot; grades or pp_remaining can
-            # change before advance_offseason reloads. Re-enforce against live from-levels and bank.
-            if new_remaining < 0 and body.get("_bulk_cpu_pp_clamp"):
-                fac_to_i, cul_to_i, boo_to_i = _bulk_enforce_improvement_pp_budget(
-                    fac_from,
-                    cul_from,
-                    boo_from,
-                    fac_to_i,
-                    cul_to_i,
-                    boo_to_i,
-                    pp_remaining,
-                )
-                delta_pp = (
-                    _improvement_pp_delta(fac_from, fac_to_i)
-                    + _improvement_pp_delta(cul_from, cul_to_i)
-                    + _improvement_pp_delta(boo_from, boo_to_i)
-                )
-                new_remaining = pp_remaining + int(delta_pp)
-            if new_remaining < 0:
-                raise ValueError("Not enough PP for those improvements.")
-
-            ut.facilities_grade = fac_to_i
-            ut.culture_grade = cul_to_i
-            ut.booster_support = boo_to_i
-            ut._clamp_values()
-
-            bank["pp_remaining"] = new_remaining
-            bank["applied"] = {
-                "facilities_grade": {"from": fac_from, "to": fac_to_i},
-                "culture_grade": {"from": cul_from, "to": cul_to_i},
-                "booster_support": {"from": boo_from, "to": boo_to_i},
-                "pp_delta": int(delta_pp),
-            }
+            _apply_user_team_program_improvements(ut, bank, body)
             state["offseason_improvements_bank"] = bank
 
     elif current == "Coach development":
@@ -1682,7 +1912,7 @@ def advance_offseason(
             state["offseason_stage_index"] = idx
             state["teams"] = [team_to_dict(t) for t in teams.values()]
             save_state(user_id, save_id, state, save_dir)
-            return {"state": state}
+            return _attach_league_history_to_result(save_dir, {"state": state})
     elif current == "Transfers II":
         pending = bool(state.get("offseason_transfer_stage_2_pending_review"))
         ack = bool(body.get("transfer_stage_2_ack_results"))
@@ -1710,7 +1940,7 @@ def advance_offseason(
             state["offseason_stage_index"] = idx
             state["teams"] = [team_to_dict(t) for t in teams.values()]
             save_state(user_id, save_id, state, save_dir)
-            return {"state": state}
+            return _attach_league_history_to_result(save_dir, {"state": state})
     elif current in ("Transfers III", "7 on 7", "Graduation"):
         pass
 
@@ -1770,7 +2000,7 @@ def advance_offseason(
         state["teams"] = [team_to_dict(t) for t in teams2.values()]
 
     save_state(user_id, save_id, state, save_dir)
-    return {"state": state}
+    return _attach_league_history_to_result(save_dir, {"state": state})
 
 
 def _extract_box_score_text(recap: str) -> str:
@@ -2294,8 +2524,30 @@ def get_save(user_id: str, save_id: str) -> Dict[str, Any]:
 
     # Align program wins/losses, titles, playoff counts on each team with league_history.json (fixes stale file rows).
     apply_team_program_totals_from_history_to_state(save_dir, state)
+    if _sync_derived_save_fields(state, save_dir):
+        save_state(user_id, save_id, state, save_dir)
 
-    return {"save_id": row["id"], "save_name": row["save_name"], "state": state}
+    try:
+        hist = load_league_history(league_history_path(save_dir))
+        if rebuild_coach_career_log_from_league_history(state, hist, merge=True):
+            save_state(user_id, save_id, state, save_dir)
+    except Exception:
+        pass
+
+    _hydrate_coach_inbox_persist_if_needed(user_id, save_id, state, save_dir)
+
+    league_history_payload: Dict[str, Any] = {"seasons": []}
+    try:
+        league_history_payload = load_league_history(league_history_path(save_dir))
+    except Exception:
+        pass
+
+    return {
+        "save_id": row["id"],
+        "save_name": row["save_name"],
+        "state": state,
+        "league_history": league_history_payload,
+    }
 
 
 def _get_save_row(user_id: str, save_id: str) -> Dict[str, Any]:
@@ -2358,6 +2610,232 @@ def _backfill_last_completed_standings(state: Dict[str, Any], save_dir: str) -> 
                 pass
 
 
+def _repair_missing_archived_season(state: Dict[str, Any], save_dir: str) -> bool:
+    """Backfill league_history.json when offseason started without append_season (legacy / skipped UI)."""
+    try:
+        lcy = int(state.get("last_completed_year") or 0)
+    except (TypeError, ValueError):
+        return False
+    if lcy <= 0:
+        return False
+    phase = str(state.get("season_phase") or "").strip().lower()
+    if phase in ("regular", "playoffs", "season_summary"):
+        return False
+    try:
+        hist = load_league_history(league_history_path(save_dir))
+    except Exception:
+        return False
+    seasons = hist.get("seasons") or []
+    if any(isinstance(s, dict) and int(s.get("year") or 0) == lcy for s in seasons):
+        return False
+    snap_all = state.get("last_completed_standings")
+    if not isinstance(snap_all, dict) or not snap_all:
+        return False
+    team_names = [
+        str(t.get("name"))
+        for t in (state.get("teams") or [])
+        if isinstance(t, dict) and t.get("name")
+    ]
+    if not team_names:
+        return False
+
+    playoffs = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else {}
+    champion = str(playoffs.get("champion") or "").strip() or "—"
+    runner_up = str(playoffs.get("runner_up") or "").strip() or "—"
+    br_flat = _flatten_playoff_bracket_results(playoffs) if playoffs else []
+    p_bc = _playoffs_by_class_snapshot(state)
+    team_coaches: Dict[str, str] = {}
+    for t in state.get("teams") or []:
+        if not isinstance(t, dict):
+            continue
+        nm = str(t.get("name") or "")
+        coach = t.get("coach")
+        if nm and isinstance(coach, dict):
+            team_coaches[nm] = str(coach.get("name") or "")
+
+    try:
+        append_season(
+            champion=champion,
+            runner_up=runner_up,
+            team_names=team_names,
+            standings=snap_all,
+            season_player_stats={},
+            year=lcy,
+            bracket_results=br_flat,
+            team_coaches=team_coaches,
+            playoffs_by_class=p_bc,
+            save_dir=save_dir,
+        )
+        append_season_to_coach_career_log(
+            state,
+            year=lcy,
+            team_coaches=team_coaches,
+            standings=snap_all,
+        )
+        teams_map = {
+            t["name"]: team_from_dict(t)
+            for t in (state.get("teams") or [])
+            if isinstance(t, dict) and t.get("name")
+        }
+        hist2 = load_league_history(league_history_path(save_dir))
+        update_prestige(teams_map, hist2)
+        state["teams"] = [team_to_dict(t) for t in teams_map.values()]
+        return True
+    except Exception:
+        logger.exception("repair missing archived season")
+        return False
+
+
+def _ensure_prestige_from_archived_season(state: Dict[str, Any], save_dir: str) -> bool:
+    """Apply season-end TP from league_history when archive ran but TP was never written to the save file."""
+    phase = str(state.get("season_phase") or "").strip().lower()
+    if phase not in ("offseason", "preseason", "season_summary"):
+        return False
+    try:
+        lcy = int(state.get("last_completed_year") or 0)
+    except (TypeError, ValueError):
+        return False
+    if lcy <= 0:
+        return False
+    if int(state.get("prestige_applied_for_year") or 0) == lcy:
+        return False
+    try:
+        hist = load_league_history(league_history_path(save_dir))
+    except Exception:
+        return False
+    seasons = [s for s in (hist.get("seasons") or []) if isinstance(s, dict)]
+    if not seasons or not any(int(s.get("year") or 0) == lcy for s in seasons):
+        return False
+    teams = {
+        t["name"]: team_from_dict(t)
+        for t in (state.get("teams") or [])
+        if isinstance(t, dict) and t.get("name")
+    }
+    if not teams:
+        return False
+    update_prestige(teams, hist)
+    state["prestige_applied_for_year"] = lcy
+    state["teams"] = [team_to_dict(t) for t in teams.values()]
+    return True
+
+
+def _repair_playoffs_complete_to_season_summary(state: Dict[str, Any], save_dir: str) -> bool:
+    """
+    When playoffs are globally complete but the save never advanced to season_summary
+    (client skipped finish, or legacy state), archive the year and open the summary hub.
+    """
+    phase = str(state.get("season_phase") or "").strip().lower()
+    if phase != "playoffs":
+        return False
+    playoffs = state.get("playoffs")
+    if not isinstance(playoffs, dict) or not _playoffs_global_completed(playoffs):
+        return False
+    _sync_playoff_top_level_champion_runner(playoffs)
+    try:
+        cy = int(state.get("current_year", 1))
+    except (TypeError, ValueError):
+        cy = 1
+    try:
+        hist = load_league_history(league_history_path(save_dir))
+    except Exception:
+        return False
+    seasons = hist.get("seasons") or []
+    already_archived = any(isinstance(s, dict) and int(s.get("year") or 0) == cy for s in seasons)
+
+    if already_archived:
+        state["season_phase"] = "season_summary"
+        teams = {
+            t["name"]: team_from_dict(t)
+            for t in (state.get("teams") or [])
+            if isinstance(t, dict) and t.get("name")
+        }
+        if teams:
+            update_prestige(teams, hist)
+            state["prestige_applied_for_year"] = cy
+            state["teams"] = [team_to_dict(t) for t in teams.values()]
+        return True
+
+    champion = str(playoffs.get("champion") or "").strip() or "—"
+    runner_up = str(playoffs.get("runner_up") or "").strip() or "—"
+    standings = state.get("standings") or {}
+    team_names = [
+        str(t.get("name"))
+        for t in (state.get("teams") or [])
+        if isinstance(t, dict) and t.get("name")
+    ]
+    if not team_names:
+        return False
+    team_coaches: Dict[str, str] = {}
+    for t in state.get("teams") or []:
+        if not isinstance(t, dict):
+            continue
+        nm = str(t.get("name") or "")
+        coach = t.get("coach")
+        if nm and isinstance(coach, dict):
+            team_coaches[nm] = str(coach.get("name") or "")
+    br_flat = _recap_merged_bracket_results(state, _flatten_playoff_bracket_results(playoffs))
+    season_player_stats = season_stats_map_from_jsonable(state.get("playoff_season_player_stats") or {})
+    p_bc = _playoffs_by_class_snapshot(state)
+    regional_champions = compute_regular_season_regional_champions(state)
+    try:
+        append_season(
+            champion=champion,
+            runner_up=runner_up,
+            team_names=team_names,
+            standings=standings,
+            season_player_stats=season_player_stats,
+            year=cy,
+            bracket_results=br_flat,
+            team_coaches=team_coaches,
+            playoffs_by_class=p_bc,
+            regional_champions=regional_champions,
+            save_dir=save_dir,
+        )
+        append_season_to_coach_career_log(
+            state,
+            year=cy,
+            team_coaches=team_coaches,
+            standings=standings,
+        )
+        teams = {
+            t["name"]: team_from_dict(t)
+            for t in (state.get("teams") or [])
+            if isinstance(t, dict) and t.get("name")
+        }
+        hist2 = load_league_history(league_history_path(save_dir))
+        update_prestige(teams, hist2)
+        state["prestige_applied_for_year"] = cy
+        state["season_phase"] = "season_summary"
+        state["teams"] = [team_to_dict(t) for t in teams.values()]
+        try:
+            state["last_completed_standings"] = copy.deepcopy(standings)
+        except Exception:
+            state["last_completed_standings"] = {
+                str(k): dict(v) if isinstance(v, dict) else v for k, v in dict(standings or {}).items()
+            }
+        state["last_completed_year"] = cy
+        return True
+    except Exception:
+        logger.exception("repair playoffs complete to season_summary")
+        return False
+
+
+def _sync_derived_save_fields(state: Dict[str, Any], save_dir: str) -> bool:
+    """Migrate TP fields, repair missing archives, and apply prestige from history. Returns True if state changed."""
+    changed = False
+    if migrate_state_team_points_fields(state):
+        changed = True
+    if _repair_playoffs_complete_to_season_summary(state, save_dir):
+        changed = True
+    if _repair_missing_archived_season(state, save_dir):
+        changed = True
+        apply_team_program_totals_from_history_to_state(save_dir, state)
+        changed = True
+    if _ensure_prestige_from_archived_season(state, save_dir):
+        changed = True
+    return changed
+
+
 def load_state(user_id: str, save_id: str) -> Tuple[Dict[str, Any], str]:
     row = _get_save_row(user_id, save_id)
     import json
@@ -2369,6 +2847,8 @@ def load_state(user_id: str, save_id: str) -> Tuple[Dict[str, Any], str]:
     with open_text_with_path_fallback(_league_save_plain_path(save_dir), "r") as f:
         state = json.load(f)
     _ensure_user_coach_and_firing_defaults(state)
+    _repair_user_team_from_serialized_teams(state)
+    _refresh_user_coach_unemployed_flag(state)
     normalize_offseason_stages(state)
     ensure_league_structure_in_state(state)
     # Migration: legacy saves predate the playoff_system field. Stamp the
@@ -2378,6 +2858,14 @@ def load_state(user_id: str, save_id: str) -> Tuple[Dict[str, Any], str]:
     _migrate_save_dir_if_changed(user_id, save_id, save_dir, stored_dir)
     apply_team_program_totals_from_history_to_state(save_dir, state)
     _backfill_last_completed_standings(state, save_dir)
+    if _sync_derived_save_fields(state, save_dir):
+        save_state(user_id, save_id, state, save_dir)
+    try:
+        hist = load_league_history(league_history_path(save_dir))
+        rebuild_coach_career_log_from_league_history(state, hist, merge=True)
+    except Exception:
+        pass
+    _hydrate_coach_inbox_persist_if_needed(user_id, save_id, state, save_dir)
     return state, save_dir
 
 
@@ -2406,6 +2894,7 @@ def save_state(user_id: str, save_id: str, state: Dict[str, Any], save_dir: str)
             os.makedirs(save_dir, exist_ok=True)
         except OSError:
             pass
+    _refresh_user_coach_unemployed_flag(state)
     dest_plain = _league_save_plain_path(save_dir)
     payload = json.dumps(state, indent=2, ensure_ascii=False)
     tmp_plain = f"{dest_plain}.tmp.{uuid.uuid4().hex}"
@@ -2802,6 +3291,221 @@ def save_coach_gameplan_v2(
     return get_coach_gameplan_v2(user_id, save_id)
 
 
+def _team_recap_safe_filename(team_name: str) -> str:
+    return "".join(c for c in str(team_name) if c.isalnum() or c in " _-").strip() or "team"
+
+
+def _bracket_results_for_archived_season(
+    season_entry: Dict[str, Any],
+    team_name: str,
+    teams_map: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    """Playoff games for recap augmentation (per-class bracket when available)."""
+    pbc = season_entry.get("playoffs_by_class")
+    if isinstance(pbc, dict) and pbc:
+        cls = _classification_of_team(teams_map, team_name)
+        inner = _playoffs_inner_for_class(pbc, cls)
+        if isinstance(inner, dict):
+            br = inner.get("bracket_results")
+            if isinstance(br, list) and br:
+                return [g for g in br if isinstance(g, dict)]
+    playoffs = season_entry.get("playoffs")
+    if isinstance(playoffs, dict):
+        br = playoffs.get("bracket_results")
+        if isinstance(br, list) and br:
+            return [g for g in br if isinstance(g, dict)]
+    return []
+
+
+def _augment_recap_text_with_postseason(
+    text: str,
+    team_name: str,
+    bracket_results: List[Dict[str, Any]],
+) -> str:
+    """Older recap files may lack POSTSEASON; inject from archived bracket_results."""
+    if not text or not bracket_results:
+        return text
+    if "POSTSEASON" in text.upper():
+        return text
+    playoff_lines = recap_postseason_lines_for_team(team_name, bracket_results)
+    if not playoff_lines:
+        return text
+    block = "\n".join(["", "POSTSEASON", "-" * 66, *playoff_lines, ""])
+    marker = "TEAM STATS"
+    idx = text.find(marker)
+    if idx >= 0:
+        return text[:idx].rstrip() + block + "\n" + text[idx:]
+    return text.rstrip() + block + "\n"
+
+
+def _resolve_team_recap_file_path(
+    save_dir: str,
+    team_name: str,
+    season_entry: Dict[str, Any],
+) -> Optional[str]:
+    """Absolute path to on-disk recap .txt, or None."""
+    team = str(team_name or "").strip()
+    if not team:
+        return None
+    base = os.path.abspath(save_dir)
+    recaps = season_entry.get("team_recaps") if isinstance(season_entry.get("team_recaps"), dict) else {}
+    rel = recaps.get(team) if isinstance(recaps.get(team), str) else None
+    if rel:
+        p = os.path.abspath(os.path.join(save_dir, rel))
+        if p.startswith(base) and isfile_any(p):
+            return p
+    safe = _team_recap_safe_filename(team)
+    year_num = int(season_entry.get("year", 0) or 0)
+    season_num = int(season_entry.get("season", year_num) or year_num)
+    candidates: List[str] = []
+    if year_num:
+        candidates.append(os.path.join(save_dir, "season_recaps", f"year_{year_num}", f"{safe}.txt"))
+    if season_num and season_num != year_num:
+        candidates.append(os.path.join(save_dir, "season_recaps", f"year_{season_num}", f"{safe}.txt"))
+    candidates.append(os.path.join(save_dir, "season_recaps", f"{safe}.txt"))
+    for p in candidates:
+        ap = os.path.abspath(p)
+        if ap.startswith(base) and isfile_any(ap):
+            return ap
+    recap_root = os.path.join(save_dir, "season_recaps")
+    if not os.path.isdir(recap_root):
+        return None
+    y_tokens = {str(year_num), str(season_num)}
+    try:
+        for root, _dirs, files in os.walk(recap_root):
+            if f"{safe}.txt" not in files:
+                continue
+            rel_dir = os.path.relpath(root, recap_root).replace("\\", "/")
+            if any(tok in rel_dir for tok in y_tokens if tok and tok != "0"):
+                ap = os.path.abspath(os.path.join(root, f"{safe}.txt"))
+                if ap.startswith(base):
+                    return ap
+    except OSError:
+        pass
+    return None
+
+
+def _team_has_season_recap(save_dir: str, team_name: str, season_entry: Dict[str, Any]) -> bool:
+    return _resolve_team_recap_file_path(save_dir, team_name, season_entry) is not None
+
+
+def _coach_display_name_for_team_in_state(state: Dict[str, Any], team: str) -> str:
+    for t in state.get("teams") or []:
+        if not isinstance(t, dict) or str(t.get("name") or "").strip() != team:
+            continue
+        coach = t.get("coach")
+        if isinstance(coach, dict):
+            nm = str(coach.get("name") or "").strip()
+            if nm:
+                return nm
+        break
+    return "—"
+
+
+def _merge_live_and_snapshot_team_history_rows(
+    state: Dict[str, Any],
+    save_dir: str,
+    team: str,
+    rows: List[Dict[str, Any]],
+    teams: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    """
+    When league_history.json is empty or missing a year, still show:
+    - the in-progress season (regular / playoffs / season summary), and
+    - the just-finished season from last_completed_standings (offseason+).
+    """
+    if not team:
+        return rows
+    seen_years = {int(r.get("year", 0) or 0) for r in rows if r.get("year") is not None}
+    out = list(rows)
+    phase = str(state.get("season_phase") or "").strip().lower()
+
+    def _append_row(year: int, wins: int, losses: int, postseason: str, has_recap: bool) -> None:
+        if year in seen_years:
+            return
+        seen_years.add(year)
+        out.append(
+            {
+                "year": year,
+                "wins": wins,
+                "losses": losses,
+                "postseason": postseason,
+                "coach": _coach_display_name_for_team_in_state(state, team),
+                "has_recap": has_recap,
+            }
+        )
+
+    try:
+        cy = int(state.get("current_year", 0) or 0)
+    except (TypeError, ValueError):
+        cy = 0
+    if phase in ("regular", "playoffs", "season_summary") and cy:
+        st = (state.get("standings") or {}).get(team)
+        if isinstance(st, dict):
+            wins = int(st.get("wins", 0) or 0)
+            losses = int(st.get("losses", 0) or 0)
+            _append_row(
+                cy,
+                wins,
+                losses,
+                _postseason_label_live(state, team, teams) if phase in ("playoffs", "season_summary") else "—",
+                _team_has_season_recap(save_dir, team, {"year": cy}),
+            )
+
+    try:
+        lcy = int(state.get("last_completed_year", 0) or 0)
+    except (TypeError, ValueError):
+        lcy = 0
+    snap_all = state.get("last_completed_standings")
+    snap = snap_all.get(team) if isinstance(snap_all, dict) else None
+    if lcy and isinstance(snap, dict):
+        season_entry = None
+        try:
+            hist = load_league_history(league_history_path(save_dir))
+            for s in hist.get("seasons") or []:
+                if isinstance(s, dict) and int(s.get("year", 0) or 0) == lcy:
+                    season_entry = s
+                    break
+        except Exception:
+            season_entry = None
+        po = _postseason_label_archived(team, season_entry, teams) if season_entry else "—"
+        _append_row(
+            lcy,
+            int(snap.get("wins", 0) or 0),
+            int(snap.get("losses", 0) or 0),
+            po,
+            _team_has_season_recap(save_dir, team, season_entry or {"year": lcy}),
+        )
+
+    out.sort(key=lambda r: int(r.get("year", 0) or 0), reverse=True)
+    return out
+
+
+def _postseason_label_live(state: Dict[str, Any], team: str, teams: Dict[str, Any]) -> str:
+    """Postseason chip from in-save playoffs object (before archive)."""
+    playoffs = state.get("playoffs")
+    if not playoffs or not isinstance(playoffs, dict):
+        return "—"
+    pbc = playoffs.get("by_class")
+    if pbc and isinstance(pbc, dict):
+        cls = None
+        t_obj = teams.get(team)
+        if t_obj is not None:
+            cls = getattr(t_obj, "classification", None)
+        if cls and cls in pbc:
+            inner = pbc[cls]
+            if isinstance(inner, dict):
+                if inner.get("champion") == team:
+                    return "State Champion"
+                if inner.get("runner_up") == team:
+                    return "Runner-up"
+    if playoffs.get("champion") == team:
+        return "State Champion"
+    if playoffs.get("runner_up") == team:
+        return "Runner-up"
+    return "—"
+
+
 def get_team_history(user_id: str, save_id: str, team_name: str) -> Dict[str, Any]:
     """History for a single team from this save's league_history.json."""
     state, save_dir = load_state(user_id, save_id)
@@ -2832,17 +3536,16 @@ def get_team_history(user_id: str, save_id: str, team_name: str) -> Dict[str, An
         if not st_row:
             continue
         coach = st_row.get("coach") if isinstance(st_row.get("coach"), str) else ""
-        recaps = s.get("team_recaps") if isinstance(s.get("team_recaps"), dict) else {}
-        recap_path = recaps.get(team) if isinstance(recaps.get(team), str) else None
         rows.append({
             "year": year,
             "wins": int(st_row.get("wins", 0) or 0),
             "losses": int(st_row.get("losses", 0) or 0),
             "postseason": _postseason_label_archived(team, s, teams),
             "coach": coach or "—",
-            "has_recap": bool(recap_path),
+            "has_recap": _team_has_season_recap(save_dir, team, s),
         })
 
+    rows = _merge_live_and_snapshot_team_history_rows(state, save_dir, team, rows, teams)
     rows.sort(key=lambda r: int(r.get("year", 0) or 0), reverse=True)
     persisted_regional = next(
         (
@@ -2861,18 +3564,54 @@ def get_coach_history(user_id: str, save_id: str, coach_name: str) -> Dict[str, 
     state, save_dir = load_state(user_id, save_id)
     teams = {t["name"]: team_from_dict(t) for t in state.get("teams", [])}
     names = sorted(list(teams.keys()))
-    target = str(coach_name or "").strip().lower()
+    target = norm_coach_key(coach_name)
     if not target:
         return {"coach_name": "", "team_names": names, "history": []}
 
     hist = load_league_history(league_history_path(save_dir))
     seasons = hist.get("seasons") or []
+    rebuild_coach_career_log_from_league_history(state, hist, merge=True)
+
+    season_by_year: Dict[int, Dict[str, Any]] = {}
+    for s in seasons:
+        if isinstance(s, dict):
+            try:
+                season_by_year[int(s.get("year", 0) or 0)] = s
+            except (TypeError, ValueError):
+                continue
 
     rows: List[Dict[str, Any]] = []
+    seen: set[Tuple[int, str]] = set()
+
+    for base in coach_history_rows_from_career_log(coach_name, state.get("coach_career_log")):
+        try:
+            y = int(base.get("year", 0) or 0)
+        except (TypeError, ValueError):
+            continue
+        team_n = str(base.get("team") or "").strip()
+        if not team_n:
+            continue
+        seen.add((y, team_n))
+        season_entry = season_by_year.get(y)
+        rows.append(
+            {
+                "year": y,
+                "team": team_n,
+                "wins": int(base.get("wins", 0) or 0),
+                "losses": int(base.get("losses", 0) or 0),
+                "postseason": _postseason_label_archived(team_n, season_entry, teams) if season_entry else "—",
+                "coach": str(base.get("coach") or "").strip() or "—",
+                "has_recap": _team_has_season_recap(save_dir, team_n, season_entry) if season_entry else False,
+            }
+        )
+
     for s in seasons:
         if not isinstance(s, dict):
             continue
-        year = s.get("year")
+        try:
+            year = int(s.get("year", 0) or 0)
+        except (TypeError, ValueError):
+            continue
         standings_list = s.get("standings") or []
         if not isinstance(standings_list, list):
             continue
@@ -2880,30 +3619,32 @@ def get_coach_history(user_id: str, save_id: str, coach_name: str) -> Dict[str, 
             if not isinstance(st_row, dict):
                 continue
             c = st_row.get("coach")
-            if not isinstance(c, str) or c.strip().lower() != target:
+            if not isinstance(c, str) or norm_coach_key(c) != target:
                 continue
             team_n = str(st_row.get("team") or "")
-            if not team_n:
+            if not team_n or (year, team_n) in seen:
                 continue
-            recaps = s.get("team_recaps") if isinstance(s.get("team_recaps"), dict) else {}
-            recap_path = recaps.get(team_n) if isinstance(recaps.get(team_n), str) else None
-            rows.append({
-                "year": year,
-                "team": team_n,
-                "wins": int(st_row.get("wins", 0) or 0),
-                "losses": int(st_row.get("losses", 0) or 0),
-                "postseason": _postseason_label_archived(team_n, s, teams),
-                "coach": c.strip() or "—",
-                "has_recap": bool(recap_path),
-            })
+            seen.add((year, team_n))
+            rows.append(
+                {
+                    "year": year,
+                    "team": team_n,
+                    "wins": int(st_row.get("wins", 0) or 0),
+                    "losses": int(st_row.get("losses", 0) or 0),
+                    "postseason": _postseason_label_archived(team_n, s, teams),
+                    "coach": c.strip() or "—",
+                    "has_recap": _team_has_season_recap(save_dir, team_n, s),
+                }
+            )
 
     rows.sort(key=lambda r: int(r.get("year", 0) or 0), reverse=True)
     return {"coach_name": str(coach_name).strip(), "team_names": names, "history": rows}
 
 
 def get_team_season_recap_text(user_id: str, save_id: str, team_name: str, year: int) -> str:
-    """Load the saved recap .txt for the requested team/year."""
+    """Load the saved recap .txt for the requested team/year (with postseason fallback from history)."""
     _state, save_dir = load_state(user_id, save_id)
+    teams = {t["name"]: team_from_dict(t) for t in _state.get("teams", [])}
     hist = load_league_history(league_history_path(save_dir))
     seasons = hist.get("seasons") or []
     team = str(team_name or "").strip()
@@ -2915,17 +3656,13 @@ def get_team_season_recap_text(user_id: str, save_id: str, team_name: str, year:
             continue
         if int(s.get("year", 0) or 0) != y:
             continue
-        recaps = s.get("team_recaps") if isinstance(s.get("team_recaps"), dict) else {}
-        rel = recaps.get(team) if isinstance(recaps.get(team), str) else None
-        if not rel:
-            break
-        p = os.path.abspath(os.path.join(save_dir, rel))
-        if not p.startswith(os.path.abspath(save_dir)):
-            raise ValueError("Invalid recap path")
-        if not isfile_any(p):
+        p = _resolve_team_recap_file_path(save_dir, team, s)
+        if not p:
             raise ValueError("Recap file not found")
         with open_text_with_path_fallback(os.path.abspath(p), "r") as f:
-            return f.read()
+            text = f.read()
+        br = _bracket_results_for_archived_season(s, team, teams)
+        return _augment_recap_text_with_postseason(text, team, br)
     raise ValueError("Recap not available for that season/team")
 
 
@@ -3075,6 +3812,8 @@ def sim_week(user_id: str, save_id: str) -> Dict[str, Any]:
 
     state["standings"] = standings
     state["week_results"] = week_results
+    if _coach_sim_emails_enabled():
+        generate_week_sim_emails(state, completed_week=current_week)
     state["current_week"] = current_week + 1
     if state["current_week"] > len(weeks):
         award_regular_season_regional_titles(state)
@@ -3102,6 +3841,9 @@ def sim_week_state(state: Dict[str, Any]) -> Dict[str, Any]:
             "This save is still in preseason. Use Play or Simulate on the scrimmage panel for practice games, "
             "then Continue to advance. Finish all preseason steps before simming the regular season."
         )
+
+    # Stateless bundle: no GET /saves hydrate — seed coach_inbox + starter mail before week logic.
+    ensure_coach_inbox(state)
 
     teams = {t["name"]: team_from_dict(t) for t in state.get("teams", [])}
     team_names = list(teams.keys())
@@ -3227,6 +3969,8 @@ def sim_week_state(state: Dict[str, Any]) -> Dict[str, Any]:
 
     state["standings"] = standings
     state["week_results"] = week_results
+    if _coach_sim_emails_enabled():
+        generate_week_sim_emails(state, completed_week=current_week)
     state["current_week"] = current_week + 1
     entering_playoffs = state["current_week"] > len(weeks)
     if entering_playoffs:
@@ -3287,6 +4031,7 @@ def sim_playoffs_state(state: Dict[str, Any]) -> Dict[str, Any]:
     state["standings"] = standings
     state["playoff_season_player_stats"] = season_player_stats
     state["teams"] = [team_to_dict(t) for t in teams.values()]
+    _maybe_coach_playoff_round_emails(state)
     return state
 
 
@@ -3299,7 +4044,9 @@ def sim_playoff_round_state(state: Dict[str, Any]) -> Dict[str, Any]:
     p = _ensure_playoffs_migrated(state, teams)
     if _playoffs_global_completed(p):
         raise ValueError("Playoffs already complete.")
-    return _advance_playoff_one_round_state(state)
+    state_out = _advance_playoff_one_round_state(state)
+    _maybe_coach_playoff_round_emails(state_out)
+    return state_out
 
 
 def advance_preseason_state(state: Dict[str, Any], playbook: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -3324,7 +4071,7 @@ def advance_preseason_state(state: Dict[str, Any], playbook: Optional[Dict[str, 
         return {"state": state, "phase_completed": None}
 
     phase_norm = str(state.get("season_phase") or "preseason").strip().lower()
-    if phase_norm in ("playoffs", "offseason", "done"):
+    if phase_norm in ("playoffs", "offseason", "done", "season_summary"):
         return {"state": state, "phase_completed": None}
     if phase_norm != "preseason":
         if had_preseason_meta:
@@ -3516,52 +4263,9 @@ def advance_offseason_state(
         bank = state.get("offseason_improvements_bank")
         if not isinstance(bank, dict):
             bank = {"pp_total": 0, "pp_remaining": 0, "breakdown": None, "applied": {}}
-        pp_remaining = int(bank.get("pp_remaining", bank.get("pp_total", 0)) or 0)
         if ut:
-            fac_to = body.get("improve_facilities_grade")
-            cul_to = body.get("improve_culture_grade")
-            boo_to = body.get("improve_booster_support")
-            fac_from = _clamp_program_grade(getattr(ut, "facilities_grade", None), 5)
-            cul_from = _clamp_program_grade(getattr(ut, "culture_grade", None), 5)
-            boo_from = _clamp_program_grade(getattr(ut, "booster_support", None), 5)
-            fac_to_i = fac_from if fac_to is None else _clamp_program_grade(fac_to, fac_from)
-            cul_to_i = cul_from if cul_to is None else _clamp_program_grade(cul_to, cul_from)
-            boo_to_i = boo_from if boo_to is None else _clamp_program_grade(boo_to, boo_from)
-            delta_pp = 0
-            delta_pp += _improvement_pp_delta(fac_from, fac_to_i)
-            delta_pp += _improvement_pp_delta(cul_from, cul_to_i)
-            delta_pp += _improvement_pp_delta(boo_from, boo_to_i)
-            new_remaining = pp_remaining + int(delta_pp)
-            if new_remaining < 0 and body.get("_bulk_cpu_pp_clamp"):
-                fac_to_i, cul_to_i, boo_to_i = _bulk_enforce_improvement_pp_budget(
-                    fac_from,
-                    cul_from,
-                    boo_from,
-                    fac_to_i,
-                    cul_to_i,
-                    boo_to_i,
-                    pp_remaining,
-                )
-                delta_pp = (
-                    _improvement_pp_delta(fac_from, fac_to_i)
-                    + _improvement_pp_delta(cul_from, cul_to_i)
-                    + _improvement_pp_delta(boo_from, boo_to_i)
-                )
-                new_remaining = pp_remaining + int(delta_pp)
-            if new_remaining < 0:
-                raise ValueError("Not enough PP for those improvements.")
-            ut.facilities_grade = fac_to_i
-            ut.culture_grade = cul_to_i
-            ut.booster_support = boo_to_i
-            ut._clamp_values()
-            bank["pp_remaining"] = new_remaining
-            bank["applied"] = {
-                "facilities_grade": {"from": fac_from, "to": fac_to_i},
-                "culture_grade": {"from": cul_from, "to": cul_to_i},
-                "booster_support": {"from": boo_from, "to": boo_to_i},
-                "pp_delta": int(delta_pp),
-            }
-            state["offseason_improvements_bank"] = bank
+            _apply_user_team_program_improvements(ut, bank, body)
+        state["offseason_improvements_bank"] = bank
     elif current in ("Coaching carousel I", "Coaching carousel II", "Coaching carousel III"):
         lh = league_history if isinstance(league_history, dict) else {"seasons": []}
         _apply_coaching_carousel_stage(state, teams, lh, current, body)
@@ -3693,7 +4397,14 @@ def advance_offseason_state(
     return state
 
 
-def finish_season_state(state: Dict[str, Any], league_history: Dict[str, Any], records: Dict[str, Any]) -> Dict[str, Any]:
+def finish_season_state(
+    state: Dict[str, Any],
+    league_history: Dict[str, Any],
+    records: Dict[str, Any],
+    *,
+    bulk_autopilot: bool = False,
+    begin_offseason: bool = False,
+) -> Dict[str, Any]:
     """Stateless finish_season: returns updated state + updated league_history/records + recap texts."""
     teams = {t["name"]: team_from_dict(t) for t in state.get("teams", [])}
     team_names = list(teams.keys())
@@ -3701,17 +4412,50 @@ def finish_season_state(state: Dict[str, Any], league_history: Dict[str, Any], r
     output_lines: List[str] = []
     playoffs = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else None
     phase_s = str(state.get("season_phase") or "").strip().lower()
+    if phase_s == "season_summary":
+        playoffs_ss = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else {}
+        champion_ss = str(playoffs_ss.get("champion") or "")
+        if begin_offseason or bulk_autopilot:
+            br_flat_ss = _recap_merged_bracket_results(state, _flatten_playoff_bracket_results(playoffs_ss))
+            year_num_ss = int(state.get("current_year", 1))
+            _finish_season_apply_offseason_transition(
+                state,
+                teams,
+                team_names,
+                standings,
+                champion_ss,
+                br_flat_ss,
+                year_num_ss,
+                league_history,
+            )
+        return {
+            "state": state,
+            "champion": champion_ss,
+            "league_history": league_history,
+            "records": records,
+            "season_recaps": {},
+        }
+
     run_playoff_stats: Dict[int, Any] = {}
 
-    if playoffs and playoffs.get("completed") and playoffs.get("champion"):
+    if playoffs and playoffs.get("completed"):
+        _sync_playoff_top_level_champion_runner(playoffs)
+    if playoffs and playoffs.get("completed") and str(playoffs.get("champion") or "").strip():
         champion = str(playoffs.get("champion") or "")
         runner_up = str(playoffs.get("runner_up") or "")
         bracket_results = list(playoffs.get("bracket_results") or [])
     elif phase_s == "playoffs":
         while True:
             p = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else None
-            if p and p.get("completed") and p.get("champion"):
+            if p and p.get("completed"):
+                _sync_playoff_top_level_champion_runner(p)
+            if p and p.get("completed") and str(p.get("champion") or "").strip():
                 champion = str(p.get("champion") or "")
+                runner_up = str(p.get("runner_up") or "")
+                bracket_results = list(p.get("bracket_results") or [])
+                break
+            if p and p.get("completed"):
+                champion = ""
                 runner_up = str(p.get("runner_up") or "")
                 bracket_results = list(p.get("bracket_results") or [])
                 break
@@ -3737,6 +4481,7 @@ def finish_season_state(state: Dict[str, Any], league_history: Dict[str, Any], r
         if uc and uc in by_class:
             playoffs["champion"] = by_class[uc].get("champion")
             playoffs["runner_up"] = by_class[uc].get("runner_up")
+        _sync_playoff_top_level_champion_runner(playoffs)
         champion = str(playoffs.get("champion") or "")
         runner_up = str(playoffs.get("runner_up") or "")
         bracket_results = _flatten_playoff_bracket_results(playoffs)
@@ -3745,7 +4490,9 @@ def finish_season_state(state: Dict[str, Any], league_history: Dict[str, Any], r
     teams = {t["name"]: team_from_dict(t) for t in state.get("teams", [])}
     team_names = list(teams.keys())
 
-    if phase_s == "playoffs" or (playoffs and playoffs.get("completed") and playoffs.get("champion")):
+    if phase_s == "playoffs" or (
+        playoffs and playoffs.get("completed") and str(playoffs.get("champion") or "").strip()
+    ):
         season_player_stats = season_stats_map_from_jsonable(state.get("playoff_season_player_stats") or {})
     else:
         season_player_stats = season_stats_map_from_jsonable(run_playoff_stats)
@@ -3911,115 +4658,35 @@ def finish_season_state(state: Dict[str, Any], league_history: Dict[str, Any], r
     )
     league_history = out_hist.get("league_history") or league_history
     records = out_hist.get("records") or records
+    append_season_to_coach_career_log(
+        state,
+        year=year_num,
+        team_coaches=team_coaches,
+        standings=standings,
+    )
     update_prestige(teams, league_history)
 
-    graduation_report: Dict[str, List[Dict[str, Any]]] = {}
-    for t in teams.values():
-        ro = run_offseason_roster_turnover(t, league_history=league_history)
-        reset_team_season_stats(t)
-        graduated = ro.get("graduated") or []
-        graduation_report[t.name] = [player_to_dict(p) for p in graduated]
+    if not bulk_autopilot:
+        state["season_phase"] = "season_summary"
+        state["teams"] = [team_to_dict(t) for t in teams.values()]
+        return {
+            "state": state,
+            "champion": champion,
+            "league_history": league_history,
+            "records": records,
+            "season_recaps": season_recaps,
+        }
 
-    state["current_year"] = int(state.get("current_year", 1)) + 1
-    state["season_phase"] = "offseason"
-    state["current_week"] = 1
-    state["offseason_stage_index"] = 0
-    state["offseason_stages"] = list(OFFSEASON_UI_STAGES)
-    state["offseason_graduation_report"] = graduation_report
-    state["offseason_training_results"] = None
-    state["offseason_winter_training_results"] = None
-    user_team_awards = str(state.get("user_team") or "")
-    sg_fs = state.get("season_goals") if isinstance(state.get("season_goals"), dict) else None
-    if user_team_awards:
-        try:
-            pp_breakdown_fs = _season_pp_awards_for_team(
-                user_team_awards,
-                standings=standings,
-                bracket_results=br_for_history,
-                champion=champion,
-                season_goals=sg_fs,
-            )
-            pp_total_fs = int(pp_breakdown_fs.get("pp_total", 0) or 0)
-        except Exception:
-            pp_breakdown_fs = None
-            pp_total_fs = 0
-    else:
-        pp_breakdown_fs = None
-        pp_total_fs = 0
-    try:
-        cd_banks_fs = build_offseason_coach_dev_banks_for_league(
-            team_names,
-            standings,
-            br_for_history,
-            champion,
-            user_team_awards or None,
-            sg_fs,
-            coaches_by_team={n: getattr(t, "coach", None) for n, t in teams.items()},
-            existing_banks=state.get("offseason_coach_dev_banks") if isinstance(state.get("offseason_coach_dev_banks"), dict) else None,
-        )
-    except Exception:
-        logger.exception("coach development banks (stateless finish)")
-        cd_banks_fs = {}
-        for n in team_names:
-            try:
-                cd_banks_fs[n] = compute_coach_development_bank(
-                    n,
-                    standings,
-                    br_for_history,
-                    champion,
-                    sg_fs if n == user_team_awards else None,
-                    coach=getattr(teams.get(n), "coach", None),
-                    existing_bank=(state.get("offseason_coach_dev_banks") or {}).get(n)
-                    if isinstance(state.get("offseason_coach_dev_banks"), dict)
-                    else None,
-                )
-            except Exception:
-                cd_banks_fs[n] = _empty_coach_dev_bank()
-    state["offseason_improvements_bank"] = {
-        "pp_total": pp_total_fs,
-        "pp_remaining": pp_total_fs,
-        "breakdown": pp_breakdown_fs,
-        "applied": {},
-    }
-    state["offseason_coach_dev_banks"] = cd_banks_fs
-    state["offseason_coach_dev_bank"] = (
-        cd_banks_fs.get(user_team_awards)
-        if user_team_awards and isinstance(cd_banks_fs.get(user_team_awards), dict)
-        else _empty_coach_dev_bank()
+    _finish_season_apply_offseason_transition(
+        state,
+        teams,
+        team_names,
+        standings,
+        champion,
+        br_for_history,
+        year_num,
+        league_history,
     )
-    state["preseason_stages"] = list(PRESEASON_STAGES)
-    state["preseason_stage_index"] = 0
-    state["preseason_scrimmages"] = []
-    state["preseason_scrimmage_opponents"] = []
-    state["season_goals"] = state.get("season_goals") or []
-    ensure_league_structure_in_state(state)
-    wk, wr = _regular_season_week_boards(teams, state)
-    state["weeks"] = wk
-    state["week_results"] = wr
-    try:
-        state["offseason_transfer_snapshot_standings"] = copy.deepcopy(standings)
-    except Exception:
-        state["offseason_transfer_snapshot_standings"] = {
-            str(k): dict(v) if isinstance(v, dict) else v for k, v in dict(standings or {}).items()
-        }
-    # Persistent snapshot of the just-finished season's standings.
-    # Survives into preseason + regular season (only overwritten at next finish_season),
-    # so the UI can render "last season's record" instead of the new year's reset 0-0
-    # on Team Info / Coach profile / dashboards while the new year hasn't started.
-    try:
-        state["last_completed_standings"] = copy.deepcopy(standings)
-    except Exception:
-        state["last_completed_standings"] = {
-            str(k): dict(v) if isinstance(v, dict) else v for k, v in dict(standings or {}).items()
-        }
-    state["last_completed_year"] = year_num
-    _clear_offseason_transfer_ui_state(state)
-    state["standings"] = {n: {"wins": 0, "losses": 0, "points_for": 0, "points_against": 0} for n in team_names}
-    state["teams"] = [team_to_dict(t) for t in teams.values()]
-    apply_team_program_totals_to_serialized_team_rows(league_history.get("seasons") or [], state=state)
-    _assign_scrimmage_opponents_for_state(state)
-    state.pop("playoffs", None)
-    state.pop("playoff_season_player_stats", None)
 
     return {"state": state, "champion": champion, "league_history": league_history, "records": records, "season_recaps": season_recaps}
 
@@ -4049,7 +4716,7 @@ def advance_preseason(user_id: str, save_id: str, playbook: Optional[Dict[str, A
         return {"state": state, "phase_completed": None}
 
     phase_norm = str(state.get("season_phase") or "preseason").strip().lower()
-    if phase_norm in ("playoffs", "offseason", "done"):
+    if phase_norm in ("playoffs", "offseason", "done", "season_summary"):
         return {"state": state, "phase_completed": None}
 
     if phase_norm != "preseason":
@@ -4750,6 +5417,7 @@ def finish_coach_week_state(state: Dict[str, Any], game: Any) -> Dict[str, Any]:
 
     state["week_results"] = week_results
     state["standings"] = standings
+    ensure_coach_inbox(state)
     return state
 
 
@@ -4815,6 +5483,9 @@ def finish_coach_playoff_state(state: Dict[str, Any], game: Any) -> Dict[str, An
     if sub.get("completed"):
         playoffs["champion"] = sub.get("champion")
         playoffs["runner_up"] = sub.get("runner_up")
+    if playoffs.get("completed"):
+        _sync_playoff_top_level_champion_runner(playoffs)
+    _maybe_coach_playoff_round_emails(state)
     return state
 
 
@@ -4987,6 +5658,7 @@ def finish_coach_week(
     state["week_results"] = week_results
     state["standings"] = standings
 
+    ensure_coach_inbox(state)
     save_state(user_id, save_id, state, save_dir)
     return {"state": state}
 
@@ -5133,9 +5805,16 @@ def finish_coach_playoff(user_id: str, save_id: str, game_id: str) -> Dict[str, 
     if sub.get("completed"):
         playoffs["champion"] = sub.get("champion")
         playoffs["runner_up"] = sub.get("runner_up")
+    if playoffs.get("completed"):
+        _sync_playoff_top_level_champion_runner(playoffs)
 
     state["standings"] = standings
+    _maybe_coach_playoff_round_emails(state)
     save_state(user_id, save_id, state, save_dir)
+    # Mirror sim_playoff_round / sim_playoffs: archive season and land in season_summary so the hub
+    # shows the year-end summary before "Begin offseason" (graduation, etc.).
+    if playoffs.get("completed"):
+        return finish_season(user_id, save_id)
     return {"state": state}
 
 
@@ -5319,33 +5998,194 @@ def _advance_playoff_one_round_state(state: Dict[str, Any]) -> Dict[str, Any]:
         by_class[cls] = pdata
     playoffs["by_class"] = by_class
     playoffs["completed"] = _playoffs_global_completed(playoffs)
-    uc = playoffs.get("user_class")
-    if uc and uc in by_class and by_class[uc].get("completed"):
-        playoffs["champion"] = by_class[uc].get("champion")
-        playoffs["runner_up"] = by_class[uc].get("runner_up")
+    if playoffs.get("completed"):
+        _sync_playoff_top_level_champion_runner(playoffs)
     state["standings"] = standings
     state["playoff_season_player_stats"] = sp
     return state
 
 
-def finish_season(user_id: str, save_id: str) -> Dict[str, Any]:
+def _finish_season_apply_offseason_transition(
+    state: Dict[str, Any],
+    teams: Dict[str, Any],
+    team_names: List[str],
+    standings: Dict[str, Any],
+    champion: str,
+    br_flat_fin: List[Dict[str, Any]],
+    year_num: int,
+    league_history: Dict[str, Any],
+) -> None:
+    """Graduation, calendar advance to offseason, PP/coach-dev banks, schedule reset — after season summary."""
+    graduation_report: Dict[str, List[Dict[str, Any]]] = {}
+    for t in teams.values():
+        ro = run_offseason_roster_turnover(t, league_history=league_history)
+        reset_team_season_stats(t)
+        graduated = ro.get("graduated") or []
+        graduation_report[t.name] = [player_to_dict(p) for p in graduated]
+
+    state["current_year"] = int(year_num) + 1
+    state["season_phase"] = "offseason"
+    state["current_week"] = 1
+    state["offseason_stage_index"] = 0
+    state["offseason_stages"] = list(OFFSEASON_UI_STAGES)
+    state["offseason_graduation_report"] = graduation_report
+    state["offseason_training_results"] = None
+    state["offseason_winter_training_results"] = None
+    user_team_name = str(state.get("user_team") or "")
+    sg_fin = state.get("season_goals") if isinstance(state.get("season_goals"), dict) else None
+    if user_team_name:
+        try:
+            breakdown = _season_pp_awards_for_team(
+                user_team_name,
+                standings=standings,
+                bracket_results=br_flat_fin,
+                champion=champion,
+                season_goals=sg_fin,
+                weeks=state.get("weeks"),
+                week_results=state.get("week_results"),
+            )
+            pp_total = int(breakdown.get("pp_total", 0) or 0)
+        except Exception:
+            breakdown = None
+            pp_total = 0
+    else:
+        breakdown = None
+        pp_total = 0
+    try:
+        cd_banks = build_offseason_coach_dev_banks_for_league(
+            team_names,
+            standings,
+            br_flat_fin,
+            champion,
+            user_team_name or None,
+            sg_fin,
+            coaches_by_team={n: getattr(t, "coach", None) for n, t in teams.items()},
+            existing_banks=state.get("offseason_coach_dev_banks") if isinstance(state.get("offseason_coach_dev_banks"), dict) else None,
+        )
+    except Exception:
+        logger.exception("coach development banks (finish_season)")
+        cd_banks = {}
+        for n in team_names:
+            try:
+                cd_banks[n] = compute_coach_development_bank(
+                    n,
+                    standings,
+                    br_flat_fin,
+                    champion,
+                    sg_fin if n == user_team_name else None,
+                    coach=getattr(teams.get(n), "coach", None),
+                    existing_bank=(state.get("offseason_coach_dev_banks") or {}).get(n)
+                    if isinstance(state.get("offseason_coach_dev_banks"), dict)
+                    else None,
+                )
+            except Exception:
+                cd_banks[n] = _empty_coach_dev_bank()
+    state["offseason_improvements_bank"] = {"pp_total": pp_total, "pp_remaining": pp_total, "breakdown": breakdown, "applied": {}}
+    state["offseason_coach_dev_banks"] = cd_banks
+    state["offseason_coach_dev_bank"] = (
+        cd_banks.get(user_team_name) if user_team_name and isinstance(cd_banks.get(user_team_name), dict) else _empty_coach_dev_bank()
+    )
+    state["preseason_stages"] = list(PRESEASON_STAGES)
+    state["preseason_stage_index"] = 0
+    state["preseason_scrimmages"] = []
+    state["preseason_scrimmage_opponents"] = []
+    state["season_goals"] = state.get("season_goals") or []
+    ensure_league_structure_in_state(state)
+    wk, wr = _regular_season_week_boards(teams, state)
+    state["weeks"] = wk
+    state["week_results"] = wr
+    try:
+        state["offseason_transfer_snapshot_standings"] = copy.deepcopy(standings)
+    except Exception:
+        state["offseason_transfer_snapshot_standings"] = {
+            str(k): dict(v) if isinstance(v, dict) else v for k, v in dict(standings or {}).items()
+        }
+    try:
+        state["last_completed_standings"] = copy.deepcopy(standings)
+    except Exception:
+        state["last_completed_standings"] = {
+            str(k): dict(v) if isinstance(v, dict) else v for k, v in dict(standings or {}).items()
+        }
+    state["last_completed_year"] = year_num
+    _clear_offseason_transfer_ui_state(state)
+    state["standings"] = {n: {"wins": 0, "losses": 0, "points_for": 0, "points_against": 0} for n in team_names}
+    state["teams"] = [team_to_dict(t) for t in teams.values()]
+    apply_team_program_totals_to_serialized_team_rows(league_history.get("seasons") or [], state=state)
+    _assign_scrimmage_opponents_for_state(state)
+    state.pop("playoffs", None)
+    state.pop("playoff_season_player_stats", None)
+
+
+def _attach_league_history_to_result(save_dir: str, result: Dict[str, Any]) -> Dict[str, Any]:
+    """Include archived seasons in API responses so the client can render League History."""
+    try:
+        result["league_history"] = load_league_history(league_history_path(save_dir))
+    except Exception:
+        result["league_history"] = {"seasons": []}
+    return result
+
+
+def finish_season(
+    user_id: str,
+    save_id: str,
+    *,
+    bulk_autopilot: bool = False,
+    begin_offseason: bool = False,
+) -> Dict[str, Any]:
     state, save_dir = load_state(user_id, save_id)
     teams = {t["name"]: team_from_dict(t) for t in state.get("teams", [])}
     team_names = list(teams.keys())
     standings = state.get("standings") or {n: {"wins": 0, "losses": 0, "points_for": 0, "points_against": 0} for n in team_names}
+    phase_s = str(state.get("season_phase") or "").strip().lower()
+    if phase_s == "offseason":
+        _sync_derived_save_fields(state, save_dir)
+        save_state(user_id, save_id, state, save_dir)
+        return _attach_league_history_to_result(save_dir, {"state": state})
+
+    if phase_s == "season_summary":
+        playoffs_ss = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else {}
+        champion_ss = str(playoffs_ss.get("champion") or "")
+        league_history_ss = load_league_history(league_history_path(save_dir))
+        if league_history_ss.get("seasons"):
+            update_prestige(teams, league_history_ss)
+            state["prestige_applied_for_year"] = int(state.get("current_year", 1) or 1)
+        if begin_offseason or bulk_autopilot:
+            br_flat_ss = _recap_merged_bracket_results(state, _flatten_playoff_bracket_results(playoffs_ss))
+            year_num_ss = int(state.get("current_year", 1))
+            _finish_season_apply_offseason_transition(
+                state,
+                teams,
+                team_names,
+                standings,
+                champion_ss,
+                br_flat_ss,
+                year_num_ss,
+                league_history_ss,
+            )
+            save_state(user_id, save_id, state, save_dir)
+        return _attach_league_history_to_result(save_dir, {"state": state, "champion": champion_ss})
+
     output_lines: List[str] = []
     playoffs = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else None
-    phase_s = str(state.get("season_phase") or "").strip().lower()
+    if playoffs and playoffs.get("completed"):
+        _sync_playoff_top_level_champion_runner(playoffs)
     run_playoff_stats: Dict[int, Any] = {}
-    if playoffs and playoffs.get("completed") and playoffs.get("champion"):
+    if playoffs and playoffs.get("completed") and str(playoffs.get("champion") or "").strip():
         champion = str(playoffs.get("champion") or "")
         runner_up = str(playoffs.get("runner_up") or "")
         bracket_results = list(playoffs.get("bracket_results") or [])
     elif phase_s == "playoffs":
         while True:
             p = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else None
-            if p and p.get("completed") and p.get("champion"):
+            if p and p.get("completed"):
+                _sync_playoff_top_level_champion_runner(p)
+            if p and p.get("completed") and str(p.get("champion") or "").strip():
                 champion = str(p.get("champion") or "")
+                runner_up = str(p.get("runner_up") or "")
+                bracket_results = list(p.get("bracket_results") or [])
+                break
+            if p and p.get("completed"):
+                champion = ""
                 runner_up = str(p.get("runner_up") or "")
                 bracket_results = list(p.get("bracket_results") or [])
                 break
@@ -5371,6 +6211,7 @@ def finish_season(user_id: str, save_id: str) -> Dict[str, Any]:
         if uc and uc in by_class:
             playoffs["champion"] = by_class[uc].get("champion")
             playoffs["runner_up"] = by_class[uc].get("runner_up")
+        _sync_playoff_top_level_champion_runner(playoffs)
         champion = str(playoffs.get("champion") or "")
         runner_up = str(playoffs.get("runner_up") or "")
         bracket_results = _flatten_playoff_bracket_results(playoffs)
@@ -5379,7 +6220,9 @@ def finish_season(user_id: str, save_id: str) -> Dict[str, Any]:
     teams = {t["name"]: team_from_dict(t) for t in state.get("teams", [])}
     team_names = list(teams.keys())
 
-    if phase_s == "playoffs" or (playoffs and playoffs.get("completed") and playoffs.get("champion")):
+    if phase_s == "playoffs" or (
+        playoffs and playoffs.get("completed") and str(playoffs.get("champion") or "").strip()
+    ):
         season_player_stats = season_stats_map_from_jsonable(state.get("playoff_season_player_stats") or {})
     else:
         season_player_stats = season_stats_map_from_jsonable(run_playoff_stats)
@@ -5556,115 +6399,36 @@ def finish_season(user_id: str, save_id: str) -> Dict[str, Any]:
         playoffs_by_class=p_bc_snap,
         save_dir=save_dir,
     )
+    append_season_to_coach_career_log(
+        state,
+        year=year_num,
+        team_coaches=team_coaches,
+        standings=standings,
+    )
 
     league_history = load_league_history(league_history_path(save_dir))
     update_prestige(teams, league_history)
+    state["prestige_applied_for_year"] = year_num
 
-    graduation_report: Dict[str, List[Dict[str, Any]]] = {}
-    for t in teams.values():
-        ro = run_offseason_roster_turnover(t, league_history=league_history)
-        reset_team_season_stats(t)
-        graduated = ro.get("graduated") or []
-        graduation_report[t.name] = [player_to_dict(p) for p in graduated]
+    if not bulk_autopilot:
+        state["season_phase"] = "season_summary"
+        state["teams"] = [team_to_dict(t) for t in teams.values()]
+        save_state(user_id, save_id, state, save_dir)
+        return _attach_league_history_to_result(save_dir, {"state": state, "champion": champion})
 
-    # advance year and reset season (interactive offseason before preseason)
-    state["current_year"] = int(state.get("current_year", 1)) + 1
-    state["season_phase"] = "offseason"
-    state["current_week"] = 1
-    state["offseason_stage_index"] = 0
-    state["offseason_stages"] = list(OFFSEASON_UI_STAGES)
-    state["offseason_graduation_report"] = graduation_report
-    state["offseason_training_results"] = None
-    state["offseason_winter_training_results"] = None
-    # Improvements + coach development banks (earned in the just-finished season)
-    user_team_name = str(state.get("user_team") or "")
-    br_flat_fin = _recap_merged_bracket_results(state, list(bracket_results or []))
-    sg_fin = state.get("season_goals") if isinstance(state.get("season_goals"), dict) else None
-    if user_team_name:
-        try:
-            breakdown = _season_pp_awards_for_team(
-                user_team_name,
-                standings=standings,
-                bracket_results=br_flat_fin,
-                champion=champion,
-                season_goals=sg_fin,
-            )
-            pp_total = int(breakdown.get("pp_total", 0) or 0)
-        except Exception:
-            breakdown = None
-            pp_total = 0
-    else:
-        breakdown = None
-        pp_total = 0
-    try:
-        cd_banks = build_offseason_coach_dev_banks_for_league(
-            team_names,
-            standings,
-            br_flat_fin,
-            champion,
-            user_team_name or None,
-            sg_fin,
-            coaches_by_team={n: getattr(t, "coach", None) for n, t in teams.items()},
-            existing_banks=state.get("offseason_coach_dev_banks") if isinstance(state.get("offseason_coach_dev_banks"), dict) else None,
-        )
-    except Exception:
-        logger.exception("coach development banks (finish_season)")
-        cd_banks = {}
-        for n in team_names:
-            try:
-                cd_banks[n] = compute_coach_development_bank(
-                    n,
-                    standings,
-                    br_flat_fin,
-                    champion,
-                    sg_fin if n == user_team_name else None,
-                    coach=getattr(teams.get(n), "coach", None),
-                    existing_bank=(state.get("offseason_coach_dev_banks") or {}).get(n)
-                    if isinstance(state.get("offseason_coach_dev_banks"), dict)
-                    else None,
-                )
-            except Exception:
-                cd_banks[n] = _empty_coach_dev_bank()
-    state["offseason_improvements_bank"] = {"pp_total": pp_total, "pp_remaining": pp_total, "breakdown": breakdown, "applied": {}}
-    state["offseason_coach_dev_banks"] = cd_banks
-    state["offseason_coach_dev_bank"] = (
-        cd_banks.get(user_team_name) if user_team_name and isinstance(cd_banks.get(user_team_name), dict) else _empty_coach_dev_bank()
+    _finish_season_apply_offseason_transition(
+        state,
+        teams,
+        team_names,
+        standings,
+        champion,
+        br_for_history,
+        year_num,
+        league_history,
     )
-    state["preseason_stages"] = list(PRESEASON_STAGES)
-    state["preseason_stage_index"] = 0
-    state["preseason_scrimmages"] = []
-    state["preseason_scrimmage_opponents"] = []
-    state["season_goals"] = state.get("season_goals") or []
-    ensure_league_structure_in_state(state)
-    wk, wr = _regular_season_week_boards(teams, state)
-    state["weeks"] = wk
-    state["week_results"] = wr
-    try:
-        state["offseason_transfer_snapshot_standings"] = copy.deepcopy(standings)
-    except Exception:
-        state["offseason_transfer_snapshot_standings"] = {
-            str(k): dict(v) if isinstance(v, dict) else v for k, v in dict(standings or {}).items()
-        }
-    # See finish_season_state: keep a persistent snapshot of the just-finished season
-    # so the UI can show last season's record across offseason/preseason/regular-week-1
-    # instead of the freshly-reset 0-0 standings.
-    try:
-        state["last_completed_standings"] = copy.deepcopy(standings)
-    except Exception:
-        state["last_completed_standings"] = {
-            str(k): dict(v) if isinstance(v, dict) else v for k, v in dict(standings or {}).items()
-        }
-    state["last_completed_year"] = year_num
-    _clear_offseason_transfer_ui_state(state)
-    state["standings"] = {n: {"wins": 0, "losses": 0, "points_for": 0, "points_against": 0} for n in team_names}
-    state["teams"] = [team_to_dict(t) for t in teams.values()]
-    apply_team_program_totals_to_serialized_team_rows(league_history.get("seasons") or [], state=state)
-    _assign_scrimmage_opponents_for_state(state)
-    state.pop("playoffs", None)
-    state.pop("playoff_season_player_stats", None)
 
     save_state(user_id, save_id, state, save_dir)
-    return {"state": state, "champion": champion}
+    return _attach_league_history_to_result(save_dir, {"state": state, "champion": champion})
 
 
 def sim_playoff_round(user_id: str, save_id: str) -> Dict[str, Any]:
@@ -5676,9 +6440,9 @@ def sim_playoff_round(user_id: str, save_id: str) -> Dict[str, Any]:
     teams = {t["name"]: team_from_dict(t) for t in state.get("teams", [])}
     p = _ensure_playoffs_migrated(state, teams)
     if _playoffs_global_completed(p):
-        # If playoffs are already done, finalize immediately so history/recaps are available now.
         return finish_season(user_id, save_id)
     state = _advance_playoff_one_round_state(state)
+    _maybe_coach_playoff_round_emails(state)
     # Championship just finished: finalize season now so team/coach history updates immediately.
     p_after = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else {}
     if _playoffs_global_completed(p_after):
@@ -5686,7 +6450,7 @@ def sim_playoff_round(user_id: str, save_id: str) -> Dict[str, Any]:
         return finish_season(user_id, save_id)
     save_state(user_id, save_id, state, save_dir)
     champ = state.get("playoffs", {}).get("champion")
-    return {"state": state, "champion": champ}
+    return _attach_league_history_to_result(save_dir, {"state": state, "champion": champ})
 
 
 def sim_playoffs(user_id: str, save_id: str) -> Dict[str, Any]:
@@ -5747,8 +6511,10 @@ def sim_playoffs(user_id: str, save_id: str) -> Dict[str, Any]:
     state["playoff_season_player_stats"] = season_player_stats
     # Full playoff sim ends with playoffs complete; finalize now for immediate history updates.
     if _playoffs_global_completed(playoffs):
+        _maybe_coach_playoff_round_emails(state)
         save_state(user_id, save_id, state, save_dir)
         return finish_season(user_id, save_id)
+    _maybe_coach_playoff_round_emails(state)
     save_state(user_id, save_id, state, save_dir)
     return {"state": state, "champion": playoffs.get("champion") or last_champion or ""}
 
@@ -6076,7 +6842,7 @@ def _bulk_complete_playoffs_and_finish_season(
             return
         playoffs = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else {}
         if _playoffs_global_completed(playoffs):
-            finish_season(user_id, save_id)
+            finish_season(user_id, save_id, bulk_autopilot=True)
             return
         if not _bulk_playoffs_bracket_started(state):
             sim_playoffs(user_id, save_id)
@@ -6131,6 +6897,10 @@ def simulate_seasons_forward(user_id: str, save_id: str, seasons: int) -> Dict[s
                 _bulk_run_offseason_autopilot(user_id, save_id)
                 _bulk_run_preseason_autopilot(user_id, save_id)
                 break
+
+            if phase == "season_summary":
+                finish_season(user_id, save_id, begin_offseason=True)
+                continue
 
             raise ValueError(
                 f"Cannot simulate seasons from season_phase={phase!r}; advance the save in-game first."

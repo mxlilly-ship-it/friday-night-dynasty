@@ -258,6 +258,8 @@ def team_to_dict(t: Team) -> Dict[str, Any]:
         "name": t.name,
         "nickname": getattr(t, "nickname", None),
         "prestige": t.prestige,
+        "team_points": round(float(getattr(t, "team_points", 0.0) or 0.0), 2),
+        "team_points_last_delta": round(float(getattr(t, "team_points_last_delta", 0.0) or 0.0), 2),
         "community_type": t.community_type.value if hasattr(t.community_type, "value") else str(t.community_type),
         "enrollment": t.enrollment,
         "classification": t.classification,
@@ -269,6 +271,9 @@ def team_to_dict(t: Team) -> Dict[str, Any]:
         "facilities_grade": t.facilities_grade,
         "culture_grade": t.culture_grade,
         "booster_support": t.booster_support,
+        "facilities_progress_pts": getattr(t, "facilities_progress_pts", 0),
+        "culture_progress_pts": getattr(t, "culture_progress_pts", 0),
+        "boosters_progress_pts": getattr(t, "boosters_progress_pts", 0),
         "roster": [player_to_dict(p) for p in t.roster],
         "coach": coach_to_dict(t.coach) if t.coach else None,
         "season_offensive_play_selection": t.season_offensive_play_selection,
@@ -302,6 +307,9 @@ def team_from_dict(d: Dict[str, Any]) -> Team:
         facilities_grade=int(d.get("facilities_grade", 5)),
         culture_grade=int(d.get("culture_grade", 5)),
         booster_support=int(d.get("booster_support", 5)),
+        facilities_progress_pts=int(d.get("facilities_progress_pts", 0) or 0),
+        culture_progress_pts=int(d.get("culture_progress_pts", 0) or 0),
+        boosters_progress_pts=int(d.get("boosters_progress_pts", 0) or 0),
         roster=roster,
         coach=coach,
         season_offensive_play_selection=d.get("season_offensive_play_selection"),
@@ -310,6 +318,18 @@ def team_from_dict(d: Dict[str, Any]) -> Team:
         sub_stamina_thresholds=d.get("sub_stamina_thresholds"),
         depth_chart_order=d.get("depth_chart_order"),
     )
+    if d.get("team_points") is not None:
+        try:
+            t.team_points = float(d["team_points"])
+        except (TypeError, ValueError):
+            t.team_points = None
+    try:
+        t.team_points_last_delta = float(d.get("team_points_last_delta", 0.0) or 0.0)
+    except (TypeError, ValueError):
+        t.team_points_last_delta = 0.0
+    from systems.prestige_system import ensure_team_points_initialized
+
+    ensure_team_points_initialized(t)
     return t
 
 
@@ -326,7 +346,7 @@ def build_league_state(
     user_coach_name: Optional[str] = None,
     allow_user_coach_firing: bool = True,
     current_week: int = 1,
-    season_phase: str = "regular",  # "regular" | "playoffs" | "offseason" | "done"
+    season_phase: str = "regular",  # "regular" | "playoffs" | "season_summary" | "offseason" | "done"
     weeks: Optional[List[List[Dict[str, str]]]] = None,  # week -> [{home, away}]
     week_results: Optional[List[List[Dict[str, Any]]]] = None,  # week -> [{played, home_score, away_score, ot}]
     standings: Optional[Dict[str, Dict[str, int]]] = None,  # team -> {wins, losses, points_for, points_against}

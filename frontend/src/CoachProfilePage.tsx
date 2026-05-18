@@ -4,7 +4,7 @@ import { COACH_ATTRIBUTE_GROUPS, formatCoachAttributeCell } from './coachAttribu
 import {
   aggregateCoachCareer,
   buildCoachHistoryFromLeagueHistory,
-  findLocalSeasonRecap,
+  downloadTeamSeasonRecap,
   mergeInProgressCoachHistory,
   type CoachHistoryRow,
 } from './coachHistory'
@@ -57,11 +57,18 @@ export default function CoachProfilePage({
     }
     if (!isLocalBundle) return
     if (leagueHistory != null) {
-      setHistoryRows(buildCoachHistoryFromLeagueHistory(leagueHistory, coachName, saveState?.teams))
+      setHistoryRows(
+        buildCoachHistoryFromLeagueHistory(
+          leagueHistory,
+          coachName,
+          saveState?.teams,
+          saveState?.coach_career_log,
+        ),
+      )
     } else {
       setHistoryRows([])
     }
-  }, [coachName, isLocalBundle, leagueHistory, saveState?.teams])
+  }, [coachName, isLocalBundle, leagueHistory, saveState?.teams, saveState?.coach_career_log])
 
   useEffect(() => {
     if (!coachName || coachName === '—') {
@@ -101,7 +108,16 @@ export default function CoachProfilePage({
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- onError from parent; avoid refetch loops
-  }, [apiBase, coachName, headers, isLocalBundle, saveId, saveState?.current_year])
+  }, [
+    apiBase,
+    coachName,
+    headers,
+    isLocalBundle,
+    saveId,
+    saveState?.current_year,
+    saveState?.season_phase,
+    saveState?.last_completed_year,
+  ])
 
   const displayRows = useMemo(
     () => mergeInProgressCoachHistory(historyRows, coachName, teamName, saveState),
@@ -146,40 +162,16 @@ export default function CoachProfilePage({
   )
 
   const downloadRecap = async (rowTeam: string, year: number | string) => {
-    if (isLocalBundle && seasonRecaps) {
-      const text = findLocalSeasonRecap(seasonRecaps, rowTeam, year)
-      if (!text) {
-        onError('Recap not found in this save zip for that season.')
-        return
-      }
-      const blob = new Blob([text], { type: 'text/plain' })
-      const dlUrl = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = dlUrl
-      a.download = `${rowTeam.replaceAll(' ', '_')}_Year_${year}_recap.txt`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      setTimeout(() => URL.revokeObjectURL(dlUrl), 250)
-      onError('')
-      return
-    }
     try {
-      const url = `${apiBase}/saves/${saveId}/team-history/recap.txt?team_name=${encodeURIComponent(
-        rowTeam,
-      )}&year=${encodeURIComponent(String(year))}`
-      const resp = await fetch(url, { headers })
-      if (!resp.ok) throw new Error(await resp.text())
-      const text = await resp.text()
-      const blob = new Blob([text], { type: 'text/plain' })
-      const dlUrl = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = dlUrl
-      a.download = `${rowTeam.replaceAll(' ', '_')}_Year_${year}_recap.txt`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      setTimeout(() => URL.revokeObjectURL(dlUrl), 250)
+      await downloadTeamSeasonRecap({
+        apiBase,
+        headers,
+        saveId,
+        teamName: rowTeam,
+        year,
+        seasonRecaps,
+        isLocalBundle,
+      })
       onError('')
     } catch (e: any) {
       onError(e?.message ?? 'Failed to download recap')

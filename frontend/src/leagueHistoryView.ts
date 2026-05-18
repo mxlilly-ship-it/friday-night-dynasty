@@ -78,7 +78,45 @@ export function partitionBracketGamesByConnectedTeams(gamesIn: unknown): unknown
 
 /**
  * Prefer embedded playoffs_by_class (new saves); else partition flat bracket_results using team graph + labels.
+ *
+ * ``ARCHIVE_PLAYOFF_ROUND_PRIORITY`` / ``sortedArchivePlayoffRounds`` mirror
+ * ``systems.playoff_system.PLAYOFF_ROUND_PRIORITY`` for UI column order (low = earlier round).
  */
+export const ARCHIVE_PLAYOFF_ROUND_PRIORITY: Record<string, number> = {
+  'Round of 64': 1,
+  'Round of 32': 2,
+  'Regional Quarterfinal': 2,
+  'Round of 16': 3,
+  'Regional Semifinal': 3,
+  Quarterfinal: 4,
+  'Regional Final': 4,
+  Semifinal: 5,
+  Championship: 6,
+}
+
+/** Group ``bracket_results`` by ``round`` and order rounds for display (regional + state). */
+export function sortedArchivePlayoffRounds(
+  bracketResults: unknown,
+): { round: string; games: Record<string, unknown>[] }[] {
+  const list = (Array.isArray(bracketResults) ? bracketResults : []).filter(
+    (g) => g && typeof g === 'object',
+  ) as Record<string, unknown>[]
+  const byRound = new Map<string, Record<string, unknown>[]>()
+  for (const g of list) {
+    const r = String(g.round ?? '').trim() || 'Game'
+    if (!byRound.has(r)) byRound.set(r, [])
+    byRound.get(r)!.push(g)
+  }
+  const rounds = [...byRound.keys()]
+  rounds.sort((a, b) => {
+    const pa = ARCHIVE_PLAYOFF_ROUND_PRIORITY[a] ?? 99
+    const pb = ARCHIVE_PLAYOFF_ROUND_PRIORITY[b] ?? 99
+    if (pa !== pb) return pa - pb
+    return a.localeCompare(b)
+  })
+  return rounds.map((round) => ({ round, games: byRound.get(round) ?? [] }))
+}
+
 export function getHistoricalPlayoffsByClass(
   season: Record<string, unknown> | null | undefined,
   classificationOfTeam: (teamName: string) => string,

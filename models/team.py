@@ -17,7 +17,9 @@ if TYPE_CHECKING:
 class Team:
     name: str
     nickname: Optional[str] = None
-    prestige: int = 5          # 1-15
+    prestige: int = 5          # 1-15 (derived from team_points)
+    team_points: Optional[float] = None  # Program reputation score; see prestige_system.py
+    team_points_last_delta: float = 0.0  # Last offseason TP change (season + carousel coach pass)
     community_type: CommunityType = CommunityType.SUBURBAN
 
     # School size (affects roster size)
@@ -36,6 +38,11 @@ class Team:
     facilities_grade: int = 5
     culture_grade: int = 5
     booster_support: int = 5
+
+    # Program progression (0–3500 each): momentum toward the next grade; see systems/program_progression.py
+    facilities_progress_pts: int = 0
+    culture_progress_pts: int = 0
+    boosters_progress_pts: int = 0
 
     # Roster: list of Player objects on this team
     roster: List["Player"] = field(default_factory=list)
@@ -60,10 +67,19 @@ class Team:
 
     def _clamp_values(self):
         """Ensure grades and prestige stay within valid ranges."""
-        self.prestige = max(1, min(15, self.prestige))
+        if self.team_points is not None:
+            from systems.prestige_system import clamp_team_points, prestige_from_team_points
+
+            self.team_points = round(clamp_team_points(float(self.team_points)), 2)
+            self.prestige = prestige_from_team_points(self.team_points)
+        else:
+            self.prestige = max(1, min(15, self.prestige))
         self.facilities_grade = max(1, min(10, self.facilities_grade))
         self.culture_grade = max(1, min(10, self.culture_grade))
         self.booster_support = max(1, min(10, self.booster_support))
+        self.facilities_progress_pts = max(0, min(3500, int(self.facilities_progress_pts)))
+        self.culture_progress_pts = max(0, min(3500, int(self.culture_progress_pts)))
+        self.boosters_progress_pts = max(0, min(3500, int(self.boosters_progress_pts)))
         self.wins = max(0, self.wins)
         self.losses = max(0, self.losses)
         self.regional_championships = max(0, self.regional_championships)

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './index.css'
 import './TitleScreen.css'
 import { NewSaveFlow } from './NewSaveFlow'
@@ -43,7 +43,7 @@ function saveHasActivePreseasonFlow(state: any): boolean {
   if (!Array.isArray(stages) || stages.length === 0) return false
   if (idx >= stages.length) return false
   const p = String(state?.season_phase ?? '').toLowerCase()
-  if (p === 'playoffs' || p === 'offseason' || p === 'done') return false
+  if (p === 'playoffs' || p === 'season_summary' || p === 'offseason' || p === 'done') return false
   return true
 }
 
@@ -116,6 +116,7 @@ export default function App() {
   const [saves, setSaves] = useState<SaveListItem[]>([])
   const [saveId, setSaveId] = useState<string>('')
   const [saveState, setSaveState] = useState<any>(null)
+  const [dynastyLeagueHistory, setDynastyLeagueHistory] = useState<{ seasons?: unknown[] }>({ seasons: [] })
   const [localBundle, setLocalBundle] = useState<SaveBundle | null>(null)
   const [error, setError] = useState<string>('')
   const [crashReportText, setCrashReportText] = useState<string>('')
@@ -143,6 +144,31 @@ export default function App() {
     if (!token) return {}
     return { Authorization: `Bearer ${token}` }
   }, [token])
+
+  const mergeLocalSimulationResult = useCallback(
+    (data: {
+      state?: unknown
+      league_history?: unknown
+      records?: unknown
+      season_recaps?: Record<string, string>
+    }) => {
+      if (data?.state !== undefined && data?.state !== null) setSaveState(data.state as any)
+      setLocalBundle((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          leagueHistory:
+            data.league_history !== undefined && data.league_history !== null
+              ? data.league_history
+              : prev.leagueHistory,
+          records:
+            data.records !== undefined && data.records !== null ? data.records : prev.records,
+          seasonRecaps: data.season_recaps ? { ...(prev.seasonRecaps ?? {}), ...data.season_recaps } : prev.seasonRecaps,
+        }
+      })
+    },
+    [],
+  )
 
   function clearStaleSession() {
     localStorage.removeItem('fnd_token')
@@ -309,6 +335,58 @@ export default function App() {
     }
   }
 
+  const refreshDynastyFromServer = useCallback(async () => {
+    if (!saveId || inLocalRuntime) return
+    try {
+      const r = await fetch(`${API_BASE}/saves/${saveId}`, { headers })
+      if (!r.ok) return
+      const data = await r.json()
+      if (data?.league_history && typeof data.league_history === 'object') {
+        setDynastyLeagueHistory(data.league_history as { seasons?: unknown[] })
+      }
+      if (data?.state) {
+        maybeTriggerBackupReminder(saveStateRef.current, data.state)
+        setSaveState(data.state)
+      }
+    } catch {
+      /* ignore refresh errors */
+    }
+  }, [saveId, inLocalRuntime, headers])
+
+  function applyDynastySimulationResult(data: {
+    state?: unknown
+    league_history?: unknown
+    records?: unknown
+    season_recaps?: Record<string, string>
+  }) {
+    if (data?.state !== undefined && data?.state !== null) {
+      maybeTriggerBackupReminder(saveStateRef.current, data.state as any)
+      setSaveState(data.state as any)
+    }
+    if (data?.league_history !== undefined && data.league_history !== null) {
+      setDynastyLeagueHistory(data.league_history as { seasons?: unknown[] })
+    } else if (saveId && !inLocalRuntime) {
+      void refreshDynastyFromServer()
+    }
+    if (data?.season_recaps && Object.keys(data.season_recaps).length > 0 && inLocalRuntime) {
+      setLocalBundle((prev) =>
+        prev
+          ? {
+              ...prev,
+              seasonRecaps: { ...(prev.seasonRecaps ?? {}), ...data.season_recaps },
+            }
+          : prev,
+      )
+    }
+  }
+
+  useEffect(() => {
+    if (screen === 'playing' && saveId && !inLocalRuntime) {
+      void refreshDynastyFromServer()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh when dynasty id changes only
+  }, [saveId, screen, inLocalRuntime])
+
   async function loadFromComputerFile(file: File) {
     const low = String(file.name || '').toLowerCase()
     if (low.endsWith('.zip')) {
@@ -426,6 +504,11 @@ export default function App() {
       setLocalBundle(null)
       setSaveId(id)
       setSaveState(data.state)
+      setDynastyLeagueHistory(
+        data.league_history && typeof data.league_history === 'object'
+          ? data.league_history
+          : { seasons: [] },
+      )
       setScreen('playing')
     } catch (e: any) {
       setError(`Could not load save (${e?.message ?? 'network error'}).${apiConnectionHint()}`)
@@ -484,6 +567,9 @@ export default function App() {
       improve_facilities_grade?: number
       improve_culture_grade?: number
       improve_booster_support?: number
+      improve_facilities_cumulative_pp?: number
+      improve_culture_cumulative_pp?: number
+      improve_boosters_cumulative_pp?: number
       coach_dev_allocations?: Record<string, number>
       carousel_job_applications?: string[]
       transfer_stage_1_ack_results?: boolean
@@ -502,7 +588,10 @@ export default function App() {
       // Stateless mode: send current bundle state to the API and receive updated state (and updated history/records/recaps).
       try {
         const payload: any = { state: live, league_history: localBundle.leagueHistory, records: localBundle.records }
-        if (opts?.seasonFinish) payload.kind = 'season-finish'
+        if (opts?.seasonFinish) {
+          payload.kind = 'season-finish'
+          payload.body = { begin_offseason: livePhase === 'season_summary' }
+        }
         // Full auto-playoff must win over generic "in playoffs → one round" (otherwise full sim never runs locally).
         else if (opts?.playoffsSim) payload.kind = 'playoffs-sim'
         else if (livePhase === 'playoffs') payload.kind = 'playoffs-sim-round'
@@ -510,7 +599,8 @@ export default function App() {
         if (!payload.kind) payload.kind = 'week-sim'
 
         if (payload.kind === 'offseason-advance') payload.body = opts?.offseasonBody ?? {}
-        if (payload.kind === 'week-sim' || payload.kind === 'season-finish') payload.body = null
+        if (payload.kind === 'week-sim') payload.body = null
+        if (payload.kind === 'season-finish' && payload.body == null) payload.body = { begin_offseason: false }
 
         // Preseason advances + finish season are driven by existing UI flows that call simWeek()
         // through the same path; map them based on structural phase detection.
@@ -565,17 +655,19 @@ export default function App() {
 
     if (opts?.seasonFinish) {
       try {
-        const r = await fetch(`${API_BASE}/saves/${saveId}/season/finish`, { method: 'POST', headers })
+        const beginOffseason = livePhase === 'season_summary'
+        const r = await fetch(`${API_BASE}/saves/${saveId}/season/finish`, {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ begin_offseason: beginOffseason }),
+        })
         if (!r.ok) {
           if (await consumeUnauthorized(r)) return false
           setError((await formatApiErrorBody(r)) || 'Failed to advance season')
           return false
         }
         const data = await r.json()
-        if (data?.state) {
-          maybeTriggerBackupReminder(live, data.state)
-          setSaveState(data.state)
-        }
+        if (data?.state) applyDynastySimulationResult(data)
         else await loadSave(saveId)
         return true
       } catch (e: any) {
@@ -593,10 +685,7 @@ export default function App() {
           return false
         }
         const data = await r.json()
-        if (data?.state) {
-          maybeTriggerBackupReminder(live, data.state)
-          setSaveState(data.state)
-        }
+        if (data?.state) applyDynastySimulationResult(data)
         else await loadSave(saveId)
         return true
       } catch (e: any) {
@@ -613,10 +702,7 @@ export default function App() {
           return false
         }
         const data = await r.json()
-        if (data?.state) {
-          maybeTriggerBackupReminder(live, data.state)
-          setSaveState(data.state)
-        }
+        if (data?.state) applyDynastySimulationResult(data)
         else await loadSave(saveId)
         return true
       } catch (e: any) {
@@ -638,16 +724,16 @@ export default function App() {
           return false
         }
         const data = await r.json()
-        if (data?.state) {
-          maybeTriggerBackupReminder(live, data.state)
-          setSaveState(data.state)
-        }
+        if (data?.state) applyDynastySimulationResult(data)
         else await loadSave(saveId)
         return true
       } catch (e: any) {
         setError(`Request failed (${e?.message ?? 'network error'}).${apiConnectionHint()}`)
         return false
       }
+    }
+    if (livePhase === 'season_summary') {
+      return simWeek({ ...opts, seasonFinish: true })
     }
     const phaseLower = String(live?.season_phase ?? '').toLowerCase()
     const structDone = preseasonStructurallyComplete(live)
@@ -692,12 +778,8 @@ export default function App() {
         setError('Server returned invalid JSON (often NaN/Infinity in save data). Check API logs.')
         return false
       }
-      if (data?.state) {
-        maybeTriggerBackupReminder(live, data.state)
-        setSaveState(data.state)
-      } else {
-        await loadSave(saveId)
-      }
+      if (data?.state) applyDynastySimulationResult(data)
+      else await loadSave(saveId)
       return true
     } catch (e: any) {
       setError(`Request failed (${e?.message ?? 'network error'}).${apiConnectionHint()}`)
@@ -834,8 +916,13 @@ export default function App() {
               backupReminderFrequency={backupReminderFrequency}
               onBackupReminderFrequencyChange={setBackupReminderFrequency}
               onBackupNow={() => void exportBackupFile()}
-              leagueHistory={inLocalRuntime && localBundle ? localBundle.leagueHistory : undefined}
+              leagueHistory={
+                inLocalRuntime && localBundle ? localBundle.leagueHistory : dynastyLeagueHistory
+              }
+              records={inLocalRuntime && localBundle ? localBundle.records : undefined}
               seasonRecaps={inLocalRuntime && localBundle ? localBundle.seasonRecaps : undefined}
+              onMergeLocalSimulationResult={inLocalRuntime ? mergeLocalSimulationResult : undefined}
+              onRefreshDynasty={inLocalRuntime ? undefined : refreshDynastyFromServer}
           />
         </LocalAssetsProvider>
         {showBackupPrompt ? (

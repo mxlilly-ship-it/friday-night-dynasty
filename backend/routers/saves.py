@@ -30,14 +30,17 @@ from backend.services.league_service import (
     get_playoff_game_text,
     get_week_game_text,
     get_team_logo_path,
+    get_team_stadium_path,
     load_state,
     match_logo_filename_to_team,
     save_team_logo,
+    save_team_stadium,
     get_coach_gameplan_v2,
     save_coach_gameplan_v2,
     get_team_history,
     get_coach_history,
     get_team_season_recap_text,
+    patch_coach_inbox,
 )
 from systems.teams_loader import load_teams_from_json
 
@@ -132,6 +135,12 @@ class AdvanceOffseasonBody(BaseModel):
     improve_facilities_grade: Optional[int] = None  # 1-10
     improve_culture_grade: Optional[int] = None  # 1-10
     improve_booster_support: Optional[int] = None  # 1-10
+    improve_facilities_progress_pts: Optional[int] = None
+    improve_culture_progress_pts: Optional[int] = None
+    improve_boosters_progress_pts: Optional[int] = None
+    improve_facilities_cumulative_pp: Optional[int] = None
+    improve_culture_cumulative_pp: Optional[int] = None
+    improve_boosters_cumulative_pp: Optional[int] = None
     # Coach development CP threshold allocations (skill -> allocated CP)
     coach_dev_allocations: Optional[Dict[str, Any]] = None
     # Coaching carousel (stages I–III): user's ranked HC job applications (team names).
@@ -145,6 +154,11 @@ class StartCoachGameBody(BaseModel):
     """Start a coach-playable game (scrimmage, regular season, or playoff)."""
     context: str  # "scrimmage" | "week" | "playoff"
     scrimmage_index: Optional[int] = 0  # 0 or 1 for Scrimmage 1 or Scrimmage 2
+
+
+class FinishSeasonBody(BaseModel):
+    """begin_offseason=true only from Season Summary (Begin offseason). Playoff finish leaves this false."""
+    begin_offseason: bool = False
 
 
 class SimulateSeasonsBody(BaseModel):
@@ -276,6 +290,40 @@ def get_team_logo_route(team_name: str, user=Depends(require_user)):
     return FileResponse(path, media_type=media_type)
 
 
+@router.post("/stadiums/{team_name}", response_model=Dict[str, Any])
+async def upload_team_stadium_route(team_name: str, stadium: UploadFile = File(...), user=Depends(require_user)):
+    name = (team_name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Missing team name")
+    filename = str(stadium.filename or "").lower()
+    ext = os.path.splitext(filename)[1]
+    if ext not in (".png", ".jpg", ".jpeg", ".webp"):
+        raise HTTPException(status_code=400, detail="Only PNG, JPG, JPEG, and WEBP are supported.")
+    data = await stadium.read()
+    try:
+        save_team_stadium(user["user_id"], name, data, ext)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=_save_route_exception_detail(e))
+    return {"ok": True, "team_name": name}
+
+
+@router.get("/stadiums/{team_name}")
+def get_team_stadium_route(team_name: str, user=Depends(require_user)):
+    name = (team_name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Missing team name")
+    path = get_team_stadium_path(user["user_id"], name)
+    if not path:
+        raise HTTPException(status_code=404, detail="Stadium image not found")
+    media_type = "image/png"
+    low = path.lower()
+    if low.endswith(".jpg") or low.endswith(".jpeg"):
+        media_type = "image/jpeg"
+    elif low.endswith(".webp"):
+        media_type = "image/webp"
+    return FileResponse(path, media_type=media_type)
+
+
 @router.get("/{save_id}/play-selection", response_model=Dict[str, Any])
 def get_play_selection_route(save_id: str, user=Depends(require_user)):
     """Play selection with names for game plan UI (preseason stage 2)."""
@@ -304,6 +352,16 @@ class CoachGameplanV2Body(BaseModel):
     offense: Optional[Dict[str, Any]] = None
     defense: Optional[Dict[str, Any]] = None
     fourth_down: Optional[Dict[str, Any]] = None
+
+
+class CoachInboxChooseBody(BaseModel):
+    email_id: str
+    choice_id: str
+
+
+class CoachInboxPatchBody(BaseModel):
+    mark_read: Optional[List[str]] = None
+    choose: Optional[CoachInboxChooseBody] = None
 
 
 @router.get("/{save_id}/coach-gameplan", response_model=Dict[str, Any])
@@ -400,6 +458,16 @@ def get_save_route(save_id: str, user=Depends(require_user)):
         raise HTTPException(status_code=404, detail=str(e))
 
 
+@router.patch("/{save_id}/coach-inbox", response_model=Dict[str, Any])
+def patch_coach_inbox_route(save_id: str, body: CoachInboxPatchBody = Body(...), user=Depends(require_user)):
+    """Mark coach inbox messages read and/or apply a response choice."""
+    try:
+        choose = body.choose.model_dump() if body.choose else None
+        return patch_coach_inbox(user["user_id"], save_id, mark_read=body.mark_read, choose=choose)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=_save_route_exception_detail(e))
+
+
 @router.delete("/{save_id}")
 def delete_save_route(save_id: str, user=Depends(require_user)):
     """Delete a save/dynasty. Cannot be undone."""
@@ -430,9 +498,14 @@ def simulate_seasons_route(save_id: str, body: SimulateSeasonsBody, user=Depends
 
 
 @router.post("/{save_id}/season/finish", response_model=Dict[str, Any])
-def finish_season_route(save_id: str, user=Depends(require_user)):
+def finish_season_route(
+    save_id: str,
+    body: Optional[FinishSeasonBody] = Body(None),
+    user=Depends(require_user),
+):
     try:
-        return finish_season(user["user_id"], save_id)
+        begin = bool(body.begin_offseason) if body else False
+        return finish_season(user["user_id"], save_id, begin_offseason=begin)
     except Exception as e:
         raise HTTPException(status_code=400, detail=_save_route_exception_detail(e))
 

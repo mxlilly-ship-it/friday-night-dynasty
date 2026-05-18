@@ -9,6 +9,8 @@ export type CallsheetBucket = 'rushing' | 'passing' | 'screen' | 'trick' | 'situ
 export type CallsheetPlayRow = {
   id: string
   name: string
+  /** Formation / personnel label from playbook (when provided by engine). */
+  formation?: string
   tag: 'base' | 'red-zone' | 'third' | 'trick'
   category: string
 }
@@ -89,7 +91,7 @@ function isSpecialEligible(p: { category: string }): boolean {
   )
 }
 
-type PlayIn = { id: string; name: string; category: string }
+type PlayIn = { id: string; name: string; category: string; formation?: string }
 
 export function buildOffenseCallsheet(
   plays: PlayIn[],
@@ -105,6 +107,7 @@ export function buildOffenseCallsheet(
     const row: CallsheetPlayRow = {
       id: p.id,
       name: p.name,
+      formation: p.formation?.trim() || undefined,
       tag: p.id.toUpperCase().includes('FAKE') ? 'trick' : tagBase(),
       category: p.category || '',
     }
@@ -128,6 +131,7 @@ export function buildDefenseCallsheet(
     const row: CallsheetPlayRow = {
       id: p.id,
       name: p.name,
+      formation: p.formation?.trim() || undefined,
       tag: p.id.toUpperCase().includes('FAKE') ? 'trick' : tagBase(),
       category: p.category || '',
     }
@@ -156,6 +160,7 @@ export function buildSpecialCallsheet(
     out[b].push({
       id: p.id,
       name: p.name,
+      formation: p.formation?.trim() || undefined,
       tag: p.id.toUpperCase().includes('FAKE') ? 'trick' : tagBase(),
       category: p.category || '',
     })
@@ -177,6 +182,14 @@ export const CALLSHEET_BUCKET_LABELS: Record<CallsheetBucket, string> = {
 /** Column order in the call sheet grid (matches game_interface.html). */
 export const CALLSHEET_BUCKET_ORDER: CallsheetBucket[] = ['rushing', 'passing', 'screen', 'trick', 'situational']
 
+/** Column titles when the DEFENSE tab is active (matches engine categories ZONES / MANS / ZONE_PRESSURE / MAN_PRESSURE). */
+const DEFENSE_BUCKET_LABELS: Record<Exclude<CallsheetBucket, 'situational'>, string> = {
+  rushing: 'ZONES',
+  passing: 'MANS',
+  screen: 'ZONE PRESSURE',
+  trick: 'MAN PRESSURE',
+}
+
 const HEADER_CLASS: Record<CallsheetBucket, string> = {
   rushing: 'rush',
   passing: 'pass',
@@ -197,6 +210,13 @@ export function callsheetHeaderClass(bucket: CallsheetBucket): string {
   return HEADER_CLASS[bucket]
 }
 
-export function callsheetHeaderTitle(bucket: CallsheetBucket): string {
-  return `${HEADER_ICON[bucket]} ${CALLSHEET_BUCKET_LABELS[bucket]}`
+export function callsheetHeaderTitle(bucket: CallsheetBucket, side: CallsheetSide = 'offense'): string {
+  const icon = HEADER_ICON[bucket]
+  if (side === 'defense') {
+    if (bucket === 'situational') {
+      return `${icon} ${CALLSHEET_BUCKET_LABELS[bucket]}`
+    }
+    return `${icon} ${DEFENSE_BUCKET_LABELS[bucket]}`
+  }
+  return `${icon} ${CALLSHEET_BUCKET_LABELS[bucket]}`
 }

@@ -40,6 +40,14 @@
   overflow: hidden;
 }
 
+/* Intentional blank crest when user has no HC job (TeamLogo with empty name). */
+.teamhome-logo .teamhome-blank-logo-slot.teamlogo-empty {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+}
+
 .teamhome-top-group {
   text-align: left;
   display: grid;
@@ -89,17 +97,382 @@
   grid-row: 2;
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
   align-items: center;
-  gap: 10px 12px;
+  gap: 10px 14px;
   justify-self: stretch;
   min-width: 0;
   padding-top: 8px;
   border-top: 1px solid rgba(255, 255, 255, 0.07);
 }
 
-.teamhome-top-actions > button.teamhome-select,
-.teamhome-top-actions > .teamhome-continue {
+.teamhome-top-actions-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  margin-left: auto;
+}
+
+.teamhome-offseason-stage-inline {
+  min-width: 0;
+  flex: 1 1 160px;
+  max-width: min(560px, 62vw);
+  text-align: left;
+}
+
+.teamhome-offseason-stage-inline-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  row-gap: 4px;
+}
+
+.teamhome-offseason-stage-k {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.52);
+}
+
+.teamhome-offseason-stage-v {
+  font-size: 0.88rem;
+  font-weight: 900;
+  color: rgba(246, 248, 255, 0.96);
+  letter-spacing: 0.02em;
+}
+
+.teamhome-offseason-stage-sep {
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 700;
+  padding: 0 2px;
+}
+
+/* --- Program development (offseason Improvements) --- */
+.teamhome-improvements-lead {
+  margin-top: 8px;
+  max-width: 760px;
+}
+
+.teamhome-improvements-wrap {
+  margin-top: 12px;
+  text-align: left;
+  width: 100%;
+  max-width: 940px;
+}
+
+.teamhome-improvements-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.teamhome-improvements-metric {
+  border-radius: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: linear-gradient(155deg, rgba(15, 23, 42, 0.88), rgba(30, 27, 46, 0.92));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+}
+
+.teamhome-improvements-metric--total {
+  border-color: rgba(56, 189, 248, 0.42);
+  background: linear-gradient(155deg, rgba(12, 74, 110, 0.35), rgba(15, 23, 42, 0.95));
+}
+
+.teamhome-improvements-metric--bank {
+  border-color: rgba(167, 139, 250, 0.35);
+}
+
+.teamhome-improvements-metric--projected {
+  border-color: rgba(52, 211, 153, 0.32);
+}
+
+.teamhome-improvements-metric-label {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: rgba(226, 232, 240, 0.55);
+  margin-bottom: 6px;
+}
+
+.teamhome-improvements-metric-value {
+  font-size: 1.45rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  color: #f8fafc;
+  line-height: 1.1;
+}
+
+.teamhome-improvements-metric-hint {
+  margin-top: 8px;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: rgba(203, 213, 225, 0.78);
+}
+
+.teamhome-improvements-num--good {
+  color: #6ee7b7;
+}
+
+.teamhome-improvements-num--bad {
+  color: #fca5a5;
+}
+
+.teamhome-improvements-num--warn {
+  color: #fdba74;
+}
+
+.teamhome-improvements-num--cyan {
+  color: #7dd3fc;
+}
+
+.teamhome-improvements-num--amber {
+  color: #fcd34d;
+}
+
+.teamhome-improvements-num--muted {
+  color: #94a3b8;
+}
+
+.teamhome-improvements-num--highlight {
+  color: #a5f3fc;
+  font-weight: 900;
+  font-size: 1.05rem;
+}
+
+.teamhome-improvements-ledger {
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(99, 102, 241, 0.28);
+  background: linear-gradient(165deg, rgba(30, 27, 75, 0.45), rgba(15, 23, 42, 0.92));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.teamhome-improvements-ledger-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 14px;
+  margin-bottom: 8px;
+}
+
+.teamhome-improvements-ledger-title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(199, 210, 254, 0.9);
+}
+
+.teamhome-improvements-ledger-record {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #e0e7ff;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(79, 70, 229, 0.35);
+  border: 1px solid rgba(129, 140, 248, 0.35);
+}
+
+.teamhome-improvements-ledger-summary {
+  margin: 0 0 12px;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: rgba(203, 213, 225, 0.88);
+}
+
+.teamhome-improvements-ledger-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.teamhome-improvements-ledger-rows li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  font-size: 0.84rem;
+  color: rgba(226, 232, 240, 0.92);
+}
+
+.teamhome-improvements-ledger-rows li:last-child {
+  border-bottom: none;
+}
+
+.teamhome-improvements-ledger-rows li > span:first-child {
+  min-width: 0;
+  padding-right: 8px;
+}
+
+.teamhome-improvements-ledger-rows li > span:last-child {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+.teamhome-improvements-ledger-net {
+  margin-top: 4px;
+  padding-top: 10px !important;
+  border-top: 1px solid rgba(129, 140, 248, 0.35) !important;
+  border-bottom: none !important;
+  font-weight: 700;
+}
+
+.teamhome-improvements-ledger-cap {
+  text-transform: capitalize;
+}
+
+.teamhome-improvements-ledger-sub {
+  font-weight: 500;
+  opacity: 0.72;
+  font-size: 0.78rem;
+}
+
+.teamhome-improvements-ledger-empty {
+  margin: 4px 0 0;
+  opacity: 0.85;
+  color: rgba(203, 213, 225, 0.9);
+}
+
+.teamhome-improvements-sliders {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 4px;
+}
+
+.teamhome-improvements-slider-row {
+  padding: 14px 14px 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-left-width: 4px;
+  background: linear-gradient(165deg, rgba(15, 23, 42, 0.72), rgba(15, 23, 42, 0.92));
+}
+
+.teamhome-improvements-slider-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-bottom: 10px;
+}
+
+.teamhome-improvements-slider-title {
+  font-weight: 800;
+  color: #f1f5f9;
+}
+
+.teamhome-improvements-slider-meter {
+  font-size: 0.8rem;
+  color: rgba(186, 199, 216, 0.95);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.teamhome-improvements-slider-track-wrap {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(30, 41, 59, 0.95);
+  overflow: hidden;
+  margin-bottom: 2px;
+}
+
+.teamhome-improvements-slider-track-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.22s ease;
+  opacity: 0.88;
+}
+
+.teamhome-improvements-range {
+  width: 100%;
+  height: 30px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.teamhome-improvements-slider-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  align-items: baseline;
+}
+
+.teamhome-improvements-slider-scale {
+  opacity: 0.72;
+  text-align: right;
+}
+
+.teamhome-improvements-details {
+  margin-top: 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(71, 85, 105, 0.45);
+  background: rgba(15, 23, 42, 0.55);
+  overflow: hidden;
+}
+
+.teamhome-improvements-details-summary {
+  cursor: pointer;
+  padding: 10px 14px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #cbd5e1;
+  list-style-position: inside;
+}
+
+.teamhome-improvements-details-summary:hover {
+  color: #e2e8f0;
+  background: rgba(51, 65, 85, 0.35);
+}
+
+.teamhome-improvements-details-body {
+  padding: 0 14px 12px;
+  border-top: 1px solid rgba(51, 65, 85, 0.5);
+  color: rgba(226, 232, 240, 0.88);
+  line-height: 1.5;
+}
+
+.teamhome-improvements-alert {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.teamhome-improvements-alert--error {
+  border: 1px solid rgba(248, 113, 113, 0.55);
+  background: rgba(127, 29, 29, 0.32);
+  color: #fecaca;
+}
+
+.teamhome-improvements-foot {
+  margin-top: 14px;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: rgba(203, 213, 225, 0.92);
+}
+
+.teamhome-improvements-hint {
+  margin-top: 10px;
+  opacity: 0.9;
+  color: rgba(186, 199, 216, 0.95);
+}
+
+.teamhome-top-actions-end .teamhome-select,
+.teamhome-top-actions-end .teamhome-continue {
   flex-shrink: 0;
 }
 
@@ -469,6 +842,16 @@ td .teamhome-roster-name--profile {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.teamhome-team-history-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  min-width: 0;
+}
+
+.teamhome-team-history-scroll .teamhome-team-history-row {
+  min-width: min(100%, 720px);
 }
 
 .teamhome-roster-empty {
@@ -1018,6 +1401,15 @@ td .teamhome-roster-name--profile {
   display: grid;
   grid-template-columns: 1fr 360px;
   gap: 18px;
+}
+
+.teamhome-preseason-top--offseason-single {
+  grid-template-columns: 1fr;
+}
+
+.teamhome-preseason-top--offseason-single .teamhome-preseason-panelA {
+  place-content: start;
+  text-align: left;
 }
 
 .teamhome-preseason-bottom {
@@ -1884,6 +2276,102 @@ td .teamhome-roster-name--profile {
   font-weight: 950;
   letter-spacing: 0.04em;
 }
+
+.teamhome-teaminfo-stadium {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.teamhome-teaminfo-stadium-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.teamhome-teaminfo-stadium-title {
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.58;
+}
+
+.teamhome-teaminfo-stadium-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.teamhome-stadium-file-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.teamhome-teaminfo-stadium-hint {
+  margin-top: 10px;
+  font-size: 0.72rem;
+  opacity: 0.5;
+  line-height: 1.45;
+  max-width: 560px;
+}
+
+.teamhome-teaminfo-banners {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.teamhome-teaminfo-banners-head {
+  margin-bottom: 10px;
+}
+
+.teamhome-teaminfo-banners-title {
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.58;
+}
+
+.teamhome-teaminfo-banners-placeholder {
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.18);
+  padding: 18px 16px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  opacity: 0.48;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.teamhome-teaminfo-banners-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.teamhome-teaminfo-banner-chip {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 215, 120, 0.35);
+  background: linear-gradient(180deg, rgba(255, 215, 120, 0.14), rgba(0, 0, 0, 0.22));
+  padding: 8px 14px;
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  color: rgba(255, 235, 180, 0.92);
+}
+
 @media (max-width: 720px) {
   .teamhome-teaminfo-summary {
     grid-template-columns: 1fr;
@@ -1897,8 +2385,304 @@ td .teamhome-roster-name--profile {
 }
 
 /* STATE → League History */
+.teamhome-league-history-root {
+  color: #e6e6ea;
+}
+.teamhome-league-history-root .teamhome-small,
+.teamhome-league-history-root .teamhome-league-history-blurb,
+.teamhome-league-history-root .teamhome-league-history-hint,
+.teamhome-league-history-root .teamhome-league-history-recap-hint {
+  color: rgba(226, 232, 240, 0.92);
+}
+.teamhome-league-history-root .teamhome-card-title {
+  color: rgba(241, 245, 249, 0.95);
+}
+.teamhome-league-history-root .teamhome-teaminfo-picker-label {
+  color: rgba(203, 213, 225, 0.78);
+}
+.teamhome-league-history-class-card .teamhome-roster-cell,
+.teamhome-league-history-class-card .teamhome-roster-name,
+.teamhome-league-history-class-card .teamhome-roster-head .teamhome-roster-cell {
+  color: #1c1c20;
+}
 .teamhome-league-history-root .teamhome-league-history-section-head {
   margin-top: 12px;
+}
+.teamhome-league-history-blurb {
+  margin-bottom: 12px;
+  opacity: 0.92;
+  line-height: 1.45;
+}
+/* Season summary hub (year-end screen before offseason) */
+.season-summary-hub {
+  padding: 0 4px 32px;
+  align-content: start;
+  max-width: 1180px;
+}
+.season-summary-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px 28px;
+  margin-bottom: 18px;
+  padding: 22px 24px 20px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 58, 95, 0.55) 55%, rgba(15, 23, 42, 0.88) 100%);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+}
+.season-summary-eyebrow {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(147, 197, 253, 0.95);
+}
+.season-summary-title {
+  margin: 0 0 8px;
+  font-size: clamp(1.55rem, 3vw, 2rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #f8fafc;
+  line-height: 1.15;
+}
+.season-summary-subtitle {
+  margin: 0;
+  max-width: 520px;
+  font-size: 0.98rem;
+  line-height: 1.5;
+  color: rgba(226, 232, 240, 0.88);
+}
+.season-summary-hero-team {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-width: 120px;
+}
+.season-summary-hero-record {
+  text-align: center;
+}
+.season-summary-hero-wl {
+  display: block;
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: #fbbf24;
+  line-height: 1.1;
+}
+.season-summary-hero-team-name {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(226, 232, 240, 0.82);
+  max-width: 140px;
+  line-height: 1.25;
+}
+.season-summary-lead {
+  margin: 0 0 22px;
+  max-width: 680px;
+  color: rgba(226, 232, 240, 0.9);
+  line-height: 1.55;
+}
+.season-summary-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.season-summary-stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+.season-summary-stat-card--highlight {
+  border-color: rgba(251, 191, 36, 0.45);
+  background: linear-gradient(160deg, rgba(30, 41, 59, 0.75), rgba(120, 53, 15, 0.22));
+}
+.season-summary-stat-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.95);
+}
+.season-summary-stat-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  line-height: 1.35;
+}
+.season-summary-stat-value--text {
+  font-size: 0.92rem;
+}
+.season-summary-tp-delta {
+  font-weight: 500;
+  opacity: 0.78;
+  font-size: 0.85em;
+}
+.season-summary-section {
+  margin-bottom: 26px;
+}
+.season-summary-section-title {
+  margin: 0 0 12px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+.season-summary-bracket-class {
+  font-weight: 500;
+  opacity: 0.75;
+  font-size: 0.92em;
+}
+.season-summary-goals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+.season-summary-goal-card {
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+}
+.season-summary-goal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.season-summary-goal-type {
+  font-weight: 700;
+  color: #e2e8f0;
+}
+.season-summary-goal-pill {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.35);
+  color: #cbd5e1;
+}
+.season-summary-goal-pill--met {
+  background: rgba(22, 163, 74, 0.35);
+  color: #86efac;
+}
+.season-summary-goal-pill--miss {
+  background: rgba(220, 38, 38, 0.28);
+  color: #fca5a5;
+}
+.season-summary-goal-detail {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: rgba(226, 232, 240, 0.88);
+}
+.season-summary-bracket-wrap {
+  margin-top: 4px;
+}
+.season-summary-bracket-readonly .teamhome-playoffs-footer,
+.season-summary-bracket-readonly .teamhome-playoffs-actions {
+  display: none;
+}
+.season-summary-two-col {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px 24px;
+  align-items: start;
+}
+.season-summary-standings-card {
+  padding: 0;
+  overflow: hidden;
+}
+.season-summary-standings-head {
+  background: rgba(15, 23, 42, 0.45);
+}
+.season-summary-standings-row--user {
+  background: rgba(59, 130, 246, 0.12);
+  box-shadow: inset 3px 0 0 #3b82f6;
+}
+.season-summary-regional-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.season-summary-regional-item {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+}
+.season-summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+}
+.season-summary-action-btn {
+  min-width: 160px;
+}
+.season-summary-state-banner {
+  margin-bottom: 14px;
+}
+.season-summary-back-btn {
+  font-size: 0.88rem;
+}
+.teamhome-season-summary-shell {
+  padding: 18px 20px 24px;
+  align-content: start;
+}
+.teamhome-season-summary-lead,
+.teamhome-season-summary-foot {
+  color: rgba(226, 232, 240, 0.92);
+  line-height: 1.5;
+  max-width: 720px;
+}
+.teamhome-season-summary-foot {
+  margin-top: 14px;
+  opacity: 0.88;
+}
+.teamhome-season-summary-card {
+  max-width: 520px;
+}
+.teamhome-season-summary-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+.teamhome-season-summary-row:last-child {
+  border-bottom: none;
+}
+.teamhome-league-history-hint {
+  opacity: 0.82;
+  margin-top: -2px;
+  margin-bottom: 8px;
+}
+.teamhome-league-history-rankings-card {
+  padding: 12px 14px 14px;
+}
+.teamhome-lh-class-col {
+  max-width: 5.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.78rem;
 }
 .teamhome-league-history-classes {
   display: grid;
@@ -1917,11 +2701,60 @@ td .teamhome-roster-name--profile {
   max-height: 320px;
   overflow-y: auto;
 }
+.teamhome-league-history-rank-table.teamhome-league-history-rank-table--single {
+  max-height: min(52vh, 520px);
+}
+.teamhome-league-history-recap-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin: 12px 0 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  background: linear-gradient(165deg, rgba(30, 27, 75, 0.45), rgba(15, 23, 42, 0.88));
+}
+
+.teamhome-league-history-recap-bar .teamhome-teaminfo-select {
+  min-width: 12rem;
+  max-width: 20rem;
+}
+
+.teamhome-league-history-recap-hint {
+  flex: 1 1 200px;
+  opacity: 0.88;
+  line-height: 1.45;
+}
+
 .teamhome-league-history-playoffs-wrap {
   display: flex;
   flex-direction: column;
   gap: 16px;
   margin-top: 10px;
+}
+.teamhome-league-history-po-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.teamhome-league-history-bracket-cols {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  align-items: flex-start;
+  -webkit-overflow-scrolling: touch;
+}
+.teamhome-league-history-bracket-cols > .teamhome-league-history-po-round {
+  flex: 0 0 min(220px, 32vw);
+  min-width: 148px;
+  max-width: 280px;
+}
+.teamhome-league-history-po-round {
+  min-width: 0;
 }
 .teamhome-league-history-playoffs-grid {
   display: grid;
@@ -1949,6 +2782,334 @@ td .teamhome-roster-name--profile {
 @media (max-width: 900px) {
   .teamhome-league-history-playoffs-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Coach Inbox (Team → Coach Inbox) */
+.coach-inbox-root {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 12px 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: min(70vh, 640px);
+}
+.coach-inbox-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  background: rgba(31, 31, 35, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+}
+.coach-inbox-title {
+  font-size: 1.15rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+.coach-inbox-sub {
+  margin-top: 6px;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: rgba(230, 230, 234, 0.72);
+  max-width: 36rem;
+}
+.coach-inbox-meters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(140px, 1fr));
+  gap: 10px 16px;
+  min-width: min(100%, 320px);
+}
+.coach-inbox-meter {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 4px 10px;
+  align-items: center;
+}
+.coach-inbox-meter-label {
+  grid-column: 1 / -1;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+.coach-inbox-meter-bar {
+  grid-column: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.coach-inbox-meter-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #3b82f6, #22c55e);
+  transition: width 0.25s ease;
+}
+.coach-inbox-meter-num {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.88);
+}
+.coach-inbox-readonly-banner {
+  padding: 10px 14px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: rgba(251, 191, 36, 0.95);
+  background: rgba(120, 80, 20, 0.22);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  border-radius: 10px;
+}
+.coach-inbox-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.coach-inbox-unread {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.78);
+}
+.coach-inbox-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.62);
+}
+.coach-inbox-panes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: 12px;
+  align-items: stretch;
+  min-height: 420px;
+}
+.coach-inbox-list,
+.coach-inbox-detail {
+  background: rgba(24, 24, 28, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.coach-inbox-list {
+  overflow-y: auto;
+}
+.coach-inbox-group {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.coach-inbox-group:last-child {
+  border-bottom: none;
+}
+.coach-inbox-group-label {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 8px 12px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+  background: rgba(18, 18, 22, 0.98);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.coach-inbox-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  margin: 0;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.coach-inbox-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.coach-inbox-row--active {
+  background: rgba(59, 130, 246, 0.12);
+  box-shadow: inset 3px 0 0 #3b82f6;
+}
+.coach-inbox-row--unread .coach-inbox-subject {
+  font-weight: 800;
+}
+.coach-inbox-row-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+.coach-inbox-sender {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.coach-inbox-day {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.45);
+}
+.coach-inbox-subject {
+  font-size: 0.8rem;
+  color: rgba(230, 230, 234, 0.88);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.coach-inbox-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.coach-inbox-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.75);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.coach-inbox-tag--muted {
+  opacity: 0.75;
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+.coach-inbox-empty {
+  padding: 28px 16px;
+  text-align: center;
+  font-size: 0.88rem;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.5;
+}
+.coach-inbox-empty--detail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+}
+.coach-inbox-detail {
+  padding: 16px;
+  overflow-y: auto;
+}
+.coach-inbox-detail-head {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.coach-inbox-detail-subject {
+  font-size: 1.05rem;
+  font-weight: 900;
+  line-height: 1.25;
+  margin-bottom: 10px;
+}
+.coach-inbox-detail-from {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.84rem;
+  color: rgba(230, 230, 234, 0.78);
+}
+.coach-inbox-detail-type {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(96, 165, 250, 0.95);
+}
+.coach-inbox-detail-when {
+  font-size: 0.78rem;
+  opacity: 0.75;
+}
+.coach-inbox-body {
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: rgba(235, 235, 240, 0.92);
+  white-space: pre-wrap;
+}
+.coach-inbox-choices {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.coach-inbox-choices-title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+  margin-bottom: 10px;
+}
+.coach-inbox-choice-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.coach-inbox-choice {
+  text-align: left;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #e6e6ea;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1.4;
+}
+.coach-inbox-choice:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.18);
+  border-color: rgba(59, 130, 246, 0.45);
+}
+.coach-inbox-choice:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.coach-inbox-resolved {
+  margin-top: 16px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: rgba(52, 211, 153, 0.95);
+}
+@media (max-width: 900px) {
+  .coach-inbox-panes {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+  .coach-inbox-list {
+    max-height: 42vh;
   }
 }
 

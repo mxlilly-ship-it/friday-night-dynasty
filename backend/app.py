@@ -1,6 +1,10 @@
 import json
 import logging
 import os
+import time
+
+# Process boot time for /health (helps detect stale uvicorn after git pull).
+_API_BOOT_UNIX = int(time.time())
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -121,7 +125,22 @@ def create_app() -> FastAPI:
     @app.get("/health")
     def health():
         """Quick check that API is running."""
-        return {"ok": True}
+        label = os.environ.get("FND_BUILD_LABEL", "").strip()
+        # Coach inbox week batches: league_service flips off when FND_DISABLE_WEEK_SIM_EMAILS is 1/true/yes.
+        from backend.services.league_service import _coach_sim_emails_enabled
+
+        disable_raw = os.environ.get("FND_DISABLE_WEEK_SIM_EMAILS")
+        disable_val = disable_raw.strip() if isinstance(disable_raw, str) and disable_raw.strip() else None
+        return {
+            "ok": True,
+            "pid": os.getpid(),
+            "boot_unix": _API_BOOT_UNIX,
+            "build_label": label or None,
+            "vite_proxy_default": "http://127.0.0.1:8001",
+            "hint": "Restart uvicorn after code changes. Dev/preview UI proxies /api to VITE_API_PROXY_TARGET (default 8001).",
+            "coach_week_sim_emails_enabled": _coach_sim_emails_enabled(),
+            "fnd_disable_week_sim_emails": disable_val,
+        }
 
     @app.get("/_fnd/ui-meta")
     def fnd_ui_meta():

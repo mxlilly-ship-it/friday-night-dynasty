@@ -1249,8 +1249,19 @@ def _try_sim_fourth_down_special(game: Game, home_team: Any, away_team: Any) -> 
     return {"result": result, "state": game_state_dict(game), "game_over": game.is_game_over(), "narrative": narrative}
 
 
-def sim_next_play(game: Game, home_team: Any, away_team: Any) -> Dict[str, Any]:
-    """AI calls both sides, runs one play, returns result and new state."""
+def sim_next_play(
+    game: Game,
+    home_team: Any,
+    away_team: Any,
+    *,
+    auto_resolve_pat: bool = False,
+) -> Dict[str, Any]:
+    """AI calls both sides, runs one play, returns result and new state.
+
+    ``auto_resolve_pat``: when True (e.g. sim-to-half / sim-to-end loops), PAT/2PT after any TD is
+    resolved by AI so the sim can continue. When False (single ``sim-next`` in coach mode), the
+    human must run the PAT snap — offense choice after their TD, defensive PAT call after opponent TD.
+    """
     home_name = getattr(game, "home_team_name", home_team.name)
     away_name = getattr(game, "away_team_name", away_team.name)
     _sync_ratings(game, home_team, away_team)
@@ -1271,22 +1282,36 @@ def sim_next_play(game: Game, home_team: Any, away_team: Any) -> Dict[str, Any]:
             "narrative": out.get("narrative", "Kickoff."),
         }
 
-    # After a user-played TD, engine leaves pending_pat True until PAT — same as submit_play path.
+    # After a TD, engine leaves pending_pat True until PAT. Single-step sim-next must not skip the
+    # PAT phase in coach mode (XP/2PT when you scored, or defensive PAT when opponent scored).
+    # Bulk sim passes auto_resolve_pat=True so sim-to-half/end can keep running.
     if getattr(game, "pending_pat", False):
-        rc_banner = _resolve_pat_ai(game, home_team, away_team)
-        game.advance_quarter()
-        narrative = "Extra point / two-point (auto)."
-        if rc_banner:
-            narrative = f"{narrative} {rc_banner}".strip()
+        user_team = str(getattr(game, "user_team_name", "") or "").strip()
+        if auto_resolve_pat or not user_team:
+            rc_banner = _resolve_pat_ai(game, home_team, away_team)
+            game.advance_quarter()
+            narrative = "Extra point / two-point (auto)."
+            if rc_banner:
+                narrative = f"{narrative} {rc_banner}".strip()
+            return {
+                "result": {
+                    "pat_resolved": True,
+                    "running_clock": game.is_running_clock_active(),
+                    "running_clock_activated": bool(rc_banner),
+                },
+                "state": game_state_dict(game),
+                "game_over": game.is_game_over(),
+                "narrative": narrative,
+            }
         return {
-            "result": {
-                "pat_resolved": True,
-                "running_clock": game.is_running_clock_active(),
-                "running_clock_activated": bool(rc_banner),
-            },
+            "result": {"needs_pat": True, "pat_choice_required": True},
             "state": game_state_dict(game),
             "game_over": game.is_game_over(),
-            "narrative": narrative,
+            "narrative": (
+                "Touchdown — run the PAT: choose extra point / two-point on offense, "
+                "or your defensive PAT call when the opponent kicks."
+            ),
+            "pat_choice_required": True,
         }
 
     if getattr(game, "ot_2pt_mode", False):
@@ -1344,7 +1369,9 @@ def sim_next_play(game: Game, home_team: Any, away_team: Any) -> Dict[str, Any]:
     _coach_record_scrimmage_stats(game, home_team, away_team, possession_before, bool(is_run), result)
 
     rc_banner_pat: Optional[str] = None
-    if result.get("needs_pat"):
+    user_team = str(getattr(game, "user_team_name", "") or "").strip()
+    hold_pat_for_coach = bool(result.get("needs_pat")) and not auto_resolve_pat and bool(user_team)
+    if result.get("needs_pat") and not hold_pat_for_coach:
         rc_banner_pat = _resolve_pat_ai(game, home_team, away_team)
     elif result.get("needs_2pt"):
         game.attempt_two_point(o, d)
@@ -1353,7 +1380,8 @@ def sim_next_play(game: Game, home_team: Any, away_team: Any) -> Dict[str, Any]:
     elif result.get("ot_possession_ended"):
         game.check_ot_period_end()
 
-    game.advance_quarter()
+    if not hold_pat_for_coach:
+        game.advance_quarter()
     narrative = build_play_narrative(
         offense_team,
         defense_team,
@@ -1382,11 +1410,19 @@ def sim_next_play(game: Game, home_team: Any, away_team: Any) -> Dict[str, Any]:
         q_before,
         t_before,
     )
-    game.advance_quarter()
+    if not hold_pat_for_coach:
+        game.advance_quarter()
     narrative = _finalize_play_running_clock(game, result, narrative)
     if rc_banner_pat and rc_banner_pat not in narrative:
         result["running_clock_activated"] = True
         narrative = f"{narrative} {rc_banner_pat}".strip()
+    if hold_pat_for_coach:
+        narrative = (
+            f"{narrative} Touchdown — run the PAT snap next "
+            "(extra point / two-point on offense, or your defensive PAT vs opponent kick)."
+        ).strip()
+        result = dict(result)
+        result["pat_choice_required"] = True
     return {"result": result, "state": game_state_dict(game), "game_over": game.is_game_over(), "narrative": narrative}
 
 
@@ -1397,10 +1433,12 @@ def sim_to_half(game: Game, home_team: Any, away_team: Any) -> Dict[str, Any]:
     for _ in range(max_plays):
         if game.is_game_over() or game.quarter > 2:
             break
-        out = sim_next_play(game, home_team, away_team)
+        out = sim_next_play(game, home_team, away_team, auto_resolve_pat=True)
         n = out.get("narrative")
         if isinstance(n, str) and n.strip():
             narratives.append(n.strip())
+        if out.get("pat_choice_required"):
+            break
         if out.get("game_over"):
             break
     else:
@@ -1415,10 +1453,12 @@ def sim_to_end(game: Game, home_team: Any, away_team: Any) -> Dict[str, Any]:
     for _ in range(max_plays):
         if game.is_game_over():
             break
-        out = sim_next_play(game, home_team, away_team)
+        out = sim_next_play(game, home_team, away_team, auto_resolve_pat=True)
         n = out.get("narrative")
         if isinstance(n, str) and n.strip():
             narratives.append(n.strip())
+        if out.get("pat_choice_required"):
+            break
     else:
         raise ValueError("Sim to end aborted: exceeded play limit (game state may be stuck).")
     return {"state": game_state_dict(game), "game_over": True, "narratives": narratives}

@@ -43,6 +43,9 @@ class SimGameStartRequest(BaseModel):
 class SimGameStepRequest(BaseModel):
     state: Dict[str, Any]
     game: Dict[str, Any]
+    # Coach-playoff finalize (stateless/local): appended when playoffs complete so history/recaps sync.
+    league_history: Optional[Dict[str, Any]] = None
+    records: Optional[Dict[str, Any]] = None
 
 
 class SimGamePlayRequest(BaseModel):
@@ -58,7 +61,7 @@ def sim_route(payload: SimRequest = Body(...)):
         kind = str(payload.kind or "").strip().lower()
         state = payload.state or {}
         body = payload.body or {}
-        if str(state.get("season_phase") or "").strip().lower() == "playoffs":
+        if str(state.get("season_phase") or "").strip().lower() in ("playoffs", "season_summary"):
             teams = {t["name"]: team_from_dict(t) for t in state.get("teams", []) if isinstance(t, dict) and t.get("name")}
             if teams:
                 st = state.get("standings") or {
@@ -79,38 +82,34 @@ def sim_route(payload: SimRequest = Body(...)):
             return {"state": out}
         if kind == "playoffs-sim":
             out = sim_playoffs_state(state)
-            playoffs = out.get("playoffs") if isinstance(out.get("playoffs"), dict) else {}
-            if _playoffs_global_completed(playoffs):
-                hist = payload.league_history or {"seasons": []}
-                records = payload.records or {}
-                fin = finish_season_state(out, hist, records)
-                return {
-                    "state": fin.get("state"),
-                    "league_history": fin.get("league_history"),
-                    "records": fin.get("records"),
-                    "season_recaps": fin.get("season_recaps"),
-                    "champion": fin.get("champion"),
-                }
             return {"state": out}
         if kind == "playoffs-sim-round":
-            out = sim_playoff_round_state(state)
-            playoffs = out.get("playoffs") if isinstance(out.get("playoffs"), dict) else {}
-            if _playoffs_global_completed(playoffs):
+            try:
+                out = sim_playoff_round_state(state)
+                return {"state": out}
+            except ValueError as err:
+                # Stateless/local: bracket already complete (e.g. user coach-played the final) but phase
+                # still "playoffs" — mirror persisted sim_playoff_round and finalize into season_summary.
+                if "Playoffs already complete" not in str(err):
+                    raise
                 hist = payload.league_history or {"seasons": []}
                 records = payload.records or {}
-                fin = finish_season_state(out, hist, records)
+                out = finish_season_state(state, hist, records, bulk_autopilot=False)
                 return {
-                    "state": fin.get("state"),
-                    "league_history": fin.get("league_history"),
-                    "records": fin.get("records"),
-                    "season_recaps": fin.get("season_recaps"),
-                    "champion": fin.get("champion"),
+                    "state": out.get("state"),
+                    "league_history": out.get("league_history"),
+                    "records": out.get("records"),
+                    "season_recaps": out.get("season_recaps"),
+                    "champion": out.get("champion"),
                 }
-            return {"state": out}
         if kind == "season-finish":
             hist = payload.league_history or {"seasons": []}
             records = payload.records or {}
-            out = finish_season_state(state, hist, records)
+            bulk_ap = bool((body or {}).get("bulk_autopilot"))
+            begin_os = bool((body or {}).get("begin_offseason"))
+            out = finish_season_state(
+                state, hist, records, bulk_autopilot=bulk_ap, begin_offseason=begin_os
+            )
             return {
                 "state": out.get("state"),
                 "league_history": out.get("league_history"),
@@ -222,8 +221,20 @@ def sim_game_finish_week_route(payload: SimGameStepRequest = Body(...)):
 def sim_game_finish_playoff_route(payload: SimGameStepRequest = Body(...)):
     try:
         game = deserialize_game(payload.game)
-        out = finish_coach_playoff_state(payload.state, game)
-        return {"state": out}
+        out_state = finish_coach_playoff_state(payload.state, game)
+        playoffs = out_state.get("playoffs") if isinstance(out_state.get("playoffs"), dict) else {}
+        if playoffs and _playoffs_global_completed(playoffs):
+            hist = payload.league_history if isinstance(payload.league_history, dict) else {"seasons": []}
+            records_raw = payload.records if isinstance(payload.records, dict) else {}
+            fin = finish_season_state(out_state, hist, records_raw, bulk_autopilot=False)
+            return {
+                "state": fin.get("state"),
+                "league_history": fin.get("league_history"),
+                "records": fin.get("records"),
+                "season_recaps": fin.get("season_recaps"),
+                "champion": fin.get("champion"),
+            }
+        return {"state": out_state}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

@@ -84,6 +84,8 @@ REGULATION_QUARTER_SECONDS = 12 * 60
 # All other plays already drain time; this matches NFHS-style "running clock" mercy conventions
 # used by the WV / many state high-school associations once the lead reaches 35.
 RUNNING_CLOCK_LEAD_THRESHOLD = 35
+# Same margin threshold: in regulation Q4, the period clock cannot stay above this many seconds.
+MERCY_Q4_GAME_CLOCK_CAP_SECONDS = 2 * 60
 _PRIOR_TUNING_COMBINED_SCRIM_SNAP_MID = (135 + 160) / 2  # combined regulation scrimmage @ 810s/qtr-era comment
 _TARGET_COMBINED_SCRIMMAGE_SNAPS_REG = 102  # ~51 per offense per regulation game
 _PRIOR_TUNING_SECONDS_PER_QUARTER = 810
@@ -208,6 +210,16 @@ class Game:
         if getattr(self, "is_overtime", False):
             return False
         return abs(int(self.score_home) - int(self.score_away)) >= RUNNING_CLOCK_LEAD_THRESHOLD
+
+    def _apply_mercy_q4_game_clock_cap(self) -> None:
+        """Regulation Q4 only: if spread is at/above mercy threshold, cap remaining period time."""
+        if getattr(self, "is_overtime", False):
+            return
+        if int(self.quarter) != 4:
+            return
+        if abs(int(self.score_home) - int(self.score_away)) < RUNNING_CLOCK_LEAD_THRESHOLD:
+            return
+        self.time_remaining = min(int(self.time_remaining), MERCY_Q4_GAME_CLOCK_CAP_SECONDS)
 
     def switch_possession(self):
         self.possession = "away" if self.possession == "home" else "home"
@@ -1095,6 +1107,7 @@ class Game:
 
     # ------------------ DISPLAY ------------------
     def display_status(self, last_play_yards=None):
+        self._apply_mercy_q4_game_clock_cap()
         if self.ball_position < 50:
             yard_marker = f"Own {self.ball_position}"
         else:
@@ -1148,6 +1161,7 @@ class Game:
                         else:
                             self.apply_halftime_kickoff()
                     # Q1→Q2 and Q3→Q4: keep ball, down, and distance
+                    self._apply_mercy_q4_game_clock_cap()
 
     def is_game_over(self):
         if self.ot_winner is not None:

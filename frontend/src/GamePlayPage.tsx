@@ -31,6 +31,8 @@ type GameState = {
   ot_period?: number
   ot_winner?: string | null
   pending_pat?: boolean
+  /** Mercy rule: 35+ spread in regulation — incomplete passes still burn clock; see engine. */
+  running_clock?: boolean
   team_stats?: Record<string, { total_yards?: number; rush_yards?: number; pass_yards?: number; touchdowns?: number; turnovers?: number; third_down?: string; fourth_down?: string; time_of_possession?: string; explosives?: number }>
 }
 
@@ -124,7 +126,7 @@ export default function GamePlayPage({
   const [loading, setLoading] = useState(false)
   const [simulating, setSimulating] = useState<string | null>(null)
   const [playFeed, setPlayFeed] = useState<string[]>([])
-  const playFeedEndRef = useRef<HTMLDivElement>(null)
+  const commentaryStripRef = useRef<HTMLDivElement>(null)
 
   const sameTeam = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
   const isUserOnOffense = state.possession === 'home' ? sameTeam(userTeam, homeTeam) : sameTeam(userTeam, awayTeam)
@@ -206,7 +208,10 @@ export default function GamePlayPage({
     setPlayFeed([])
   }, [gameId])
   useEffect(() => {
-    playFeedEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    const el = commentaryStripRef.current
+    if (el && playFeed.length > 0) {
+      el.scrollTo({ left: el.scrollWidth, behavior: 'smooth' })
+    }
   }, [playFeed])
 
   const formatTime = (sec: number) => {
@@ -425,31 +430,61 @@ export default function GamePlayPage({
   const hs = state.team_stats?.[homeTeam]
   const as = state.team_stats?.[awayTeam]
 
+  const playTypeDisplay =
+    callsheetBucket || (selectedPlay?.category ? String(selectedPlay.category).replace(/_/g, ' ') : '—')
+
+  const inlineStatRows = (s: typeof hs, score: number) => (
+    <>
+      <li>
+        <span className="gameplay-inline-stat-lbl">Pts</span>
+        <span className="gameplay-inline-stat-val">{score}</span>
+      </li>
+      <li>
+        <span className="gameplay-inline-stat-lbl">Yds</span>
+        <span className="gameplay-inline-stat-val">{s?.total_yards ?? 0}</span>
+      </li>
+      <li>
+        <span className="gameplay-inline-stat-lbl">Rush</span>
+        <span className="gameplay-inline-stat-val">{s?.rush_yards ?? 0}</span>
+      </li>
+      <li>
+        <span className="gameplay-inline-stat-lbl">Pass</span>
+        <span className="gameplay-inline-stat-val">{s?.pass_yards ?? 0}</span>
+      </li>
+      <li>
+        <span className="gameplay-inline-stat-lbl">TO</span>
+        <span className="gameplay-inline-stat-val">{s?.turnovers ?? 0}</span>
+      </li>
+      <li>
+        <span className="gameplay-inline-stat-lbl">TOP</span>
+        <span className="gameplay-inline-stat-val gameplay-inline-stat-val--narrow">{s?.time_of_possession ?? '0:00'}</span>
+      </li>
+      <li>
+        <span className="gameplay-inline-stat-lbl">Xpl</span>
+        <span className="gameplay-inline-stat-val">{s?.explosives ?? 0}</span>
+      </li>
+      <li>
+        <span className="gameplay-inline-stat-lbl">3rd</span>
+        <span className="gameplay-inline-stat-val gameplay-inline-stat-val--narrow">{s?.third_down ?? '0/0'}</span>
+      </li>
+      <li>
+        <span className="gameplay-inline-stat-lbl">4th</span>
+        <span className="gameplay-inline-stat-val gameplay-inline-stat-val--narrow">{s?.fourth_down ?? '0/0'}</span>
+      </li>
+    </>
+  )
+
   return (
     <div className="gameplay-root">
       <header className="gameplay-header">
         <div className="gameplay-header-left gameplay-header-matchup">
           <div className={`gameplay-matchup-side ${userTeam === homeTeam ? 'gameplay-matchup-user' : ''}`}>
-            <TeamLogo
-              apiBase={apiBase}
-              headers={headers}
-              teamName={homeTeam}
-              logoVersion={logoVersion}
-              size={40}
-            />
             <div className="gameplay-team-name">{homeTeam}</div>
           </div>
           <span className="gameplay-matchup-vs" aria-hidden>
             vs
           </span>
           <div className={`gameplay-matchup-side ${userTeam === awayTeam ? 'gameplay-matchup-user' : ''}`}>
-            <TeamLogo
-              apiBase={apiBase}
-              headers={headers}
-              teamName={awayTeam}
-              logoVersion={logoVersion}
-              size={40}
-            />
             <div className="gameplay-team-name">{awayTeam}</div>
           </div>
         </div>
@@ -469,21 +504,36 @@ export default function GamePlayPage({
 
       <div className="gameplay-scoreboard">
         <div className="gameplay-team-block gameplay-team-block-home">
-          <div className="gameplay-team-identity">
-            <TeamLogo
-              apiBase={apiBase}
-              headers={headers}
-              teamName={homeTeam}
-              logoVersion={logoVersion}
-              size={48}
-            />
-            <div className="gameplay-team-label">{homeTeam}</div>
+          <div className="gameplay-team-block-inner">
+            <div className="gameplay-team-score-stack">
+              <div className="gameplay-team-label gameplay-team-label--board" title={homeTeam}>
+                {homeTeam.length > 18 ? `${homeTeam.slice(0, 16)}…` : homeTeam}
+              </div>
+              <TeamLogo
+                apiBase={apiBase}
+                headers={headers}
+                teamName={homeTeam}
+                logoVersion={logoVersion}
+                size={52}
+              />
+              <div className="gameplay-score">{state.score_home}</div>
+            </div>
+            <ul className="gameplay-inline-stats gameplay-inline-stats--home" aria-label={`${homeTeam} game stats`}>
+              {inlineStatRows(hs, state.score_home)}
+            </ul>
           </div>
-          <div className="gameplay-score">{state.score_home}</div>
         </div>
         <div className="gameplay-clock-block">
           <div className="gameplay-time">{formatTime(state.time_remaining)}</div>
           <div className="gameplay-quarter">Q{state.quarter}{state.is_overtime ? ` OT${state.ot_period || 1}` : ''}</div>
+          {state.running_clock && !state.is_overtime ? (
+            <div
+              className="gameplay-running-clock"
+              title="35+ point margin: clock keeps moving on incomplete passes. In Q4, period time is capped at 2:00."
+            >
+              Running clock · 35+
+            </div>
+          ) : null}
           <div className="gameplay-down">
             {state.down} & {state.yards_to_go}
           </div>
@@ -492,87 +542,48 @@ export default function GamePlayPage({
           </div>
         </div>
         <div className="gameplay-team-block gameplay-team-block-away">
-          <div className="gameplay-team-identity">
-            <TeamLogo
-              apiBase={apiBase}
-              headers={headers}
-              teamName={awayTeam}
-              logoVersion={logoVersion}
-              size={48}
-            />
-            <div className="gameplay-team-label">{awayTeam}</div>
+          <div className="gameplay-team-block-inner gameplay-team-block-inner--away">
+            <ul className="gameplay-inline-stats gameplay-inline-stats--away" aria-label={`${awayTeam} game stats`}>
+              {inlineStatRows(as, state.score_away)}
+            </ul>
+            <div className="gameplay-team-score-stack">
+              <div className="gameplay-team-label gameplay-team-label--board" title={awayTeam}>
+                {awayTeam.length > 18 ? `${awayTeam.slice(0, 16)}…` : awayTeam}
+              </div>
+              <TeamLogo
+                apiBase={apiBase}
+                headers={headers}
+                teamName={awayTeam}
+                logoVersion={logoVersion}
+                size={52}
+              />
+              <div className="gameplay-score">{state.score_away}</div>
+            </div>
           </div>
-          <div className="gameplay-score">{state.score_away}</div>
         </div>
       </div>
 
-      <div className="gameplay-main">
-        <div className="gameplay-left-panel gameplay-left-panel--stats">
-          <div className="gameplay-panel-title">Game stats</div>
-          <div className="gameplay-stats gameplay-stats-under-field gameplay-stats-vertical gameplay-stats--sidebar">
-            <div className="gameplay-stats-vertical-head">
-              <div className="gameplay-stats-team-col">
-                <span className="gameplay-stats-team-abbr" title={homeTeam}>
-                  {homeTeam.length > 12 ? `${homeTeam.slice(0, 10)}…` : homeTeam}
+      <div className="gameplay-body">
+        <div className="gameplay-main">
+          <div className="gameplay-center-stack">
+          <div
+            ref={commentaryStripRef}
+            className="gameplay-commentary-strip"
+            role="log"
+            aria-live="polite"
+            aria-label="Play-by-play"
+          >
+            {playFeed.length === 0 ? (
+              <span className="gameplay-commentary-strip-empty">Play-by-play will appear here after each snap.</span>
+            ) : (
+              playFeed.map((line, i) => (
+                <span key={`${i}-${line.slice(0, 20)}`} className="gameplay-commentary-strip-item">
+                  {line}
                 </span>
-              </div>
-              <div className="gameplay-stats-team-col gameplay-stats-team-col--away">
-                <span className="gameplay-stats-team-abbr" title={awayTeam}>
-                  {awayTeam.length > 12 ? `${awayTeam.slice(0, 10)}…` : awayTeam}
-                </span>
-              </div>
-            </div>
-            <ul className="gameplay-stats-vertical-list">
-              <li className="gameplay-stat-vrow">
-                <span className="gameplay-stat-vlabel">Points</span>
-                <span className="gameplay-stat-vval">{state.score_home}</span>
-                <span className="gameplay-stat-vval gameplay-stat-vval--away">{state.score_away}</span>
-              </li>
-              <li className="gameplay-stat-vrow">
-                <span className="gameplay-stat-vlabel">Total yds</span>
-                <span className="gameplay-stat-vval">{hs?.total_yards ?? 0}</span>
-                <span className="gameplay-stat-vval gameplay-stat-vval--away">{as?.total_yards ?? 0}</span>
-              </li>
-              <li className="gameplay-stat-vrow">
-                <span className="gameplay-stat-vlabel">Rushing</span>
-                <span className="gameplay-stat-vval">{hs?.rush_yards ?? 0}</span>
-                <span className="gameplay-stat-vval gameplay-stat-vval--away">{as?.rush_yards ?? 0}</span>
-              </li>
-              <li className="gameplay-stat-vrow">
-                <span className="gameplay-stat-vlabel">Passing</span>
-                <span className="gameplay-stat-vval">{hs?.pass_yards ?? 0}</span>
-                <span className="gameplay-stat-vval gameplay-stat-vval--away">{as?.pass_yards ?? 0}</span>
-              </li>
-              <li className="gameplay-stat-vrow">
-                <span className="gameplay-stat-vlabel">Turnovers</span>
-                <span className="gameplay-stat-vval">{hs?.turnovers ?? 0}</span>
-                <span className="gameplay-stat-vval gameplay-stat-vval--away">{as?.turnovers ?? 0}</span>
-              </li>
-              <li className="gameplay-stat-vrow">
-                <span className="gameplay-stat-vlabel">T.O.P.</span>
-                <span className="gameplay-stat-vval">{hs?.time_of_possession ?? '0:00'}</span>
-                <span className="gameplay-stat-vval gameplay-stat-vval--away">{as?.time_of_possession ?? '0:00'}</span>
-              </li>
-              <li className="gameplay-stat-vrow">
-                <span className="gameplay-stat-vlabel">Explosives</span>
-                <span className="gameplay-stat-vval">{hs?.explosives ?? 0}</span>
-                <span className="gameplay-stat-vval gameplay-stat-vval--away">{as?.explosives ?? 0}</span>
-              </li>
-              <li className="gameplay-stat-vrow">
-                <span className="gameplay-stat-vlabel">3rd down</span>
-                <span className="gameplay-stat-vval">{hs?.third_down ?? '0/0'}</span>
-                <span className="gameplay-stat-vval gameplay-stat-vval--away">{as?.third_down ?? '0/0'}</span>
-              </li>
-              <li className="gameplay-stat-vrow">
-                <span className="gameplay-stat-vlabel">4th down</span>
-                <span className="gameplay-stat-vval">{hs?.fourth_down ?? '0/0'}</span>
-                <span className="gameplay-stat-vval gameplay-stat-vval--away">{as?.fourth_down ?? '0/0'}</span>
-              </li>
-            </ul>
+              ))
+            )}
           </div>
-        </div>
 
-        <div className="gameplay-center-stack">
           <div className="gameplay-field-wrap">
             <div className="gameplay-field" role="img" aria-label="Football field, ball position by yard line">
               <div className="gameplay-field-layer gameplay-field-turf" aria-hidden />
@@ -643,10 +654,29 @@ export default function GamePlayPage({
               SIM TO NEXT PLAY
             </button>
           </div>
+
+          <div className="gameplay-play-meta-row" aria-label="Last play summary">
+            <div className="gameplay-meta-cell">
+              <span className="gameplay-meta-lbl">Previous play</span>
+              <span className="gameplay-meta-val">{previousPlay ?? '—'}</span>
+            </div>
+            <div className="gameplay-meta-cell">
+              <span className="gameplay-meta-lbl">Opp. play</span>
+              <span className="gameplay-meta-val">{previousOpponentPlay ?? '—'}</span>
+            </div>
+            <div className="gameplay-meta-cell">
+              <span className="gameplay-meta-lbl">Play type</span>
+              <span className="gameplay-meta-val">{playTypeDisplay}</span>
+            </div>
+            <div className="gameplay-meta-cell gameplay-meta-cell--grow">
+              <span className="gameplay-meta-lbl">Play result</span>
+              <span className="gameplay-meta-val">{lastResult ?? '—'}</span>
+            </div>
+          </div>
         </div>
 
-        <div className="gameplay-right-panel">
-          <div className="gameplay-sim-row">
+        <aside className="gameplay-right-rail" aria-label="Simulation shortcuts">
+          <div className="gameplay-sim-row gameplay-sim-row--stack">
             <button
               type="button"
               className="gameplay-sim-row-btn"
@@ -664,34 +694,10 @@ export default function GamePlayPage({
               {simulating === 'sim-to-end' ? '…' : 'Sim to End'}
             </button>
           </div>
-          <div className="gameplay-panel-title">Previous Play</div>
-          <div className="gameplay-history-box">{previousPlay ?? '—'}</div>
-          <div className="gameplay-panel-title">Previous Opponent Play</div>
-          <div className="gameplay-history-box">{previousOpponentPlay ?? '—'}</div>
-          <div className="gameplay-panel-title">Play Type</div>
-          <div className="gameplay-history-box">
-            {callsheetBucket ||
-              (selectedPlay?.category ? String(selectedPlay.category).replace(/_/g, ' ') : '—')}
-          </div>
-          <div className="gameplay-panel-title">Play Result</div>
-          <div className="gameplay-result-box">{lastResult ?? '—'}</div>
-          <div className="gameplay-panel-title">Play-by-play</div>
-          <div className="gameplay-play-feed" role="log" aria-live="polite">
-            {playFeed.length === 0 ? (
-              <div className="gameplay-play-feed-empty">Play calls will show here with player names.</div>
-            ) : (
-              playFeed.map((line, i) => (
-                <div key={`${i}-${line.slice(0, 24)}`} className="gameplay-play-feed-line">
-                  {line}
-                </div>
-              ))
-            )}
-            <div ref={playFeedEndRef} />
-          </div>
-        </div>
+        </aside>
       </div>
 
-      <div className="callsheet-section">
+        <div className="callsheet-section">
         <div className="callsheet-header">
           <h2>📋 Call Sheet</h2>
           <button
@@ -720,7 +726,9 @@ export default function GamePlayPage({
         <div className="callsheet-grid">
           {CALLSHEET_BUCKET_ORDER.map((bucket) => (
             <div key={bucket} className="cs-category">
-              <div className={`cs-cat-header ${callsheetHeaderClass(bucket)}`}>{callsheetHeaderTitle(bucket)}</div>
+              <div className={`cs-cat-header ${callsheetHeaderClass(bucket)}`}>
+                {callsheetHeaderTitle(bucket, callsheetSide)}
+              </div>
               <div className="cs-plays">
                 {(gridPlays[bucket] ?? []).map((row) => {
                   const userPool = options
@@ -752,7 +760,10 @@ export default function GamePlayPage({
                       }}
                     >
                       <div className="play-dot" />
-                      <span>{row.name}</span>
+                      <span className="cs-play-text">
+                        <span className="cs-play-title">{row.name}</span>
+                        {row.formation ? <span className="cs-play-formation">{row.formation}</span> : null}
+                      </span>
                       <span className={`play-tag ${tc}`}>{tl}</span>
                     </div>
                   )
@@ -761,6 +772,7 @@ export default function GamePlayPage({
             </div>
           ))}
         </div>
+      </div>
       </div>
 
       {gameOver && (
