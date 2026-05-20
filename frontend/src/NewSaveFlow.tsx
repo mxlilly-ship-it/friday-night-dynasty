@@ -619,6 +619,17 @@ export function NewSaveFlow({
               : 'Loaded from data/teams.json.'}{' '}
             Pick the program you run.
           </p>
+          {teamsData?.state ? (
+            <p className="newsave-sub newsave-league-state">
+              League state: <strong>{teamsData.state}</strong>
+              {teamsData.league_id ? (
+                <>
+                  {' '}
+                  · id <code>{teamsData.league_id}</code>
+                </>
+              ) : null}
+            </p>
+          ) : null}
           {teamsData?._schema ? <div className="newsave-schema">{teamsData._schema}</div> : null}
           <input
             className="newsave-input newsave-team-search"

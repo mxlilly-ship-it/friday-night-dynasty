@@ -62,8 +62,17 @@ def ensure_coach_inbox(state: Dict[str, Any]) -> Dict[str, Any]:
     inbox.setdefault("job_security", 72)
     inbox.setdefault("last_week_sim_batch_key", None)
     inbox.setdefault("last_playoff_batch_key", None)
-    seed_wv_starter_coach_emails(state, inbox)
+    seed_starter_coach_emails(state, inbox)
     return inbox
+
+
+def seed_starter_coach_emails(state: Dict[str, Any], inbox: Dict[str, Any]) -> None:
+    """One-time starter mail for the save's ``email_pack`` (from league JSON / save state)."""
+    from systems.league_metadata import email_pack_from_state
+
+    pack = email_pack_from_state(state)
+    if pack == "wv":
+        seed_wv_starter_coach_emails(state, inbox)
 
 
 def _clamp_meter(v: Any, lo: int = 0, hi: int = 100) -> int:
@@ -1201,6 +1210,21 @@ def mark_emails_read(inbox: Dict[str, Any], ids: List[str]) -> None:
     for e in inbox.get("emails") or []:
         if isinstance(e, dict) and e.get("id") in want:
             e["read"] = True
+
+
+def delete_emails(inbox: Dict[str, Any], ids: List[str]) -> int:
+    """Remove messages by id. Returns number removed."""
+    want = {str(x) for x in ids if x}
+    if not want:
+        return 0
+    emails = inbox.get("emails")
+    if not isinstance(emails, list):
+        return 0
+    kept = [e for e in emails if isinstance(e, dict) and str(e.get("id") or "") not in want]
+    removed = len(emails) - len(kept)
+    if removed:
+        inbox["emails"] = kept
+    return removed
 
 
 def resolve_email_choice(inbox: Dict[str, Any], email_id: str, choice_id: str) -> bool:

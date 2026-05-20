@@ -41,6 +41,7 @@ import {
   standingsListToRecord,
 } from './leagueHistoryView'
 import SeasonSummaryPanel from './SeasonSummaryPanel'
+import CoachInboxPanel from './CoachInboxPanel'
 import {
   buildPrestigeReportRows,
   formatTeamPoints,
@@ -54,6 +55,7 @@ const PLAYOFF_BRACKET_MENU = 'Playoff bracket'
 /** Preseason hub: stage flow (playbook, depth, etc.). Other Team menu values show roster/stats/gameplans. */
 const PRESEASON_TEAM_HUB = 'Preseason hub'
 const OFFSEASON_TEAM_HUB = 'Offseason hub'
+const COACH_INBOX_MENU = 'Coach Inbox'
 
 function defaultTeamMenuForPhase(phase: string): string {
   if (phase === 'preseason') return PRESEASON_TEAM_HUB
@@ -287,6 +289,9 @@ const PILLAR_CUMULATIVE_PP_MAX = (() => {
   for (let k = 1; k <= 9; k += 1) s += UPGRADE_COST_BY_LEVEL[k] ?? 3000
   return s
 })()
+
+/** Step for pillar +/- controls and range slider (less sensitive than 1 PP per tick). */
+const PILLAR_SLIDER_STEP = 5
 
 function pillarCumulativePpValue(level: number, progressPts: number): number {
   const L = clampImprovementLevel(level, 5)
@@ -1692,6 +1697,11 @@ function TeamHomePageBody({
     [saveState, teamScheduleTeam],
   )
   const rosterPlayers = useMemo(() => buildRosterPlayersSorted(saveState), [saveState])
+  const coachInboxUnread = useMemo(() => {
+    const emails = saveState?.coach_inbox?.emails
+    if (!Array.isArray(emails)) return 0
+    return emails.filter((e: { read?: boolean }) => !e?.read).length
+  }, [saveState?.coach_inbox?.emails])
   const rosterGridCols = useMemo(
     () => rosterDepthTableGridTemplateColumns(PLAYER_ATTRIBUTE_COLUMNS_SCROLL.length),
     [],
@@ -4334,6 +4344,22 @@ function TeamHomePageBody({
         />
       )
     }
+
+    if (teamMenu === COACH_INBOX_MENU) {
+      return (
+        <div className="teamhome-roster-shell teamhome-coach-inbox-shell">
+          <CoachInboxPanel
+            saveState={saveState}
+            saveId={saveId}
+            apiBase={apiBase}
+            headers={headers}
+            onSaveState={onSaveState}
+            onError={onError}
+            readOnly={isLocalBundle}
+          />
+        </div>
+      )
+    }
     return (
       <div className="teamhome-roster-shell">
         <div className="teamhome-roster-empty">Select a view from the menu.</div>
@@ -4395,6 +4421,9 @@ function TeamHomePageBody({
             <option>DEF Gameplan</option>
             <option value={SCOUTING_MENU_OFFENSE}>Offensive Scouting Report</option>
             <option value={SCOUTING_MENU_DEFENSE}>Defensive Scouting Report</option>
+            <option value={COACH_INBOX_MENU}>
+              Coach Inbox{coachInboxUnread > 0 ? ` (${coachInboxUnread} new)` : ''}
+            </option>
           </select>
         </div>
         <div className="teamhome-top-group teamhome-top-group-league">
@@ -5561,7 +5590,8 @@ function TeamHomePageBody({
                   <>
                     <div className="teamhome-preseason-title">Program development</div>
                     <div className="teamhome-preseason-sub teamhome-improvements-lead">
-                      Drag each <b>pillar slider</b> to invest your flex <b>program points (PP)</b> into that program track. You can sit
+                      Use <b>− / +</b> (5 PP per click) or drag each <b>pillar slider</b> to invest your flex <b>program points (PP)</b> into
+                      that program track. You can sit
                       between full grades (partial progress) so the program moves smoothly — level-ups still happen when you cross the
                       PP thresholds from the in-season system. Use <b>Continue</b> to apply and advance.
                     </div>
@@ -5724,16 +5754,39 @@ function TeamHomePageBody({
                                   }}
                                 />
                               </div>
-                              <input
-                                type="range"
-                                className="teamhome-improvements-range"
-                                min={0}
-                                max={PILLAR_CUMULATIVE_PP_MAX}
-                                step={1}
-                                value={row.targetCumulative}
-                                onChange={(e) => setC(Number(e.target.value))}
-                                aria-label={`${row.label} program investment`}
-                              />
+                              <div className="teamhome-improvements-slider-controls">
+                                <button
+                                  type="button"
+                                  className="teamhome-improvements-step-btn"
+                                  onClick={() => setC(row.targetCumulative - PILLAR_SLIDER_STEP)}
+                                  disabled={row.targetCumulative <= 0}
+                                  aria-label={`Decrease ${row.label} investment by ${PILLAR_SLIDER_STEP} PP`}
+                                >
+                                  −
+                                </button>
+                                <input
+                                  type="range"
+                                  className="teamhome-improvements-range"
+                                  min={0}
+                                  max={PILLAR_CUMULATIVE_PP_MAX}
+                                  step={PILLAR_SLIDER_STEP}
+                                  value={row.targetCumulative}
+                                  onChange={(e) => setC(Number(e.target.value))}
+                                  aria-label={`${row.label} program investment`}
+                                  aria-valuemin={0}
+                                  aria-valuemax={PILLAR_CUMULATIVE_PP_MAX}
+                                  aria-valuenow={row.targetCumulative}
+                                />
+                                <button
+                                  type="button"
+                                  className="teamhome-improvements-step-btn"
+                                  onClick={() => setC(row.targetCumulative + PILLAR_SLIDER_STEP)}
+                                  disabled={row.targetCumulative >= PILLAR_CUMULATIVE_PP_MAX}
+                                  aria-label={`Increase ${row.label} investment by ${PILLAR_SLIDER_STEP} PP`}
+                                >
+                                  +
+                                </button>
+                              </div>
                               <div className="teamhome-improvements-slider-meta">
                                 <span className="teamhome-small">
                                   PP vs current:{' '}
@@ -5751,7 +5804,7 @@ function TeamHomePageBody({
                                   (negative spends bank)
                                 </span>
                                 <span className="teamhome-improvements-slider-scale teamhome-small">
-                                  0 — {PILLAR_CUMULATIVE_PP_MAX} PP invested in this pillar
+                                  0 — {PILLAR_CUMULATIVE_PP_MAX} PP · ±{PILLAR_SLIDER_STEP} per click or slider step
                                 </span>
                               </div>
                             </div>

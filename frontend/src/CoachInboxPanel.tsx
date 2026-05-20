@@ -78,6 +78,8 @@ export default function CoachInboxPanel({
   onError,
   readOnly = false,
 }: Props) {
+  const leagueStateName =
+    typeof saveState?.state === 'string' && saveState.state.trim() ? saveState.state.trim() : null
   const inbox = (saveState?.coach_inbox || {}) as CoachInboxState
   const emails = useMemo(() => (Array.isArray(inbox.emails) ? inbox.emails : []) as CoachEmail[], [inbox.emails])
   const [filterCat, setFilterCat] = useState('all')
@@ -106,7 +108,11 @@ export default function CoachInboxPanel({
   )
 
   const patchInbox = useCallback(
-    async (body: { mark_read?: string[]; choose?: { email_id: string; choice_id: string } }) => {
+    async (body: {
+      mark_read?: string[]
+      choose?: { email_id: string; choice_id: string }
+      delete?: string[]
+    }) => {
       const r = await fetch(`${apiBase}/saves/${saveId}/coach-inbox`, {
         method: 'PATCH',
         headers: { ...headers, 'Content-Type': 'application/json' },
@@ -115,12 +121,38 @@ export default function CoachInboxPanel({
       if (!r.ok) {
         const err = await r.json().catch(() => ({}))
         onError(typeof err?.detail === 'string' ? err.detail : 'Inbox update failed')
-        return
+        return false
       }
       const data = await r.json()
       if (data?.state) onSaveState?.(data.state)
+      return true
     },
     [apiBase, headers, onError, onSaveState, saveId],
+  )
+
+  const deleteEmail = useCallback(
+    async (email: CoachEmail) => {
+      if (!email?.id) return
+
+      if (readOnly) {
+        if (!onSaveState) return
+        const prev = (saveState?.coach_inbox || {}) as CoachInboxState
+        const list = Array.isArray(prev.emails) ? prev.emails : []
+        onSaveState({
+          ...saveState,
+          coach_inbox: {
+            ...prev,
+            emails: list.filter((row) => row.id !== email.id),
+          },
+        })
+        setSelectedId(null)
+        return
+      }
+
+      const ok = await patchInbox({ delete: [email.id] })
+      if (ok) setSelectedId(null)
+    },
+    [onSaveState, patchInbox, readOnly, saveState],
   )
 
   const openEmail = async (e: CoachEmail) => {
@@ -148,8 +180,14 @@ export default function CoachInboxPanel({
         <div>
           <div className="coach-inbox-title">Coach inbox</div>
           <div className="coach-inbox-sub">
-            Weekly messages scaled by program prestige. Read mail and respond when choices appear — it shifts morale,
-            trust, and how loud the outside noise gets.
+            {leagueStateName ? (
+              <>
+                <strong>{leagueStateName}</strong> high school football — weekly messages scaled by program prestige.
+              </>
+            ) : (
+              <>Weekly messages scaled by program prestige.</>
+            )}{' '}
+            Read mail and respond when choices appear — it shifts morale, trust, and how loud the outside noise gets.
           </div>
         </div>
         <div className="coach-inbox-meters">
@@ -162,7 +200,7 @@ export default function CoachInboxPanel({
 
       {readOnly ? (
         <div className="coach-inbox-readonly-banner" role="status">
-          Imported save (local): reading mail works; mark read and responses need a cloud save.
+          Imported save (local): you can read and delete mail here; mark read and responses need a cloud save.
         </div>
       ) : null}
 
@@ -225,7 +263,17 @@ export default function CoachInboxPanel({
           ) : (
             <>
               <div className="coach-inbox-detail-head">
-                <div className="coach-inbox-detail-subject">{selected.subject}</div>
+                <div className="coach-inbox-detail-head-row">
+                  <div className="coach-inbox-detail-subject">{selected.subject}</div>
+                  <button
+                    type="button"
+                    className="coach-inbox-delete"
+                    onClick={() => void deleteEmail(selected)}
+                    title={readOnly ? 'Remove from this imported save (not synced to cloud)' : 'Delete this message'}
+                  >
+                    Delete
+                  </button>
+                </div>
                 <div className="coach-inbox-detail-from">
                   <strong>{selected.sender_name}</strong>
                   <span className="coach-inbox-detail-type">{selected.sender_type}</span>

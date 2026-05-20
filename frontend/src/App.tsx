@@ -33,7 +33,7 @@ async function formatApiErrorBody(r: Response): Promise<string> {
 }
 
 function apiConnectionHint() {
-  return ' Start the API: python -m uvicorn backend.app:app --host 127.0.0.1 --port 8001'
+  return ' Start the API: python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000'
 }
 
 /** True when save JSON still has preseason stages to complete (even if season_phase is missing or wrong). */

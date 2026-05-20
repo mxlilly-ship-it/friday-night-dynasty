@@ -30,6 +30,11 @@ from systems.playoff_systems import (
 )
 from models.coach import apply_coach_config_dict
 from models.team import Team
+from systems.league_metadata import (
+    apply_league_metadata_to_state,
+    ensure_league_metadata_in_state,
+    league_metadata_from_config,
+)
 from systems.league_structure import (
     default_league_structure,
     ensure_league_structure_in_state,
@@ -126,6 +131,7 @@ from systems.playbook_system import (
 )
 from systems.transfer_system import run_transfer_stage_1, run_transfer_stage_2
 from systems.coach_email_system import (
+    delete_emails,
     ensure_coach_inbox,
     generate_playoff_round_emails,
     generate_week_sim_emails,
@@ -182,8 +188,9 @@ def patch_coach_inbox(
     *,
     mark_read: Optional[List[str]] = None,
     choose: Optional[Dict[str, str]] = None,
+    delete: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """Mark messages read and/or resolve a choice; persists state."""
+    """Mark messages read, resolve a choice, and/or delete messages; persists state."""
     state, save_dir = load_state(user_id, save_id)
     inbox = ensure_coach_inbox(state)
     if mark_read:
@@ -193,6 +200,8 @@ def patch_coach_inbox(
         cid = choose.get("choice_id")
         if eid and cid:
             resolve_email_choice(inbox, str(eid), str(cid))
+    if delete:
+        delete_emails(inbox, [str(x) for x in delete if x])
     save_state(user_id, save_id, state, save_dir)
     return {"state": state}
 
@@ -1284,7 +1293,7 @@ def _season_pp_awards_for_team(
 def _ensure_user_coach_and_firing_defaults(state: Dict[str, Any]) -> None:
     """Backfill user_coach_name / allow_user_coach_firing for older league_save.json files."""
     if "allow_user_coach_firing" not in state:
-        state["allow_user_coach_firing"] = True
+        state["allow_user_coach_firing"] = False
     else:
         state["allow_user_coach_firing"] = bool(state.get("allow_user_coach_firing"))
     ucn = state.get("user_coach_name")
@@ -1303,7 +1312,7 @@ def _ensure_user_coach_and_firing_defaults(state: Dict[str, Any]) -> None:
 
 
 def _carousel_opts_from_state(state: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
-    allow_fire = bool(state.get("allow_user_coach_firing", True))
+    allow_fire = bool(state.get("allow_user_coach_firing", False))
     raw = state.get("user_coach_name")
     ucn = str(raw).strip() if isinstance(raw, str) else None
     return allow_fire, ucn if ucn else None
@@ -2269,10 +2278,12 @@ def create_save(
     *,
     start_year: Optional[int] = None,
     teams_data: Optional[Dict[str, Any]] = None,
-    allow_user_coach_firing: bool = True,
+    allow_user_coach_firing: bool = False,
 ) -> Dict[str, Any]:
     provided_rows = None
+    league_cfg: Dict[str, Any] = {}
     if isinstance(teams_data, dict):
+        league_cfg = teams_data
         maybe_rows = teams_data.get("teams")
         if isinstance(maybe_rows, list):
             provided_rows = [r for r in maybe_rows if isinstance(r, dict)]
@@ -2280,13 +2291,15 @@ def create_save(
         teams = build_teams_from_configs(provided_rows, generate_roster=True, two_way_chance=0.55, assign_coaches=True)
         # Pull the playoff system from the caller-provided league config so an
         # in-app league editor can pick a non-default system. Falls back to WV.
-        playoff_system_id = playoff_system_id_from_config(teams_data)
+        playoff_system_id = playoff_system_id_from_config(league_cfg)
     else:
         teams = build_teams_from_json(generate_roster=True, two_way_chance=0.55, assign_coaches=True)
         # Read the league JSON header (currently data/teams.json) for its
         # ``playoff_system`` field so the save records which postseason
         # structure it should use. Falls back to the default if missing.
-        playoff_system_id = playoff_system_id_from_config(load_league_config_from_json())
+        league_cfg = load_league_config_from_json()
+        playoff_system_id = playoff_system_id_from_config(league_cfg)
+    league_meta = league_metadata_from_config(league_cfg)
     if user_team not in teams:
         raise ValueError("user_team not found")
 
@@ -2372,6 +2385,8 @@ def create_save(
     # for the life of this save (immutable across the dynasty for now).
     state["playoff_system"] = playoff_system_id
     ensure_playoff_system_in_state(state)
+    apply_league_metadata_to_state(state, league_meta)
+    ensure_league_metadata_in_state(state)
     save_state(user_id, save_id, state, _save_dir)
 
     return {"save_id": save_id}
@@ -2854,6 +2869,7 @@ def load_state(user_id: str, save_id: str) -> Tuple[Dict[str, Any], str]:
     # Migration: legacy saves predate the playoff_system field. Stamp the
     # default (WV) so callers can always read a valid id from state.
     ensure_playoff_system_in_state(state)
+    ensure_league_metadata_in_state(state)
 
     _migrate_save_dir_if_changed(user_id, save_id, save_dir, stored_dir)
     apply_team_program_totals_from_history_to_state(save_dir, state)

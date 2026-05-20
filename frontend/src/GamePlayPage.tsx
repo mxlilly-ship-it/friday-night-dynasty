@@ -433,46 +433,45 @@ export default function GamePlayPage({
   const playTypeDisplay =
     callsheetBucket || (selectedPlay?.category ? String(selectedPlay.category).replace(/_/g, ' ') : '—')
 
-  const inlineStatRows = (s: typeof hs, score: number) => (
-    <>
-      <li>
-        <span className="gameplay-inline-stat-lbl">Pts</span>
-        <span className="gameplay-inline-stat-val">{score}</span>
-      </li>
-      <li>
-        <span className="gameplay-inline-stat-lbl">Yds</span>
-        <span className="gameplay-inline-stat-val">{s?.total_yards ?? 0}</span>
-      </li>
-      <li>
-        <span className="gameplay-inline-stat-lbl">Rush</span>
-        <span className="gameplay-inline-stat-val">{s?.rush_yards ?? 0}</span>
-      </li>
-      <li>
-        <span className="gameplay-inline-stat-lbl">Pass</span>
-        <span className="gameplay-inline-stat-val">{s?.pass_yards ?? 0}</span>
-      </li>
-      <li>
-        <span className="gameplay-inline-stat-lbl">TO</span>
-        <span className="gameplay-inline-stat-val">{s?.turnovers ?? 0}</span>
-      </li>
-      <li>
-        <span className="gameplay-inline-stat-lbl">TOP</span>
-        <span className="gameplay-inline-stat-val gameplay-inline-stat-val--narrow">{s?.time_of_possession ?? '0:00'}</span>
-      </li>
-      <li>
-        <span className="gameplay-inline-stat-lbl">Xpl</span>
-        <span className="gameplay-inline-stat-val">{s?.explosives ?? 0}</span>
-      </li>
-      <li>
-        <span className="gameplay-inline-stat-lbl">3rd</span>
-        <span className="gameplay-inline-stat-val gameplay-inline-stat-val--narrow">{s?.third_down ?? '0/0'}</span>
-      </li>
-      <li>
-        <span className="gameplay-inline-stat-lbl">4th</span>
-        <span className="gameplay-inline-stat-val gameplay-inline-stat-val--narrow">{s?.fourth_down ?? '0/0'}</span>
-      </li>
-    </>
+  type InlineStat = { label: string; value: string | number; narrow?: boolean }
+
+  const buildInlineStats = (s: typeof hs, score: number): InlineStat[] => [
+    { label: 'Pts', value: score },
+    { label: 'Yds', value: s?.total_yards ?? 0 },
+    { label: 'Rush', value: s?.rush_yards ?? 0 },
+    { label: 'Pass', value: s?.pass_yards ?? 0 },
+    { label: 'TO', value: s?.turnovers ?? 0 },
+    { label: 'TOP', value: s?.time_of_possession ?? '0:00', narrow: true },
+    { label: 'Xpl', value: s?.explosives ?? 0 },
+    { label: '3rd', value: s?.third_down ?? '0/0', narrow: true },
+    { label: '4th', value: s?.fourth_down ?? '0/0', narrow: true },
+  ]
+
+  const renderStatColumn = (items: InlineStat[], side: 'home' | 'away') => (
+    <ul className={`gameplay-inline-stats-col gameplay-inline-stats-col--${side}`}>
+      {items.map((row) => (
+        <li key={row.label}>
+          <span className="gameplay-inline-stat-lbl">{row.label}</span>
+          <span
+            className={`gameplay-inline-stat-val${row.narrow ? ' gameplay-inline-stat-val--narrow' : ''}`}
+          >
+            {row.value}
+          </span>
+        </li>
+      ))}
+    </ul>
   )
+
+  const renderTeamStatGrid = (s: typeof hs, score: number, side: 'home' | 'away') => {
+    const all = buildInlineStats(s, score)
+    const split = Math.ceil(all.length / 2)
+    return (
+      <div className="gameplay-team-stats-cols" aria-label={`${side === 'home' ? homeTeam : awayTeam} stats`}>
+        {renderStatColumn(all.slice(0, split), side)}
+        {renderStatColumn(all.slice(split), side)}
+      </div>
+    )
+  }
 
   return (
     <div className="gameplay-root">
@@ -518,9 +517,7 @@ export default function GamePlayPage({
               />
               <div className="gameplay-score">{state.score_home}</div>
             </div>
-            <ul className="gameplay-inline-stats gameplay-inline-stats--home" aria-label={`${homeTeam} game stats`}>
-              {inlineStatRows(hs, state.score_home)}
-            </ul>
+            {renderTeamStatGrid(hs, state.score_home, 'home')}
           </div>
         </div>
         <div className="gameplay-clock-block">
@@ -543,9 +540,7 @@ export default function GamePlayPage({
         </div>
         <div className="gameplay-team-block gameplay-team-block-away">
           <div className="gameplay-team-block-inner gameplay-team-block-inner--away">
-            <ul className="gameplay-inline-stats gameplay-inline-stats--away" aria-label={`${awayTeam} game stats`}>
-              {inlineStatRows(as, state.score_away)}
-            </ul>
+            {renderTeamStatGrid(as, state.score_away, 'away')}
             <div className="gameplay-team-score-stack">
               <div className="gameplay-team-label gameplay-team-label--board" title={awayTeam}>
                 {awayTeam.length > 18 ? `${awayTeam.slice(0, 16)}…` : awayTeam}
@@ -566,6 +561,7 @@ export default function GamePlayPage({
       <div className="gameplay-body">
         <div className="gameplay-main">
           <div className="gameplay-center-stack">
+          <div className="gameplay-center-upper">
           <div
             ref={commentaryStripRef}
             className="gameplay-commentary-strip"
@@ -629,48 +625,53 @@ export default function GamePlayPage({
               </div>
             </div>
           </div>
-
-          <div className="gameplay-playbar-strip">
-            <label htmlFor="gameplay-selected-play-display">PLAY SELECTED:</label>
-            <div id="gameplay-selected-play-display" className="gameplay-play-display">
-              {selectedPlay
-                ? `${selectedPlay.name}${selectedPlay.formation ? ` (${selectedPlay.formation})` : ''}`
-                : '—'}
-            </div>
-            <button
-              type="button"
-              className="gameplay-btn-action"
-              onClick={() => void runPlay()}
-              disabled={!selectedPlay || loading || gameOver}
-            >
-              RUN PLAY
-            </button>
-            <button
-              type="button"
-              className="gameplay-btn-action gameplay-btn-action--alt"
-              onClick={() => void simAction('sim-next')}
-              disabled={!!simulating || gameOver}
-            >
-              SIM TO NEXT PLAY
-            </button>
           </div>
 
-          <div className="gameplay-play-meta-row" aria-label="Last play summary">
-            <div className="gameplay-meta-cell">
-              <span className="gameplay-meta-lbl">Previous play</span>
-              <span className="gameplay-meta-val">{previousPlay ?? '—'}</span>
+          <div className="gameplay-play-panel">
+            <div className="gameplay-playbar-strip">
+              <label htmlFor="gameplay-selected-play-display">Play selected</label>
+              <div id="gameplay-selected-play-display" className="gameplay-play-display">
+                {selectedPlay
+                  ? `${selectedPlay.name}${selectedPlay.formation ? ` (${selectedPlay.formation})` : ''}`
+                  : '—'}
+              </div>
+              <div className="gameplay-playbar-actions">
+                <button
+                  type="button"
+                  className="gameplay-btn-action"
+                  onClick={() => void runPlay()}
+                  disabled={!selectedPlay || loading || gameOver}
+                >
+                  RUN PLAY
+                </button>
+                <button
+                  type="button"
+                  className="gameplay-btn-action gameplay-btn-action--alt"
+                  onClick={() => void simAction('sim-next')}
+                  disabled={!!simulating || gameOver}
+                >
+                  SIM TO NEXT PLAY
+                </button>
+              </div>
             </div>
-            <div className="gameplay-meta-cell">
-              <span className="gameplay-meta-lbl">Opp. play</span>
-              <span className="gameplay-meta-val">{previousOpponentPlay ?? '—'}</span>
-            </div>
-            <div className="gameplay-meta-cell">
-              <span className="gameplay-meta-lbl">Play type</span>
-              <span className="gameplay-meta-val">{playTypeDisplay}</span>
-            </div>
-            <div className="gameplay-meta-cell gameplay-meta-cell--grow">
-              <span className="gameplay-meta-lbl">Play result</span>
-              <span className="gameplay-meta-val">{lastResult ?? '—'}</span>
+
+            <div className="gameplay-play-meta-row" aria-label="Last play summary">
+              <span className="gameplay-meta-chip">
+                <span className="gameplay-meta-chip-lbl">Prev</span>
+                <span className="gameplay-meta-chip-val">{previousPlay ?? '—'}</span>
+              </span>
+              <span className="gameplay-meta-chip">
+                <span className="gameplay-meta-chip-lbl">Opp</span>
+                <span className="gameplay-meta-chip-val">{previousOpponentPlay ?? '—'}</span>
+              </span>
+              <span className="gameplay-meta-chip">
+                <span className="gameplay-meta-chip-lbl">Type</span>
+                <span className="gameplay-meta-chip-val">{playTypeDisplay}</span>
+              </span>
+              <span className="gameplay-meta-chip gameplay-meta-chip--result">
+                <span className="gameplay-meta-chip-lbl">Result</span>
+                <span className="gameplay-meta-chip-val">{lastResult ?? '—'}</span>
+              </span>
             </div>
           </div>
         </div>

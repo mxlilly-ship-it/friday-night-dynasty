@@ -344,7 +344,7 @@ def build_league_state(
     *,
     user_team: Optional[str] = None,
     user_coach_name: Optional[str] = None,
-    allow_user_coach_firing: bool = True,
+    allow_user_coach_firing: bool = False,
     current_week: int = 1,
     season_phase: str = "regular",  # "regular" | "playoffs" | "season_summary" | "offseason" | "done"
     weeks: Optional[List[List[Dict[str, str]]]] = None,  # week -> [{home, away}]
@@ -380,7 +380,7 @@ def save_league(
     *,
     user_team: Optional[str] = None,
     user_coach_name: Optional[str] = None,
-    allow_user_coach_firing: bool = True,
+    allow_user_coach_firing: bool = False,
     current_week: int = 1,
     season_phase: str = "regular",
     weeks: Optional[List[List[Dict[str, str]]]] = None,

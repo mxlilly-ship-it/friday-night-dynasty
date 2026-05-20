@@ -16,6 +16,14 @@ export type TeamJsonRow = {
 
 export type TeamsDataResponse = {
   _schema?: string
+  _league_schema?: string
+  /** Short league id (e.g. wv); stamped on save as league_id */
+  league_id?: string
+  /** US state display name (e.g. West Virginia); stamped on save as state */
+  state?: string
+  /** Coach inbox starter template pack; defaults to league_id */
+  email_pack?: string
+  playoff_system?: string
   teams: TeamJsonRow[]
 }
 

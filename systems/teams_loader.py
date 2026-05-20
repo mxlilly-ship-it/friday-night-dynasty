@@ -2,9 +2,10 @@
 Load teams from data/teams.json.
 Single source of truth for league setup; add teams to the JSON file to expand the league.
 
-The same JSON also carries league-level metadata (currently just
-``playoff_system``) at the top, so a state's playoff structure travels with
-its team list — see ``load_league_config_from_json``.
+The same JSON also carries league-level metadata at the top (``state``,
+``league_id``, ``email_pack``, ``playoff_system``) so a league's identity and
+rules travel with its team list — see ``load_league_config_from_json`` and
+``systems.league_metadata``.
 """
 
 import json

@@ -167,13 +167,14 @@ def _maybe_fire_coach(
     coach_changes: Dict[str, Tuple[float, float]],
     hot_seat_by_team: Dict[str, int],
     *,
-    allow_user_coach_firing: bool = True,
+    allow_user_coach_firing: bool = False,
+    user_coach_name: Optional[str] = None,
 ) -> bool:
     prestige = getattr(team, "prestige", 5) or 5
     hs = compute_hot_seat(name, seasons, standings_row, season_goals if name == user_team else None)
     coach.hot_seat = hs
     hot_seat_by_team[name] = hs
-    if name == user_team and str(user_team or "") and not allow_user_coach_firing:
+    if _is_users_head_coach(name, coach, user_team, user_coach_name) and not allow_user_coach_firing:
         return False
     # Lowered thresholds (88→78, 92→82) so year-2+ stage-1 churn also lifts a bit and
     # genuinely under-pressure coaches get axed; year-1 hot-seats top out around 30
@@ -206,6 +207,20 @@ def _coach_matches_user(coach: Optional[Coach], user_coach_name: Optional[str]) 
     if not coach or not user_coach_name:
         return False
     return str(coach.name or "").strip().lower() == _user_coach_name_key(user_coach_name)
+
+
+def _is_users_head_coach(
+    team_name: str,
+    coach: Optional[Coach],
+    user_team: Optional[str],
+    user_coach_name: Optional[str],
+) -> bool:
+    """True when this team/coach row is the human player's head coach."""
+    if user_coach_name and _coach_matches_user(coach, user_coach_name):
+        return True
+    if user_team and str(team_name) == str(user_team) and coach is not None:
+        return True
+    return False
 
 
 def _find_unemployed_user_coach(
@@ -433,6 +448,9 @@ def _hiring_iteration(
     for school, (_, coach) in list(employed_coaches.items()):
         if not coach:
             continue
+        if _is_users_head_coach(school, coach, user_team, user_coach_name):
+            # User's coach only moves schools when they ranked an HC application.
+            continue
         school_team = team_by_name.get(school)
         if not school_team:
             continue
@@ -573,8 +591,8 @@ def _ensure_user_coach_landed(
     user_coach_name: Optional[str],
 ) -> List[Coach]:
     """
-    After the final hiring round, guarantee the user's coach has a program if they were fired.
-    Prefers ranked applications, then open jobs, then the lowest-prestige opening available.
+    After the final hiring round, place an unemployed user coach only at a school they ranked
+    in job_applications. Never auto-assign a random landing spot.
     """
     if not user_coach_name or _user_coach_is_employed(teams, user_coach_name):
         return unemployed
@@ -587,9 +605,6 @@ def _ensure_user_coach_landed(
     ut = str(user_team or "").strip()
     apps = [str(a).strip() for a in (job_applications or []) if str(a).strip()]
 
-    def _prestige(name: str) -> int:
-        return int(getattr(team_by_name.get(name), "prestige", 5) or 5)
-
     dest: Optional[str] = None
     for name in apps:
         if name == ut:
@@ -598,22 +613,6 @@ def _ensure_user_coach_landed(
         if t and not getattr(t, "coach", None):
             dest = name
             break
-
-    if not dest:
-        open_slots = [
-            (_prestige(n), n)
-            for n, t in team_by_name.items()
-            if n != ut and not getattr(t, "coach", None)
-        ]
-        open_slots.sort()
-        if open_slots:
-            dest = open_slots[0][1]
-
-    if not dest:
-        ranked = [(_prestige(n), n) for n in team_by_name if n != ut]
-        ranked.sort()
-        if ranked:
-            dest = ranked[0][1]
 
     if not dest:
         return unemployed
@@ -745,7 +744,8 @@ def _carousel_init(
     user_team: Optional[str],
     season_goals: Optional[Dict[str, Any]],
     *,
-    allow_user_coach_firing: bool = True,
+    allow_user_coach_firing: bool = False,
+    user_coach_name: Optional[str] = None,
 ) -> Tuple[List[str], List[Coach], List[Dict[str, Any]], Dict[str, Tuple[float, float]], Dict[str, int]]:
     events: List[Dict[str, Any]] = []
     coach_changes: Dict[str, Tuple[float, float]] = {}
@@ -768,6 +768,8 @@ def _carousel_init(
             break
         coach = getattr(team, "coach", None)
         if not coach:
+            continue
+        if _is_users_head_coach(name, coach, user_team, user_coach_name):
             continue
         if random.random() < _retirement_chance(coach.age):
             events.append(
@@ -796,6 +798,8 @@ def _carousel_init(
         coach.hot_seat = hs
         hot_seat_by_team[name] = hs
         prestige = int(getattr(team, "prestige", 5) or 5)
+        if _is_users_head_coach(name, coach, user_team, user_coach_name):
+            continue
         if random.random() < _random_exit_chance(coach, hs, prestige):
             events.append(
                 {
@@ -834,6 +838,7 @@ def _carousel_init(
             coach_changes,
             hot_seat_by_team,
             allow_user_coach_firing=allow_user_coach_firing,
+            user_coach_name=user_coach_name,
         )
 
     for name, team in teams.items():
@@ -859,7 +864,7 @@ def run_coach_carousel_step(
     current_year: int = 1,
     job_applications: Optional[List[str]] = None,
     *,
-    allow_user_coach_firing: bool = True,
+    allow_user_coach_firing: bool = False,
     user_coach_name: Optional[str] = None,
 ) -> Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]], Dict[str, Tuple[float, float]], Dict[str, int]]:
     """
@@ -886,7 +891,13 @@ def run_coach_carousel_step(
 
     if persisted is None:
         vacancies, unemployed, events, coach_changes, hot_seat_by_team = _carousel_init(
-            teams, seasons, standings, user_team, season_goals, allow_user_coach_firing=allow_user_coach_firing
+            teams,
+            seasons,
+            standings,
+            user_team,
+            season_goals,
+            allow_user_coach_firing=allow_user_coach_firing,
+            user_coach_name=user_coach_name,
         )
     else:
         vacancies = list(persisted.get("vacancies") or [])

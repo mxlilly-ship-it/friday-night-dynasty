@@ -107,7 +107,7 @@ class CreateSaveRequest(BaseModel):
     coach_config: Dict[str, Any] = {}
     start_year: Optional[int] = None
     teams_data: Optional[Dict[str, Any]] = None
-    allow_user_coach_firing: bool = True
+    allow_user_coach_firing: bool = False
 
 
 STAGE_GOAL_OPTIONS = ["Winning Season", "Playoffs", "Semifinal", "State Championship", "Title Winner"]
@@ -362,6 +362,7 @@ class CoachInboxChooseBody(BaseModel):
 class CoachInboxPatchBody(BaseModel):
     mark_read: Optional[List[str]] = None
     choose: Optional[CoachInboxChooseBody] = None
+    delete: Optional[List[str]] = None
 
 
 @router.get("/{save_id}/coach-gameplan", response_model=Dict[str, Any])
@@ -460,10 +461,12 @@ def get_save_route(save_id: str, user=Depends(require_user)):
 
 @router.patch("/{save_id}/coach-inbox", response_model=Dict[str, Any])
 def patch_coach_inbox_route(save_id: str, body: CoachInboxPatchBody = Body(...), user=Depends(require_user)):
-    """Mark coach inbox messages read and/or apply a response choice."""
+    """Mark coach inbox messages read, apply a response choice, and/or delete messages."""
     try:
         choose = body.choose.model_dump() if body.choose else None
-        return patch_coach_inbox(user["user_id"], save_id, mark_read=body.mark_read, choose=choose)
+        return patch_coach_inbox(
+            user["user_id"], save_id, mark_read=body.mark_read, choose=choose, delete=body.delete
+        )
     except Exception as e:
         raise HTTPException(status_code=400, detail=_save_route_exception_detail(e))
 

@@ -1,11 +1,14 @@
 .gameplay-root {
-  min-height: 100vh;
-  height: 100vh;
+  /* Reserve space for fixed news ticker (34px) so bottom UI is not clipped on Mac/laptop viewports. */
+  min-height: 0;
+  height: calc(100vh - 34px);
+  height: calc(100dvh - 34px);
   background: #0d0d0f;
   color: #e6e6ea;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .gameplay-header {
@@ -98,10 +101,10 @@
 
 .gameplay-scoreboard {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  gap: 16px 20px;
+  grid-template-columns: minmax(0, 1.2fr) auto minmax(0, 1.2fr);
+  gap: 12px 16px;
   align-items: center;
-  padding: 12px 20px;
+  padding: 8px 16px;
   background: #141418;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   flex-shrink: 0;
@@ -158,6 +161,38 @@
   text-align: right;
 }
 
+.gameplay-team-stats-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 10px;
+  min-width: 0;
+  flex: 1;
+  max-width: 240px;
+}
+
+.gameplay-inline-stats-col {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 0.58rem;
+  min-width: 0;
+}
+
+.gameplay-inline-stats-col--away li {
+  flex-direction: row-reverse;
+}
+
+.gameplay-inline-stats-col li {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+}
+
 .gameplay-inline-stats {
   list-style: none;
   margin: 0;
@@ -169,6 +204,16 @@
   min-width: 0;
   flex: 1;
   max-width: 200px;
+}
+
+.gameplay-team-block-home .gameplay-team-stats-cols {
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  padding-left: 8px;
+}
+
+.gameplay-team-block-away .gameplay-team-stats-cols {
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  padding-right: 8px;
 }
 
 .gameplay-inline-stats--home {
@@ -228,7 +273,7 @@
 }
 
 .gameplay-score {
-  font-size: 2rem;
+  font-size: 1.75rem;
   font-weight: 900;
   line-height: 1;
 }
@@ -284,7 +329,7 @@
   flex-direction: row;
   align-items: stretch;
   gap: 12px;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   padding: 10px 14px 0;
   min-height: 0;
   overflow: hidden;
@@ -333,6 +378,16 @@
   min-width: 0;
   flex: 1;
   min-height: 0;
+}
+
+/* Commentary + field shrink/scroll; play controls stay pinned below. */
+.gameplay-center-upper {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 1;
 }
 
 .gameplay-right-rail {
@@ -387,17 +442,64 @@
   padding-right: 0;
 }
 
+.gameplay-play-panel {
+  flex-shrink: 0;
+  margin-top: auto;
+  position: relative;
+  z-index: 2;
+  border: 1px solid #444;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #222;
+}
+
 .gameplay-play-meta-row {
   flex-shrink: 0;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px 12px;
-  padding: 8px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
   margin-top: 0;
-  background: rgba(20, 20, 24, 0.92);
-  border: 1px solid #444;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 0 0 6px 6px;
+  background: rgba(0, 0, 0, 0.28);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.gameplay-meta-chip {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 0;
+  padding: 6px 10px;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.gameplay-meta-chip:last-child {
+  border-right: none;
+}
+
+.gameplay-meta-chip--result {
+  flex: 1.35 1 0;
+}
+
+.gameplay-meta-chip-lbl {
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.gameplay-meta-chip-val {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: rgba(230, 230, 234, 0.95);
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .gameplay-meta-cell {
@@ -594,7 +696,7 @@
 .gameplay-field {
   width: 100%;
   max-width: 820px;
-  height: 148px;
+  height: clamp(96px, 18vh, 148px);
   position: relative;
   overflow: hidden;
   border-radius: 6px;
@@ -951,9 +1053,36 @@
   font-size: 1.2rem;
 }
 
+@media (max-height: 860px) {
+  .gameplay-field {
+    height: clamp(88px, 16vh, 120px);
+  }
+}
+
+@media (max-height: 720px) {
+  .gameplay-field {
+    height: clamp(80px, 14vh, 104px);
+  }
+
+  .gameplay-commentary-strip {
+    margin-bottom: 4px;
+    padding: 6px 10px;
+  }
+}
+
 @media (max-width: 780px) {
   .gameplay-play-meta-row {
+    display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .gameplay-meta-chip {
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .gameplay-team-stats-cols {
+    max-width: none;
   }
   .gameplay-main {
     flex-direction: column;

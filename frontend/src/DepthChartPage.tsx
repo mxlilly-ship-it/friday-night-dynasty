@@ -1,21 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import './TeamHomePage.css'
 import {
+  CANONICAL_STORAGE_KEYS,
+  POSITION_DEPTH,
+  findDisplaySlot,
+  getCoachPlaybooksFromSave,
+  getPlaybookDepthLayout,
+  getSlotPlayerName,
+  setSlotPlayerName,
+  type DepthDisplaySlot,
+  type PlaybookDepthLayout,
+} from './depthChartPlaybookLayouts'
+import {
   PLAYER_ATTRIBUTE_COLUMNS_SCROLL,
   formatPlayerAttributeCell,
   formatPlayerMeasureLine,
   rosterDepthTableGridTemplateColumns,
 } from './playerAttributes'
 import { PlayerProfileName } from './PlayerProfileContext'
-
-const OFFENSE_POSITIONS = ['QB', 'RB', 'WR', 'OL', 'TE'] as const
-const DEFENSE_POSITIONS = ['DE', 'DT', 'LB', 'CB', 'S'] as const
-const ALL_POSITIONS = [...OFFENSE_POSITIONS, ...DEFENSE_POSITIONS] as const
-
-const POSITION_DEPTH: Record<string, number> = {
-  QB: 2, RB: 4, WR: 6, OL: 8, TE: 2,
-  DE: 4, DT: 3, LB: 5, CB: 4, S: 3,
-}
 
 function computeOffenseRating(p: any, pos: string) {
   const get = (k: string) => Number(p?.[k] ?? 0)
@@ -35,19 +37,23 @@ function computeDefenseRating(p: any, pos: string) {
 }
 
 function getPlayerSidePosition(p: any, side: 'offense' | 'defense') {
-  const allowed = (side === 'offense' ? OFFENSE_POSITIONS : DEFENSE_POSITIONS) as readonly string[]
+  const offense = ['QB', 'RB', 'WR', 'OL', 'TE'] as const
+  const defense = ['DE', 'DT', 'LB', 'CB', 'S'] as const
+  const allowed = side === 'offense' ? offense : defense
   const primary = String(p?.position ?? '')
   const secondary = String(p?.secondary_position ?? '')
-  if (allowed.includes(primary)) return primary
-  if (allowed.includes(secondary)) return secondary
+  if ((allowed as readonly string[]).includes(primary)) return primary
+  if ((allowed as readonly string[]).includes(secondary)) return secondary
   return '—'
 }
 
 function getBestSideRating(p: any, side: 'offense' | 'defense') {
-  const allowed = (side === 'offense' ? OFFENSE_POSITIONS : DEFENSE_POSITIONS) as readonly string[]
+  const offense = ['QB', 'RB', 'WR', 'OL', 'TE'] as const
+  const defense = ['DE', 'DT', 'LB', 'CB', 'S'] as const
+  const allowed = side === 'offense' ? offense : defense
   const rate = side === 'offense' ? computeOffenseRating : computeDefenseRating
   const candidates = [String(p?.position ?? ''), String(p?.secondary_position ?? '')].filter((pos) =>
-    allowed.includes(pos),
+    (allowed as readonly string[]).includes(pos),
   )
   if (candidates.length === 0) return 0
   let best = 0
@@ -55,7 +61,6 @@ function getBestSideRating(p: any, side: 'offense' | 'defense') {
   return Math.round(best)
 }
 
-/** Simple roster OVR (aligned with Team Home roster view). */
 function computePlayerOverall(p: any) {
   const keys = [
     'speed',
@@ -100,6 +105,132 @@ function findTeam(state: any, teamName: string) {
   return (state?.teams ?? []).find((t: any) => t?.name === teamName) ?? null
 }
 
+function isDefensiveRatingKey(key: string) {
+  return key === 'DE' || key === 'DT' || key === 'LB' || key === 'CB' || key === 'S'
+}
+
+function getCandidatesForRatingKey(roster: any[], ratingKey: string) {
+  const exact = roster.filter((p: any) => p?.position === ratingKey || p?.secondary_position === ratingKey)
+  if (exact.length > 0) {
+    const rate = isDefensiveRatingKey(ratingKey)
+      ? (p: any) => computeDefenseRating(p, ratingKey)
+      : (p: any) => computeOffenseRating(p, ratingKey)
+    return [...exact].sort((a, b) => rate(b) - rate(a))
+  }
+  return roster
+    .map((p: any) => ({
+      ...p,
+      _rate: isDefensiveRatingKey(ratingKey)
+        ? computeDefenseRating(p, ratingKey)
+        : computeOffenseRating(p, ratingKey),
+    }))
+    .sort((a: any, b: any) => (b._rate ?? 0) - (a._rate ?? 0))
+}
+
+function sortCandidatesByPositionRating(pool: any[], ratingKey: string): any[] {
+  const isDef = isDefensiveRatingKey(ratingKey)
+  const posRate = (p: any) => (isDef ? computeDefenseRating(p, ratingKey) : computeOffenseRating(p, ratingKey))
+  return [...pool].sort((a, b) => {
+    const pr = posRate(b) - posRate(a)
+    if (pr !== 0) return pr
+    return computePlayerOverall(b) - computePlayerOverall(a)
+  })
+}
+
+function buildAutoDepthChartOrder(userRoster: any[]): Record<string, string[]> {
+  const next: Record<string, string[]> = {}
+  for (const pos of CANONICAL_STORAGE_KEYS) {
+    const slots = POSITION_DEPTH[pos] ?? 4
+    const pool = getCandidatesForRatingKey(userRoster, pos)
+    const sorted = sortCandidatesByPositionRating(pool, pos)
+    const names = sorted.slice(0, slots).map((p: any) => p?.name ?? '—')
+    while (names.length < slots) names.push('—')
+    next[pos] = names
+  }
+  return next
+}
+
+function ensureFullCanonicalOrder(
+  userRoster: any[],
+  savedOrder: Record<string, string[]>,
+): Record<string, string[]> {
+  const init: Record<string, string[]> = {}
+  for (const pos of CANONICAL_STORAGE_KEYS) {
+    const slots = POSITION_DEPTH[pos] ?? 4
+    const pool = getCandidatesForRatingKey(userRoster, pos)
+    const saved = savedOrder[pos]
+    if (saved && Array.isArray(saved)) {
+      init[pos] = saved.filter((n) => typeof n === 'string').slice(0, slots)
+    } else {
+      init[pos] = pool.slice(0, slots).map((p: any) => p?.name ?? '—')
+    }
+    while (init[pos].length < slots) init[pos].push('—')
+  }
+  return init
+}
+
+function buildStartersFromLayout(
+  order: Record<string, string[]>,
+  roster: any[],
+  slots: DepthDisplaySlot[],
+  userTeam: string,
+) {
+  const byName = new Map<string, any>()
+  for (const p of roster ?? []) {
+    if (p?.name) byName.set(p.name, p)
+  }
+  return slots.map((slot) => {
+    const name = getSlotPlayerName(order, slot)
+    const player = name && name !== '—' ? byName.get(name) : null
+    return {
+      slot,
+      name: name && name !== '—' ? name : '—',
+      offPosition: player ? getPlayerSidePosition(player, 'offense') : '—',
+      defPosition: player ? getPlayerSidePosition(player, 'defense') : '—',
+      offRating: player ? getBestSideRating(player, 'offense') : 0,
+      defRating: player ? getBestSideRating(player, 'defense') : 0,
+      measure: player ? formatPlayerMeasureLine(player) : '',
+      userTeam,
+    }
+  })
+}
+
+function SlotSelect({
+  layout,
+  slot,
+  order,
+  roster,
+  onChange,
+}: {
+  layout: PlaybookDepthLayout
+  slot: DepthDisplaySlot
+  order: Record<string, string[]>
+  roster: any[]
+  onChange: (name: string) => void
+}) {
+  const pool = useMemo(() => getCandidatesForRatingKey(roster, slot.ratingKey), [roster, slot.ratingKey])
+  const value = getSlotPlayerName(order, slot)
+
+  return (
+    <div className="teamhome-depth-item depth-slot-row">
+      <span className="teamhome-depth-slot-label">{slot.label}</span>
+      <select
+        className="teamhome-select-inline depth-slot-select"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label={`${slot.label} starter (${layout.offensivePlaybook} / ${layout.defensivePlaybook})`}
+      >
+        <option value="—">—</option>
+        {pool.map((p: any, i: number) => (
+          <option key={`${slot.id}-${p?.name ?? i}`} value={p?.name ?? '—'}>
+            {p?.name ?? '—'}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
 export default function DepthChartPage({
   saveState,
   userTeam,
@@ -113,67 +244,56 @@ export default function DepthChartPage({
     [saveState, userTeam],
   )
 
-  const [selectedPos, setSelectedPos] = useState<string>('QB')
+  const coachPlaybooks = useMemo(() => getCoachPlaybooksFromSave(saveState, userTeam), [saveState, userTeam])
+  const layout = useMemo(
+    () => getPlaybookDepthLayout(coachPlaybooks.offensive, coachPlaybooks.defensive),
+    [coachPlaybooks],
+  )
+
   const [localOrder, setLocalOrder] = useState<Record<string, string[]>>({})
+  const [selectedSlotId, setSelectedSlotId] = useState<string>('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    const init: Record<string, string[]> = {}
-    for (const pos of ALL_POSITIONS) {
-      const slots = POSITION_DEPTH[pos] ?? 4
-      const pool = getCandidatesForPosition(userRoster, pos)
-      const saved = savedOrder[pos]
-      if (saved && Array.isArray(saved)) {
-        init[pos] = saved.filter((n) => typeof n === 'string').slice(0, slots)
-      } else {
-        init[pos] = pool.slice(0, slots).map((p: any) => p?.name ?? '—')
-      }
-      while (init[pos].length < slots) init[pos].push('—')
-    }
-    setLocalOrder(init)
+    setLocalOrder(ensureFullCanonicalOrder(userRoster, savedOrder))
   }, [userRoster, savedOrder])
 
-  const setLocalOrderForPos = useCallback((pos: string, names: string[]) => {
-    setLocalOrder((prev) => ({ ...prev, [pos]: [...names] }))
-  }, [])
+  useEffect(() => {
+    const first = layout.offense[0]?.id ?? layout.defense[0]?.id ?? ''
+    setSelectedSlotId((prev) => (findDisplaySlot(layout, prev) ? prev : first))
+  }, [layout])
+
+  const selectedSlot = useMemo(
+    () => (selectedSlotId ? findDisplaySlot(layout, selectedSlotId) : undefined),
+    [layout, selectedSlotId],
+  )
 
   const pool = useMemo(
-    () => getCandidatesForPosition(userRoster, selectedPos),
-    [userRoster, selectedPos],
+    () => (selectedSlot ? getCandidatesForRatingKey(userRoster, selectedSlot.ratingKey) : []),
+    [userRoster, selectedSlot],
   )
-
-  const slots = POSITION_DEPTH[selectedPos] ?? 4
-  const currentOrder = localOrder[selectedPos] ?? []
 
   const offensiveStarters = useMemo(
-    () => buildStartersFromOrder(localOrder, userRoster, 'offense'),
-    [localOrder, userRoster],
+    () => buildStartersFromLayout(localOrder, userRoster, layout.offense, userTeam),
+    [localOrder, userRoster, layout.offense, userTeam],
   )
   const defensiveStarters = useMemo(
-    () => buildStartersFromOrder(localOrder, userRoster, 'defense'),
-    [localOrder, userRoster],
+    () => buildStartersFromLayout(localOrder, userRoster, layout.defense, userTeam),
+    [localOrder, userRoster, layout.defense, userTeam],
   )
 
   const handleSlotChange = useCallback(
-    (slotIndex: number, playerName: string) => {
-      const next = [...currentOrder]
-      while (next.length <= slotIndex) next.push('—')
-      const prevName = next[slotIndex]
-      next[slotIndex] = playerName === '' ? '—' : playerName
-      if (prevName && prevName !== '—') {
-        const idx = next.findIndex((n, i) => i !== slotIndex && n === playerName)
-        if (idx >= 0) next[idx] = prevName
-      }
-      setLocalOrderForPos(selectedPos, next)
+    (slot: DepthDisplaySlot, playerName: string) => {
+      setLocalOrder((prev) => setSlotPlayerName(prev, slot, playerName))
     },
-    [currentOrder, selectedPos, setLocalOrderForPos],
+    [],
   )
 
   const handleSave = useCallback(async () => {
     setSaving(true)
     try {
       const toSave: Record<string, string[]> = {}
-      for (const pos of ALL_POSITIONS) {
+      for (const pos of CANONICAL_STORAGE_KEYS) {
         const arr = (localOrder[pos] ?? []).filter((n) => n && n !== '—')
         if (arr.length) toSave[pos] = arr
       }
@@ -192,51 +312,73 @@ export default function DepthChartPage({
     [],
   )
 
+  const renderSlotOptions = (side: 'offense' | 'defense') => {
+    const slots = side === 'offense' ? layout.offense : layout.defense
+    const playbook = side === 'offense' ? layout.offensivePlaybook : layout.defensivePlaybook
+    return (
+      <optgroup key={side} label={`${side === 'offense' ? 'Offense' : 'Defense'} (${playbook})`}>
+        {slots.map((slot) => (
+          <option key={slot.id} value={slot.id}>
+            {slot.label}
+          </option>
+        ))}
+      </optgroup>
+    )
+  }
+
   return (
     <div className="teamhome-depth-shell">
+      <p className="teamhome-depth-playbook-banner teamhome-small">
+        Base personnel for your playbooks:{' '}
+        <strong>{layout.offensivePlaybook}</strong> ({layout.baseOffenseFormation}) ·{' '}
+        <strong>{layout.defensivePlaybook}</strong> ({layout.baseDefenseFormation}). Slots map to your saved depth at
+        each position; subs and packages still use full position depth behind these starters.
+      </p>
+
       <div className="teamhome-depth-top">
         <div className="teamhome-depth-col">
           <div className="teamhome-depth-title">
-            Position:{' '}
+            Starter:{' '}
             <select
               className="teamhome-select teamhome-select-inline"
-              value={selectedPos}
-              onChange={(e) => setSelectedPos(e.target.value)}
+              value={selectedSlotId}
+              onChange={(e) => setSelectedSlotId(e.target.value)}
             >
-              {ALL_POSITIONS.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
+              {renderSlotOptions('offense')}
+              {renderSlotOptions('defense')}
             </select>
           </div>
-          <div className="teamhome-depth-stack">
-            {Array.from({ length: slots }, (_, i) => (
-              <div key={i} className="teamhome-depth-item depth-slot-row">
-                <span>{i + 1}.</span>
-                <select
-                  className="teamhome-select-inline depth-slot-select"
-                  value={currentOrder[i] ?? '—'}
-                  onChange={(e) => handleSlotChange(i, e.target.value)}
-                >
-                  <option value="—">—</option>
-                  {pool.map((p: any) => (
-                    <option key={p?.name ?? i} value={p?.name ?? '—'}>
-                      {p?.name ?? '—'}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ))}
-          </div>
+          {selectedSlot ? (
+            <div className="teamhome-depth-stack">
+              <SlotSelect
+                layout={layout}
+                slot={selectedSlot}
+                order={localOrder}
+                roster={userRoster}
+                onChange={(name) => handleSlotChange(selectedSlot, name)}
+              />
+            </div>
+          ) : null}
         </div>
 
         <div className="teamhome-depth-col">
-          <div className="teamhome-depth-title">Offensive starters</div>
-          <div className="teamhome-depth-stack">
-            {offensiveStarters.map((s, i) => (
-              <div key={`${s.label}-${i}`} className="teamhome-depth-item">
-                {s.label}:{' '}
+          <div className="teamhome-depth-title">Offense — {layout.offensivePlaybook}</div>
+          <div className="teamhome-depth-stack teamhome-depth-stack--compact">
+            {offensiveStarters.map((s) => (
+              <div
+                key={s.slot.id}
+                className={`teamhome-depth-item teamhome-depth-item--clickable${selectedSlotId === s.slot.id ? ' teamhome-depth-item--active' : ''}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedSlotId(s.slot.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    setSelectedSlotId(s.slot.id)
+                  }
+                }}
+              >
+                <span className="teamhome-depth-slot-label">{s.slot.label}:</span>{' '}
                 <PlayerProfileName teamName={userTeam} playerName={s.name} as="span" />
                 {s.name !== '—' ? (
                   <span className="teamhome-depth-subline">
@@ -250,11 +392,23 @@ export default function DepthChartPage({
         </div>
 
         <div className="teamhome-depth-col">
-          <div className="teamhome-depth-title">Defensive starters</div>
-          <div className="teamhome-depth-stack">
-            {defensiveStarters.map((s, i) => (
-              <div key={`${s.label}-${i}`} className="teamhome-depth-item">
-                {s.label}:{' '}
+          <div className="teamhome-depth-title">Defense — {layout.defensivePlaybook}</div>
+          <div className="teamhome-depth-stack teamhome-depth-stack--compact">
+            {defensiveStarters.map((s) => (
+              <div
+                key={s.slot.id}
+                className={`teamhome-depth-item teamhome-depth-item--clickable${selectedSlotId === s.slot.id ? ' teamhome-depth-item--active' : ''}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedSlotId(s.slot.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    setSelectedSlotId(s.slot.id)
+                  }
+                }}
+              >
+                <span className="teamhome-depth-slot-label">{s.slot.label}:</span>{' '}
                 <PlayerProfileName teamName={userTeam} playerName={s.name} as="span" />
                 {s.name !== '—' ? (
                   <span className="teamhome-depth-subline">
@@ -270,22 +424,17 @@ export default function DepthChartPage({
 
       <div className="teamhome-depth-bottom">
         <div className="teamhome-depth-title">
-          Position:{' '}
-          <select
-            className="teamhome-select teamhome-select-inline"
-            value={selectedPos}
-            onChange={(e) => setSelectedPos(e.target.value)}
-          >
-            {ALL_POSITIONS.map((p) => (
-              <option key={`bot-${p}`} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
+          Candidates for{' '}
+          <strong>{selectedSlot?.label ?? '—'}</strong>
+          {selectedSlot ? (
+            <span className="teamhome-small" style={{ marginLeft: 8, opacity: 0.75 }}>
+              (rates as {selectedSlot.ratingKey})
+            </span>
+          ) : null}
         </div>
         <div className="teamhome-depth-candidates">
           {pool.length === 0 ? (
-            <div className="teamhome-roster-empty">No players can play this position yet.</div>
+            <div className="teamhome-roster-empty">No players match this spot yet.</div>
           ) : (
             <>
               <div
@@ -309,14 +458,10 @@ export default function DepthChartPage({
                 ))}
               </div>
               {pool.map((p: any, i: number) => {
-                const posRtg =
-                  selectedPos === 'DE' ||
-                  selectedPos === 'DT' ||
-                  selectedPos === 'LB' ||
-                  selectedPos === 'CB' ||
-                  selectedPos === 'S'
-                    ? Math.round(computeDefenseRating(p, selectedPos))
-                    : Math.round(computeOffenseRating(p, selectedPos))
+                const ratingKey = selectedSlot?.ratingKey ?? 'QB'
+                const posRtg = isDefensiveRatingKey(ratingKey)
+                  ? Math.round(computeDefenseRating(p, ratingKey))
+                  : Math.round(computeOffenseRating(p, ratingKey))
                 return (
                   <div
                     key={`cand-${p?.name}-${i}`}
@@ -369,133 +514,18 @@ export default function DepthChartPage({
           className="teamhome-playbook-confirm"
           disabled={saving || userRoster.length === 0}
           onClick={handleAutoDepthByOverall}
-          title="Fill each position from eligible players: highest position rating (offense or defense for that spot), then general overall as tiebreak."
+          title="Fill full position depth (all backup slots), then map to playbook starters."
         >
           Auto depth (by position rating)
         </button>
-        <button
-          type="button"
-          className="teamhome-playbook-confirm"
-          disabled={saving}
-          onClick={handleSave}
-        >
+        <button type="button" className="teamhome-playbook-confirm" disabled={saving} onClick={handleSave}>
           {saving ? 'Saving…' : isPreseason ? 'CONFIRM' : 'Save'}
         </button>
       </div>
-      <div className="teamhome-small" style={{ marginTop: 8, maxWidth: 560 }}>
-        Auto depth uses the same eligibility rules as each position’s dropdown, then ranks by that position’s offensive
-        or defensive rating (tiebreak: general overall).
+      <div className="teamhome-small" style={{ marginTop: 8, maxWidth: 640 }}>
+        Chart layout follows your selected playbooks. Under the hood, data is still stored by position group (e.g. FB
+        uses the RB depth list). Auto depth fills every backup slot; click a starter on the right to edit that spot.
       </div>
     </div>
   )
-}
-
-function getCandidatesForPosition(roster: any[], pos: string) {
-  const exact = roster.filter((p: any) => p?.position === pos || p?.secondary_position === pos)
-  if (exact.length > 0) {
-    const rate = pos === 'DE' || pos === 'DT' || pos === 'LB' || pos === 'CB' || pos === 'S'
-      ? (p: any) => computeDefenseRating(p, pos)
-      : (p: any) => computeOffenseRating(p, pos)
-    return [...exact].sort((a, b) => rate(b) - rate(a))
-  }
-  return roster
-    .map((p: any) => ({
-      ...p,
-      _rate: pos === 'DE' || pos === 'DT' || pos === 'LB' || pos === 'CB' || pos === 'S'
-        ? computeDefenseRating(p, pos)
-        : computeOffenseRating(p, pos),
-    }))
-    .sort((a: any, b: any) => (b._rate ?? 0) - (a._rate ?? 0))
-}
-
-/** Order eligible players for a position: position offense/defense rating first, then general overall. */
-function sortCandidatesByPositionRating(pool: any[], pos: string): any[] {
-  const isDef = pos === 'DE' || pos === 'DT' || pos === 'LB' || pos === 'CB' || pos === 'S'
-  const posRate = (p: any) => (isDef ? computeDefenseRating(p, pos) : computeOffenseRating(p, pos))
-  return [...pool].sort((a, b) => {
-    const pr = posRate(b) - posRate(a)
-    if (pr !== 0) return pr
-    return computePlayerOverall(b) - computePlayerOverall(a)
-  })
-}
-
-/** Full depth chart: each position filled independently from its candidate pool. */
-function buildAutoDepthChartOrder(userRoster: any[]): Record<string, string[]> {
-  const next: Record<string, string[]> = {}
-  for (const pos of ALL_POSITIONS) {
-    const slots = POSITION_DEPTH[pos] ?? 4
-    const pool = getCandidatesForPosition(userRoster, pos)
-    const sorted = sortCandidatesByPositionRating(pool, pos)
-    const names = sorted.slice(0, slots).map((p: any) => p?.name ?? '—')
-    while (names.length < slots) names.push('—')
-    next[pos] = names
-  }
-  return next
-}
-
-const OFF_SLOTS = [
-  { label: 'QB', base: 'QB' },
-  { label: 'RB', base: 'RB' },
-  { label: 'WR1', base: 'WR', idx: 0 },
-  { label: 'WR2', base: 'WR', idx: 1 },
-  { label: 'WR3', base: 'WR', idx: 2 },
-  { label: 'WR4', base: 'WR', idx: 3 },
-  { label: 'WR5', base: 'WR', idx: 4 },
-  { label: 'TE', base: 'TE' },
-  { label: 'OL1', base: 'OL', idx: 0 },
-  { label: 'OL2', base: 'OL', idx: 1 },
-  { label: 'OL3', base: 'OL', idx: 2 },
-  { label: 'OL4', base: 'OL', idx: 3 },
-  { label: 'OL5', base: 'OL', idx: 4 },
-]
-
-const DEF_SLOTS = [
-  { label: 'DL1', base: 'DE', idx: 0 },
-  { label: 'DL2', base: 'DE', idx: 1 },
-  { label: 'DL3', base: 'DT', idx: 0 },
-  { label: 'DL4', base: 'DT', idx: 1 },
-  { label: 'LB1', base: 'LB', idx: 0 },
-  { label: 'LB2', base: 'LB', idx: 1 },
-  { label: 'LB3', base: 'LB', idx: 2 },
-  { label: 'LB4', base: 'LB', idx: 3 },
-  { label: 'CB1', base: 'CB', idx: 0 },
-  { label: 'CB2', base: 'CB', idx: 1 },
-  { label: 'CB3', base: 'CB', idx: 2 },
-  { label: 'SS', base: 'S', idx: 0 },
-  { label: 'FS', base: 'S', idx: 1 },
-]
-
-function buildStartersFromOrder(
-  order: Record<string, string[]>,
-  roster: any[],
-  side: 'offense' | 'defense',
-): Array<{
-  label: string
-  name: string
-  offPosition: string
-  defPosition: string
-  offRating: number
-  defRating: number
-  measure: string
-}> {
-  const byName = new Map<string, any>()
-  for (const p of roster ?? []) {
-    if (p?.name) byName.set(p.name, p)
-  }
-  const slots = side === 'offense' ? OFF_SLOTS : DEF_SLOTS
-  return slots.map((s) => {
-    const arr = order[s.base]
-    const idx = s.idx ?? 0
-    const name = arr?.[idx] ?? '—'
-    const player = name && name !== '—' ? byName.get(name) : null
-    return {
-      label: s.label,
-      name: name && name !== '—' ? name : '—',
-      offPosition: player ? getPlayerSidePosition(player, 'offense') : '—',
-      defPosition: player ? getPlayerSidePosition(player, 'defense') : '—',
-      offRating: player ? getBestSideRating(player, 'offense') : 0,
-      defRating: player ? getBestSideRating(player, 'defense') : 0,
-      measure: player ? formatPlayerMeasureLine(player) : '',
-    }
-  })
 }

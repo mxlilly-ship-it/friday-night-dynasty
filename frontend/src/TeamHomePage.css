@@ -394,7 +394,46 @@
   opacity: 0.88;
 }
 
+.teamhome-improvements-slider-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.teamhome-improvements-step-btn {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(30, 41, 59, 0.9);
+  color: #e2e8f0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.teamhome-improvements-step-btn:hover:not(:disabled) {
+  background: rgba(51, 65, 85, 0.95);
+  border-color: rgba(148, 163, 184, 0.75);
+  color: #fff;
+}
+
+.teamhome-improvements-step-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .teamhome-improvements-range {
+  flex: 1 1 auto;
+  min-width: 0;
   width: 100%;
   height: 30px;
   margin: 0;
@@ -953,6 +992,46 @@ td .teamhome-roster-name--profile {
   gap: 12px;
 }
 
+.teamhome-depth-playbook-banner {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  line-height: 1.45;
+  color: rgba(226, 232, 240, 0.9);
+}
+
+.teamhome-depth-stack--compact {
+  gap: 2px;
+}
+
+.teamhome-depth-item--clickable {
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 4px 6px;
+  margin: 0 -6px;
+  transition: background 0.12s;
+}
+
+.teamhome-depth-item--clickable:hover {
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.teamhome-depth-item--active {
+  background: rgba(59, 130, 246, 0.2);
+  outline: 1px solid rgba(96, 165, 250, 0.45);
+}
+
+.teamhome-depth-slot-label {
+  display: inline-block;
+  min-width: 2.5rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: rgba(251, 191, 36, 0.95);
+}
+
 .teamhome-depth-top {
   border-top: 2px solid rgba(220, 224, 234, 0.55);
   display: grid;
@@ -1034,8 +1113,8 @@ td .teamhome-roster-name--profile {
   gap: 8px;
 }
 
-.depth-slot-row span {
-  min-width: 1.2em;
+.depth-slot-row .teamhome-depth-slot-label {
+  min-width: 3rem;
 }
 
 .depth-slot-select {
@@ -2786,6 +2865,22 @@ td .teamhome-roster-name--profile {
 }
 
 /* Coach Inbox (Team → Coach Inbox) */
+.teamhome-roster-shell.teamhome-coach-inbox-shell {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px 12px;
+  min-height: min(72vh, 760px);
+  overflow: hidden;
+}
+
+.teamhome-coach-inbox-shell .coach-inbox-root {
+  flex: 1;
+  min-height: 0;
+  max-width: none;
+  margin: 0;
+  padding: 8px 4px 12px;
+}
+
 .coach-inbox-root {
   box-sizing: border-box;
   width: 100%;
@@ -3028,11 +3123,36 @@ td .teamhome-roster-name--profile {
   padding-bottom: 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
+.coach-inbox-detail-head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.coach-inbox-delete {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  background: rgba(248, 113, 113, 0.12);
+  color: #fecaca;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+}
+.coach-inbox-delete:hover {
+  background: rgba(248, 113, 113, 0.22);
+  border-color: rgba(248, 113, 113, 0.65);
+}
 .coach-inbox-detail-subject {
+  flex: 1;
+  min-width: 0;
   font-size: 1.05rem;
   font-weight: 900;
   line-height: 1.25;
-  margin-bottom: 10px;
+  margin-bottom: 0;
 }
 .coach-inbox-detail-from {
   display: flex;
