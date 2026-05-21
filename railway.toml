@@ -4,7 +4,7 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "sh scripts/start_railway.sh"
+# Use Dockerfile CMD (PYTHONPATH=/app, uvicorn on $PORT). Override only if not using Docker.
 healthcheckPath = "/health"
-healthcheckTimeout = 120
+healthcheckTimeout = 300
 restartPolicyType = "on_failure"

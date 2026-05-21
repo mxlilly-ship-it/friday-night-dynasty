@@ -8,6 +8,7 @@ RUN npx vite build
 FROM python:3.13-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
     PORT=8080 \
     FND_IGNORE_STALE_SPA=1
 WORKDIR /app
@@ -19,5 +20,4 @@ COPY . .
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
 EXPOSE 8080
-RUN chmod +x scripts/start_railway.sh
-CMD ["sh", "scripts/start_railway.sh"]
+CMD ["sh", "-c", "python -m uvicorn backend.app:app --host 0.0.0.0 --port ${PORT:-8080}"]
