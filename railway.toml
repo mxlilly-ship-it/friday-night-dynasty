@@ -1,0 +1,10 @@
+# Deploy from repo root (not backend/). Service Settings → Root Directory should be empty or "."
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "sh scripts/start_railway.sh"
+healthcheckPath = "/health"
+healthcheckTimeout = 120
+restartPolicyType = "on_failure"
