@@ -4,10 +4,20 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import Any, Dict, List
 
-# Env names to set on Railway (service that runs the Docker app).
-REQUIRED_ENV_KEYS = (
+# Prefer FND_* on Railway (VITE_* may be build-only or easy to mis-format in RAW editor).
+RUNTIME_ENV_KEYS = (
+    "FND_FIREBASE_API_KEY",
+    "FND_FIREBASE_AUTH_DOMAIN",
+    "FND_FIREBASE_PROJECT_ID",
+    "FND_FIREBASE_STORAGE_BUCKET",
+    "FND_FIREBASE_MESSAGING_SENDER_ID",
+    "FND_FIREBASE_APP_ID",
+)
+
+LEGACY_VITE_KEYS = (
     "VITE_FIREBASE_API_KEY",
     "VITE_FIREBASE_AUTH_DOMAIN",
     "VITE_FIREBASE_PROJECT_ID",
@@ -27,7 +37,7 @@ def _env(*names: str) -> str:
 
 def _config_from_json_blob() -> Dict[str, Any] | None:
     """Optional single variable: FIREBASE_WEB_CONFIG_JSON='{"apiKey":"...", ...}'"""
-    raw = _env("FIREBASE_WEB_CONFIG_JSON", "VITE_FIREBASE_WEB_CONFIG_JSON")
+    raw = _env("FIREBASE_WEB_CONFIG_JSON", "FND_FIREBASE_WEB_CONFIG_JSON", "VITE_FIREBASE_WEB_CONFIG_JSON")
     if not raw:
         return None
     try:
@@ -39,12 +49,21 @@ def _config_from_json_blob() -> Dict[str, Any] | None:
     return data
 
 
+def firebase_env_keys_in_process() -> List[str]:
+    """Env var names in this container that look Firebase-related (for /health debugging)."""
+    pat = re.compile(r"^(FIREBASE_|FND_FIREBASE_|VITE_FIREBASE_)", re.I)
+    return sorted(k for k in os.environ if pat.match(k))
+
+
 def firebase_env_status() -> Dict[str, bool]:
     """Which Firebase-related env keys are set (names only — for /health debugging)."""
-    keys = list(REQUIRED_ENV_KEYS) + [
-        "VITE_FIREBASE_MEASUREMENT_ID",
+    keys = [
         "FIREBASE_WEB_CONFIG_JSON",
         "FIREBASE_SERVICE_ACCOUNT_JSON",
+        *RUNTIME_ENV_KEYS,
+        *LEGACY_VITE_KEYS,
+        "FND_FIREBASE_MEASUREMENT_ID",
+        "VITE_FIREBASE_MEASUREMENT_ID",
     ]
     return {k: bool(os.environ.get(k, "").strip()) for k in keys}
 
@@ -60,27 +79,39 @@ def firebase_public_config() -> Dict[str, Any]:
         app_id = str(blob.get("appId") or "").strip()
         measurement_id = str(blob.get("measurementId") or "").strip()
     else:
-        api_key = _env("VITE_FIREBASE_API_KEY", "FND_FIREBASE_API_KEY", "FIREBASE_API_KEY")
+        api_key = _env(
+            "FND_FIREBASE_API_KEY",
+            "VITE_FIREBASE_API_KEY",
+            "FIREBASE_API_KEY",
+        )
         auth_domain = _env(
-            "VITE_FIREBASE_AUTH_DOMAIN",
             "FND_FIREBASE_AUTH_DOMAIN",
+            "VITE_FIREBASE_AUTH_DOMAIN",
             "FIREBASE_AUTH_DOMAIN",
         )
-        project_id = _env("VITE_FIREBASE_PROJECT_ID", "FND_FIREBASE_PROJECT_ID", "FIREBASE_PROJECT_ID")
+        project_id = _env(
+            "FND_FIREBASE_PROJECT_ID",
+            "VITE_FIREBASE_PROJECT_ID",
+            "FIREBASE_PROJECT_ID",
+        )
         storage_bucket = _env(
-            "VITE_FIREBASE_STORAGE_BUCKET",
             "FND_FIREBASE_STORAGE_BUCKET",
+            "VITE_FIREBASE_STORAGE_BUCKET",
             "FIREBASE_STORAGE_BUCKET",
         )
         messaging_sender_id = _env(
-            "VITE_FIREBASE_MESSAGING_SENDER_ID",
             "FND_FIREBASE_MESSAGING_SENDER_ID",
+            "VITE_FIREBASE_MESSAGING_SENDER_ID",
             "FIREBASE_MESSAGING_SENDER_ID",
         )
-        app_id = _env("VITE_FIREBASE_APP_ID", "FND_FIREBASE_APP_ID", "FIREBASE_APP_ID")
+        app_id = _env(
+            "FND_FIREBASE_APP_ID",
+            "VITE_FIREBASE_APP_ID",
+            "FIREBASE_APP_ID",
+        )
         measurement_id = _env(
-            "VITE_FIREBASE_MEASUREMENT_ID",
             "FND_FIREBASE_MEASUREMENT_ID",
+            "VITE_FIREBASE_MEASUREMENT_ID",
             "FIREBASE_MEASUREMENT_ID",
         )
 
@@ -97,15 +128,18 @@ def firebase_public_config() -> Dict[str, Any]:
             missing.append(label)
 
     if missing:
-        unset = [k for k in REQUIRED_ENV_KEYS if not os.environ.get(k, "").strip()]
+        found = firebase_env_keys_in_process()
         hint = (
-            "Set these on the **same Railway service** that deploys this app (Variables tab), "
-            "then redeploy: "
-            + ", ".join(REQUIRED_ENV_KEYS)
-            + ". Or set one variable FIREBASE_WEB_CONFIG_JSON with your Firebase web config JSON."
+            "Easiest fix on Railway: add one variable FIREBASE_WEB_CONFIG_JSON with your Firebase "
+            "web config as a single line of JSON, then redeploy. "
+            "Or use FND_FIREBASE_API_KEY, FND_FIREBASE_AUTH_DOMAIN, etc. (one line each, no line breaks). "
+            "If FIREBASE_SERVICE_ACCOUNT_JSON is set but nothing else appears in firebase_env_keys_in_process, "
+            "your VITE_* entries may be mis-formatted in the Variables RAW editor."
         )
-        if unset:
-            hint += f" Currently unset: {', '.join(unset)}."
+        if found:
+            hint += f" Keys seen in container: {', '.join(found)}."
+        else:
+            hint += " No FIREBASE_/FND_FIREBASE_/VITE_FIREBASE_ keys seen in this container."
         raise ValueError(f"Missing Firebase env on server: {', '.join(missing)}. {hint}")
 
     out: Dict[str, Any] = {

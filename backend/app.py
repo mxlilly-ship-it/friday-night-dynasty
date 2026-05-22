@@ -136,7 +136,11 @@ def create_app() -> FastAPI:
     def health():
         """Quick check that API is running."""
         from backend.data_paths import data_root, saves_base_dir, sqlite_db_path
-        from backend.firebase_public_config import firebase_configured, firebase_env_status
+        from backend.firebase_public_config import (
+            firebase_configured,
+            firebase_env_keys_in_process,
+            firebase_env_status,
+        )
         from backend.services.league_service import _coach_sim_emails_enabled
 
         label = os.environ.get("FND_BUILD_LABEL", "").strip()
@@ -162,6 +166,7 @@ def create_app() -> FastAPI:
             "saves_dir_exists": os.path.isdir(saves_dir),
             "firebase_configured": firebase_configured(),
             "firebase_env_set": firebase_env_status(),
+            "firebase_env_keys_in_process": firebase_env_keys_in_process(),
         }
 
     @app.get("/_fnd/ui-meta")
