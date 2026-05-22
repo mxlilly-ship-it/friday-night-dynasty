@@ -3,4 +3,5 @@ uvicorn[standard]
 pydantic
 httpx
 python-multipart
+firebase-admin
 

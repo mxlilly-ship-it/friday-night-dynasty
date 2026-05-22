@@ -5,6 +5,15 @@ import { NewSaveFlow } from './NewSaveFlow'
 import TeamHomePage from './TeamHomePage'
 import { exportSaveZip, importSaveZip, type SaveBundle } from './saveBundle'
 import { LocalAssetsProvider } from './LocalAssetsContext'
+import {
+  firebaseLoginAndExchange,
+  firebaseRemoveDevice,
+  firebaseSignOut,
+  firebaseSignUpAndExchange,
+  tryRefreshAppSession,
+} from './authSession.js'
+import { auth } from './auth.js'
+import { getOrCreateDeviceId } from './deviceId.js'
 
 /** In dev, use Vite proxy (/api → backend). Production: set VITE_API_BASE or default below. */
 /** Dev: Vite proxy. Production build served from the same host as FastAPI → empty string (same-origin). */
@@ -16,7 +25,9 @@ const USE_LOCAL_BUNDLES = String((import.meta as any).env?.VITE_USE_LOCAL_BUNDLE
 
 /** Tokens live in the server DB; redeploys / new DB invalidate old browser tokens. */
 const STALE_SESSION_MSG =
-  'Your session expired. This often happens after a server restart or deploy. Enter your coach name and tap Continue to sign in again.'
+  'Your session expired after a server update. Sign in again with your email and password — your dynasties should still be there if cloud storage is configured.'
+const ALLOW_DEV_LOGIN =
+  import.meta.env.DEV && String((import.meta as any).env?.VITE_ALLOW_DEV_LOGIN ?? '').toLowerCase() === 'true'
 
 async function formatApiErrorBody(r: Response): Promise<string> {
   const raw = await r.text()
@@ -111,7 +122,14 @@ async function readAutosave(): Promise<BrowserAutosaveRecord | null> {
 
 export default function App() {
   const [token, setToken] = useState<string>(() => localStorage.getItem('fnd_token') ?? '')
-  const [username, setUsername] = useState('alice')
+  const [username, setUsername] = useState(() => localStorage.getItem('fnd_username') ?? '')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [authBusy, setAuthBusy] = useState(false)
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login')
+  const [deviceLimitDevices, setDeviceLimitDevices] = useState<
+    Array<{ device_id: string; label?: string | null; last_seen_at?: number }>
+  >([])
   const [screen, setScreen] = useState<Screen>('title')
   const [saves, setSaves] = useState<SaveListItem[]>([])
   const [saveId, setSaveId] = useState<string>('')
@@ -172,7 +190,9 @@ export default function App() {
 
   function clearStaleSession() {
     localStorage.removeItem('fnd_token')
+    localStorage.removeItem('fnd_username')
     setToken('')
+    void firebaseSignOut()
   }
 
   function expireSession(message: string = STALE_SESSION_MSG) {
@@ -187,31 +207,104 @@ export default function App() {
       const r = await fetch(`${API_BASE}/auth/session`, {
         headers: { Authorization: `Bearer ${t}` },
       })
-      return r.ok
+      if (r.ok) return true
     } catch {
-      return false
+      /* try Firebase refresh below */
     }
+    const refreshed = await tryRefreshAppSession(API_BASE)
+    if (refreshed?.token) {
+      applySession(refreshed)
+      return true
+    }
+    return false
   }
 
-  /** Fresh bearer headers for protected API calls (re-logs in if token is stale). */
+  /** Fresh bearer headers for protected API calls. */
   async function getAuthHeaders(): Promise<Record<string, string>> {
     const stored = (localStorage.getItem('fnd_token') ?? token).trim()
     if (stored && (await validateSession(stored))) {
-      return { Authorization: `Bearer ${stored}` }
+      const live = (localStorage.getItem('fnd_token') ?? token).trim()
+      return live ? { Authorization: `Bearer ${live}` } : {}
     }
-    if (stored) clearStaleSession()
-    const ok = await devLogin()
-    const fresh = (localStorage.getItem('fnd_token') ?? '').trim()
-    if (!ok || !fresh) {
-      expireSession()
-      return {}
-    }
-    return { Authorization: `Bearer ${fresh}` }
+    if (stored) expireSession()
+    return {}
   }
 
-  /** If response is 401, clears stored token and sets a friendly message. Returns true = caller should stop. */
+  function applySession(data: { token: string; username?: string; email?: string }) {
+    localStorage.setItem('fnd_token', data.token)
+    setToken(data.token)
+    const label = String(data.username || data.email || '').trim()
+    if (label) {
+      localStorage.setItem('fnd_username', label)
+      setUsername(label)
+    }
+  }
+
+  async function removeRegisteredDevice(deviceId: string) {
+    setError('')
+    try {
+      const user = auth.currentUser
+      if (!user) {
+        setError('Sign in with Firebase first (enter email/password), then remove a device.')
+        return
+      }
+      await firebaseRemoveDevice(API_BASE, user, deviceId)
+      setDeviceLimitDevices((prev) => prev.filter((d) => d.device_id !== deviceId))
+      setSuccessMessage('Device removed. Tap Log in again.')
+      setTimeout(() => setSuccessMessage(''), 4000)
+    } catch (e: any) {
+      setError(e?.message ? String(e.message) : 'Could not remove device')
+    }
+  }
+
+  async function firebaseAuthSubmit(mode: 'login' | 'signup') {
+    setError('')
+    setDeviceLimitDevices([])
+    const em = email.trim()
+    if (!em || !password) {
+      setError('Enter email and password.')
+      return false
+    }
+    setAuthBusy(true)
+    try {
+      const data =
+        mode === 'signup'
+          ? await firebaseSignUpAndExchange(API_BASE, { email: em, password })
+          : await firebaseLoginAndExchange(API_BASE, { email: em, password })
+      applySession(data)
+      return true
+    } catch (e: any) {
+      return handleFirebaseAuthError(e)
+    } finally {
+      setAuthBusy(false)
+    }
+  }
+
+  function handleFirebaseAuthError(e: any): false {
+    if (e?.code === 'DEVICE_LIMIT' && Array.isArray(e.devices)) {
+      setDeviceLimitDevices(e.devices)
+      setError(
+        `This account is already on 3 devices. Remove one below, then sign in again. (This browser: ${getOrCreateDeviceId().slice(0, 8)}…)`,
+      )
+      return false
+    }
+    const msg = e?.message ? String(e.message) : 'Sign in failed'
+    setError(
+      msg.toLowerCase().includes('fetch') || msg.toLowerCase().includes('network')
+        ? `Sign in failed (${msg}).${apiConnectionHint()}`
+        : msg,
+    )
+    return false
+  }
+
+  /** If response is 401, try Firebase re-login once; else expire session. Returns true = caller should stop. */
   async function consumeUnauthorized(r: Response): Promise<boolean> {
     if (r.status !== 401) return false
+    const refreshed = await tryRefreshAppSession(API_BASE)
+    if (refreshed?.token) {
+      applySession(refreshed)
+      return false
+    }
     expireSession()
     return true
   }
@@ -477,33 +570,6 @@ export default function App() {
       setTimeout(() => setSuccessMessage(''), 2500)
     } catch (e: any) {
       setError(e?.message ? String(e.message) : 'Failed to export save zip')
-    }
-  }
-
-  async function devLogin() {
-    setError('')
-    try {
-      const r = await fetch(`${API_BASE}/auth/dev-login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username }),
-      })
-      if (!r.ok) {
-        setError(await formatApiErrorBody(r))
-        return false
-      }
-      const data = await r.json()
-      localStorage.setItem('fnd_token', data.token)
-      setToken(data.token)
-      return true
-    } catch (e: any) {
-      const msg = e?.message ? String(e.message) : 'network error'
-      setError(
-        msg.toLowerCase().includes('fetch') || msg.toLowerCase().includes('network') || msg.toLowerCase().includes('failed')
-          ? `Login failed (${msg}).${apiConnectionHint()}`
-          : `Login failed: ${msg}`,
-      )
-      return false
     }
   }
 
@@ -850,20 +916,21 @@ export default function App() {
   }, [])
 
   async function onContinueLoad() {
-    const ok = await devLogin()
+    const ok = await firebaseAuthSubmit(authMode)
     if (ok) await loadSaves()
   }
 
   async function onContinueNew() {
     setError('')
-    const h = await getAuthHeaders()
-    if (!h.Authorization) setScreen('new')
+    const ok = await firebaseAuthSubmit(authMode)
+    if (ok) setScreen('new')
   }
 
   useEffect(() => {
     if (!token) return
     void validateSession(token).then((ok) => {
       if (!ok) clearStaleSession()
+      else if (screen === 'load') void loadSaves()
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- validate stored token once on load
   }, [])
@@ -1079,23 +1146,88 @@ export default function App() {
               </>
             ) : !token ? (
               <>
-                <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>Enter coach name to see your saves.</p>
-                <div className="fnd-login-row">
-                  <input
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Coach name"
-                    onKeyDown={(e) => e.key === 'Enter' && onContinueLoad()}
-                  />
-                  <button type="button" onClick={onContinueLoad}>
-                    Continue
+                <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
+                  Sign in with your account to see cloud saves on this server.
+                </p>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  <button
+                    type="button"
+                    className={authMode === 'login' ? 'fnd-title-btn' : 'teamhome-select'}
+                    style={{ flex: 1, maxWidth: 'none' }}
+                    onClick={() => setAuthMode('login')}
+                  >
+                    Log in
+                  </button>
+                  <button
+                    type="button"
+                    className={authMode === 'signup' ? 'fnd-title-btn' : 'teamhome-select'}
+                    style={{ flex: 1, maxWidth: 'none' }}
+                    onClick={() => setAuthMode('signup')}
+                  >
+                    Sign up
                   </button>
                 </div>
+                <div className="fnd-login-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Email"
+                    onKeyDown={(e) => e.key === 'Enter' && void onContinueLoad()}
+                  />
+                  <input
+                    type="password"
+                    autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Password"
+                    onKeyDown={(e) => e.key === 'Enter' && void onContinueLoad()}
+                  />
+                  <button type="button" disabled={authBusy} onClick={() => void onContinueLoad()}>
+                    {authBusy ? 'Please wait…' : authMode === 'signup' ? 'Create account & continue' : 'Log in & continue'}
+                  </button>
+                </div>
+                {deviceLimitDevices.length > 0 ? (
+                  <div style={{ marginTop: 12, padding: 10, border: '1px solid #4a5568', borderRadius: 8 }}>
+                    <p style={{ margin: '0 0 8px', fontSize: '0.85rem', color: '#cbd5e1' }}>Registered devices</p>
+                    {deviceLimitDevices.map((d) => (
+                      <div
+                        key={d.device_id}
+                        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}
+                      >
+                        <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
+                          {d.device_id.slice(0, 8)}…
+                          {d.last_seen_at ? ` · ${new Date(d.last_seen_at * 1000).toLocaleDateString()}` : ''}
+                        </span>
+                        <button type="button" className="teamhome-select" onClick={() => void removeRegisteredDevice(d.device_id)}>
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                {ALLOW_DEV_LOGIN ? (
+                  <p style={{ marginTop: 12, fontSize: '0.75rem', color: '#6b7280' }}>
+                    Dev: set VITE_ALLOW_DEV_LOGIN=true and use legacy dev-login via API only.
+                  </p>
+                ) : null}
               </>
             ) : (
               <>
                 <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.85rem' }}>
                   Signed in as <strong style={{ color: '#d0d4dc' }}>{username}</strong>
+                  <button
+                    type="button"
+                    className="teamhome-select"
+                    style={{ marginLeft: 10, fontSize: '0.75rem' }}
+                    onClick={() => {
+                      clearStaleSession()
+                      setSaves([])
+                    }}
+                  >
+                    Sign out
+                  </button>
                 </p>
                 <button type="button" className="fnd-title-btn" style={{ maxWidth: '100%', marginBottom: '1rem' }} onClick={loadSaves}>
                   Refresh list
@@ -1135,19 +1267,62 @@ export default function App() {
             </button>
             <h2>New dynasty</h2>
             <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
-              Sign in with a coach account to set up your save.
+              Create an account or log in to start a new dynasty (saved on the server).
             </p>
-            <div className="fnd-login-row">
-              <input
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Coach / username"
-                onKeyDown={(e) => e.key === 'Enter' && onContinueNew()}
-              />
-              <button type="button" onClick={onContinueNew}>
-                Continue
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              <button
+                type="button"
+                className={authMode === 'login' ? 'fnd-title-btn' : 'teamhome-select'}
+                style={{ flex: 1, maxWidth: 'none' }}
+                onClick={() => setAuthMode('login')}
+              >
+                Log in
+              </button>
+              <button
+                type="button"
+                className={authMode === 'signup' ? 'fnd-title-btn' : 'teamhome-select'}
+                style={{ flex: 1, maxWidth: 'none' }}
+                onClick={() => setAuthMode('signup')}
+              >
+                Sign up
               </button>
             </div>
+            <div className="fnd-login-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+              <input
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Email"
+              />
+              <input
+                type="password"
+                autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Password"
+                onKeyDown={(e) => e.key === 'Enter' && void onContinueNew()}
+              />
+              <button type="button" disabled={authBusy} onClick={() => void onContinueNew()}>
+                {authBusy ? 'Please wait…' : authMode === 'signup' ? 'Create account & continue' : 'Log in & continue'}
+              </button>
+            </div>
+            {deviceLimitDevices.length > 0 ? (
+              <div style={{ marginTop: 12, padding: 10, border: '1px solid #4a5568', borderRadius: 8 }}>
+                <p style={{ margin: '0 0 8px', fontSize: '0.85rem', color: '#cbd5e1' }}>Registered devices</p>
+                {deviceLimitDevices.map((d) => (
+                  <div
+                    key={d.device_id}
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}
+                  >
+                    <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>{d.device_id.slice(0, 8)}…</span>
+                    <button type="button" className="teamhome-select" onClick={() => void removeRegisteredDevice(d.device_id)}>
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
         )}
 

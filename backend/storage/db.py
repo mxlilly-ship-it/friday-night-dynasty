@@ -3,14 +3,12 @@ import sqlite3
 from contextlib import contextmanager
 from typing import Iterator, List, Optional
 
+from backend.data_paths import saves_base_dir, sqlite_db_path
 from systems.win_path_io import extended_abs_path, makedirs_with_path_fallback, windows_file_arg_error
 
 
 def _db_path() -> str:
-    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    # backend/.. = project root
-    root = os.path.dirname(base)
-    return os.path.join(root, "backend", "dynasty.sqlite3")
+    return sqlite_db_path()
 
 
 def _sqlite_db_candidates() -> List[str]:
@@ -40,6 +38,11 @@ def init_db() -> None:
         makedirs_with_path_fallback(os.path.abspath(os.path.normpath(db_dir)))
     except OSError:
         os.makedirs(db_dir, exist_ok=True)
+    saves_dir = saves_base_dir()
+    try:
+        makedirs_with_path_fallback(os.path.abspath(os.path.normpath(saves_dir)))
+    except OSError:
+        os.makedirs(saves_dir, exist_ok=True)
     with _connect_sqlite() as conn:
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute(
@@ -86,6 +89,33 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_devices (
+              user_id TEXT NOT NULL,
+              device_id TEXT NOT NULL,
+              label TEXT,
+              created_at INTEGER NOT NULL,
+              last_seen_at INTEGER NOT NULL,
+              PRIMARY KEY (user_id, device_id),
+              FOREIGN KEY(user_id) REFERENCES users(id)
+            )
+            """
+        )
+        _migrate_users_firebase(conn)
+
+
+def _migrate_users_firebase(conn: sqlite3.Connection) -> None:
+    """Add firebase_uid / email columns for Firebase accounts (legacy dev users unchanged)."""
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
+    if "firebase_uid" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN firebase_uid TEXT")
+    if "email" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid) "
+        "WHERE firebase_uid IS NOT NULL AND firebase_uid != ''"
+    )
 
 
 @contextmanager

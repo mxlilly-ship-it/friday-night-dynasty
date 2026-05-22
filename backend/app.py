@@ -125,12 +125,15 @@ def create_app() -> FastAPI:
     @app.get("/health")
     def health():
         """Quick check that API is running."""
-        label = os.environ.get("FND_BUILD_LABEL", "").strip()
-        # Coach inbox week batches: league_service flips off when FND_DISABLE_WEEK_SIM_EMAILS is 1/true/yes.
+        from backend.data_paths import data_root, saves_base_dir, sqlite_db_path
         from backend.services.league_service import _coach_sim_emails_enabled
 
+        label = os.environ.get("FND_BUILD_LABEL", "").strip()
         disable_raw = os.environ.get("FND_DISABLE_WEEK_SIM_EMAILS")
         disable_val = disable_raw.strip() if isinstance(disable_raw, str) and disable_raw.strip() else None
+        data_dir = data_root()
+        db_path = sqlite_db_path()
+        saves_dir = saves_base_dir()
         return {
             "ok": True,
             "pid": os.getpid(),
@@ -140,6 +143,12 @@ def create_app() -> FastAPI:
             "hint": "Restart uvicorn after code changes. Dev/preview UI proxies /api to VITE_API_PROXY_TARGET (default 8001).",
             "coach_week_sim_emails_enabled": _coach_sim_emails_enabled(),
             "fnd_disable_week_sim_emails": disable_val,
+            "data_root": data_dir,
+            "persistent_data": bool(os.environ.get("FND_DATA_DIR", "").strip()),
+            "sqlite_db": db_path,
+            "sqlite_db_exists": os.path.isfile(db_path),
+            "saves_dir": saves_dir,
+            "saves_dir_exists": os.path.isdir(saves_dir),
         }
 
     @app.get("/_fnd/ui-meta")
