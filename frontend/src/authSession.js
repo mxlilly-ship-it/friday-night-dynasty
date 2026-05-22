@@ -1,5 +1,5 @@
 import { signOut } from 'firebase/auth'
-import { login, signUp, auth } from './auth.js'
+import { login, signUp, getAuthInstance } from './auth.js'
 import { getOrCreateDeviceId } from './deviceId.js'
 
 /**
@@ -83,7 +83,7 @@ export async function firebaseRemoveDevice(apiBase, user, deviceId) {
  * @returns {Promise<{ token: string, username?: string, email?: string } | null>}
  */
 export async function tryRefreshAppSession(apiBase) {
-  const user = auth.currentUser
+  const user = getAuthInstance().currentUser
   if (!user) return null
   try {
     return await exchangeIdToken(apiBase, user)
@@ -94,7 +94,7 @@ export async function tryRefreshAppSession(apiBase) {
 
 export async function firebaseSignOut() {
   try {
-    await signOut(auth)
+    await signOut(getAuthInstance())
   } catch {
     /* ignore */
   }

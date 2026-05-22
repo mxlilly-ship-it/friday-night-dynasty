@@ -12,7 +12,7 @@ import {
   firebaseSignUpAndExchange,
   tryRefreshAppSession,
 } from './authSession.js'
-import { auth } from './auth.js'
+import { getAuthInstance } from './auth.js'
 import { getOrCreateDeviceId } from './deviceId.js'
 
 /** In dev, use Vite proxy (/api → backend). Production: set VITE_API_BASE or default below. */
@@ -243,7 +243,7 @@ export default function App() {
   async function removeRegisteredDevice(deviceId: string) {
     setError('')
     try {
-      const user = auth.currentUser
+      const user = getAuthInstance().currentUser
       if (!user) {
         setError('Sign in with Firebase first (enter email/password), then remove a device.')
         return

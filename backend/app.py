@@ -122,10 +122,21 @@ def create_app() -> FastAPI:
         except Exception as e:
             return {"_schema": str(e), "offense_playbooks": {}, "defense_playbooks": {}, "_debug": {"cwd": os.getcwd()}}
 
+    @app.get("/config/firebase.json")
+    def firebase_config_route():
+        """Public Firebase web config (runtime env). Used when Vite build did not embed VITE_*."""
+        from backend.firebase_public_config import firebase_public_config
+
+        try:
+            return firebase_public_config()
+        except ValueError as e:
+            raise HTTPException(status_code=503, detail=str(e)) from e
+
     @app.get("/health")
     def health():
         """Quick check that API is running."""
         from backend.data_paths import data_root, saves_base_dir, sqlite_db_path
+        from backend.firebase_public_config import firebase_configured
         from backend.services.league_service import _coach_sim_emails_enabled
 
         label = os.environ.get("FND_BUILD_LABEL", "").strip()
@@ -149,6 +160,7 @@ def create_app() -> FastAPI:
             "sqlite_db_exists": os.path.isfile(db_path),
             "saves_dir": saves_dir,
             "saves_dir_exists": os.path.isdir(saves_dir),
+            "firebase_configured": firebase_configured(),
         }
 
     @app.get("/_fnd/ui-meta")
