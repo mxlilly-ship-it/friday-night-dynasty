@@ -48,6 +48,17 @@ import {
   formatTeamPointsDelta,
   prestigeBandLabel,
 } from './prestigeUtils'
+import {
+  buildRegionalPlayoffSlice,
+  buildStatePlayoffFromResults,
+  findPlayoffGame,
+  isRegionalPlayoffSeeds,
+  PLAYOFF_FINAL_FOUR_VIEW,
+  playoffDisplaySeedForTeam,
+  playoffRegionsFromSeeds,
+  userRegionFromSeeds,
+  type PlayoffRoundColumn,
+} from './playoffBracketView'
 
 /** Team menu value for the playoff bracket view (vs roster / depth / gameplans). */
 const PLAYOFF_BRACKET_MENU = 'Playoff bracket'
@@ -1316,7 +1327,7 @@ function buildPlayoffChRow(ch: any[], sf: any[]) {
   return { home: 'TBD', away: 'TBD', home_score: null, away_score: null, projected: true }
 }
 
-function buildPlayoffView(state: any, classKey?: string | null) {
+function buildPlayoffView(state: any, classKey?: string | null, regionKey?: string | null) {
   let inner: {
     seeds?: Array<{ seed: number; team: string }>
     bracket_results?: any[]
@@ -1344,12 +1355,12 @@ function buildPlayoffView(state: any, classKey?: string | null) {
     bc && Object.keys(bc).length && preferred && !resolveBracketClassKey(bc, preferred),
   )
 
-  const seeds: Array<{ seed: number; team: string }> = Array.isArray(inner?.seeds) ? inner.seeds : []
+  const seeds: Array<{ seed: number; team: string; region?: string; region_seed?: number }> = Array.isArray(
+    inner?.seeds,
+  )
+    ? inner.seeds
+    : []
   const results: Array<any> = Array.isArray(inner?.bracket_results) ? inner.bracket_results : []
-  const byRound = (round: string) => results.filter((g) => String(g?.round || '') === round)
-  const qf = byRound('Quarterfinal')
-  const sf = byRound('Semifinal')
-  const ch = byRound('Championship')
   const completed = Boolean(inner?.completed)
   const champion = inner?.champion != null ? String(inner.champion) : ''
   let viewClass: string | null = null
@@ -1365,6 +1376,64 @@ function buildPlayoffView(state: any, classKey?: string | null) {
     viewClass = null
   }
 
+  if (!missingBracket && isRegionalPlayoffSeeds(seeds)) {
+    const regions = playoffRegionsFromSeeds(seeds)
+    if (regions.length) {
+      const ut = String(state?.user_team || '').trim()
+      const userReg = userRegionFromSeeds(seeds, ut)
+      const rk = regionKey != null && String(regionKey).trim() !== '' ? String(regionKey).trim() : ''
+      if (rk === PLAYOFF_FINAL_FOUR_VIEW) {
+        const stateOnly = buildStatePlayoffFromResults(results)
+        return {
+          seeds,
+          isRegional: true as const,
+          viewFinalFour: true as const,
+          regions,
+          selectedRegion: PLAYOFF_FINAL_FOUR_VIEW,
+          teamsPerRegion: 0,
+          inRegionColumns: [] as PlayoffRoundColumn[],
+          qfPairs: [] as { home: string; away: string }[],
+          qf: [] as any[],
+          sf: [] as any[],
+          ch: [] as any[],
+          sfRows: stateOnly.stateSfRows,
+          chRow: stateOnly.stateChRow,
+          completed,
+          champion,
+          viewClass,
+          missingBracket,
+        }
+      }
+      const selectedRegion =
+        rk && regions.includes(rk) ? rk : userReg && regions.includes(userReg) ? userReg : regions[0]
+      const slice = buildRegionalPlayoffSlice(seeds, results, selectedRegion)
+      return {
+        seeds,
+        isRegional: true as const,
+        viewFinalFour: false as const,
+        regions,
+        selectedRegion,
+        teamsPerRegion: seeds.filter((s) => String(s.region) === selectedRegion).length,
+        inRegionColumns: slice.inRegionColumns,
+        qfPairs: [] as { home: string; away: string }[],
+        qf: [] as any[],
+        sf: [] as any[],
+        ch: [] as any[],
+        sfRows: slice.stateSfRows,
+        chRow: slice.stateChRow,
+        completed,
+        champion,
+        viewClass,
+        missingBracket,
+      }
+    }
+  }
+
+  const byRound = (round: string) => results.filter((g) => String(g?.round || '') === round)
+  const qf = byRound('Quarterfinal')
+  const sf = byRound('Semifinal')
+  const ch = byRound('Championship')
+
   const seedName = (n: number) => seeds.find((s) => Number(s.seed) === n)?.team || `Seed ${n}`
   // Match engine order: 1v8, 2v7, 3v6, 4v5
   const qfPairs = missingBracket
@@ -1379,7 +1448,25 @@ function buildPlayoffView(state: any, classKey?: string | null) {
   const sfRows = missingBracket ? [] : buildPlayoffSfRows(qf, sf, qfPairs)
   const chRow = missingBracket ? null : buildPlayoffChRow(ch, sf)
 
-  return { seeds, qfPairs, qf, sf, ch, sfRows, chRow, completed, champion, viewClass, missingBracket }
+  return {
+    seeds,
+    isRegional: false as const,
+    viewFinalFour: false as const,
+    regions: [] as string[],
+    selectedRegion: '',
+    teamsPerRegion: 0,
+    inRegionColumns: [] as PlayoffRoundColumn[],
+    qfPairs,
+    qf,
+    sf,
+    ch,
+    sfRows,
+    chRow,
+    completed,
+    champion,
+    viewClass,
+    missingBracket,
+  }
 }
 
 /** Playoff seed (1–8) for a team from initial bracket seeds; null if unknown / placeholder label. */
@@ -1484,7 +1571,7 @@ function TeamHomePageBody({
   stadiumVersion,
   setStadiumVersion,
 }: TeamHomePageBodyProps) {
-  const isLocalBundle = saveId === '__local__'
+  const isLocalBundle = saveId === '__local__' || saveId.startsWith('b_')
   const stadiumFileInputRef = useRef<HTMLInputElement>(null)
 
   const downloadTeamRecap = async (teamName: string, year: number | string) => {
@@ -1624,6 +1711,8 @@ function TeamHomePageBody({
   const [carouselVacancyPick, setCarouselVacancyPick] = useState('')
   /** Playoffs dashboard: which classification bracket to display (multi-class leagues). */
   const [playoffBracketClass, setPlayoffBracketClass] = useState<string>('')
+  /** Regional playoffs: which scheduling region bracket to display (regional_8x4 / regional_4x4). */
+  const [playoffBracketRegion, setPlayoffBracketRegion] = useState<string>('')
   const prevSaveIdForPlayoffViewRef = useRef<string | null>(null)
   useEffect(() => {
     const prev = prevSaveIdForPlayoffViewRef.current
@@ -1635,6 +1724,7 @@ function TeamHomePageBody({
         /* ignore */
       }
       setPlayoffBracketClass('')
+      setPlayoffBracketRegion('')
     }
   }, [saveId])
   /** Team classifications plus any `by_class` keys so the dropdown always lists real brackets. */
@@ -1685,10 +1775,51 @@ function TeamHomePageBody({
     }
     return defaultPlayoffClass || playoffClassOptions[0] || ''
   }, [playoffBracketClass, defaultPlayoffClass, playoffClassOptions, saveId])
+  const playoffRegionOptions = useMemo(() => {
+    const bc = normalizePlayoffsByClass(saveState)
+    if (!bc) return [] as string[]
+    const rk = resolveBracketClassKey(bc, bracketClassForView || defaultPlayoffClass)
+    const inner = rk && bc[rk] ? bc[rk] : null
+    const seeds = Array.isArray(inner?.seeds) ? inner.seeds : []
+    if (!isRegionalPlayoffSeeds(seeds)) return []
+    return playoffRegionsFromSeeds(seeds)
+  }, [saveState, bracketClassForView, defaultPlayoffClass])
+  const defaultPlayoffRegion = useMemo(() => {
+    if (!playoffRegionOptions.length) return ''
+    const bc = normalizePlayoffsByClass(saveState)
+    const rk = resolveBracketClassKey(bc, bracketClassForView || defaultPlayoffClass)
+    const inner = rk && bc?.[rk] ? bc[rk] : null
+    const seeds = Array.isArray(inner?.seeds) ? inner.seeds : []
+    const ur = userRegionFromSeeds(seeds, String(saveState?.user_team || ''))
+    return ur && playoffRegionOptions.includes(ur) ? ur : playoffRegionOptions[0]
+  }, [saveState, bracketClassForView, defaultPlayoffClass, playoffRegionOptions, userTeam])
+  const bracketRegionForView = useMemo(() => {
+    const t = (playoffBracketRegion || '').trim()
+    if (t) return t
+    try {
+      const s = sessionStorage.getItem(`fnd.playoff.viewRegion.${saveId}`)?.trim()
+      if (s) return s
+    } catch {
+      /* ignore */
+    }
+    return defaultPlayoffRegion
+  }, [playoffBracketRegion, defaultPlayoffRegion, saveId])
+  const selectPlayoffRegionValue = useMemo(() => {
+    const v = (playoffBracketRegion || '').trim()
+    if (v) return v
+    try {
+      const s = sessionStorage.getItem(`fnd.playoff.viewRegion.${saveId}`)?.trim()
+      if (s) return s
+    } catch {
+      /* ignore */
+    }
+    return defaultPlayoffRegion || playoffRegionOptions[0] || ''
+  }, [playoffBracketRegion, defaultPlayoffRegion, playoffRegionOptions, saveId])
   const playoffView = useMemo(
-    () => buildPlayoffView(saveState, bracketClassForView || null),
-    [saveState, bracketClassForView],
+    () => buildPlayoffView(saveState, bracketClassForView || null, bracketRegionForView || null),
+    [saveState, bracketClassForView, bracketRegionForView],
   )
+  const playoffSeedDisplayMode = playoffView.isRegional ? ('regional' as const) : ('overall' as const)
   const [teamHistoryLoading, setTeamHistoryLoading] = useState(false)
   const [teamHistoryRows, setTeamHistoryRows] = useState<any[]>([])
   const [teamHistoryTotals, setTeamHistoryTotals] = useState<TeamProgramTotalsDisplay | null>(null)
@@ -1744,9 +1875,82 @@ function TeamHomePageBody({
   )
   const userClassification = useMemo(() => classificationOfUserTeam(saveState), [saveState])
   const seasonSummaryStandingsRows = useMemo(
-    () => buildStandingsRows(saveState, userClassification).slice(0, 10),
-    [saveState, userClassification],
+    () => buildStandingsRows(saveState, bracketClassForView || userClassification).slice(0, 10),
+    [saveState, bracketClassForView, userClassification],
   )
+
+  const playoffBracketToolbar = useMemo(() => {
+    if (playoffClassOptions.length <= 1 && playoffRegionOptions.length === 0) return null
+    return (
+      <div className="teamhome-playoffs-bracket-header season-summary-bracket-selectors">
+        {playoffClassOptions.length > 1 ? (
+          <label className="teamhome-playoffs-class-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="teamhome-small" style={{ marginBottom: 0 }}>
+              Class
+            </span>
+            <select
+              className="teamhome-select"
+              value={selectPlayoffClassValue}
+              onChange={(e) => {
+                const v = e.target.value
+                setPlayoffBracketClass(v)
+                try {
+                  sessionStorage.setItem(`fnd.playoff.viewClass.${saveId}`, v)
+                } catch {
+                  /* ignore */
+                }
+              }}
+              aria-label="Season summary playoff classification bracket"
+            >
+              {playoffClassOptions.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : playoffClassOptions.length === 1 ? (
+          <div className="teamhome-small" style={{ marginBottom: 0, opacity: 0.85 }}>
+            Class: <strong>{playoffClassOptions[0]}</strong>
+          </div>
+        ) : null}
+        {playoffRegionOptions.length > 0 ? (
+          <label className="teamhome-playoffs-class-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="teamhome-small" style={{ marginBottom: 0 }}>
+              View
+            </span>
+            <select
+              className="teamhome-select"
+              value={selectPlayoffRegionValue}
+              onChange={(e) => {
+                const v = e.target.value
+                setPlayoffBracketRegion(v)
+                try {
+                  sessionStorage.setItem(`fnd.playoff.viewRegion.${saveId}`, v)
+                } catch {
+                  /* ignore */
+                }
+              }}
+              aria-label="Season summary playoff bracket view"
+            >
+              {playoffRegionOptions.map((r) => (
+                <option key={r} value={r}>
+                  Region {r}
+                </option>
+              ))}
+              <option value={PLAYOFF_FINAL_FOUR_VIEW}>Final Four</option>
+            </select>
+          </label>
+        ) : null}
+      </div>
+    )
+  }, [
+    playoffClassOptions,
+    playoffRegionOptions,
+    selectPlayoffClassValue,
+    selectPlayoffRegionValue,
+    saveId,
+  ])
   const rankingsRows = useMemo(
     () => buildRankingsRows(saveState, leagueClassFilter),
     [saveState, leagueClassFilter],
@@ -2232,10 +2436,200 @@ function TeamHomePageBody({
     )
   }
 
+  const renderPlayoffMatchupRow = (
+    home: string,
+    away: string,
+    homeScore: number | null | undefined,
+    awayScore: number | null | undefined,
+    roundKey: string,
+    exportEnabled: boolean,
+    rowKey: string,
+  ) => (
+    <div key={rowKey} className="teamhome-playoffs-row teamhome-playoffs-row--stacked">
+      <div className="teamhome-playoffs-matchup">
+        {renderPlayoffBracketLine(home, homeScore, {
+          playoffSeed: playoffDisplaySeedForTeam(playoffView.seeds, home, playoffSeedDisplayMode),
+        })}
+        {renderPlayoffBracketLine(away, awayScore, {
+          playoffSeed: playoffDisplaySeedForTeam(playoffView.seeds, away, playoffSeedDisplayMode),
+        })}
+      </div>
+      <div className="teamhome-playoffs-footer">
+        <div className="teamhome-playoffs-actions">
+          <button
+            type="button"
+            className="teamhome-playoffs-link"
+            disabled={!exportEnabled}
+            onClick={async () => {
+              try {
+                await downloadPlayoffText(roundKey, home, away, 'box-score', playoffView.viewClass)
+              } catch (e: any) {
+                onError(e?.message ?? 'Failed to export box score')
+              }
+            }}
+          >
+            Box score
+          </button>
+          <button
+            type="button"
+            className="teamhome-playoffs-link"
+            disabled={!exportEnabled}
+            onClick={async () => {
+              try {
+                await downloadPlayoffText(roundKey, home, away, 'game-log', playoffView.viewClass)
+              } catch (e: any) {
+                onError(e?.message ?? 'Failed to export game log')
+              }
+            }}
+          >
+            Game log
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
+  const renderPlayoffRoundColumn = (col: PlayoffRoundColumn) => (
+    <div className="teamhome-card" key={col.roundKey}>
+      <div className="teamhome-card-title">{col.title}</div>
+      <div className="teamhome-playoffs-list">
+        {col.pairs.length > 0
+          ? col.pairs.map((m) => {
+              const played = findPlayoffGame(col.games, m)
+              const playedHomeScore =
+                played == null ? null : played.home === m.home ? played.home_score : played.away_score
+              const playedAwayScore =
+                played == null ? null : played.home === m.home ? played.away_score : played.home_score
+              return renderPlayoffMatchupRow(
+                m.home,
+                m.away,
+                playedHomeScore,
+                playedAwayScore,
+                col.roundKey,
+                Boolean(played),
+                `${col.roundKey}-${m.home}-${m.away}`,
+              )
+            })
+          : col.rows.map((g, i) =>
+              renderPlayoffMatchupRow(
+                String(g.home),
+                String(g.away),
+                g.home_score,
+                g.away_score,
+                col.roundKey,
+                g.home_score != null,
+                `${col.roundKey}-row-${i}-${g.home}-${g.away}`,
+              ),
+            )}
+      </div>
+    </div>
+  )
+
+  const renderSeasonSummaryRoundColumn = (col: PlayoffRoundColumn) => (
+    <div className="teamhome-card" key={col.roundKey}>
+      <div className="teamhome-card-title">{col.title}</div>
+      <div className="teamhome-playoffs-list">
+        {col.pairs.length > 0
+          ? col.pairs.map((m) => {
+              const played = findPlayoffGame(col.games, m)
+              const playedHomeScore =
+                played == null ? null : played.home === m.home ? played.home_score : played.away_score
+              const playedAwayScore =
+                played == null ? null : played.home === m.home ? played.away_score : played.home_score
+              return (
+                <div key={`${col.roundKey}-${m.home}-${m.away}`} className="teamhome-playoffs-row teamhome-playoffs-row--stacked">
+                  <div className="teamhome-playoffs-matchup">
+                    {renderPlayoffBracketLine(m.home, playedHomeScore, {
+                      playoffSeed: playoffSeedForTeam(playoffView.seeds, m.home),
+                    })}
+                    {renderPlayoffBracketLine(m.away, playedAwayScore, {
+                      playoffSeed: playoffSeedForTeam(playoffView.seeds, m.away),
+                    })}
+                  </div>
+                </div>
+              )
+            })
+          : col.rows.map((g, i) => (
+              <div
+                key={`${col.roundKey}-row-${i}-${g.home}-${g.away}`}
+                className="teamhome-playoffs-row teamhome-playoffs-row--stacked"
+              >
+                <div className="teamhome-playoffs-matchup">
+                  {renderPlayoffBracketLine(String(g.home), g.home_score, {
+                    playoffSeed: playoffSeedForTeam(playoffView.seeds, String(g.home)),
+                  })}
+                  {renderPlayoffBracketLine(String(g.away), g.away_score, {
+                    playoffSeed: playoffSeedForTeam(playoffView.seeds, String(g.away)),
+                  })}
+                </div>
+              </div>
+            ))}
+      </div>
+    </div>
+  )
+
   const seasonSummaryBracketNode = useMemo(() => {
     if (playoffView.missingBracket) return null
+    const bracketKey = `ss-bracket-${bracketClassForView}-${playoffView.selectedRegion ?? 'std'}`
+    if (playoffView.isRegional && playoffView.viewFinalFour) {
+      return (
+        <div
+          className="teamhome-playoffs-grid teamhome-playoffs-grid--final-four season-summary-bracket-readonly"
+          key={bracketKey}
+        >
+          <div className="teamhome-card">
+            <div className="teamhome-card-title">Semifinals</div>
+            <div className="teamhome-playoffs-list">
+              {playoffView.sfRows.map(
+                (g: { home: string; away: string; home_score?: number | null; away_score?: number | null }, i: number) => (
+                  <div key={`ss-sf-${i}-${g.home}-${g.away}`} className="teamhome-playoffs-row teamhome-playoffs-row--stacked">
+                    <div className="teamhome-playoffs-matchup">
+                      {renderPlayoffBracketLine(String(g.home), g.home_score, {
+                        playoffSeed: playoffSeedForTeam(playoffView.seeds, String(g.home)),
+                      })}
+                      {renderPlayoffBracketLine(String(g.away), g.away_score, {
+                        playoffSeed: playoffSeedForTeam(playoffView.seeds, String(g.away)),
+                      })}
+                    </div>
+                  </div>
+                ),
+              )}
+            </div>
+          </div>
+          <div className="teamhome-card">
+            <div className="teamhome-card-title">Championship</div>
+            <div className="teamhome-playoffs-list">
+              {playoffView.chRow ? (
+                <div className="teamhome-playoffs-row teamhome-playoffs-row--stacked">
+                  <div className="teamhome-playoffs-matchup">
+                    {renderPlayoffBracketLine(String(playoffView.chRow.home), playoffView.chRow.home_score, {
+                      playoffSeed: playoffSeedForTeam(playoffView.seeds, String(playoffView.chRow.home)),
+                    })}
+                    {renderPlayoffBracketLine(String(playoffView.chRow.away), playoffView.chRow.away_score, {
+                      playoffSeed: playoffSeedForTeam(playoffView.seeds, String(playoffView.chRow.away)),
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="teamhome-small teamhome-playoffs-empty">TBD</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )
+    }
+    if (playoffView.isRegional) {
+      return (
+        <div
+          className="teamhome-playoffs-grid teamhome-playoffs-grid--regional season-summary-bracket-readonly"
+          key={bracketKey}
+        >
+          {playoffView.inRegionColumns.map((col) => renderSeasonSummaryRoundColumn(col))}
+        </div>
+      )
+    }
     return (
-      <div className="teamhome-playoffs-grid season-summary-bracket-readonly" key={`ss-bracket-${bracketClassForView}`}>
+      <div className="teamhome-playoffs-grid season-summary-bracket-readonly" key={bracketKey}>
         <div className="teamhome-card">
           <div className="teamhome-card-title">Quarterfinals</div>
           <div className="teamhome-playoffs-list">
@@ -3558,6 +3952,15 @@ function TeamHomePageBody({
       offseasonCurrentStage === 'Coaching carousel III')
   const isCoachingCarouselSummaryStage = phase === 'offseason' && offseasonCurrentStage === 'Coaching carousel IV'
   const isCoachingCarouselStage = isCoachingCarouselApplyStage || isCoachingCarouselSummaryStage
+  const userSchemeNotice = saveState?.user_scheme_change_notice as
+    | {
+        headline?: string
+        detail?: string
+        playbooks_may_change?: boolean
+        next_playbook_eligible_year?: number | null
+        playbook_interval_seasons?: number
+      }
+    | undefined
   useEffect(() => {
     if (!isCoachingCarouselStage) setCarouselHotSeatTeamFilter('')
   }, [isCoachingCarouselStage])
@@ -4687,6 +5090,7 @@ function TeamHomePageBody({
               playoffView={playoffView}
               standingsRows={seasonSummaryStandingsRows}
               bracketSlot={seasonSummaryBracketNode}
+              bracketToolbar={playoffBracketToolbar}
               teamWithLogo={teamWithLogo}
               onOpenLeagueHistory={() => setStateMenu('League History')}
               onOpenTeamHistory={() => setStateMenu('Team History')}
@@ -4721,9 +5125,17 @@ function TeamHomePageBody({
                   {!canChangePreferredPlaybooks ? (
                     <p className="teamhome-playbook-lock" style={{ marginBottom: 12, opacity: 0.92, maxWidth: 520 }}>
                       Preferred playbooks are locked until season {nextPreferredPlaybookEligibleYear ?? '—'} (once every{' '}
-                      {PREFERRED_PLAYBOOK_LOCK_SEASONS} seasons). You can still confirm to advance using your current playbooks.
+                      {PREFERRED_PLAYBOOK_LOCK_SEASONS} seasons). The league never changes your schemes — only you can, here when
+                      eligible. You can still confirm to advance using your current playbooks.
                     </p>
-                  ) : null}
+                  ) : (
+                    <p className="teamhome-playbook-lock" style={{ marginBottom: 12, opacity: 0.92, maxWidth: 520 }}>
+                      You may change offensive and defensive playbooks now (once every {PREFERRED_PLAYBOOK_LOCK_SEASONS}{' '}
+                      seasons). Philosophy ({safeStr(findTeam(saveState, userTeam)?.coach?.offensive_style)} /{' '}
+                      {safeStr(findTeam(saveState, userTeam)?.coach?.defensive_style)}) stays as set until you change it at
+                      creation or a future update.
+                    </p>
+                  )}
                   <div className="teamhome-playbook-row">
                     <div className="teamhome-playbook-field">
                       <label className="teamhome-playbook-label">Offensive playbook</label>
@@ -5073,11 +5485,18 @@ function TeamHomePageBody({
           ) : (
               <div className="teamhome-playoffs-shell">
                 <div className="teamhome-card teamhome-card-dark" style={{ marginBottom: 14 }}>
-                  <div className="teamhome-card-title">Playoffs (8 teams)</div>
+                  <div className="teamhome-card-title">
+                    Playoffs
+                    {playoffView.isRegional
+                      ? ` (regional · ${playoffView.seeds.length} teams)`
+                      : ` (${playoffView.seeds.length || 8} teams)`}
+                  </div>
                   <div className="teamhome-small" style={{ marginBottom: 10 }}>
                     {playoffView.completed
                       ? `Champion: ${playoffView.champion || '—'}`
-                      : 'Use Continue (top right) to run one round at a time — quarterfinals, then semifinals, then the championship.'}
+                      : playoffView.isRegional
+                        ? 'Use Continue to advance each round. Pick a region for local brackets, or Final Four for state semifinals and the championship.'
+                        : 'Use Continue (top right) to run one round at a time — quarterfinals, then semifinals, then the championship.'}
                   </div>
                   <div className="teamhome-actions-grid">
                     <button
@@ -5222,12 +5641,87 @@ function TeamHomePageBody({
                       Class: <strong>{playoffClassOptions[0]}</strong>
                     </div>
                   ) : null}
+                  {playoffRegionOptions.length > 0 ? (
+                    <label className="teamhome-playoffs-class-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span className="teamhome-small" style={{ marginBottom: 0 }}>
+                        View
+                      </span>
+                      <select
+                        className="teamhome-select"
+                        value={selectPlayoffRegionValue}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          setPlayoffBracketRegion(v)
+                          try {
+                            sessionStorage.setItem(`fnd.playoff.viewRegion.${saveId}`, v)
+                          } catch {
+                            /* ignore */
+                          }
+                        }}
+                        aria-label="Playoff bracket view"
+                      >
+                        {playoffRegionOptions.map((r) => (
+                          <option key={r} value={r}>
+                            Region {r}
+                          </option>
+                        ))}
+                        <option value={PLAYOFF_FINAL_FOUR_VIEW}>Final Four</option>
+                      </select>
+                    </label>
+                  ) : null}
                 </div>
                 {playoffView.missingBracket ? (
                   <div className="teamhome-card teamhome-card-dark" style={{ marginBottom: 0 }}>
                     <div className="teamhome-small">
                       No playoff bracket for this class. An 8-team bracket exists only when at least eight teams are in that classification.
                     </div>
+                  </div>
+                ) : playoffView.isRegional && playoffView.viewFinalFour ? (
+                  <div
+                    className="teamhome-playoffs-grid teamhome-playoffs-grid--final-four"
+                    key={`playoff-bracket-${bracketClassForView}-final-four`}
+                  >
+                    <div className="teamhome-card">
+                      <div className="teamhome-card-title">Semifinals</div>
+                      <div className="teamhome-playoffs-list">
+                        {playoffView.sfRows.map((g: any, i: number) =>
+                          renderPlayoffMatchupRow(
+                            String(g.home),
+                            String(g.away),
+                            g.home_score,
+                            g.away_score,
+                            'Semifinal',
+                            g.home_score != null,
+                            `state-sf-${i}-${g.home}-${g.away}`,
+                          ),
+                        )}
+                      </div>
+                    </div>
+                    <div className="teamhome-card">
+                      <div className="teamhome-card-title">Championship</div>
+                      <div className="teamhome-playoffs-list">
+                        {playoffView.chRow
+                          ? renderPlayoffMatchupRow(
+                              String(playoffView.chRow.home),
+                              String(playoffView.chRow.away),
+                              playoffView.chRow.home_score,
+                              playoffView.chRow.away_score,
+                              'Championship',
+                              playoffView.chRow.home_score != null,
+                              `state-ch-${playoffView.chRow.home}-${playoffView.chRow.away}`,
+                            )
+                          : (
+                            <div className="teamhome-small teamhome-playoffs-empty">TBD</div>
+                          )}
+                      </div>
+                    </div>
+                  </div>
+                ) : playoffView.isRegional ? (
+                  <div
+                    className="teamhome-playoffs-grid teamhome-playoffs-grid--regional"
+                    key={`playoff-bracket-${bracketClassForView}-${playoffView.selectedRegion}`}
+                  >
+                    {playoffView.inRegionColumns.map((col) => renderPlayoffRoundColumn(col))}
                   </div>
                 ) : (
                   <div className="teamhome-playoffs-grid" key={`playoff-bracket-${bracketClassForView}`}>
@@ -5942,6 +6436,39 @@ function TeamHomePageBody({
                       </div>
                     )}
                     <div style={{ marginTop: 14, textAlign: 'left' }}>
+                      {userSchemeNotice?.detail ? (
+                        <div
+                          className="teamhome-playbook-lock"
+                          style={{
+                            marginBottom: 14,
+                            padding: '12px 14px',
+                            borderRadius: 8,
+                            border: '1px solid rgba(125, 211, 252, 0.35)',
+                            background: 'rgba(30, 58, 95, 0.35)',
+                            maxWidth: 640,
+                          }}
+                        >
+                          <div className="teamhome-small" style={{ fontWeight: 700, marginBottom: 6 }}>
+                            {userSchemeNotice.headline ?? 'Your preferred schemes'}
+                          </div>
+                          <div className="teamhome-small" style={{ opacity: 0.92, lineHeight: 1.45 }}>
+                            {userSchemeNotice.detail}
+                          </div>
+                          {!userSchemeNotice.playbooks_may_change &&
+                          userSchemeNotice.next_playbook_eligible_year != null ? (
+                            <div className="teamhome-small" style={{ marginTop: 8, opacity: 0.85 }}>
+                              Preseason <b>Playbook Select</b> unlocks playbook changes in season{' '}
+                              {userSchemeNotice.next_playbook_eligible_year} (every{' '}
+                              {userSchemeNotice.playbook_interval_seasons ?? PREFERRED_PLAYBOOK_LOCK_SEASONS} seasons).
+                            </div>
+                          ) : userSchemeNotice.playbooks_may_change ? (
+                            <div className="teamhome-small" style={{ marginTop: 8, opacity: 0.85 }}>
+                              You can update playbooks at preseason <b>Playbook Select</b> this year. The league does not
+                              change your schemes for you.
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
                       {isCoachingCarouselSummaryStage ? (
                         (() => {
                           const summ = saveState?.offseason_coaching_changes_summary as
@@ -6274,11 +6801,21 @@ function TeamHomePageBody({
                         {(saveState?.offseason_coach_carousel_last_events ?? []).length === 0 ? (
                           <li className="teamhome-small">No moves logged at this carousel step yet ΓÇö press Continue.</li>
                         ) : (
-                          (saveState?.offseason_coach_carousel_last_events ?? []).map((ev: any, i: number) => (
-                            <li key={`cc-ev-${i}`} className="teamhome-carousel-event-item" style={{ marginBottom: 6 }}>
-                              <span style={{ opacity: 0.8 }}>[{ev.type ?? 'ΓÇö'}]</span> {ev.detail ?? ''}
-                            </li>
-                          ))
+                          (saveState?.offseason_coach_carousel_last_events ?? []).map((ev: any, i: number) => {
+                            const yours =
+                              ev?.affects_user_program === true ||
+                              (ev?.is_user_coach === true && ev?.is_user_team === true) ||
+                              ev?.type === 'user_scheme_reminder'
+                            const typeLabel =
+                              ev?.type === 'user_scheme_reminder' ? 'your schemes' : (ev.type ?? '—')
+                            return (
+                              <li key={`cc-ev-${i}`} className="teamhome-carousel-event-item" style={{ marginBottom: 6 }}>
+                                <span style={{ opacity: 0.8 }}>[{typeLabel}]</span>{' '}
+                                {yours ? <strong style={{ marginRight: 6 }}>Your program:</strong> : null}
+                                {ev.detail ?? ''}
+                              </li>
+                            )
+                          })
                         )}
                       </ul>
                       <div className="teamhome-small" style={{ marginTop: 12 }}>

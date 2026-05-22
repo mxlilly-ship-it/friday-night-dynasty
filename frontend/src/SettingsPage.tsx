@@ -169,7 +169,7 @@ export default function SettingsPage({
   }
 
   const sortedTeams = [...teamNames].sort((a, b) => a.localeCompare(b))
-  const isLocalSave = saveId === '__local__'
+  const isLocalSave = saveId === '__local__' || saveId.startsWith('b_')
   // Production build uses same-origin API: App passes apiBase="" so fetch URLs are `/saves/...` (empty string is falsy but valid).
   const canBulkSimulate = Boolean(
     !isLocalSave && Boolean(saveId) && typeof onApplySaveState === 'function' && typeof apiBase === 'string',

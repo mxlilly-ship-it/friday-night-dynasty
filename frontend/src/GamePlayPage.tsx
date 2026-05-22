@@ -98,6 +98,21 @@ type Props = {
   onError: (msg: string) => void
 }
 
+/** Read FastAPI ``detail`` (or raw body) so coach-play errors are actionable in crash reports. */
+async function apiErrorMessage(r: Response, fallback: string): Promise<string> {
+  const txt = await r.text()
+  try {
+    const j = JSON.parse(txt) as { detail?: unknown }
+    const d = j.detail
+    if (typeof d === 'string' && d.trim()) return d
+    if (Array.isArray(d))
+      return d.map((x: { msg?: string }) => x?.msg || JSON.stringify(x)).join('; ') || fallback
+  } catch {
+    /* not JSON */
+  }
+  return txt.trim() || fallback
+}
+
 export default function GamePlayPage({
   apiBase,
   headers,
@@ -131,7 +146,7 @@ export default function GamePlayPage({
   const sameTeam = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
   const isUserOnOffense = state.possession === 'home' ? sameTeam(userTeam, homeTeam) : sameTeam(userTeam, awayTeam)
   const gameOver = !!state.ot_winner || (state.quarter > 4 && !state.is_overtime)
-  const isLocalBundle = saveId === '__local__'
+  const isLocalBundle = saveId === '__local__' || saveId.startsWith('b_')
 
   const finishPayloadIfNeeded = (ended: boolean) =>
     isLocalBundle && ended ? { game: localGame } : undefined
@@ -145,7 +160,7 @@ export default function GamePlayPage({
             body: JSON.stringify({ state: saveState ?? {}, game: localGame ?? {} }),
           })
         : await fetch(`${apiBase}/games/${gameId}/options?save_id=${encodeURIComponent(saveId)}`, { headers })
-      if (!r.ok) throw new Error('Failed to load play options')
+      if (!r.ok) throw new Error(await apiErrorMessage(r, 'Failed to load play options'))
       const data = await r.json()
       const opts = data.options as PlayOptions
       if (opts && state.down === 4 && !state.is_overtime) {
@@ -222,6 +237,12 @@ export default function GamePlayPage({
 
   const runPlay = async () => {
     if (!options || !selectedPlay || loading) return
+    const userPlays = (isUserOnOffense ? options.offense_plays : options.defense_plays) as PlayOption[]
+    if (!userPlays.some((p) => p.id === selectedPlay.id)) {
+      onError('Play list updated — pick a play again.')
+      await fetchOptions()
+      return
+    }
     setLoading(true)
     try {
       let offensePlayId = isUserOnOffense ? selectedPlay.id : options.ai.offense_play_id
@@ -264,7 +285,7 @@ export default function GamePlayPage({
             headers: { ...headers, 'Content-Type': 'application/json' },
             body: JSON.stringify({ offense_play_id: offensePlayId, defense_play_id: defensePlayId }),
           })
-      if (!r.ok) throw new Error('Play failed')
+      if (!r.ok) throw new Error(await apiErrorMessage(r, 'Play failed'))
       const data = await r.json()
 
       const prevPossession = state.possession
@@ -329,21 +350,7 @@ export default function GamePlayPage({
             method: 'POST',
             headers,
           })
-      if (!r.ok) {
-        const txt = await r.text()
-        let msg = 'Simulation failed'
-        try {
-          const j = JSON.parse(txt) as { detail?: unknown }
-          const d = j.detail
-          if (typeof d === 'string') msg = d
-          else if (Array.isArray(d))
-            msg = d.map((x: { msg?: string }) => x?.msg || JSON.stringify(x)).join('; ')
-          else if (txt.trim()) msg = txt
-        } catch {
-          if (txt.trim()) msg = txt
-        }
-        throw new Error(msg)
-      }
+      if (!r.ok) throw new Error(await apiErrorMessage(r, 'Simulation failed'))
       const data = await r.json()
       if (isLocalBundle && data.game) setLocalGame(data.game)
       setState(data.state)

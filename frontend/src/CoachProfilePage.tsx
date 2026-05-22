@@ -44,7 +44,7 @@ export default function CoachProfilePage({
   onError,
 }: Props) {
   const coachName = String(coach?.name ?? '—')
-  const isLocalBundle = saveId === '__local__'
+  const isLocalBundle = saveId === '__local__' || saveId.startsWith('b_')
   const team = teamName ? findTeam(saveState, teamName) : null
 
   const [historyRows, setHistoryRows] = useState<CoachHistoryRow[]>([])

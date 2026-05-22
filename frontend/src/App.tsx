@@ -3,7 +3,19 @@ import './index.css'
 import './TitleScreen.css'
 import { NewSaveFlow } from './NewSaveFlow'
 import TeamHomePage from './TeamHomePage'
-import { exportSaveZip, importSaveZip, type SaveBundle } from './saveBundle'
+import { importSaveZip, type SaveBundle } from './saveBundle'
+import { downloadBackupJson, downloadBackupZip } from './backupDownload'
+import {
+  createBrowserSaveId,
+  deleteBrowserSave,
+  getBrowserSave,
+  isBrowserSaveId,
+  listBrowserSaves,
+  putBrowserSave,
+  readLatestAutosave,
+  writeLatestAutosave,
+  type BrowserAutosaveRecord,
+} from './browserSave'
 import { LocalAssetsProvider } from './LocalAssetsContext'
 import {
   firebaseLoginAndExchange,
@@ -21,13 +33,9 @@ const API_BASE = import.meta.env.DEV
   ? '/api'
   : ((import.meta as any).env?.VITE_API_BASE ?? '')
 
-const USE_LOCAL_BUNDLES = String((import.meta as any).env?.VITE_USE_LOCAL_BUNDLES ?? '').toLowerCase() === 'true'
-
 /** Tokens live in the server DB; redeploys / new DB invalidate old browser tokens. */
 const STALE_SESSION_MSG =
-  'Your session expired after a server update. Sign in again with your email and password — your dynasties should still be there if cloud storage is configured.'
-const ALLOW_DEV_LOGIN =
-  import.meta.env.DEV && String((import.meta as any).env?.VITE_ALLOW_DEV_LOGIN ?? '').toLowerCase() === 'true'
+  'Your session expired after a server update. Sign in again with your email and password.'
 
 async function formatApiErrorBody(r: Response): Promise<string> {
   const raw = await r.text()
@@ -68,57 +76,7 @@ function preseasonStructurallyComplete(state: any): boolean {
 type SaveListItem = { save_id: string; save_name: string; updated_at: number }
 type Screen = 'title' | 'load' | 'new' | 'playing'
 type BackupReminderFrequency = 'none' | '3_weeks' | '6_weeks' | 'stage'
-type BrowserAutosaveRecord = {
-  savedAt: number
-  saveId: string
-  saveName: string
-  payload: SaveBundle
-}
-
-const AUTOSAVE_DB = 'fnd-browser-saves'
-const AUTOSAVE_STORE = 'autosaves'
-const AUTOSAVE_KEY = 'latest'
-
-function openAutosaveDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    if (typeof window === 'undefined' || !('indexedDB' in window)) {
-      reject(new Error('IndexedDB is not available in this browser.'))
-      return
-    }
-    const req = window.indexedDB.open(AUTOSAVE_DB, 1)
-    req.onupgradeneeded = () => {
-      const db = req.result
-      if (!db.objectStoreNames.contains(AUTOSAVE_STORE)) {
-        db.createObjectStore(AUTOSAVE_STORE)
-      }
-    }
-    req.onsuccess = () => resolve(req.result)
-    req.onerror = () => reject(req.error ?? new Error('Failed to open autosave database'))
-  })
-}
-
-async function writeAutosave(record: BrowserAutosaveRecord): Promise<void> {
-  const db = await openAutosaveDb()
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(AUTOSAVE_STORE, 'readwrite')
-    tx.objectStore(AUTOSAVE_STORE).put(record, AUTOSAVE_KEY)
-    tx.oncomplete = () => resolve()
-    tx.onerror = () => reject(tx.error ?? new Error('Failed to write autosave'))
-  })
-  db.close()
-}
-
-async function readAutosave(): Promise<BrowserAutosaveRecord | null> {
-  const db = await openAutosaveDb()
-  const out = await new Promise<BrowserAutosaveRecord | null>((resolve, reject) => {
-    const tx = db.transaction(AUTOSAVE_STORE, 'readonly')
-    const req = tx.objectStore(AUTOSAVE_STORE).get(AUTOSAVE_KEY)
-    req.onsuccess = () => resolve((req.result as BrowserAutosaveRecord | undefined) ?? null)
-    req.onerror = () => reject(req.error ?? new Error('Failed to read autosave'))
-  })
-  db.close()
-  return out
-}
+type CloudSaveListItem = { save_id: string; save_name: string; updated_at: number }
 
 export default function App() {
   const [token, setToken] = useState<string>(() => localStorage.getItem('fnd_token') ?? '')
@@ -132,6 +90,7 @@ export default function App() {
   >([])
   const [screen, setScreen] = useState<Screen>('title')
   const [saves, setSaves] = useState<SaveListItem[]>([])
+  const [cloudSaves, setCloudSaves] = useState<CloudSaveListItem[]>([])
   const [saveId, setSaveId] = useState<string>('')
   const [saveState, setSaveState] = useState<any>(null)
   const [dynastyLeagueHistory, setDynastyLeagueHistory] = useState<{ seasons?: unknown[] }>({ seasons: [] })
@@ -153,10 +112,40 @@ export default function App() {
   })
   const [showBackupPrompt, setShowBackupPrompt] = useState(false)
   const [backupPromptReason, setBackupPromptReason] = useState('')
-  const inLocalRuntime = Boolean(localBundle)
+  const inLocalRuntime = Boolean(localBundle) && isBrowserSaveId(saveId)
 
   const saveStateRef = useRef<any>(null)
   saveStateRef.current = saveState
+
+  const getCurrentBundle = useCallback((): SaveBundle | null => {
+    const live = saveStateRef.current
+    if (!live) return null
+    if (localBundle) return { ...localBundle, state: live }
+    return {
+      state: live,
+      leagueHistory: dynastyLeagueHistory ?? { seasons: [] },
+      records: {},
+      logos: {},
+      seasonRecaps: {},
+    }
+  }, [localBundle, dynastyLeagueHistory])
+
+  const persistCurrentBrowserSave = useCallback(async () => {
+    if (!localBundle) return
+    const live = saveStateRef.current
+    if (!live) return
+    let id = saveId.startsWith('b_') ? saveId : createBrowserSaveId()
+    if (saveId === '__local__' || !saveId) {
+      setSaveId(id)
+    }
+    const saveName = String(live?.save_name ?? localBundle.state?.save_name ?? 'Dynasty').trim() || 'Dynasty'
+    await putBrowserSave({
+      id,
+      saveName,
+      updatedAt: Date.now(),
+      bundle: { ...localBundle, state: live },
+    })
+  }, [saveId, localBundle])
 
   const headers = useMemo((): Record<string, string> => {
     if (!token) return {}
@@ -309,34 +298,6 @@ export default function App() {
     return true
   }
 
-  async function loadLocalBundleFromZip(file: File) {
-    setError('')
-    setSuccessMessage('')
-    try {
-      const bundle = await importSaveZip(file)
-      setLocalBundle(bundle)
-      setSaveId('__local__')
-      setSaveState(bundle.state)
-      setScreen('playing')
-      setSuccessMessage('Loaded save from computer.')
-      setTimeout(() => setSuccessMessage(''), 2500)
-    } catch (e: any) {
-      setError(e?.message ? String(e.message) : 'Failed to import save zip')
-    }
-  }
-
-  function downloadJson(filename: string, payload: unknown) {
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    setTimeout(() => URL.revokeObjectURL(url), 250)
-  }
-
   function downloadText(filename: string, text: string) {
     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
     const url = URL.createObjectURL(blob)
@@ -386,26 +347,47 @@ export default function App() {
     downloadText(`fnd_crash_report_${stamp}.txt`, crashReportText)
   }
 
-  async function exportBackupFile() {
-    const live = saveStateRef.current
-    if (!live) {
+  async function exportBackupJsonFile() {
+    const payload = getCurrentBundle()
+    if (!payload) {
       setError('No save state loaded to export.')
       return
     }
-    const payload: SaveBundle = localBundle
-      ? { ...localBundle, state: live }
-      : { state: live, leagueHistory: { seasons: [] }, records: {}, logos: {}, seasonRecaps: {} }
-    const name = String(live?.save_name ?? 'dynasty').trim() || 'dynasty'
-    downloadJson(
-      `${name.replaceAll(' ', '_')}_backup.json`,
-      {
-        format: 'fnd-backup-v1',
-        exported_at: new Date().toISOString(),
-        payload,
-      },
-    )
-    setSuccessMessage('Backup downloaded.')
+    downloadBackupJson(payload)
+    setSuccessMessage('Backup (.json) downloaded.')
     setTimeout(() => setSuccessMessage(''), 2500)
+  }
+
+  async function exportBackupZipFile() {
+    const payload = getCurrentBundle()
+    if (!payload) {
+      setError('No save state loaded to export.')
+      return
+    }
+    try {
+      await downloadBackupZip(payload)
+      setSuccessMessage('Backup (.zip) downloaded.')
+      setTimeout(() => setSuccessMessage(''), 2500)
+    } catch (e: any) {
+      setError(e?.message ? String(e.message) : 'Failed to export save zip')
+    }
+  }
+
+  async function downloadBackupForListedSave(id: string, format: 'json' | 'zip') {
+    setError('')
+    try {
+      const rec = await getBrowserSave(id)
+      if (!rec?.bundle?.state) {
+        setError('Save not found in this browser.')
+        return
+      }
+      if (format === 'json') downloadBackupJson(rec.bundle)
+      else await downloadBackupZip(rec.bundle)
+      setSuccessMessage(`Backup (.${format}) downloaded.`)
+      setTimeout(() => setSuccessMessage(''), 2500)
+    } catch (e: any) {
+      setError(e?.message ? String(e.message) : 'Download failed')
+    }
   }
 
   function normalizeImportedBundle(raw: any): SaveBundle {
@@ -494,15 +476,30 @@ export default function App() {
     } else if (saveId && !inLocalRuntime) {
       void refreshDynastyFromServer()
     }
-    if (data?.season_recaps && Object.keys(data.season_recaps).length > 0 && inLocalRuntime) {
-      setLocalBundle((prev) =>
-        prev
-          ? {
-              ...prev,
-              seasonRecaps: { ...(prev.seasonRecaps ?? {}), ...data.season_recaps },
-            }
-          : prev,
-      )
+    if (localBundle) {
+      const live = saveStateRef.current
+      const nextBundle: SaveBundle = {
+        ...localBundle,
+        state: data?.state !== undefined && data?.state !== null ? (data.state as any) : live,
+        leagueHistory:
+          data?.league_history !== undefined && data?.league_history !== null
+            ? (data.league_history as any)
+            : localBundle.leagueHistory,
+        records:
+          data?.records !== undefined && data?.records !== null ? (data.records as any) : localBundle.records,
+        seasonRecaps: data?.season_recaps
+          ? { ...(localBundle.seasonRecaps ?? {}), ...data.season_recaps }
+          : localBundle.seasonRecaps,
+      }
+      setLocalBundle(nextBundle)
+      const id = saveId.startsWith('b_') ? saveId : createBrowserSaveId()
+      if (!saveId.startsWith('b_')) setSaveId(id)
+      void putBrowserSave({
+        id,
+        saveName: String(nextBundle.state?.save_name ?? 'Dynasty').trim() || 'Dynasty',
+        updatedAt: Date.now(),
+        bundle: nextBundle,
+      }).catch((e: any) => setError(e?.message ? String(e.message) : 'Failed to save to browser'))
     }
   }
 
@@ -513,36 +510,42 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh when dynasty id changes only
   }, [saveId, screen, inLocalRuntime])
 
+  async function importBundleToLibrary(bundle: SaveBundle) {
+    const id = createBrowserSaveId()
+    const saveName = String(bundle.state?.save_name ?? 'Imported Dynasty').trim() || 'Imported Dynasty'
+    await putBrowserSave({ id, saveName, updatedAt: Date.now(), bundle })
+    await loadBrowserSave(id)
+    await loadBrowserSaveList()
+  }
+
   async function loadFromComputerFile(file: File) {
-    const low = String(file.name || '').toLowerCase()
-    if (low.endsWith('.zip')) {
-      await loadLocalBundleFromZip(file)
-      return
-    }
-    const text = await file.text()
-    const parsed = JSON.parse(text)
-    const bundle = normalizeImportedBundle(parsed)
-    setLocalBundle(bundle)
-    setSaveId('__local__')
-    setSaveState(bundle.state)
-    setScreen('playing')
     setError('')
-    setSuccessMessage('Loaded save from computer.')
-    setTimeout(() => setSuccessMessage(''), 2500)
+    try {
+      const low = String(file.name || '').toLowerCase()
+      const bundle = low.endsWith('.zip')
+        ? await importSaveZip(file)
+        : normalizeImportedBundle(JSON.parse(await file.text()))
+      await importBundleToLibrary(bundle)
+      setSuccessMessage('Imported into this browser. Saved in My dynasties.')
+      setTimeout(() => setSuccessMessage(''), 3000)
+    } catch (e: any) {
+      setError(e?.message ? String(e.message) : 'Failed to import save')
+    }
   }
 
   async function restoreAutosave() {
     setError('')
     try {
-      const rec = await readAutosave()
+      const rec = await readLatestAutosave()
       if (!rec?.payload?.state) {
         setError('No browser autosave found yet.')
         return
       }
-      setLocalBundle(rec.payload)
-      setSaveId('__local__')
-      setSaveState(rec.payload.state)
-      setScreen('playing')
+      if (rec.saveId.startsWith('b_')) {
+        await loadBrowserSave(rec.saveId)
+      } else {
+        await importBundleToLibrary(rec.payload)
+      }
       setSuccessMessage(`Restored autosave from ${new Date(rec.savedAt).toLocaleString()}.`)
       setTimeout(() => setSuccessMessage(''), 3000)
     } catch (e: any) {
@@ -550,65 +553,92 @@ export default function App() {
     }
   }
 
-  async function exportLocalBundleZip() {
-    if (!localBundle) {
-      setError('No local bundle loaded.')
+  async function loadBrowserSaveList() {
+    setError('')
+    try {
+      const rows = await listBrowserSaves()
+      setSaves(
+        rows.map((r) => ({
+          save_id: r.id,
+          save_name: r.saveName,
+          updated_at: Math.floor(r.updatedAt / 1000),
+        })),
+      )
+    } catch (e: any) {
+      setError(e?.message ? String(e.message) : 'Could not read saves from this browser')
+    }
+  }
+
+  async function loadCloudSaves() {
+    if (!token) return
+    try {
+      const auth = await getAuthHeaders()
+      if (!auth.Authorization) return
+      const r = await fetch(`${API_BASE}/saves`, { headers: auth })
+      if (!r.ok) {
+        if (await consumeUnauthorized(r)) return
+        return
+      }
+      const data = await r.json()
+      setCloudSaves(data)
+    } catch {
+      /* optional */
+    }
+  }
+
+  async function loadBrowserSave(id: string) {
+    setError('')
+    const rec = await getBrowserSave(id)
+    if (!rec?.bundle?.state) {
+      setError('Save not found in this browser.')
       return
     }
-    try {
-      const blob = await exportSaveZip({ ...localBundle, state: saveStateRef.current })
-      const name = String(saveStateRef.current?.save_name ?? 'dynasty').trim() || 'dynasty'
-      const a = document.createElement('a')
-      const url = URL.createObjectURL(blob)
-      a.href = url
-      a.download = `${name.replaceAll(' ', '_')}.zip`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      setTimeout(() => URL.revokeObjectURL(url), 250)
-      setSuccessMessage('Exported save zip.')
-      setTimeout(() => setSuccessMessage(''), 2500)
-    } catch (e: any) {
-      setError(e?.message ? String(e.message) : 'Failed to export save zip')
-    }
+    setLocalBundle(rec.bundle)
+    setSaveId(id)
+    setSaveState(rec.bundle.state)
+    setDynastyLeagueHistory(
+      rec.bundle.leagueHistory && typeof rec.bundle.leagueHistory === 'object'
+        ? rec.bundle.leagueHistory
+        : { seasons: [] },
+    )
+    setScreen('playing')
   }
-
-  async function loadSaves() {
-    setError('')
-    try {
-      const r = await fetch(`${API_BASE}/saves`, { headers })
-      if (!r.ok) {
-        if (await consumeUnauthorized(r)) return
-        setError(await formatApiErrorBody(r))
-        return
-      }
-      const data = await r.json()
-      setSaves(data)
-    } catch (e: any) {
-      setError(`Could not load saves (${e?.message ?? 'network error'}).${apiConnectionHint()}`)
-    }
-  }
-
 
   async function loadSave(id: string) {
+    if (isBrowserSaveId(id)) {
+      try {
+        await loadBrowserSave(id)
+      } catch (e: any) {
+        setError(e?.message ? String(e.message) : 'Could not load save')
+      }
+      return
+    }
     setError('')
     try {
-      const r = await fetch(`${API_BASE}/saves/${id}`, { headers })
+      const auth = await getAuthHeaders()
+      const r = await fetch(`${API_BASE}/saves/${id}`, { headers: auth })
       if (!r.ok) {
         if (await consumeUnauthorized(r)) return
         setError(await formatApiErrorBody(r))
         return
       }
       const data = await r.json()
-      setLocalBundle(null)
-      setSaveId(id)
-      setSaveState(data.state)
-      setDynastyLeagueHistory(
-        data.league_history && typeof data.league_history === 'object'
-          ? data.league_history
-          : { seasons: [] },
-      )
-      setScreen('playing')
+      const bundle: SaveBundle = {
+        state: data.state,
+        leagueHistory: data.league_history ?? { seasons: [] },
+        records: data.records ?? {},
+        logos: {},
+        seasonRecaps: {},
+      }
+      const localId = createBrowserSaveId()
+      await putBrowserSave({
+        id: localId,
+        saveName: String(data.state?.save_name ?? 'Dynasty'),
+        updatedAt: Date.now(),
+        bundle,
+      })
+      await loadBrowserSave(localId)
+      await loadBrowserSaveList()
     } catch (e: any) {
       setError(`Could not load save (${e?.message ?? 'network error'}).${apiConnectionHint()}`)
     }
@@ -621,28 +651,67 @@ export default function App() {
     setSuccessMessage('')
     setDeletingId(id)
     try {
-      const r = await fetch(`${API_BASE}/saves/${id}`, { method: 'DELETE', headers })
-      if (!r.ok) {
-        if (await consumeUnauthorized(r)) {
+      if (isBrowserSaveId(id)) {
+        await deleteBrowserSave(id)
+        await loadBrowserSaveList()
+      } else {
+        const auth = await getAuthHeaders()
+        const r = await fetch(`${API_BASE}/saves/${id}`, { method: 'DELETE', headers: auth })
+        if (!r.ok) {
+          if (await consumeUnauthorized(r)) {
+            setDeletingId(null)
+            return
+          }
+          setError((await formatApiErrorBody(r)) || 'Delete failed')
           setDeletingId(null)
           return
         }
-        setError((await formatApiErrorBody(r)) || 'Delete failed')
-        setDeletingId(null)
-        return
+        await loadCloudSaves()
       }
-      await loadSaves()
       setSuccessMessage(`"${saveName}" deleted.`)
       setTimeout(() => setSuccessMessage(''), 3000)
       if (saveId === id) {
         setSaveId('')
         setSaveState(null)
+        setLocalBundle(null)
         setScreen('load')
       }
     } catch (e: any) {
       setError(`Delete failed (${e?.message ?? 'network error'}).${apiConnectionHint()}`)
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  async function copyCloudSaveToBrowser(cloudId: string) {
+    setError('')
+    try {
+      const auth = await getAuthHeaders()
+      const r = await fetch(`${API_BASE}/saves/${cloudId}`, { headers: auth })
+      if (!r.ok) {
+        if (await consumeUnauthorized(r)) return
+        setError(await formatApiErrorBody(r))
+        return
+      }
+      const data = await r.json()
+      const id = createBrowserSaveId()
+      await putBrowserSave({
+        id,
+        saveName: String(data.state?.save_name ?? 'Dynasty'),
+        updatedAt: Date.now(),
+        bundle: {
+          state: data.state,
+          leagueHistory: data.league_history ?? { seasons: [] },
+          records: data.records ?? {},
+          logos: {},
+          seasonRecaps: {},
+        },
+      })
+      await loadBrowserSaveList()
+      setSuccessMessage('Copied to this browser.')
+      setTimeout(() => setSuccessMessage(''), 2500)
+    } catch (e: any) {
+      setError(e?.message ? String(e.message) : 'Copy failed')
     }
   }
 
@@ -889,7 +958,8 @@ export default function App() {
   async function onLoadSaveClick() {
     setError('')
     setScreen('load')
-    if (!USE_LOCAL_BUNDLES && token) await loadSaves()
+    await loadBrowserSaveList()
+    if (token) await loadCloudSaves()
   }
 
   async function onNewSaveClick() {
@@ -917,7 +987,10 @@ export default function App() {
 
   async function onContinueLoad() {
     const ok = await firebaseAuthSubmit(authMode)
-    if (ok) await loadSaves()
+    if (ok) {
+      await loadBrowserSaveList()
+      await loadCloudSaves()
+    }
   }
 
   async function onContinueNew() {
@@ -930,13 +1003,19 @@ export default function App() {
     if (!token) return
     void validateSession(token).then((ok) => {
       if (!ok) clearStaleSession()
-      else if (screen === 'load') void loadSaves()
+      else if (screen === 'load') {
+        void loadBrowserSaveList()
+        void loadCloudSaves()
+      }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- validate stored token once on load
   }, [])
 
   useEffect(() => {
-    if (!USE_LOCAL_BUNDLES && token && screen === 'load') loadSaves()
+    if (screen === 'load') {
+      void loadBrowserSaveList()
+      if (token) void loadCloudSaves()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, screen])
 
@@ -987,12 +1066,15 @@ export default function App() {
         saveName: String(live?.save_name ?? 'dynasty'),
         payload,
       }
-      void writeAutosave(rec)
+      void writeLatestAutosave(rec)
         .then(() => setLastAutosaveAt(rec.savedAt))
         .catch((e: any) => setError(e?.message ? String(e.message) : 'Autosave failed'))
+      if (localBundle && saveId) {
+        void persistCurrentBrowserSave().catch(() => {})
+      }
     }, 1200)
     return () => window.clearTimeout(timer)
-  }, [autosaveEnabled, localBundle, saveId, saveState, screen])
+  }, [autosaveEnabled, localBundle, saveId, saveState, screen, persistCurrentBrowserSave])
 
   function goTitle() {
     setScreen('title')
@@ -1000,21 +1082,19 @@ export default function App() {
   }
 
   /* ——— Playing: league dashboard (same data as before) ——— */
-  if (screen === 'playing' && (token || (USE_LOCAL_BUNDLES && localBundle))) {
+  if (screen === 'playing' && localBundle && saveState) {
     return (
       <>
-        <div style={{ position: 'fixed', top: 12, right: 12, zIndex: 9999, display: 'flex', gap: 8 }}>
+        <div style={{ position: 'fixed', top: 12, right: 12, zIndex: 9999, display: 'flex', gap: 8, flexWrap: 'wrap', maxWidth: 'min(100vw - 24px, 520px)', justifyContent: 'flex-end' }}>
           <button type="button" className="teamhome-select" onClick={() => setAutosaveEnabled((v) => !v)} title="Toggle browser autosave">
             Autosave: {autosaveEnabled ? 'On' : 'Off'}
           </button>
-          <button type="button" className="teamhome-select" onClick={exportBackupFile} title="Download JSON backup to your computer">
-            Backup Save
+          <button type="button" className="teamhome-select" onClick={() => void exportBackupZipFile()} title="Full save zip (state, history, records, logos)">
+            Download backup (.zip)
           </button>
-          {inLocalRuntime ? (
-            <button type="button" className="teamhome-select" onClick={exportLocalBundleZip} title="Download updated save zip">
-              Export ZIP
-            </button>
-          ) : null}
+          <button type="button" className="teamhome-select" onClick={() => void exportBackupJsonFile()} title="Lighter JSON backup">
+            Download backup (.json)
+          </button>
         </div>
         <LocalAssetsProvider bundle={localBundle}>
           <TeamHomePage
@@ -1028,7 +1108,7 @@ export default function App() {
               onError={setError}
               backupReminderFrequency={backupReminderFrequency}
               onBackupReminderFrequencyChange={setBackupReminderFrequency}
-              onBackupNow={() => void exportBackupFile()}
+              onBackupNow={() => void exportBackupZipFile()}
               leagueHistory={
                 inLocalRuntime && localBundle ? localBundle.leagueHistory : dynastyLeagueHistory
               }
@@ -1061,11 +1141,21 @@ export default function App() {
                   type="button"
                   className="teamhome-select"
                   onClick={() => {
-                    void exportBackupFile()
+                    void exportBackupZipFile()
                     setShowBackupPrompt(false)
                   }}
                 >
-                  Backup now
+                  Download .zip
+                </button>
+                <button
+                  type="button"
+                  className="teamhome-select"
+                  onClick={() => {
+                    void exportBackupJsonFile()
+                    setShowBackupPrompt(false)
+                  }}
+                >
+                  Download .json
                 </button>
               </div>
             </div>
@@ -1106,9 +1196,13 @@ export default function App() {
               ← Back
             </button>
             <h2>Load save</h2>
+            <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
+              Dynasties are stored in <strong style={{ color: '#d0d4dc' }}>this browser</strong> (IndexedDB). Download backups
+              to keep a copy on your computer.
+            </p>
             <div style={{ marginBottom: '1rem', padding: '0.75rem', border: '1px solid #2f3440', borderRadius: 8 }}>
               <p style={{ margin: '0 0 0.5rem', color: '#9ca3af', fontSize: '0.9rem' }}>
-                Restore from computer (.json backup or .zip save), or load your latest browser autosave.
+                <strong style={{ color: '#d0d4dc' }}>Import</strong> — restore a .zip or .json backup into this browser.
               </p>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                 <input
@@ -1121,7 +1215,7 @@ export default function App() {
                   }}
                 />
                 <button type="button" className="fnd-title-btn" style={{ maxWidth: 220 }} onClick={restoreAutosave}>
-                  Load Browser Autosave
+                  Load latest autosave
                 </button>
               </div>
               {lastAutosaveAt ? (
@@ -1130,24 +1224,59 @@ export default function App() {
                 </p>
               ) : null}
             </div>
-            {USE_LOCAL_BUNDLES ? (
-              <>
-                <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
-                  Upload a dynasty save zip (contains JSON + logos). You’ll export a new zip when you’re done playing.
-                </p>
-                <input
-                  type="file"
-                  accept=".zip,application/zip"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0]
-                    if (f) void loadLocalBundleFromZip(f)
-                  }}
-                />
-              </>
-            ) : !token ? (
-              <>
-                <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
-                  Sign in with your account to see cloud saves on this server.
+            <button type="button" className="fnd-title-btn" style={{ maxWidth: '100%', marginBottom: '1rem' }} onClick={() => void loadBrowserSaveList()}>
+              Refresh my dynasties
+            </button>
+            <h3 style={{ margin: '0 0 0.75rem', fontSize: '1rem', color: '#d0d4dc' }}>My dynasties (this browser)</h3>
+            {saves.length === 0 ? (
+              <p style={{ color: '#9ca3af', margin: '0 0 1.5rem' }}>No saves in this browser yet. Import a file or start New Save.</p>
+            ) : (
+              <div style={{ marginBottom: '1.5rem' }}>
+                {saves.map((s) => (
+                  <div key={s.save_id} className="fnd-save-row-wrap" style={{ flexWrap: 'wrap', gap: 6 }}>
+                    <button type="button" className="fnd-save-row" style={{ flex: '1 1 200px' }} onClick={() => loadSave(s.save_id)}>
+                      <strong>{s.save_name}</strong>
+                      <small>{new Date(s.updated_at * 1000).toLocaleString()}</small>
+                    </button>
+                    <button
+                      type="button"
+                      className="teamhome-select"
+                      style={{ fontSize: '0.75rem' }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void downloadBackupForListedSave(s.save_id, 'zip')
+                      }}
+                    >
+                      .zip
+                    </button>
+                    <button
+                      type="button"
+                      className="teamhome-select"
+                      style={{ fontSize: '0.75rem' }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void downloadBackupForListedSave(s.save_id, 'json')
+                      }}
+                    >
+                      .json
+                    </button>
+                    <button
+                      type="button"
+                      className="fnd-save-delete"
+                      onClick={(e) => deleteSave(s.save_id, s.save_name, e)}
+                      disabled={deletingId === s.save_id}
+                      title="Delete from this browser"
+                    >
+                      {deletingId === s.save_id ? '…' : 'Delete'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {!token ? (
+              <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #2f3440' }}>
+                <p style={{ margin: '0 0 0.75rem', color: '#9ca3af', fontSize: '0.85rem' }}>
+                  Optional: sign in to copy cloud saves from the server into this browser.
                 </p>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
                   <button
@@ -1168,14 +1297,7 @@ export default function App() {
                   </button>
                 </div>
                 <div className="fnd-login-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
-                  <input
-                    type="email"
-                    autoComplete="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Email"
-                    onKeyDown={(e) => e.key === 'Enter' && void onContinueLoad()}
-                  />
+                  <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" />
                   <input
                     type="password"
                     autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'}
@@ -1185,37 +1307,13 @@ export default function App() {
                     onKeyDown={(e) => e.key === 'Enter' && void onContinueLoad()}
                   />
                   <button type="button" disabled={authBusy} onClick={() => void onContinueLoad()}>
-                    {authBusy ? 'Please wait…' : authMode === 'signup' ? 'Create account & continue' : 'Log in & continue'}
+                    {authBusy ? 'Please wait…' : authMode === 'signup' ? 'Sign up' : 'Log in'}
                   </button>
                 </div>
-                {deviceLimitDevices.length > 0 ? (
-                  <div style={{ marginTop: 12, padding: 10, border: '1px solid #4a5568', borderRadius: 8 }}>
-                    <p style={{ margin: '0 0 8px', fontSize: '0.85rem', color: '#cbd5e1' }}>Registered devices</p>
-                    {deviceLimitDevices.map((d) => (
-                      <div
-                        key={d.device_id}
-                        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}
-                      >
-                        <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
-                          {d.device_id.slice(0, 8)}…
-                          {d.last_seen_at ? ` · ${new Date(d.last_seen_at * 1000).toLocaleDateString()}` : ''}
-                        </span>
-                        <button type="button" className="teamhome-select" onClick={() => void removeRegisteredDevice(d.device_id)}>
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-                {ALLOW_DEV_LOGIN ? (
-                  <p style={{ marginTop: 12, fontSize: '0.75rem', color: '#6b7280' }}>
-                    Dev: set VITE_ALLOW_DEV_LOGIN=true and use legacy dev-login via API only.
-                  </p>
-                ) : null}
-              </>
+              </div>
             ) : (
-              <>
-                <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.85rem' }}>
+              <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #2f3440' }}>
+                <p style={{ margin: '0 0 0.75rem', color: '#9ca3af', fontSize: '0.85rem' }}>
                   Signed in as <strong style={{ color: '#d0d4dc' }}>{username}</strong>
                   <button
                     type="button"
@@ -1223,39 +1321,31 @@ export default function App() {
                     style={{ marginLeft: 10, fontSize: '0.75rem' }}
                     onClick={() => {
                       clearStaleSession()
-                      setSaves([])
+                      setCloudSaves([])
                     }}
                   >
                     Sign out
                   </button>
                 </p>
-                <button type="button" className="fnd-title-btn" style={{ maxWidth: '100%', marginBottom: '1rem' }} onClick={loadSaves}>
-                  Refresh list
-                </button>
-                {saves.length === 0 ? (
-                  <p style={{ color: '#9ca3af', margin: 0 }}>No saves yet. Use New Save from the main menu.</p>
+                <h3 style={{ margin: '0 0 0.5rem', fontSize: '0.95rem', color: '#d0d4dc' }}>Server saves (copy to browser)</h3>
+                {cloudSaves.length === 0 ? (
+                  <p style={{ color: '#7f8794', fontSize: '0.85rem', margin: 0 }}>No cloud saves on this account.</p>
                 ) : (
-                  saves.map((s) => (
-                    <div key={s.save_id} className="fnd-save-row-wrap">
-                      <button type="button" className="fnd-save-row" onClick={() => loadSave(s.save_id)}>
+                  cloudSaves.map((s) => (
+                    <div key={s.save_id} className="fnd-save-row-wrap" style={{ marginBottom: 6 }}>
+                      <span style={{ flex: 1, padding: '0.5rem 0', color: '#c5cad3', fontSize: '0.9rem' }}>
                         <strong>{s.save_name}</strong>
-                        <small>
-                          {new Date(s.updated_at * 1000).toLocaleString()} · {s.save_id.slice(0, 8)}…
+                        <small style={{ display: 'block', color: '#7f8794' }}>
+                          {new Date(s.updated_at * 1000).toLocaleString()}
                         </small>
-                      </button>
-                      <button
-                        type="button"
-                        className="fnd-save-delete"
-                        onClick={(e) => deleteSave(s.save_id, s.save_name, e)}
-                        disabled={deletingId === s.save_id}
-                        title="Delete this dynasty"
-                      >
-                        {deletingId === s.save_id ? 'Deleting…' : 'Delete'}
+                      </span>
+                      <button type="button" className="teamhome-select" onClick={() => void copyCloudSaveToBrowser(s.save_id)}>
+                        Copy here
                       </button>
                     </div>
                   ))
                 )}
-              </>
+              </div>
             )}
           </div>
         )}
@@ -1267,7 +1357,7 @@ export default function App() {
             </button>
             <h2>New dynasty</h2>
             <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
-              Create an account or log in to start a new dynasty (saved on the server).
+              Log in to create a new dynasty. It will be saved in this browser (IndexedDB); download backups anytime.
             </p>
             <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
               <button
@@ -1335,9 +1425,34 @@ export default function App() {
             onError={setError}
             onSessionExpired={() => expireSession()}
             defaultCoachName={username}
-            onCreated={async (id) => {
-              await loadSaves()
-              await loadSave(id)
+            onCreated={async (cloudId) => {
+              try {
+                const auth = await getAuthHeaders()
+                const r = await fetch(`${API_BASE}/saves/${cloudId}`, { headers: auth })
+                if (!r.ok) {
+                  if (await consumeUnauthorized(r)) return
+                  setError(await formatApiErrorBody(r))
+                  return
+                }
+                const data = await r.json()
+                const localId = createBrowserSaveId()
+                await putBrowserSave({
+                  id: localId,
+                  saveName: String(data.state?.save_name ?? 'My Dynasty'),
+                  updatedAt: Date.now(),
+                  bundle: {
+                    state: data.state,
+                    leagueHistory: data.league_history ?? { seasons: [] },
+                    records: data.records ?? {},
+                    logos: {},
+                    seasonRecaps: {},
+                  },
+                })
+                await loadBrowserSaveList()
+                await loadBrowserSave(localId)
+              } catch (e: any) {
+                setError(e?.message ? String(e.message) : 'Could not save dynasty to this browser')
+              }
             }}
           />
         ) : null}
