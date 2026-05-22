@@ -29,9 +29,11 @@ cp frontend/.env.example frontend/.env
 # Fill VITE_FIREBASE_* from Firebase Console → Project settings → Your apps
 ```
 
-## Railway (production build)
+## Railway (production)
 
-Add these **service variables** (same values as Firebase web app config):
+Variables must be on the **same service** that runs the Dockerfile (your web app), not only at project level.
+
+**Option A — six variables** (names must match exactly):
 
 - `VITE_FIREBASE_API_KEY`
 - `VITE_FIREBASE_AUTH_DOMAIN`
@@ -41,6 +43,14 @@ Add these **service variables** (same values as Firebase web app config):
 - `VITE_FIREBASE_APP_ID`
 - `VITE_FIREBASE_MEASUREMENT_ID` (optional)
 
-Redeploy after changing them — Vite bakes them in at **build** time.
+**Option B — one JSON variable** (easier):
 
-Keep `FIREBASE_SERVICE_ACCOUNT_JSON` as the separate server variable (full JSON, not committed).
+- `FIREBASE_WEB_CONFIG_JSON` = paste the whole web config object from Firebase Console as one line, e.g.  
+  `{"apiKey":"AIza...","authDomain":"friday-night-dynasty.firebaseapp.com","projectId":"friday-night-dynasty",...}`
+
+After saving variables, click **Redeploy**. Check:
+
+- `https://<your-app>/health` → `firebase_env_set` should show `true` for each key you set
+- `https://<your-app>/config/firebase.json` → should return JSON, not an error
+
+Keep `FIREBASE_SERVICE_ACCOUNT_JSON` as a **separate** variable (server login only).
