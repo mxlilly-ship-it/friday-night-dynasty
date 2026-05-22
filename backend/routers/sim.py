@@ -13,6 +13,8 @@ from backend.services.league_service import (
     finish_coach_week_state,
     finish_coach_playoff_state,
     finish_coach_scrimmage_state,
+    get_play_selection_from_state,
+    get_play_learning_summary_from_state,
     _ensure_playoffs_migrated,
     _init_playoffs_multiclass,
     _ensure_all_eligible_playoff_brackets,
@@ -32,6 +34,10 @@ class SimRequest(BaseModel):
     body: Optional[Dict[str, Any]] = None
     league_history: Optional[Dict[str, Any]] = None
     records: Optional[Dict[str, Any]] = None
+
+
+class SimStateRequest(BaseModel):
+    state: Dict[str, Any]
 
 
 class SimGameStartRequest(BaseModel):
@@ -118,6 +124,24 @@ def sim_route(payload: SimRequest = Body(...)):
                 "champion": out.get("champion"),
             }
         raise ValueError(f"Unknown kind '{payload.kind}'")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/play-selection", response_model=Dict[str, Any])
+def sim_play_selection_route(payload: SimStateRequest = Body(...)):
+    """Preseason play selection UI for browser/local saves (no auth)."""
+    try:
+        return get_play_selection_from_state(payload.state)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/play-learning-summary", response_model=Dict[str, Any])
+def sim_play_learning_summary_route(payload: SimStateRequest = Body(...)):
+    """Play selection results screen for browser/local saves (no auth)."""
+    try:
+        return get_play_learning_summary_from_state(payload.state)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

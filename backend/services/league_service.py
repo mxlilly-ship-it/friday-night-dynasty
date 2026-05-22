@@ -884,8 +884,9 @@ def _normalize_name(s: str) -> str:
 
 
 def _saves_base_dir() -> str:
-    base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "saves")
-    return os.path.abspath(base)
+    from backend.data_paths import saves_base_dir
+
+    return saves_base_dir()
 
 
 def _get_user_logo_dir(user_id: str) -> str:
@@ -1318,6 +1319,30 @@ def _carousel_opts_from_state(state: Dict[str, Any]) -> Tuple[bool, Optional[str
     return allow_fire, ucn if ucn else None
 
 
+def _refresh_user_scheme_change_notice(
+    state: Dict[str, Any],
+    teams: Dict[str, Any],
+    user_team: Optional[str],
+    current_year: int,
+) -> None:
+    """Persist offseason reminder: league does not auto-edit the human coach's preferred schemes."""
+    from systems.coach_career_system import build_user_scheme_change_notice
+
+    ut = str(user_team or "").strip()
+    if not ut or ut not in teams:
+        state.pop("user_scheme_change_notice", None)
+        return
+    coach = getattr(teams[ut], "coach", None)
+    if not coach:
+        state.pop("user_scheme_change_notice", None)
+        return
+    notice = build_user_scheme_change_notice(coach, int(current_year))
+    if notice:
+        state["user_scheme_change_notice"] = notice
+    else:
+        state.pop("user_scheme_change_notice", None)
+
+
 def _coach_name_normalized_key(raw: Optional[Any]) -> str:
     """Lowercase + collapse internal whitespace for stable coach-name comparisons."""
     s = str(raw or "").strip()
@@ -1590,6 +1615,7 @@ def _apply_coaching_carousel_churn(
     """Engine step 1: retire/resign/fire only; establishes carousel persist for UI round I."""
     from systems.coach_carousel import run_coach_carousel_step
 
+    _ensure_user_coach_and_firing_defaults(state)
     sg = state.get("season_goals") if isinstance(state.get("season_goals"), dict) else None
     ut = state.get("user_team")
     carousel_year = max(1, int(state.get("current_year", 1)))
@@ -1611,7 +1637,14 @@ def _apply_coaching_carousel_churn(
     )
     _sync_user_team_with_saved_coach(state, teams)
     state["offseason_coach_carousel"] = persist
-    state["offseason_coach_carousel_last_events"] = (events or [])[-40:]
+    from systems.coach_carousel import annotate_carousel_events_for_user
+
+    tagged = annotate_carousel_events_for_user(
+        (events or [])[-40:],
+        user_team=ut,
+        user_coach_name=user_coach_key,
+    )
+    state["offseason_coach_carousel_last_events"] = tagged
     state["offseason_coach_carousel_hot_seat"] = hs or {}
 
 
@@ -1625,6 +1658,7 @@ def _apply_coaching_carousel_stage(
     """Run carousel hiring rounds (engine steps 2–4); step III UI runs final engine step with schemes + prestige."""
     from systems.coach_carousel import build_carousel_season_archive, run_coach_carousel_step
 
+    _ensure_user_coach_and_firing_defaults(state)
     _merge_carousel_job_applications(state, body)
 
     sg = state.get("season_goals") if isinstance(state.get("season_goals"), dict) else None
@@ -1654,9 +1688,17 @@ def _apply_coaching_carousel_stage(
     _sync_user_team_with_saved_coach(state, teams)
     _sync_user_team_from_carousel_events(state, events)
     state["offseason_coach_carousel"] = persist
-    state["offseason_coach_carousel_last_events"] = (events or [])[-40:]
+    from systems.coach_carousel import annotate_carousel_events_for_user
+
+    tagged = annotate_carousel_events_for_user(
+        (events or [])[-40:],
+        user_team=ut,
+        user_coach_name=user_coach_key,
+    )
+    state["offseason_coach_carousel_last_events"] = tagged
     state["offseason_coach_carousel_hot_seat"] = hs or {}
     if step == 4:
+        _refresh_user_scheme_change_notice(state, teams, ut, carousel_year)
         update_prestige(teams, league_history, coach_changes=cc, coach_turnover_only=True)
         season_year = max(1, int(state.get("current_year", 1)) - 1)
         ch = list(state.get("coaching_history") or [])
@@ -2392,7 +2434,118 @@ def create_save(
     return {"save_id": save_id}
 
 
+def _reconcile_saves_from_disk(user_id: str, coach_match_key: Optional[str] = None) -> None:
+    """
+    After a deploy wipes the SQLite index, re-register saves that still exist on disk.
+    When coach_match_key is set (login username), also claim legacy folders under other user ids
+    whose league_save.json user_coach_name matches.
+    """
+    import json
+    import uuid as _uuid
+
+    base = _saves_base_dir()
+    if not _safe_isdir(base):
+        return
+
+    now = int(time.time())
+    safe_user = _safe_path_segment(user_id, default="user")
+
+    def _read_save_name(save_dir: str) -> Optional[str]:
+        jplain = _league_save_plain_path(save_dir)
+        try:
+            with open_text_with_path_fallback(jplain, "r") as f:
+                data = json.load(f)
+        except Exception:
+            return None
+        if not isinstance(data, dict):
+            return None
+        name = str(data.get("save_name") or "").strip()
+        return name or None
+
+    def _coach_key_from_dir(save_dir: str) -> str:
+        jplain = _league_save_plain_path(save_dir)
+        try:
+            with open_text_with_path_fallback(jplain, "r") as f:
+                data = json.load(f)
+        except Exception:
+            return ""
+        if not isinstance(data, dict):
+            return ""
+        return _coach_name_normalized_key(data.get("user_coach_name"))
+
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT save_name FROM saves WHERE user_id=?",
+            (user_id,),
+        ).fetchall()
+        known_names = {str(r["save_name"]) for r in rows}
+
+        def _register_dir(save_dir: str) -> None:
+            nonlocal known_names
+            if not _has_league_save_file(save_dir):
+                return
+            save_name = _read_save_name(save_dir)
+            if not save_name or save_name in known_names:
+                return
+            save_id = str(_uuid.uuid4())
+            try:
+                updated_at = int(os.path.getmtime(_league_save_plain_path(save_dir)))
+            except OSError:
+                updated_at = now
+            conn.execute(
+                """
+                INSERT INTO saves (id, user_id, save_name, save_dir, created_at, updated_at)
+                VALUES (?,?,?,?,?,?)
+                """,
+                (save_id, user_id, save_name, save_dir, now, updated_at),
+            )
+            known_names.add(save_name)
+
+        user_root = os.path.join(base, safe_user)
+        if _safe_isdir(user_root):
+            try:
+                for entry in sorted(os.listdir(user_root)):
+                    if entry == "_logos":
+                        continue
+                    cand = os.path.join(user_root, entry)
+                    if _safe_isdir(cand):
+                        _register_dir(cand)
+            except OSError:
+                pass
+
+        if coach_match_key:
+            try:
+                top_entries = sorted(os.listdir(base))
+            except OSError:
+                top_entries = []
+            for other_uid in top_entries:
+                if other_uid in (safe_user, "_logos"):
+                    continue
+                other_root = os.path.join(base, other_uid)
+                if not _safe_isdir(other_root):
+                    continue
+                try:
+                    sub_entries = sorted(os.listdir(other_root))
+                except OSError:
+                    continue
+                for entry in sub_entries:
+                    if entry == "_logos":
+                        continue
+                    cand = os.path.join(other_root, entry)
+                    if not _safe_isdir(cand) or not _has_league_save_file(cand):
+                        continue
+                    if _coach_key_from_dir(cand) != coach_match_key:
+                        continue
+                    _register_dir(cand)
+
+
 def list_saves(user_id: str) -> List[Dict[str, Any]]:
+    coach_key: Optional[str] = None
+    with db() as conn:
+        urow = conn.execute("SELECT username FROM users WHERE id=?", (user_id,)).fetchone()
+        if urow and urow["username"]:
+            coach_key = _coach_name_normalized_key(urow["username"])
+    _reconcile_saves_from_disk(user_id, coach_match_key=coach_key or None)
     with db() as conn:
         rows = conn.execute(
             "SELECT id, save_name, updated_at FROM saves WHERE user_id=? ORDER BY updated_at DESC",
@@ -3012,15 +3165,9 @@ def _merge_defensive_playbook_for_display(pb: Any, def_sel: Dict[str, Any]) -> D
     return out
 
 
-def get_play_selection_for_team(user_id: str, save_id: str) -> Dict[str, Any]:
-    """Return user team's play selection with play names for the game plan UI."""
-    try:
-        state, save_dir = load_state(user_id, save_id)
-    except Exception:
-        return {"offensive": {}, "defensive": {}}
-
+def _teams_map_from_state(state: Dict[str, Any]) -> Dict[str, Any]:
     teams_list = state.get("teams") or []
-    teams = {}
+    teams: Dict[str, Any] = {}
     for t in teams_list:
         try:
             team_obj = team_from_dict(t) if isinstance(t, dict) else None
@@ -3028,19 +3175,25 @@ def get_play_selection_for_team(user_id: str, save_id: str) -> Dict[str, Any]:
                 teams[team_obj.name] = team_obj
         except Exception:
             continue
+    return teams
 
+
+def get_play_selection_from_state(state: Dict[str, Any]) -> Dict[str, Any]:
+    """Play selection payload for game plan UI (stateless / browser saves)."""
+    teams = _teams_map_from_state(state)
     user_team_name = state.get("user_team")
     if not user_team_name or user_team_name not in teams:
         return {"offensive": {}, "defensive": {}}
 
     team = teams[user_team_name]
+    state_changed = False
     if not getattr(team, "season_offensive_play_selection", None) or not getattr(
         team, "season_defensive_play_selection", None
     ):
         try:
             run_play_selection_for_team(team)
             state["teams"] = [team_to_dict(t) for t in teams.values()]
-            save_state(user_id, save_id, state, save_dir)
+            state_changed = True
         except Exception:
             pass
 
@@ -3052,34 +3205,32 @@ def get_play_selection_for_team(user_id: str, save_id: str) -> Dict[str, Any]:
     off_sel = getattr(team, "season_offensive_play_selection", None) or {}
     def_sel = getattr(team, "season_defensive_play_selection", None) or {}
 
-    # Full playbook per category (Nickel/Dime/6-2 etc.), not only the small auto-installed subset.
-    return {
+    out: Dict[str, Any] = {
         "offensive": _merge_offensive_playbook_for_display(pb, off_sel),
         "defensive": _merge_defensive_playbook_for_display(pb, def_sel),
     }
+    if state_changed:
+        out["state"] = state
+    return out
 
 
-def get_play_learning_summary(user_id: str, save_id: str) -> Dict[str, Any]:
-    """How well the user's plays are learned (off/def % + overall grade) for results UI."""
+def get_play_selection_for_team(user_id: str, save_id: str) -> Dict[str, Any]:
+    """Return user team's play selection with play names for the game plan UI."""
     try:
-        state, _save_dir = load_state(user_id, save_id)
+        state, save_dir = load_state(user_id, save_id)
     except Exception:
-        return {
-            "offensive_pct_learned": 0,
-            "defensive_pct_learned": 0,
-            "overall_grade": None,
-        }
+        return {"offensive": {}, "defensive": {}}
 
-    teams_list = state.get("teams") or []
-    teams: Dict[str, Any] = {}
-    for t in teams_list:
-        try:
-            team_obj = team_from_dict(t) if isinstance(t, dict) else None
-            if team_obj:
-                teams[team_obj.name] = team_obj
-        except Exception:
-            continue
+    out = get_play_selection_from_state(state)
+    if out.get("state") is not None:
+        save_state(user_id, save_id, out["state"], save_dir)
+        del out["state"]
+    return out
 
+
+def get_play_learning_summary_from_state(state: Dict[str, Any]) -> Dict[str, Any]:
+    """Learning summary for Play Selection Results (stateless / browser saves)."""
+    teams = _teams_map_from_state(state)
     user_team_name = state.get("user_team")
     if not user_team_name or user_team_name not in teams:
         return {
@@ -3097,6 +3248,19 @@ def get_play_learning_summary(user_id: str, save_id: str) -> Dict[str, Any]:
             "defensive_pct_learned": 0,
             "overall_grade": None,
         }
+
+
+def get_play_learning_summary(user_id: str, save_id: str) -> Dict[str, Any]:
+    """How well the user's plays are learned (off/def % + overall grade) for results UI."""
+    try:
+        state, _save_dir = load_state(user_id, save_id)
+    except Exception:
+        return {
+            "offensive_pct_learned": 0,
+            "defensive_pct_learned": 0,
+            "overall_grade": None,
+        }
+    return get_play_learning_summary_from_state(state)
 
 
 def update_depth_chart(user_id: str, save_id: str, depth_chart: Dict[str, List[str]]) -> Dict[str, Any]:
@@ -6670,7 +6834,10 @@ def _bulk_carousel_job_prefs_for_state(state: Dict[str, Any]) -> List[str]:
     """
     Ranked HC vacancy applications for bulk sim (higher prestige schools first).
 
-    Mirrors seeking bigger jobs during carousel rounds — only vacancies still open in carousel state."""
+    Only when the user's coach was fired and is unemployed — bulk sim must not silently
+    move an employed head coach or create misleading \"you resigned\" carousel headlines."""
+    if not state.get("user_coach_unemployed"):
+        return []
     ut = str(state.get("user_team") or "").strip()
     persist = state.get("offseason_coach_carousel") if isinstance(state.get("offseason_coach_carousel"), dict) else None
     if not persist or not ut:

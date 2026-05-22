@@ -4,6 +4,7 @@ import './NewSaveFlow.css'
 import type { CSSProperties } from 'react'
 import { DEFENSIVE_PLAYBOOKS, OFFENSIVE_PLAYBOOKS } from './newSaveTypes'
 import PlaybookGamePlanPage from './PlaybookGamePlanPage'
+import { fetchPlayLearningSummary } from './browserSave'
 import DepthChartPage from './DepthChartPage'
 import ScrimmagePanel from './ScrimmagePanel'
 import GamePlayPage from './GamePlayPage'
@@ -4251,8 +4252,7 @@ function TeamHomePageBody({
     }
     let cancelled = false
     setLearningLoading(true)
-    fetch(`${apiBase}/saves/${saveId}/play-learning-summary`, { headers })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('Failed to load learning summary'))))
+    fetchPlayLearningSummary(apiBase, saveId, saveState, headers)
       .then((data) => {
         if (!cancelled) {
           setLearningSummary({
@@ -4277,7 +4277,7 @@ function TeamHomePageBody({
     return () => {
       cancelled = true
     }
-  }, [apiBase, headers, isPlaySelectionResultsStage, saveId])
+  }, [apiBase, headers, isPlaySelectionResultsStage, saveId, saveState])
 
   if (showSettings) {
     return (
@@ -4310,6 +4310,7 @@ function TeamHomePageBody({
           await onSimWeek({ gamePlan })
         }}
         onError={onError}
+        onSaveState={onSaveState}
       />
     )
   }
@@ -4704,6 +4705,7 @@ function TeamHomePageBody({
           logoVersion={logoVersion}
           onBack={gpBack}
           onError={onError}
+          onSaveState={onSaveState}
           readOnly
           headerBackLabel="Back to Team Home"
         />

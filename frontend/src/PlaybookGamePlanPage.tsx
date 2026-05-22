@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { fetchPlaySelection } from './browserSave'
 import './PlaybookGamePlanPage.css'
 import TeamLogo from './TeamLogo'
 
@@ -32,6 +33,7 @@ type Props = {
     defensive: Record<string, { play_id: string; pct: number }[]>
   }) => Promise<void>
   onError: (msg: string) => void
+  onSaveState?: (state: any) => void
   readOnly?: boolean
   headerBackLabel?: string
 }
@@ -49,6 +51,7 @@ export default function PlaybookGamePlanPage({
   onBack,
   onConfirm,
   onError,
+  onSaveState,
   readOnly = false,
   headerBackLabel = 'Back to Preseason',
 }: Props) {
@@ -70,20 +73,8 @@ export default function PlaybookGamePlanPage({
     setLoading(true)
     setFetchError(null)
     try {
-      const url = `${apiBase ?? ''}/saves/${saveId}/play-selection`
-      const r = await fetch(url, { headers })
-      if (!r.ok) {
-        const errText = await r.text()
-        let msg = `Failed to load (${r.status})`
-        try {
-          const j = JSON.parse(errText)
-          if (j.detail) msg = j.detail
-        } catch {
-          if (errText) msg = errText
-        }
-        throw new Error(msg)
-      }
-      const json = await r.json()
+      const json = await fetchPlaySelection(apiBase ?? '', saveId, saveState, headers)
+      if (json.state) onSaveState?.(json.state)
       setLocalOffensive(json.offensive || {})
       setLocalDefensive(json.defensive || {})
     } catch (e: any) {
@@ -92,7 +83,7 @@ export default function PlaybookGamePlanPage({
     } finally {
       setLoading(false)
     }
-  }, [apiBase, headers, saveId])
+  }, [apiBase, headers, saveId, saveState, onSaveState])
 
   useEffect(() => {
     if (saveId) fetchData()

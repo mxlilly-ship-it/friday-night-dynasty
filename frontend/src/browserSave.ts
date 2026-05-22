@@ -126,3 +126,61 @@ export async function readLatestAutosave(): Promise<BrowserAutosaveRecord | null
   db.close()
   return out
 }
+
+async function parseApiError(r: Response): Promise<string> {
+  const errText = await r.text()
+  let msg = `Failed to load (${r.status})`
+  try {
+    const j = JSON.parse(errText)
+    if (j.detail) msg = typeof j.detail === 'string' ? j.detail : JSON.stringify(j.detail)
+  } catch {
+    if (errText) msg = errText
+  }
+  return msg
+}
+
+/** Preseason play selection (stage 2) — uses /sim for browser saves. */
+export async function fetchPlaySelection(
+  apiBase: string,
+  saveId: string,
+  saveState: unknown,
+  headers: Record<string, string>,
+): Promise<{ offensive: Record<string, unknown[]>; defensive: Record<string, unknown[]>; state?: unknown }> {
+  if (isBrowserSaveId(saveId)) {
+    const r = await fetch(`${apiBase}/sim/play-selection`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state: saveState }),
+    })
+    if (!r.ok) throw new Error(await parseApiError(r))
+    return r.json()
+  }
+  const r = await fetch(`${apiBase}/saves/${saveId}/play-selection`, { headers })
+  if (!r.ok) throw new Error(await parseApiError(r))
+  return r.json()
+}
+
+/** Play selection results learning summary — uses /sim for browser saves. */
+export async function fetchPlayLearningSummary(
+  apiBase: string,
+  saveId: string,
+  saveState: unknown,
+  headers: Record<string, string>,
+): Promise<{
+  offensive_pct_learned: number
+  defensive_pct_learned: number
+  overall_grade: string | null
+}> {
+  if (isBrowserSaveId(saveId)) {
+    const r = await fetch(`${apiBase}/sim/play-learning-summary`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state: saveState }),
+    })
+    if (!r.ok) throw new Error(await parseApiError(r))
+    return r.json()
+  }
+  const r = await fetch(`${apiBase}/saves/${saveId}/play-learning-summary`, { headers })
+  if (!r.ok) throw new Error(await parseApiError(r))
+  return r.json()
+}
