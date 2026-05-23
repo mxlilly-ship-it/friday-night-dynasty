@@ -14,7 +14,7 @@ export type SaveBundle = {
   seasonRecaps: Record<string, string>
 }
 
-function guessMime(filename: string): string {
+export function guessMime(filename: string): string {
   const low = filename.toLowerCase()
   if (low.endsWith('.png')) return 'image/png'
   if (low.endsWith('.jpg') || low.endsWith('.jpeg')) return 'image/jpeg'

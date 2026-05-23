@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { fetchCoachGameplan, saveCoachGameplan } from './browserSave'
 import './CoachGameplanPage.css'
 
 type Side = 'offense' | 'defense'
@@ -40,9 +41,11 @@ type Props = {
   apiBase: string
   headers: Record<string, string>
   saveId: string
+  saveState: unknown
   side: Side
   onBack?: () => void
   onError: (msg: string) => void
+  onSaveState?: (state: unknown) => void
 }
 
 function clampPct(n: number) {
@@ -183,8 +186,18 @@ function parsePlanCsv(side: Side, csvText: string, basePlan?: Plan | null): Plan
   return plan
 }
 
-export default function CoachGameplanPage({ apiBase, headers, saveId, side, onBack, onError }: Props) {
+export default function CoachGameplanPage({
+  apiBase,
+  headers,
+  saveId,
+  saveState,
+  side,
+  onBack,
+  onError,
+  onSaveState,
+}: Props) {
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [matchupKey, setMatchupKey] = useState<string | null>(null)
   const importInputRef = useRef<HTMLInputElement | null>(null)
@@ -200,32 +213,45 @@ export default function CoachGameplanPage({ apiBase, headers, saveId, side, onBa
   const plan = side === 'offense' ? offense : defense
   const setPlan = side === 'offense' ? setOffense : setDefense
 
-  const fetchPlan = useCallback(async () => {
+  const saveStateRef = useRef(saveState)
+  saveStateRef.current = saveState
+  const onSaveStateRef = useRef(onSaveState)
+  onSaveStateRef.current = onSaveState
+  const headersRef = useRef(headers)
+  headersRef.current = headers
+
+  const fetchPlan = useCallback(async (opts?: { showLoading?: boolean }) => {
     if (!saveId) {
       setLoading(false)
       return
     }
-    setLoading(true)
+    const showLoading = opts?.showLoading ?? true
+    if (showLoading) setLoading(true)
+    setLoadError(null)
     try {
-      const r = await fetch(`${apiBase ?? ''}/saves/${saveId}/coach-gameplan`, { headers })
-      if (!r.ok) throw new Error(await r.text())
-      const j: ApiResp = await r.json()
+      const j = await fetchCoachGameplan(
+        apiBase ?? '',
+        saveId,
+        saveStateRef.current,
+        headersRef.current,
+      )
+      if (j.state) onSaveStateRef.current?.(j.state)
       setMatchupKey(j.matchup_key ?? null)
-      setOffense(j.offense)
-      setDefense(j.defense)
+      setOffense(j.offense as Plan)
+      setDefense(j.defense as Plan)
       const raw = Number(j.fourth_down?.go_for_it_max_ytg)
       setGoForItMaxYtg(Number.isFinite(raw) ? Math.max(0, Math.min(10, Math.round(raw))) : 2)
-      onError('')
-    } catch (e: any) {
-      onError(e?.message ?? 'Failed to load gameplan')
+    } catch (e: unknown) {
+      setLoadError(e instanceof Error ? e.message : 'Failed to load gameplan')
     } finally {
-      setLoading(false)
+      if (showLoading) setLoading(false)
     }
-  }, [apiBase, saveId, headers, onError])
+  }, [apiBase, saveId])
 
   useEffect(() => {
-    void fetchPlan()
-  }, [fetchPlan])
+    void fetchPlan({ showLoading: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saveId])
 
   const rows = useMemo(() => {
     const p = plan
@@ -359,16 +385,11 @@ export default function CoachGameplanPage({ apiBase, headers, saveId, side, onBa
       const fourth_down = { go_for_it_max_ytg: Math.max(0, Math.min(10, Math.round(Number(goForItMaxYtg) || 0))) }
       // 4th-down decisions are offensive-only. Don't allow DEF confirm to overwrite them.
       const body = side === 'offense' ? { offense: plan, fourth_down } : { defense: plan }
-      const r = await fetch(`${apiBase ?? ''}/saves/${saveId}/coach-gameplan`, {
-        method: 'PUT',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      if (!r.ok) throw new Error(await r.text())
-      const j: ApiResp = await r.json()
+      const j = await saveCoachGameplan(apiBase ?? '', saveId, saveState, headers, body)
+      if (j.state) onSaveState?.(j.state)
       setMatchupKey(j.matchup_key ?? null)
-      setOffense(j.offense)
-      setDefense(j.defense)
+      setOffense(j.offense as Plan)
+      setDefense(j.defense as Plan)
       const raw = Number(j.fourth_down?.go_for_it_max_ytg)
       setGoForItMaxYtg(Number.isFinite(raw) ? Math.max(0, Math.min(10, Math.round(raw))) : 2)
       onError('')
@@ -391,6 +412,13 @@ export default function CoachGameplanPage({ apiBase, headers, saveId, side, onBa
 
       {loading ? (
         <div className="gp2-card">Loading…</div>
+      ) : loadError ? (
+        <div className="gp2-card">
+          <p>{loadError}</p>
+          <button type="button" className="gp2-refresh" onClick={() => void fetchPlan({ showLoading: true })}>
+            Retry
+          </button>
+        </div>
       ) : !plan ? (
         <div className="gp2-card">No gameplan loaded.</div>
       ) : (
@@ -511,7 +539,7 @@ export default function CoachGameplanPage({ apiBase, headers, saveId, side, onBa
             <button type="button" className="gp2-confirm" onClick={() => void onConfirm()} disabled={busy}>
               {busy ? 'Saving…' : 'Confirm'}
             </button>
-            <button type="button" className="gp2-refresh" onClick={() => void fetchPlan()} disabled={busy}>
+            <button type="button" className="gp2-refresh" onClick={() => void fetchPlan({ showLoading: true })} disabled={busy}>
               Reload
             </button>
           </div>

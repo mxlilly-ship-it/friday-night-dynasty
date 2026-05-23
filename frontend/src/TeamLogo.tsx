@@ -52,9 +52,8 @@ export default function TeamLogo({
     const localLogo = localAssets?.getTeamLogo(teamName)
     if (localLogo) {
       revokeCurrent()
-      const bytes = localLogo.data instanceof Uint8Array ? localLogo.data : new Uint8Array(localLogo.data as any)
-      const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
-      const blob = new Blob([ab], { type: localLogo.mime || 'application/octet-stream' })
+      const bytes = localLogo.data instanceof Uint8Array ? localLogo.data : new Uint8Array(localLogo.data as ArrayLike<number>)
+      const blob = new Blob([bytes], { type: localLogo.mime || 'application/octet-stream' })
       const objUrl = URL.createObjectURL(blob)
       blobRef.current = objUrl
       setBlobSrc(objUrl)

@@ -129,7 +129,10 @@ def get_game(game_id: str) -> Game:
     with db() as conn:
         row = conn.execute("SELECT state_json FROM games WHERE id=?", (game_id,)).fetchone()
     if not row:
-        raise ValueError("game not found")
+        raise ValueError(
+            "game session not found — close this screen and tap Play game again "
+            "(in-progress coach games are cleared when the server restarts)"
+        )
     return loads_game(row["state_json"])
 
 
@@ -1098,9 +1101,17 @@ def submit_play(game: Game, home_team: Any, away_team: Any, offense_play_id: str
     def_pb = build_playbook_for_team(defense_team)
     o = off_pb.get_offensive_play_by_id(offense_play_id)
     d = def_pb.get_defensive_play_by_id(defense_play_id)
+    if o is None and off_pb.offensive_plays:
+        o = off_pb.offensive_plays[0]
+    if d is None and def_pb.defensive_plays:
+        d = def_pb.defensive_plays[0]
 
     if o is None or d is None:
-        raise ValueError("invalid play id")
+        raise ValueError(
+            f"invalid play id (offense={offense_play_id!r}, defense={defense_play_id!r}; "
+            f"{offense_name} has {len(off_pb.offensive_plays)} offense / "
+            f"{len(def_pb.defensive_plays)} defense plays)"
+        )
 
     down_before = game.down
     q_before = game.quarter

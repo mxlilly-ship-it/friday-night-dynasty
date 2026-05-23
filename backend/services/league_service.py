@@ -1546,6 +1546,7 @@ def _finalize_offseason_to_preseason(state: Dict[str, Any], teams: Dict[str, Any
     state["preseason_stages"] = list(PRESEASON_STAGES)
     state["current_week"] = 1
     state["preseason_scrimmages"] = []
+    _assign_scrimmage_opponents_for_state(state)
     state.pop("offseason_stage_index", None)
     state.pop("offseason_stages", None)
     state.pop("offseason_training_results", None)
@@ -3263,9 +3264,8 @@ def get_play_learning_summary(user_id: str, save_id: str) -> Dict[str, Any]:
     return get_play_learning_summary_from_state(state)
 
 
-def update_depth_chart(user_id: str, save_id: str, depth_chart: Dict[str, List[str]]) -> Dict[str, Any]:
-    """Save user's depth chart order and return updated state."""
-    state, save_dir = load_state(user_id, save_id)
+def update_depth_chart_in_state(state: Dict[str, Any], depth_chart: Dict[str, List[str]]) -> Dict[str, Any]:
+    """Save user's depth chart order and return updated state (in-memory)."""
     teams_list = state.get("teams") or []
     teams = {t["name"]: team_from_dict(t) for t in teams_list if isinstance(t, dict)}
     user_team_name = state.get("user_team")
@@ -3278,15 +3278,89 @@ def update_depth_chart(user_id: str, save_id: str, depth_chart: Dict[str, List[s
         if isinstance(k, str) and k.strip()
     }
     state["teams"] = [team_to_dict(t) for t in teams.values()]
+    return state
+
+
+def update_depth_chart(user_id: str, save_id: str, depth_chart: Dict[str, List[str]]) -> Dict[str, Any]:
+    """Save user's depth chart order and return updated state."""
+    state, save_dir = load_state(user_id, save_id)
+    state = update_depth_chart_in_state(state, depth_chart)
     save_state(user_id, save_id, state, save_dir)
     return state
 
 
-def _week_result_slot_played(slot: Any) -> bool:
-    """Only skip silent sim when the slot is explicitly marked complete (bool True)."""
+def _week_result_slot_finalized(slot: Any) -> bool:
+    """True when this schedule slot already has a final result (do not re-sim)."""
     if not isinstance(slot, dict):
         return False
-    return slot.get("played") is True
+    if slot.get("played") is True:
+        return True
+    if slot.get("played") is False:
+        return False
+    recap = str(slot.get("recap") or slot.get("box_score_text") or "")
+    if recap and "FINAL:" in recap:
+        return True
+    return False
+
+
+def _week_result_slot_played(slot: Any) -> bool:
+    """Alias for callers that gate week sim / coach finish on completed slots."""
+    return _week_result_slot_finalized(slot)
+
+
+def _apply_game_result_to_standings(
+    standings: Dict[str, Dict[str, Any]],
+    home: str,
+    away: str,
+    home_score: int,
+    away_score: int,
+) -> None:
+    for name in (home, away):
+        if name not in standings:
+            standings[name] = {"wins": 0, "losses": 0, "points_for": 0, "points_against": 0}
+    home_s = standings[home]
+    away_s = standings[away]
+    home_s["points_for"] = int(home_s.get("points_for", 0)) + int(home_score)
+    home_s["points_against"] = int(home_s.get("points_against", 0)) + int(away_score)
+    away_s["points_for"] = int(away_s.get("points_for", 0)) + int(away_score)
+    away_s["points_against"] = int(away_s.get("points_against", 0)) + int(home_score)
+    if home_score > away_score:
+        home_s["wins"] = int(home_s.get("wins", 0)) + 1
+        away_s["losses"] = int(away_s.get("losses", 0)) + 1
+    elif away_score > home_score:
+        away_s["wins"] = int(away_s.get("wins", 0)) + 1
+        home_s["losses"] = int(home_s.get("losses", 0)) + 1
+
+
+def _rebuild_standings_from_week_results(state: Dict[str, Any], team_names: List[str]) -> Dict[str, Dict[str, Any]]:
+    """Recompute W/L and points from finalized week_results (prevents double-count on week sim)."""
+    standings: Dict[str, Dict[str, Any]] = {
+        n: {"wins": 0, "losses": 0, "points_for": 0, "points_against": 0} for n in team_names
+    }
+    weeks = state.get("weeks") or []
+    week_results = state.get("week_results") or []
+    for wi, wk in enumerate(weeks):
+        if not isinstance(wk, list):
+            continue
+        wk_res = week_results[wi] if wi < len(week_results) else []
+        for gi, g in enumerate(wk):
+            if not isinstance(g, dict):
+                continue
+            home = g.get("home")
+            away = g.get("away")
+            if not home or not away:
+                continue
+            slot = wk_res[gi] if gi < len(wk_res) else {}
+            if not _week_result_slot_finalized(slot):
+                continue
+            _apply_game_result_to_standings(
+                standings,
+                str(home),
+                str(away),
+                int(slot.get("home_score", 0)),
+                int(slot.get("away_score", 0)),
+            )
+    return standings
 
 
 def get_user_matchup(state: Dict[str, Any]) -> Optional[Tuple[str, str, int, int]]:
@@ -3370,12 +3444,11 @@ def attach_user_coach_gameplan_v2_from_save_state(
             coach.fourth_down_go_for_it_max_ytg = 2
 
 
-def get_coach_gameplan_v2(user_id: str, save_id: str) -> Dict[str, Any]:
+def get_coach_gameplan_v2_from_state(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get the coach gameplan (OFF + DEF) for the user's next game.
     Stored inside the save so it travels with the dynasty.
     """
-    state, _save_dir = load_state(user_id, save_id)
     key = _coach_gameplan_v2_matchup_key(state)
     store = state.get("coach_gameplans_v2") if isinstance(state.get("coach_gameplans_v2"), dict) else {}
     entry = store.get(key) if key and isinstance(store, dict) else None
@@ -3421,16 +3494,19 @@ def get_coach_gameplan_v2(user_id: str, save_id: str) -> Dict[str, Any]:
     }
 
 
-def save_coach_gameplan_v2(
-    user_id: str,
-    save_id: str,
+def get_coach_gameplan_v2(user_id: str, save_id: str) -> Dict[str, Any]:
+    state, _save_dir = load_state(user_id, save_id)
+    return get_coach_gameplan_v2_from_state(state)
+
+
+def save_coach_gameplan_v2_in_state(
+    state: Dict[str, Any],
     *,
     offense: Optional[Dict[str, Any]] = None,
     defense: Optional[Dict[str, Any]] = None,
     fourth_down: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Save the user's coach gameplan for the next game."""
-    state, save_dir = load_state(user_id, save_id)
+    """Save the user's coach gameplan for the next game (mutates state in memory)."""
     key = _coach_gameplan_v2_matchup_key(state)
     if not key:
         raise ValueError("No upcoming game found to attach a gameplan to.")
@@ -3467,8 +3543,27 @@ def save_coach_gameplan_v2(
     entry["updated_at"] = int(time.time())
     store[key] = entry
     state["coach_gameplans_v2"] = store
+    return get_coach_gameplan_v2_from_state(state)
+
+
+def save_coach_gameplan_v2(
+    user_id: str,
+    save_id: str,
+    *,
+    offense: Optional[Dict[str, Any]] = None,
+    defense: Optional[Dict[str, Any]] = None,
+    fourth_down: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Save the user's coach gameplan for the next game."""
+    state, save_dir = load_state(user_id, save_id)
+    result = save_coach_gameplan_v2_in_state(
+        state,
+        offense=offense,
+        defense=defense,
+        fourth_down=fourth_down,
+    )
     save_state(user_id, save_id, state, save_dir)
-    return get_coach_gameplan_v2(user_id, save_id)
+    return result
 
 
 def _team_recap_safe_filename(team_name: str) -> str:
@@ -3870,7 +3965,7 @@ def sim_week(user_id: str, save_id: str) -> Dict[str, Any]:
     current_week = int(state.get("current_week", 1))
     weeks = state.get("weeks") or []
     week_results = state.get("week_results") or []
-    standings = state.get("standings") or {n: {"wins": 0, "losses": 0, "points_for": 0, "points_against": 0} for n in team_names}
+    standings = _rebuild_standings_from_week_results(state, team_names)
 
     if current_week < 1:
         raise ValueError("invalid current week")
@@ -4033,7 +4128,7 @@ def sim_week_state(state: Dict[str, Any]) -> Dict[str, Any]:
     current_week = int(state.get("current_week", 1))
     weeks = state.get("weeks") or []
     week_results = state.get("week_results") or []
-    standings = state.get("standings") or {n: {"wins": 0, "losses": 0, "points_for": 0, "points_against": 0} for n in team_names}
+    standings = _rebuild_standings_from_week_results(state, team_names)
 
     if current_week < 1:
         raise ValueError("invalid current week")
@@ -4229,6 +4324,120 @@ def sim_playoff_round_state(state: Dict[str, Any]) -> Dict[str, Any]:
     return state_out
 
 
+def _apply_preseason_scrimmage_stage(
+    state: Dict[str, Any],
+    teams: Dict[str, Any],
+    team_names: List[str],
+    current_stage: str,
+) -> None:
+    """Simulate scrimmage when advancing from Scrimmage 1 / Scrimmage 2 (Continue or Simulate)."""
+    user_team_name = state.get("user_team")
+    opponents_list = state.get("preseason_scrimmage_opponents") or []
+    scrim_idx = 0 if current_stage == "Scrimmage 1" else 1
+    slot = opponents_list[scrim_idx] if scrim_idx < len(opponents_list) else None
+
+    def _append_result(result: Dict[str, Any]) -> None:
+        scrimmages = state.get("preseason_scrimmages") or []
+        scrimmages.append(
+            {
+                "name": current_stage,
+                "completed": True,
+                "home": result["home"],
+                "away": result["away"],
+                "home_score": result["home_score"],
+                "away_score": result["away_score"],
+                "ot": result["ot"],
+                "team_stats": result.get("team_stats", {}),
+                "player_stats": result.get("player_stats", []),
+            }
+        )
+        state["preseason_scrimmages"] = scrimmages
+
+    def _append_stub() -> None:
+        scrimmages = state.get("preseason_scrimmages") or []
+        scrimmages.append({"name": current_stage, "completed": True})
+        state["preseason_scrimmages"] = scrimmages
+
+    if user_team_name and user_team_name in teams and slot and slot.get("opponent") in teams:
+        opponent = slot["opponent"]
+        user_home = slot.get("user_home", random.random() < 0.5)
+        home_team = teams[user_team_name] if user_home else teams[opponent]
+        away_team = teams[opponent] if user_home else teams[user_team_name]
+        try:
+            _append_result(run_scrimmage_game(home_team, away_team))
+        except Exception:
+            logger.exception("run_scrimmage_game failed (slotted opponent)")
+            _append_stub()
+    elif user_team_name and user_team_name in teams:
+        scheduled_opponents = set()
+        for wk in state.get("weeks") or []:
+            for g in wk or []:
+                if isinstance(g, dict):
+                    h, a = g.get("home"), g.get("away")
+                    if h == user_team_name and a:
+                        scheduled_opponents.add(a)
+                    elif a == user_team_name and h:
+                        scheduled_opponents.add(h)
+        eligible = [t for t in team_names if t != user_team_name and t not in scheduled_opponents]
+        if not eligible:
+            eligible = [t for t in team_names if t != user_team_name]
+        if eligible:
+            opponent = random.choice(eligible)
+            user_home = random.random() < 0.5
+            home_team = teams[user_team_name] if user_home else teams[opponent]
+            away_team = teams[opponent] if user_home else teams[user_team_name]
+            try:
+                _append_result(run_scrimmage_game(home_team, away_team))
+            except Exception:
+                logger.exception("run_scrimmage_game failed (fallback opponent)")
+                _append_stub()
+        else:
+            _append_stub()
+    else:
+        _append_stub()
+
+
+def _maybe_assign_preseason_scrimmage_opponents_on_advance(
+    state: Dict[str, Any],
+    team_names: List[str],
+    new_idx: int,
+    stages: List[str],
+) -> None:
+    """Assign both scrimmage opponents when entering Position changes / Set Depth Chart / Scrimmage 1."""
+    if new_idx >= len(stages) or stages[new_idx] not in ("Position changes", "Set Depth Chart", "Scrimmage 1"):
+        return
+    if state.get("preseason_scrimmage_opponents"):
+        return
+    user_team_name = state.get("user_team")
+    if not user_team_name:
+        return
+    scheduled_opponents = set()
+    for wk in state.get("weeks") or []:
+        for g in wk or []:
+            if isinstance(g, dict):
+                h, a = g.get("home"), g.get("away")
+                if h == user_team_name and a:
+                    scheduled_opponents.add(a)
+                elif a == user_team_name and h:
+                    scheduled_opponents.add(h)
+    eligible = [t for t in team_names if t != user_team_name and t not in scheduled_opponents]
+    if not eligible:
+        eligible = [t for t in team_names if t != user_team_name]
+    if len(eligible) >= 2:
+        chosen = random.sample(eligible, 2)
+        state["preseason_scrimmage_opponents"] = [
+            {"opponent": chosen[0], "user_home": random.random() < 0.5},
+            {"opponent": chosen[1], "user_home": random.random() < 0.5},
+        ]
+    elif len(eligible) == 1:
+        state["preseason_scrimmage_opponents"] = [
+            {"opponent": eligible[0], "user_home": random.random() < 0.5},
+            {"opponent": eligible[0], "user_home": random.random() >= 0.5},
+        ]
+    else:
+        state["preseason_scrimmage_opponents"] = []
+
+
 def advance_preseason_state(state: Dict[str, Any], playbook: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """In-memory variant of advance_preseason."""
     teams = {t["name"]: team_from_dict(t) for t in state.get("teams", [])}
@@ -4260,6 +4469,10 @@ def advance_preseason_state(state: Dict[str, Any], playbook: Optional[Dict[str, 
             return {"state": state, "phase_completed": None}
 
     current_stage = stages[idx]
+    team_names = list(teams.keys())
+    user_team_name = state.get("user_team")
+    if current_stage in ("Scrimmage 1", "Scrimmage 2"):
+        _ensure_scrimmage_opponents(state, team_names, user_team_name)
 
     # Reuse the existing logic by calling the non-I/O blocks above in this file:
     # This is a shallow wrapper: we run the original function body by temporarily
@@ -4339,6 +4552,8 @@ def advance_preseason_state(state: Dict[str, Any], playbook: Optional[Dict[str, 
                 state["season_goals"] = state.get("season_goals") or {"win_goal": 6, "stage_goal": "Winning Season"}
         else:
             state["season_goals"] = state.get("season_goals") or {"win_goal": 6, "stage_goal": "Winning Season"}
+    elif current_stage in ("Scrimmage 1", "Scrimmage 2"):
+        _apply_preseason_scrimmage_stage(state, teams, team_names, current_stage)
     # --- End: core stage effects ---
 
     state["teams"] = [team_to_dict(t) for t in teams.values()]
@@ -4346,6 +4561,19 @@ def advance_preseason_state(state: Dict[str, Any], playbook: Optional[Dict[str, 
     if state["preseason_stage_index"] >= len(stages):
         state["season_phase"] = "regular"
         state["current_week"] = max(1, int(state.get("current_week", 1)))
+
+    new_idx = state["preseason_stage_index"]
+    _maybe_assign_preseason_scrimmage_opponents_on_advance(state, team_names, new_idx, stages)
+    if new_idx < len(stages) and stages[new_idx] == "Play Selection":
+        if user_team_name and user_team_name in teams:
+            ut = teams[user_team_name]
+            if not getattr(ut, "season_offensive_play_selection", None):
+                try:
+                    run_play_selection_for_team(ut)
+                    state["teams"] = [team_to_dict(t) for t in teams.values()]
+                except Exception:
+                    pass
+
     return {"state": state, "phase_completed": current_stage}
 
 
@@ -4906,6 +5134,9 @@ def advance_preseason(user_id: str, save_id: str, playbook: Optional[Dict[str, A
             return {"state": state, "phase_completed": None}
 
     current_stage = stages[idx]
+    user_team_name = state.get("user_team")
+    if current_stage in ("Scrimmage 1", "Scrimmage 2"):
+        _ensure_scrimmage_opponents(state, team_names, user_team_name)
 
     # Playbook Select: apply playbook choices to user's team coach.
     if current_stage == "Playbook Select" and playbook:
@@ -5013,119 +5244,15 @@ def advance_preseason(user_id: str, save_id: str, playbook: Optional[Dict[str, A
                 "stage_goal": "Winning Season",
             }
     elif current_stage in ("Scrimmage 1", "Scrimmage 2"):
-        user_team_name = state.get("user_team")
-        opponents_list = state.get("preseason_scrimmage_opponents") or []
-        scrim_idx = 0 if current_stage == "Scrimmage 1" else 1
-        slot = opponents_list[scrim_idx] if scrim_idx < len(opponents_list) else None
-
-        if user_team_name and user_team_name in teams and slot and slot.get("opponent") in teams:
-            opponent = slot["opponent"]
-            user_home = slot.get("user_home", random.random() < 0.5)
-            home_team = teams[user_team_name] if user_home else teams[opponent]
-            away_team = teams[opponent] if user_home else teams[user_team_name]
-            try:
-                result = run_scrimmage_game(home_team, away_team)
-                scrimmages = state.get("preseason_scrimmages") or []
-                scrimmages.append({
-                    "name": current_stage,
-                    "completed": True,
-                    "home": result["home"],
-                    "away": result["away"],
-                    "home_score": result["home_score"],
-                    "away_score": result["away_score"],
-                    "ot": result["ot"],
-                    "team_stats": result.get("team_stats", {}),
-                    "player_stats": result.get("player_stats", []),
-                })
-                state["preseason_scrimmages"] = scrimmages
-            except Exception:
-                logger.exception("run_scrimmage_game failed (slotted opponent)")
-                scrimmages = state.get("preseason_scrimmages") or []
-                scrimmages.append({"name": current_stage, "completed": True})
-                state["preseason_scrimmages"] = scrimmages
-        elif user_team_name and user_team_name in teams:
-            scheduled_opponents = set()
-            for wk in state.get("weeks") or []:
-                for g in wk or []:
-                    if isinstance(g, dict):
-                        h, a = g.get("home"), g.get("away")
-                        if h == user_team_name and a:
-                            scheduled_opponents.add(a)
-                        elif a == user_team_name and h:
-                            scheduled_opponents.add(h)
-            eligible = [t for t in team_names if t != user_team_name and t not in scheduled_opponents]
-            if not eligible:
-                eligible = [t for t in team_names if t != user_team_name]
-            if eligible:
-                opponent = random.choice(eligible)
-                user_home = random.random() < 0.5
-                home_team = teams[user_team_name] if user_home else teams[opponent]
-                away_team = teams[opponent] if user_home else teams[user_team_name]
-                try:
-                    result = run_scrimmage_game(home_team, away_team)
-                    scrimmages = state.get("preseason_scrimmages") or []
-                    scrimmages.append({
-                        "name": current_stage,
-                        "completed": True,
-                        "home": result["home"],
-                        "away": result["away"],
-                        "home_score": result["home_score"],
-                        "away_score": result["away_score"],
-                        "ot": result["ot"],
-                        "team_stats": result.get("team_stats", {}),
-                        "player_stats": result.get("player_stats", []),
-                    })
-                    state["preseason_scrimmages"] = scrimmages
-                except Exception:
-                    logger.exception("run_scrimmage_game failed (fallback opponent)")
-                    scrimmages = state.get("preseason_scrimmages") or []
-                    scrimmages.append({"name": current_stage, "completed": True})
-                    state["preseason_scrimmages"] = scrimmages
-            else:
-                scrimmages = state.get("preseason_scrimmages") or []
-                scrimmages.append({"name": current_stage, "completed": True})
-                state["preseason_scrimmages"] = scrimmages
-        else:
-            scrimmages = state.get("preseason_scrimmages") or []
-            scrimmages.append({"name": current_stage, "completed": True})
-            state["preseason_scrimmages"] = scrimmages
+        _apply_preseason_scrimmage_stage(state, teams, team_names, current_stage)
 
     state["preseason_stage_index"] = idx + 1
     if state["preseason_stage_index"] >= len(stages):
         state["season_phase"] = "regular"
         state["current_week"] = 1
 
-    # When entering Position changes, Set Depth Chart, or Scrimmage 1, assign both scrimmage opponents if not yet set.
     new_idx = state["preseason_stage_index"]
-    if new_idx < len(stages) and stages[new_idx] in ("Position changes", "Set Depth Chart", "Scrimmage 1"):
-        if not state.get("preseason_scrimmage_opponents"):
-            user_team_name = state.get("user_team")
-            if user_team_name:
-                scheduled_opponents = set()
-                for wk in state.get("weeks") or []:
-                    for g in wk or []:
-                        if isinstance(g, dict):
-                            h, a = g.get("home"), g.get("away")
-                            if h == user_team_name and a:
-                                scheduled_opponents.add(a)
-                            elif a == user_team_name and h:
-                                scheduled_opponents.add(h)
-                eligible = [t for t in team_names if t != user_team_name and t not in scheduled_opponents]
-                if not eligible:
-                    eligible = [t for t in team_names if t != user_team_name]
-                if len(eligible) >= 2:
-                    chosen = random.sample(eligible, 2)
-                    state["preseason_scrimmage_opponents"] = [
-                        {"opponent": chosen[0], "user_home": random.random() < 0.5},
-                        {"opponent": chosen[1], "user_home": random.random() < 0.5},
-                    ]
-                elif len(eligible) == 1:
-                    state["preseason_scrimmage_opponents"] = [
-                        {"opponent": eligible[0], "user_home": random.random() < 0.5},
-                        {"opponent": eligible[0], "user_home": random.random() >= 0.5},
-                    ]
-                else:
-                    state["preseason_scrimmage_opponents"] = []
+    _maybe_assign_preseason_scrimmage_opponents_on_advance(state, team_names, new_idx, stages)
 
     # When entering Play Selection (e.g. from Playbook Select), run play selection for user's team.
     if new_idx < len(stages) and stages[new_idx] == "Play Selection":
@@ -5579,24 +5706,10 @@ def finish_coach_week_state(state: Dict[str, Any], game: Any) -> Dict[str, Any]:
         "player_stats": player_stats_list,
     }
 
-    for name in (home_name, away_name):
-        if name not in standings:
-            standings[name] = {"wins": 0, "losses": 0, "points_for": 0, "points_against": 0}
-    home_s = standings[home_name]
-    away_s = standings[away_name]
-    home_s["points_for"] = home_s.get("points_for", 0) + hs
-    home_s["points_against"] = home_s.get("points_against", 0) + as_
-    away_s["points_for"] = away_s.get("points_for", 0) + as_
-    away_s["points_against"] = away_s.get("points_against", 0) + hs
-    if hs > as_:
-        home_s["wins"] = home_s.get("wins", 0) + 1
-        away_s["losses"] = away_s.get("losses", 0) + 1
-    elif as_ > hs:
-        away_s["wins"] = away_s.get("wins", 0) + 1
-        home_s["losses"] = home_s.get("losses", 0) + 1
+    team_names = [t.get("name") for t in (state.get("teams") or []) if isinstance(t, dict) and t.get("name")]
+    state["standings"] = _rebuild_standings_from_week_results(state, team_names)
 
     state["week_results"] = week_results
-    state["standings"] = standings
     ensure_coach_inbox(state)
     return state
 
@@ -5676,33 +5789,38 @@ def finish_coach_scrimmage_state(state: Dict[str, Any], game: Any, scrimmage_sta
     gs = game_state_dict(game)
     home_name = gs["home_team_name"]
     away_name = gs["away_team_name"]
-    hs = int(gs.get("score_home", 0))
-    as_ = int(gs.get("score_away", 0))
-    ot = bool(gs.get("ot_winner"))
     teams_dict = {t["name"]: team_from_dict(t) for t in state.get("teams", []) if isinstance(t, dict)}
     home_team_o = teams_dict.get(home_name)
     away_team_o = teams_dict.get(away_name)
     _, player_stats_list = build_coach_postgame_box_assets(game, home_team_o, away_team_o, home_name, away_name)
-    # Attach minimal scrimmage record (matches existing UI expectations)
-    scrims = list(state.get("preseason_scrimmages") or [])
-    scrims.append(
+
+    scrimmages = list(state.get("preseason_scrimmages") or [])
+    scrimmages.append(
         {
-            "stage": scrimmage_stage,
+            "name": scrimmage_stage,
+            "completed": True,
             "home": home_name,
             "away": away_name,
-            "home_score": hs,
-            "away_score": as_,
-            "ot": ot,
-            "played": True,
+            "home_score": int(gs.get("score_home", 0)),
+            "away_score": int(gs.get("score_away", 0)),
+            "ot": bool(gs.get("ot_winner")),
+            "team_stats": gs.get("team_stats", {}),
             "player_stats": player_stats_list,
         }
     )
-    state["preseason_scrimmages"] = scrims
-    # Move preseason forward one stage (same behavior as finish_coach_scrimmage route)
-    try:
-        state["preseason_stage_index"] = int(state.get("preseason_stage_index", 0)) + 1
-    except Exception:
-        state["preseason_stage_index"] = 1
+    state["preseason_scrimmages"] = scrimmages
+
+    stages = state.get("preseason_stages") or list(PRESEASON_STAGES)
+    idx = int(state.get("preseason_stage_index", 0))
+    if idx < len(stages) and stages[idx] == scrimmage_stage:
+        state["preseason_stage_index"] = idx + 1
+        if state["preseason_stage_index"] >= len(stages):
+            state["season_phase"] = "regular"
+            state["current_week"] = 1
+    team_names = [t.get("name") for t in (state.get("teams") or []) if isinstance(t, dict) and t.get("name")]
+    _maybe_assign_preseason_scrimmage_opponents_on_advance(
+        state, team_names, int(state.get("preseason_stage_index", 0)), stages
+    )
     return state
 
 
@@ -5816,27 +5934,10 @@ def finish_coach_week(
         "player_stats": player_stats_list,
     }
 
-    # update standings
-    for name in (home_name, away_name):
-        if name not in standings:
-            standings[name] = {"wins": 0, "losses": 0, "points_for": 0, "points_against": 0}
-
-    home_s = standings[home_name]
-    away_s = standings[away_name]
-    home_s["points_for"] = home_s.get("points_for", 0) + hs
-    home_s["points_against"] = home_s.get("points_against", 0) + as_
-    away_s["points_for"] = away_s.get("points_for", 0) + as_
-    away_s["points_against"] = away_s.get("points_against", 0) + hs
-
-    if hs > as_:
-        home_s["wins"] = home_s.get("wins", 0) + 1
-        away_s["losses"] = away_s.get("losses", 0) + 1
-    elif as_ > hs:
-        away_s["wins"] = away_s.get("wins", 0) + 1
-        home_s["losses"] = home_s.get("losses", 0) + 1
+    team_names = [t.get("name") for t in (state.get("teams") or []) if isinstance(t, dict) and t.get("name")]
+    state["standings"] = _rebuild_standings_from_week_results(state, team_names)
 
     state["week_results"] = week_results
-    state["standings"] = standings
 
     ensure_coach_inbox(state)
     save_state(user_id, save_id, state, save_dir)

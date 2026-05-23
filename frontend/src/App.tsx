@@ -27,6 +27,9 @@ import {
 import { getAuthInstance } from './auth.js'
 import { getOrCreateDeviceId } from './deviceId.js'
 
+/** Stable reference so child effects do not re-run when logged out (browser saves). */
+const EMPTY_AUTH_HEADERS: Record<string, string> = Object.freeze({})
+
 /** In dev, use Vite proxy (/api → backend). Production: set VITE_API_BASE or default below. */
 /** Dev: Vite proxy. Production build served from the same host as FastAPI → empty string (same-origin). */
 const API_BASE = import.meta.env.DEV
@@ -117,6 +120,50 @@ export default function App() {
   const saveStateRef = useRef<any>(null)
   saveStateRef.current = saveState
 
+  /** Apply API simulation payload immediately (ref + React state) so back-to-back simWeek() calls stay in sync. */
+  const applySimulationState = useCallback(
+    (nextState: any, data?: { league_history?: unknown; records?: unknown; season_recaps?: Record<string, string> }) => {
+      if (nextState === undefined || nextState === null) return
+      maybeTriggerBackupReminder(saveStateRef.current, nextState)
+      saveStateRef.current = nextState
+      setSaveState(nextState)
+      if (localBundle) {
+        setLocalBundle((prev) => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            state: nextState,
+            leagueHistory:
+              data?.league_history !== undefined && data?.league_history !== null
+                ? (data.league_history as typeof prev.leagueHistory)
+                : prev.leagueHistory,
+            records:
+              data?.records !== undefined && data?.records !== null
+                ? (data.records as typeof prev.records)
+                : prev.records,
+            seasonRecaps: data?.season_recaps
+              ? { ...(prev.seasonRecaps ?? {}), ...data.season_recaps }
+              : prev.seasonRecaps,
+          }
+        })
+      }
+    },
+    [localBundle],
+  )
+
+  const patchSaveState = useCallback(
+    (nextState: unknown) => {
+      if (nextState === undefined || nextState === null) return
+      if (inLocalRuntime) {
+        applySimulationState(nextState as any)
+      } else {
+        saveStateRef.current = nextState
+        setSaveState(nextState)
+      }
+    },
+    [inLocalRuntime, applySimulationState],
+  )
+
   const getCurrentBundle = useCallback((): SaveBundle | null => {
     const live = saveStateRef.current
     if (!live) return null
@@ -148,9 +195,38 @@ export default function App() {
   }, [saveId, localBundle])
 
   const headers = useMemo((): Record<string, string> => {
-    if (!token) return {}
+    if (!token) return EMPTY_AUTH_HEADERS
     return { Authorization: `Bearer ${token}` }
   }, [token])
+
+  const importLogosToBundle = useCallback(
+    async (newLogos: SaveBundle['logos']) => {
+      const live = saveStateRef.current
+      setLocalBundle((prev) => {
+        if (!prev) return prev
+        const next: SaveBundle = {
+          ...prev,
+          logos: { ...(prev.logos ?? {}), ...newLogos },
+          state: live ?? prev.state,
+        }
+        let id = saveId.startsWith('b_') ? saveId : createBrowserSaveId()
+        if (!saveId.startsWith('b_')) {
+          setSaveId(id)
+        }
+        const saveName = String((live ?? prev.state)?.save_name ?? 'Dynasty').trim() || 'Dynasty'
+        void putBrowserSave({
+          id,
+          saveName,
+          updatedAt: Date.now(),
+          bundle: next,
+        }).catch((e: unknown) =>
+          setError(e instanceof Error ? e.message : 'Failed to save logos to browser'),
+        )
+        return next
+      })
+    },
+    [saveId],
+  )
 
   const mergeLocalSimulationResult = useCallback(
     (data: {
@@ -159,22 +235,25 @@ export default function App() {
       records?: unknown
       season_recaps?: Record<string, string>
     }) => {
-      if (data?.state !== undefined && data?.state !== null) setSaveState(data.state as any)
-      setLocalBundle((prev) => {
-        if (!prev) return prev
-        return {
-          ...prev,
-          leagueHistory:
-            data.league_history !== undefined && data.league_history !== null
-              ? data.league_history
-              : prev.leagueHistory,
-          records:
-            data.records !== undefined && data.records !== null ? data.records : prev.records,
-          seasonRecaps: data.season_recaps ? { ...(prev.seasonRecaps ?? {}), ...data.season_recaps } : prev.seasonRecaps,
-        }
-      })
+      if (data?.state !== undefined && data?.state !== null) {
+        applySimulationState(data.state as any, data)
+      } else if (data?.league_history || data?.records || data?.season_recaps) {
+        setLocalBundle((prev) => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            leagueHistory:
+              data.league_history !== undefined && data.league_history !== null
+                ? data.league_history
+                : prev.leagueHistory,
+            records:
+              data.records !== undefined && data.records !== null ? data.records : prev.records,
+            seasonRecaps: data.season_recaps ? { ...(prev.seasonRecaps ?? {}), ...data.season_recaps } : prev.seasonRecaps,
+          }
+        })
+      }
     },
-    [],
+    [applySimulationState],
   )
 
   function clearStaleSession() {
@@ -453,13 +532,12 @@ export default function App() {
         setDynastyLeagueHistory(data.league_history as { seasons?: unknown[] })
       }
       if (data?.state) {
-        maybeTriggerBackupReminder(saveStateRef.current, data.state)
-        setSaveState(data.state)
+        applySimulationState(data.state, data)
       }
     } catch {
       /* ignore refresh errors */
     }
-  }, [saveId, inLocalRuntime, headers])
+  }, [saveId, inLocalRuntime, headers, applySimulationState])
 
   function applyDynastySimulationResult(data: {
     state?: unknown
@@ -468,37 +546,34 @@ export default function App() {
     season_recaps?: Record<string, string>
   }) {
     if (data?.state !== undefined && data?.state !== null) {
-      maybeTriggerBackupReminder(saveStateRef.current, data.state as any)
-      setSaveState(data.state as any)
+      applySimulationState(data.state as any, data)
     }
     if (data?.league_history !== undefined && data.league_history !== null) {
       setDynastyLeagueHistory(data.league_history as { seasons?: unknown[] })
     } else if (saveId && !inLocalRuntime) {
       void refreshDynastyFromServer()
     }
-    if (localBundle) {
-      const live = saveStateRef.current
-      const nextBundle: SaveBundle = {
-        ...localBundle,
-        state: data?.state !== undefined && data?.state !== null ? (data.state as any) : live,
-        leagueHistory:
-          data?.league_history !== undefined && data?.league_history !== null
-            ? (data.league_history as any)
-            : localBundle.leagueHistory,
-        records:
-          data?.records !== undefined && data?.records !== null ? (data.records as any) : localBundle.records,
-        seasonRecaps: data?.season_recaps
-          ? { ...(localBundle.seasonRecaps ?? {}), ...data.season_recaps }
-          : localBundle.seasonRecaps,
-      }
-      setLocalBundle(nextBundle)
+    if (localBundle && data?.state !== undefined && data?.state !== null) {
       const id = saveId.startsWith('b_') ? saveId : createBrowserSaveId()
       if (!saveId.startsWith('b_')) setSaveId(id)
+      const live = saveStateRef.current
       void putBrowserSave({
         id,
-        saveName: String(nextBundle.state?.save_name ?? 'Dynasty').trim() || 'Dynasty',
+        saveName: String(live?.save_name ?? 'Dynasty').trim() || 'Dynasty',
         updatedAt: Date.now(),
-        bundle: nextBundle,
+        bundle: {
+          ...localBundle,
+          state: live,
+          leagueHistory:
+            data?.league_history !== undefined && data?.league_history !== null
+              ? (data.league_history as any)
+              : localBundle.leagueHistory,
+          records:
+            data?.records !== undefined && data?.records !== null ? (data.records as any) : localBundle.records,
+          seasonRecaps: data?.season_recaps
+            ? { ...(localBundle.seasonRecaps ?? {}), ...data.season_recaps }
+            : localBundle.seasonRecaps,
+        },
       }).catch((e: any) => setError(e?.message ? String(e.message) : 'Failed to save to browser'))
     }
   }
@@ -799,20 +874,7 @@ export default function App() {
         }
         const data = await r.json()
         if (data?.state) {
-          maybeTriggerBackupReminder(live, data.state)
-          setSaveState(data.state)
-        }
-        if (data?.league_history || data?.records || data?.season_recaps) {
-          setLocalBundle((prev) => {
-            if (!prev) return prev
-            return {
-              ...prev,
-              state: data.state ?? prev.state,
-              leagueHistory: data.league_history ?? prev.leagueHistory,
-              records: data.records ?? prev.records,
-              seasonRecaps: data.season_recaps ? { ...(prev.seasonRecaps ?? {}), ...data.season_recaps } : prev.seasonRecaps,
-            }
-          })
+          applySimulationState(data.state, data)
         }
         return true
       } catch (e: any) {
@@ -1104,7 +1166,8 @@ export default function App() {
               saveState={saveState}
               onMainMenu={goTitle}
               onSimWeek={simWeek}
-              onSaveState={setSaveState}
+              getLiveSaveState={() => saveStateRef.current}
+              onSaveState={patchSaveState}
               onError={setError}
               backupReminderFrequency={backupReminderFrequency}
               onBackupReminderFrequencyChange={setBackupReminderFrequency}
@@ -1115,6 +1178,7 @@ export default function App() {
               records={inLocalRuntime && localBundle ? localBundle.records : undefined}
               seasonRecaps={inLocalRuntime && localBundle ? localBundle.seasonRecaps : undefined}
               onMergeLocalSimulationResult={inLocalRuntime ? mergeLocalSimulationResult : undefined}
+              onImportLogosToBundle={inLocalRuntime ? importLogosToBundle : undefined}
               onRefreshDynasty={inLocalRuntime ? undefined : refreshDynastyFromServer}
           />
         </LocalAssetsProvider>

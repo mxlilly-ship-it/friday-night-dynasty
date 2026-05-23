@@ -16,6 +16,11 @@ export function isBrowserSaveId(saveId: string): boolean {
   return saveId === '__local__' || saveId.startsWith('b_')
 }
 
+/** Browser saves and unauthenticated sessions use stateless /sim/* routes. */
+export function shouldUseSimApi(saveId: string, headers: Record<string, string>): boolean {
+  return isBrowserSaveId(saveId) || !headers?.Authorization
+}
+
 export function createBrowserSaveId(): string {
   const raw =
     typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -146,7 +151,7 @@ export async function fetchPlaySelection(
   saveState: unknown,
   headers: Record<string, string>,
 ): Promise<{ offensive: Record<string, unknown[]>; defensive: Record<string, unknown[]>; state?: unknown }> {
-  if (isBrowserSaveId(saveId)) {
+  if (shouldUseSimApi(saveId, headers)) {
     const r = await fetch(`${apiBase}/sim/play-selection`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -171,7 +176,7 @@ export async function fetchPlayLearningSummary(
   defensive_pct_learned: number
   overall_grade: string | null
 }> {
-  if (isBrowserSaveId(saveId)) {
+  if (shouldUseSimApi(saveId, headers)) {
     const r = await fetch(`${apiBase}/sim/play-learning-summary`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -181,6 +186,91 @@ export async function fetchPlayLearningSummary(
     return r.json()
   }
   const r = await fetch(`${apiBase}/saves/${saveId}/play-learning-summary`, { headers })
+  if (!r.ok) throw new Error(await parseApiError(r))
+  return r.json()
+}
+
+export type CoachGameplanResponse = {
+  matchup_key: string | null
+  offense: Record<string, unknown>
+  defense: Record<string, unknown>
+  fourth_down?: { go_for_it_max_ytg?: number }
+  meta?: unknown
+  state?: unknown
+}
+
+/** OFF/DEF coach gameplan (v2) — uses /sim for browser saves and when not signed in. */
+export async function fetchCoachGameplan(
+  apiBase: string,
+  saveId: string,
+  saveState: unknown,
+  headers: Record<string, string>,
+): Promise<CoachGameplanResponse> {
+  if (shouldUseSimApi(saveId, headers)) {
+    const r = await fetch(`${apiBase}/sim/coach-gameplan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state: saveState }),
+    })
+    if (!r.ok) throw new Error(await parseApiError(r))
+    return r.json()
+  }
+  const r = await fetch(`${apiBase}/saves/${saveId}/coach-gameplan`, { headers })
+  if (!r.ok) throw new Error(await parseApiError(r))
+  return r.json()
+}
+
+export async function saveCoachGameplan(
+  apiBase: string,
+  saveId: string,
+  saveState: unknown,
+  headers: Record<string, string>,
+  body: {
+    offense?: Record<string, unknown>
+    defense?: Record<string, unknown>
+    fourth_down?: { go_for_it_max_ytg?: number }
+  },
+): Promise<CoachGameplanResponse> {
+  if (shouldUseSimApi(saveId, headers)) {
+    const r = await fetch(`${apiBase}/sim/coach-gameplan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state: saveState, ...body }),
+    })
+    if (!r.ok) throw new Error(await parseApiError(r))
+    return r.json()
+  }
+  const r = await fetch(`${apiBase}/saves/${saveId}/coach-gameplan`, {
+    method: 'PUT',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!r.ok) throw new Error(await parseApiError(r))
+  return r.json()
+}
+
+/** Save depth chart (team menu) — uses /sim for browser saves and when not signed in. */
+export async function saveDepthChart(
+  apiBase: string,
+  saveId: string,
+  saveState: unknown,
+  headers: Record<string, string>,
+  depthChart: Record<string, string[]>,
+): Promise<{ state?: unknown }> {
+  if (shouldUseSimApi(saveId, headers)) {
+    const r = await fetch(`${apiBase}/sim/depth-chart`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state: saveState, depth_chart: depthChart }),
+    })
+    if (!r.ok) throw new Error(await parseApiError(r))
+    return r.json()
+  }
+  const r = await fetch(`${apiBase}/saves/${saveId}/depth-chart`, {
+    method: 'PUT',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ depth_chart: depthChart }),
+  })
   if (!r.ok) throw new Error(await parseApiError(r))
   return r.json()
 }

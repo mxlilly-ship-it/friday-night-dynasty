@@ -15,6 +15,9 @@ from backend.services.league_service import (
     finish_coach_scrimmage_state,
     get_play_selection_from_state,
     get_play_learning_summary_from_state,
+    get_coach_gameplan_v2_from_state,
+    save_coach_gameplan_v2_in_state,
+    update_depth_chart_in_state,
     _ensure_playoffs_migrated,
     _init_playoffs_multiclass,
     _ensure_all_eligible_playoff_brackets,
@@ -38,6 +41,18 @@ class SimRequest(BaseModel):
 
 class SimStateRequest(BaseModel):
     state: Dict[str, Any]
+
+
+class SimCoachGameplanRequest(BaseModel):
+    state: Dict[str, Any]
+    offense: Optional[Dict[str, Any]] = None
+    defense: Optional[Dict[str, Any]] = None
+    fourth_down: Optional[Dict[str, Any]] = None
+
+
+class SimDepthChartRequest(BaseModel):
+    state: Dict[str, Any]
+    depth_chart: Dict[str, Any]
 
 
 class SimGameStartRequest(BaseModel):
@@ -142,6 +157,39 @@ def sim_play_learning_summary_route(payload: SimStateRequest = Body(...)):
     """Play selection results screen for browser/local saves (no auth)."""
     try:
         return get_play_learning_summary_from_state(payload.state)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/depth-chart", response_model=Dict[str, Any])
+def sim_depth_chart_route(payload: SimDepthChartRequest = Body(...)):
+    """Save depth chart order for browser/local saves (no auth)."""
+    try:
+        dc = payload.depth_chart if isinstance(payload.depth_chart, dict) else {}
+        state = update_depth_chart_in_state(payload.state, dc)
+        return {"state": state}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/coach-gameplan", response_model=Dict[str, Any])
+def sim_coach_gameplan_route(payload: SimCoachGameplanRequest = Body(...)):
+    """OFF/DEF coach gameplan (v2) for browser/local saves (no auth)."""
+    try:
+        if (
+            payload.offense is not None
+            or payload.defense is not None
+            or payload.fourth_down is not None
+        ):
+            result = save_coach_gameplan_v2_in_state(
+                payload.state,
+                offense=payload.offense,
+                defense=payload.defense,
+                fourth_down=payload.fourth_down,
+            )
+        else:
+            result = get_coach_gameplan_v2_from_state(payload.state)
+        return {**result, "state": payload.state}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

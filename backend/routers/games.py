@@ -69,6 +69,9 @@ def play_route(game_id: str, save_id: str, body: PlayRequest, user=Depends(requi
         state = save["state"]
         game = get_game(game_id)
         home_team, away_team = _get_teams_for_game(state, game)
+        attach_user_coach_gameplan_v2_from_save_state(
+            state, home_team, away_team, getattr(game, "user_team_name", None)
+        )
         out = submit_play(game, home_team, away_team, body.offense_play_id, body.defense_play_id)
         save_game(game_id, game)
         return {"game_id": game_id, **out}

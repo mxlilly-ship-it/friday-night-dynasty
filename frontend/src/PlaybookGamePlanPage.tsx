@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchPlaySelection } from './browserSave'
 import './PlaybookGamePlanPage.css'
 import TeamLogo from './TeamLogo'
@@ -64,30 +64,45 @@ export default function PlaybookGamePlanPage({
   const [confirming, setConfirming] = useState(false)
   const userTeam = String(saveState?.user_team ?? '')
 
-  const fetchData = useCallback(async () => {
+  const saveStateRef = useRef(saveState)
+  saveStateRef.current = saveState
+  const onSaveStateRef = useRef(onSaveState)
+  onSaveStateRef.current = onSaveState
+  const headersRef = useRef(headers)
+  headersRef.current = headers
+
+  const fetchData = useCallback(async (opts?: { showLoading?: boolean }) => {
     if (!saveId) {
       setFetchError('Missing configuration')
       setLoading(false)
       return
     }
-    setLoading(true)
+    const showLoading = opts?.showLoading ?? true
+    if (showLoading) setLoading(true)
     setFetchError(null)
     try {
-      const json = await fetchPlaySelection(apiBase ?? '', saveId, saveState, headers)
-      if (json.state) onSaveState?.(json.state)
+      const json = await fetchPlaySelection(
+        apiBase ?? '',
+        saveId,
+        saveStateRef.current,
+        headersRef.current,
+      )
+      if (json.state) onSaveStateRef.current?.(json.state)
       setLocalOffensive(json.offensive || {})
       setLocalDefensive(json.defensive || {})
     } catch (e: any) {
       const msg = e?.message ?? 'Failed to load'
       setFetchError(msg)
     } finally {
-      setLoading(false)
+      if (showLoading) setLoading(false)
     }
-  }, [apiBase, headers, saveId, saveState, onSaveState])
+  }, [apiBase, saveId])
 
   useEffect(() => {
-    if (saveId) fetchData()
-  }, [saveId, fetchData])
+    if (saveId) void fetchData({ showLoading: true })
+    // Intentionally only when saveId changes — saveState updates from onSaveState must not re-fetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saveId])
 
   const updateOffensivePct = (catKey: string, playId: string, pct: number) => {
     setLocalOffensive((prev) => {
@@ -191,7 +206,7 @@ export default function PlaybookGamePlanPage({
       ) : fetchError ? (
         <div className="playbook-gp-error">
           <p>{fetchError}</p>
-          <button type="button" className="playbook-gp-back" onClick={() => fetchData()}>
+          <button type="button" className="playbook-gp-back" onClick={() => void fetchData({ showLoading: true })}>
             Retry
           </button>
         </div>

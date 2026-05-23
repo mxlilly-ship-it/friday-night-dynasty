@@ -393,9 +393,37 @@ function ingestScrimmages(prev: any, next: any, center: ReturnType<typeof getNew
   }
 }
 
+function normalizeCoachKey(name: string): string {
+  return String(name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+}
+
+function carouselEventAffectsUser(
+  e: any,
+  userTeam: string,
+  userCoachName: string,
+): boolean {
+  if (e?.affects_user_program === true) return true
+  if (String(e?.type ?? '') === 'user_scheme_reminder') return true
+  if (e?.is_user_coach === true && e?.is_user_team === true) return true
+  const team = String(e?.team ?? '').trim()
+  const coach = normalizeCoachKey(String(e?.coach ?? ''))
+  const ut = String(userTeam || '').trim()
+  const ucn = normalizeCoachKey(userCoachName)
+  if (!ucn || !coach) return false
+  if (coach !== ucn) return false
+  const typ = String(e?.type ?? '').toLowerCase()
+  if (typ === 'application_hire' || typ === 'promotion') return true
+  return Boolean(ut && team === ut)
+}
+
 function ingestCarousel(prev: any, next: any, center: ReturnType<typeof getNewsCenter>) {
   const pa = (prev?.offseason_coach_carousel_last_events ?? []) as any[]
   const na = (next?.offseason_coach_carousel_last_events ?? []) as any[]
+  const userTeam = String(next?.user_team ?? '')
+  const userCoachName = String(next?.user_coach_name ?? '')
   const prevSet = new Set(pa.map((e) => JSON.stringify(e)))
   for (const e of na) {
     const k = JSON.stringify(e)
@@ -406,11 +434,24 @@ function ingestCarousel(prev: any, next: any, center: ReturnType<typeof getNewsC
     const coach = String(e?.coach ?? '')
     const detail = String(e?.detail ?? '')
     const fromSchool = String(e?.from_school ?? '')
+    const affectsUser = carouselEventAffectsUser(e, userTeam, userCoachName)
+    const sameNameOtherProgram = Boolean(
+      !affectsUser &&
+        userCoachName &&
+        normalizeCoachKey(coach) === normalizeCoachKey(userCoachName) &&
+        team &&
+        team !== userTeam,
+    )
+    if (typ === 'scheme_change' && affectsUser) {
+      continue
+    }
     const rendered = renderCarouselCopy(typ, {
       team,
       coach,
       from_school: fromSchool,
       detail,
+      affects_user: affectsUser,
+      same_name_other_program: sameNameOtherProgram,
     })
     let title = rendered.title
     let tickerText = rendered.ticker
@@ -565,8 +606,45 @@ function replaceCarouselTokens(template: string, vars: { team: string; coach: st
 
 function renderCarouselCopy(
   typ: string,
-  vars: { team: string; coach: string; from_school: string; detail: string },
+  vars: {
+    team: string
+    coach: string
+    from_school: string
+    detail: string
+    affects_user?: boolean
+    same_name_other_program?: boolean
+  },
 ): { title: string; ticker: string; summary: string } {
+  if (vars.affects_user && typ === 'user_scheme_reminder') {
+    const headline = vars.detail.includes('Playbook Select')
+      ? clipTicker('Your playbooks: change at Playbook Select when eligible', 72)
+      : clipTicker('Your preferred schemes unchanged by the league', 72)
+    return {
+      title: headline,
+      ticker: clipTicker('SCHEMES: You control playbook changes in preseason', 80),
+      summary: clipTicker(vars.detail, 160),
+    }
+  }
+  if (vars.affects_user && typ === 'application_hire') {
+    const dest = vars.team || 'program'
+    const from = vars.from_school || 'your school'
+    return {
+      title: clipTicker(`You take the ${dest} head coaching job`, 72),
+      ticker: clipTicker(`HC MOVE: You leave ${from} for ${dest}`, 80),
+      summary: clipTicker(vars.detail || `You accepted the ${dest} position.`, 160),
+    }
+  }
+  if (vars.same_name_other_program && (typ === 'resignation' || typ === 'retirement')) {
+    const label = `${vars.coach} at ${vars.team}`
+    return {
+      title: clipTicker(`League: ${label} steps down`, 72),
+      ticker: clipTicker(`CAROUSEL: ${vars.team} HC exit (not your program)`, 80),
+      summary: clipTicker(
+        `${vars.detail} This is another coach in the league, not your head coach.`,
+        160,
+      ),
+    }
+  }
   const bank = CAROUSEL_COPY_BANK[typ] ?? []
   if (!bank.length) {
     const fallback = vars.detail || 'Coaching carousel update'

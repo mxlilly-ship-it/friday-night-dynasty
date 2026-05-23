@@ -4,7 +4,7 @@ import './NewSaveFlow.css'
 import type { CSSProperties } from 'react'
 import { DEFENSIVE_PLAYBOOKS, OFFENSIVE_PLAYBOOKS } from './newSaveTypes'
 import PlaybookGamePlanPage from './PlaybookGamePlanPage'
-import { fetchPlayLearningSummary } from './browserSave'
+import { fetchPlayLearningSummary, saveDepthChart } from './browserSave'
 import DepthChartPage from './DepthChartPage'
 import ScrimmagePanel from './ScrimmagePanel'
 import GamePlayPage from './GamePlayPage'
@@ -210,6 +210,8 @@ type Props = {
       transfer_stage_2_ack_results?: boolean
     }
   }) => Promise<boolean>
+  /** Latest save after sim (ref); use for back-to-back week sims before React re-renders. */
+  getLiveSaveState?: () => any
   onSaveState?: (state: any) => void
   onError: (msg: string) => void
   backupReminderFrequency?: 'none' | '3_weeks' | '6_weeks' | 'stage'
@@ -225,6 +227,8 @@ type Props = {
     records?: unknown
     season_recaps?: Record<string, string>
   }) => void
+  /** Browser saves: merge imported logos into the zip bundle and IndexedDB. */
+  onImportLogosToBundle?: (logos: import('./saveBundle').SaveBundle['logos']) => Promise<void>
   /** API saves: reload league_history.json when opening Team History. */
   onRefreshDynasty?: () => void | Promise<void>
 }
@@ -1561,6 +1565,7 @@ function TeamHomePageBody({
   seasonRecaps,
   onMainMenu,
   onSimWeek,
+  getLiveSaveState,
   onSaveState,
   onError,
   backupReminderFrequency = 'none',
@@ -1573,7 +1578,11 @@ function TeamHomePageBody({
   setStadiumVersion,
 }: TeamHomePageBodyProps) {
   const isLocalBundle = saveId === '__local__' || saveId.startsWith('b_')
+  /** Browser/IDB saves use stateless /sim/game/* (no Bearer). Cloud saves need auth for /start-coach-game. */
+  const canStartCoachPlay = Boolean(saveId) && (isLocalBundle || Boolean(headers?.Authorization))
   const stadiumFileInputRef = useRef<HTMLInputElement>(null)
+  const saveStateFetchRef = useRef(saveState)
+  saveStateFetchRef.current = saveState
 
   const downloadTeamRecap = async (teamName: string, year: number | string) => {
     try {
@@ -1693,7 +1702,12 @@ function TeamHomePageBody({
   }, [saveState?.teams])
   const completedScrimmages = useMemo(() => {
     const list = (saveState?.preseason_scrimmages ?? []) as any[]
-    return list.filter((s) => s && s.completed !== false && s.name)
+    return list.filter((s) => {
+      if (!s) return false
+      if (!String(s.name || s.stage || '')) return false
+      if (s.completed === false) return false
+      return s.completed === true || s.played === true
+    })
   }, [saveState?.preseason_scrimmages])
   const [teamScheduleTeam, setTeamScheduleTeam] = useState('')
   const [teamInfoTeam, setTeamInfoTeam] = useState('')
@@ -4252,7 +4266,7 @@ function TeamHomePageBody({
     }
     let cancelled = false
     setLearningLoading(true)
-    fetchPlayLearningSummary(apiBase, saveId, saveState, headers)
+    fetchPlayLearningSummary(apiBase, saveId, saveStateFetchRef.current, headers)
       .then((data) => {
         if (!cancelled) {
           setLearningSummary({
@@ -4277,7 +4291,7 @@ function TeamHomePageBody({
     return () => {
       cancelled = true
     }
-  }, [apiBase, headers, isPlaySelectionResultsStage, saveId, saveState])
+  }, [apiBase, headers, isPlaySelectionResultsStage, saveId])
 
   if (showSettings) {
     return (
@@ -4293,6 +4307,7 @@ function TeamHomePageBody({
         onClose={() => setShowSettings(false)}
         onError={onError}
         onLogoVersionBump={() => setLogoVersion(Date.now())}
+        onImportLogosToBundle={onImportLogosToBundle}
       />
     )
   }
@@ -4475,18 +4490,13 @@ function TeamHomePageBody({
           isPreseason={false}
           onSave={async (depthChart) => {
             if (!saveId || !onSaveState) return
-            const r = await fetch(`${apiBase}/saves/${saveId}/depth-chart`, {
-              method: 'PUT',
-              headers: { ...headers, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ depth_chart: depthChart }),
-            })
-            if (!r.ok) {
-              const err = await r.json().catch(() => ({}))
-              onError(err?.detail ?? 'Failed to save depth chart')
-              return
+            try {
+              const data = await saveDepthChart(apiBase, saveId, saveState, headers, depthChart)
+              if (data?.state) onSaveState(data.state)
+              onError('')
+            } catch (e: unknown) {
+              onError(e instanceof Error ? e.message : 'Failed to save depth chart')
             }
-            const data = await r.json()
-            if (data?.state) onSaveState(data.state)
           }}
           onBack={() => setTeamMenu(defaultTeamMenuForPhase(phase))}
         />
@@ -4713,12 +4723,30 @@ function TeamHomePageBody({
     }
     if (teamMenu === 'OFF Gameplan') {
       return (
-        <CoachGameplanPage apiBase={apiBase} headers={headers} saveId={saveId} side="offense" onBack={gpBack} onError={onError} />
+        <CoachGameplanPage
+          apiBase={apiBase}
+          headers={headers}
+          saveId={saveId}
+          saveState={saveState}
+          side="offense"
+          onBack={gpBack}
+          onError={onError}
+          onSaveState={onSaveState}
+        />
       )
     }
     if (teamMenu === 'DEF Gameplan') {
       return (
-        <CoachGameplanPage apiBase={apiBase} headers={headers} saveId={saveId} side="defense" onBack={gpBack} onError={onError} />
+        <CoachGameplanPage
+          apiBase={apiBase}
+          headers={headers}
+          saveId={saveId}
+          saveState={saveState}
+          side="defense"
+          onBack={gpBack}
+          onError={onError}
+          onSaveState={onSaveState}
+        />
       )
     }
     if (teamMenu === SCOUTING_MENU_OFFENSE) {
@@ -5111,11 +5139,11 @@ function TeamHomePageBody({
                   <span className="teamhome-scrimmage-upcoming-label">Scrimmage results:</span>{' '}
                   {completedScrimmages
                     .slice()
-                    .sort((a, b) => String(a.name).localeCompare(String(b.name)))
+                    .sort((a, b) => String(a.name || a.stage).localeCompare(String(b.name || b.stage)))
                     .map((s, i) => (
-                      <span key={`${s.name}-${i}`}>
+                      <span key={`${s.name || s.stage}-${i}`}>
                         {i > 0 && ' · '}
-                        {s.name}: {s.home} {s.home_score}–{s.away} {s.away_score}
+                        {s.name || s.stage}: {s.home} {s.home_score}–{s.away} {s.away_score}
                         {s.ot ? ' (OT)' : ''}
                       </span>
                     ))}
@@ -5401,7 +5429,7 @@ function TeamHomePageBody({
                     await onSimWeek({ forcePreseasonAdvance: true })
                   }}
                   onPlay={async () => {
-                    if (!saveId || !headers) return
+                    if (!saveId) return
                     const scrimIdx = preseasonCurrentStage === 'Scrimmage 1' ? 0 : 1
                     const r = isLocalBundle
                       ? await fetch(`${apiBase}/sim/game/start`, {
@@ -5504,9 +5532,9 @@ function TeamHomePageBody({
                     <button
                       type="button"
                       className="teamhome-action-btn"
-                      disabled={!saveId || playingWeek || !canCoachPlayoffGame}
+                      disabled={!canStartCoachPlay || playingWeek || !canCoachPlayoffGame}
                       onClick={async () => {
-                        if (!saveId || !headers) return
+                        if (!canStartCoachPlay) return
                         setPlayingWeek(true)
                         try {
                           const r = isLocalBundle
@@ -7413,9 +7441,9 @@ function TeamHomePageBody({
                 <button
                   type="button"
                   className="teamhome-action-btn"
-                  disabled={playingWeek || !hasUnplayedGameThisWeek || isLocalBundle}
+                  disabled={!canStartCoachPlay || playingWeek || !hasUnplayedGameThisWeek}
                   onClick={async () => {
-                    if (!saveId || !headers) return
+                    if (!canStartCoachPlay) return
                     setPlayingWeek(true)
                     try {
                           const r = isLocalBundle
@@ -7499,6 +7527,11 @@ function TeamHomePageBody({
                           for (let i = 0; i < n; i++) {
                             const ok = await onSimWeek()
                             if (!ok) break
+                            const st = getLiveSaveState?.() ?? saveState
+                            const simPhase = String(st?.season_phase ?? '').toLowerCase()
+                            const cw = Number(st?.current_week ?? 1)
+                            const totalWeeks = Array.isArray(st?.weeks) ? st.weeks.length : 0
+                            if (simPhase !== 'regular' || (totalWeeks > 0 && cw > totalWeeks)) break
                           }
                         } finally {
                           setSimMultipleCount(0)

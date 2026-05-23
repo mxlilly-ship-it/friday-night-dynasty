@@ -1342,6 +1342,17 @@ td .teamhome-roster-name--profile {
   gap: 14px;
 }
 
+/* regional_8x4: in-region rounds only (state rounds via Final Four view) */
+.teamhome-playoffs-grid--regional {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  overflow-x: auto;
+}
+
+.teamhome-playoffs-grid--final-four {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 720px;
+}
+
 .teamhome-playoffs-grid--tabbed {
   grid-template-columns: minmax(0, 1fr);
   max-width: 640px;
@@ -2619,6 +2630,20 @@ td .teamhome-roster-name--profile {
   font-weight: 500;
   opacity: 0.75;
   font-size: 0.92em;
+}
+.season-summary-bracket-head-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 16px;
+  margin-bottom: 12px;
+}
+.season-summary-bracket-head-row .season-summary-section-title {
+  margin-bottom: 0;
+}
+.season-summary-bracket-toolbar .teamhome-playoffs-bracket-header {
+  margin: 0;
 }
 .season-summary-goals-grid {
   display: grid;

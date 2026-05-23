@@ -2,8 +2,11 @@ import { useState } from 'react'
 import './TeamHomePage.css'
 
 type ScrimmageResult = {
-  name: string
+  name?: string
+  /** Legacy coach-play records used ``stage`` instead of ``name``. */
+  stage?: string
   completed?: boolean
+  played?: boolean
   home: string
   away: string
   home_score: number
@@ -26,15 +29,25 @@ type Props = {
   onPlay?: () => Promise<void>
 }
 
+function scrimmageStageName(s: ScrimmageResult): string {
+  return String(s.name || s.stage || '')
+}
+
+function scrimmageIsComplete(s: ScrimmageResult): boolean {
+  if (s.completed === false) return false
+  if (s.played === true) return true
+  return s.completed !== false
+}
+
 export default function ScrimmagePanel({ currentStage, scrimmages, opponents = [], onSimulate, onPlay }: Props) {
   const [simulating, setSimulating] = useState(false)
   const [playing, setPlaying] = useState(false)
   // Prefer the latest entry for this stage (avoids a stale first entry blocking the UI after re-sim / sync issues).
-  const prevResult = [...scrimmages].reverse().find((s) => s.name === currentStage)
-  const lastCompleted = scrimmages.filter((s) => s.completed !== false).pop()
+  const prevResult = [...scrimmages].reverse().find((s) => scrimmageStageName(s) === currentStage)
+  const lastCompleted = scrimmages.filter((s) => scrimmageIsComplete(s) && scrimmageStageName(s)).pop()
   const scrimIdx = currentStage === 'Scrimmage 1' ? 0 : 1
   const opponentSlot = opponents[scrimIdx]
-  const isCompleted = Boolean(prevResult && prevResult.completed !== false)
+  const isCompleted = Boolean(prevResult && scrimmageIsComplete(prevResult))
 
   return (
     <div className="teamhome-preseason-panelA teamhome-scrimmage-panel">
@@ -56,13 +69,13 @@ export default function ScrimmagePanel({ currentStage, scrimmages, opponents = [
           : 'Practice game vs a non-conference opponent. Score and stats are shown but not recorded in season standings.'}
       </div>
 
-      {lastCompleted && lastCompleted.name !== currentStage ? (
+      {lastCompleted && scrimmageStageName(lastCompleted) !== currentStage ? (
         <div className="teamhome-scrimmage-sub" style={{ marginBottom: 8, opacity: 0.85 }}>
-          Earlier: {lastCompleted.name} — {lastCompleted.home} {lastCompleted.home_score}–{lastCompleted.away} {lastCompleted.away_score}
+          Earlier: {scrimmageStageName(lastCompleted)} — {lastCompleted.home} {lastCompleted.home_score}–{lastCompleted.away} {lastCompleted.away_score}
         </div>
       ) : null}
 
-      {prevResult && prevResult.completed !== false ? (
+      {prevResult && scrimmageIsComplete(prevResult) && prevResult.home && prevResult.away ? (
         <div className="teamhome-scrimmage-result">
           <div className="teamhome-scrimmage-score">
             {prevResult.home} {prevResult.home_score} – {prevResult.away} {prevResult.away_score}

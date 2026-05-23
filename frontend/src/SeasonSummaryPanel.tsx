@@ -29,6 +29,8 @@ type Props = {
   }
   standingsRows: SeasonSummaryStandingsRow[]
   bracketSlot: ReactNode
+  /** Class / region selectors (same as live playoffs when multiple brackets exist). */
+  bracketToolbar?: ReactNode
   onOpenLeagueHistory: () => void
   onOpenTeamHistory: () => void
   teamWithLogo: (name: string, size?: number, opts?: { playoffSeed?: number | null }) => ReactNode
@@ -51,6 +53,7 @@ export default function SeasonSummaryPanel({
   playoffView,
   standingsRows,
   bracketSlot,
+  bracketToolbar,
   onOpenLeagueHistory,
   onOpenTeamHistory,
   teamWithLogo,
@@ -196,13 +199,28 @@ export default function SeasonSummaryPanel({
 
       {!playoffView.missingBracket ? (
         <section className="season-summary-section" aria-labelledby="season-summary-bracket-head">
-          <h2 id="season-summary-bracket-head" className="season-summary-section-title">
-            Playoff bracket
-            {playoffView.viewClass ? (
-              <span className="season-summary-bracket-class"> · Class {playoffView.viewClass}</span>
-            ) : null}
-          </h2>
+          <div className="season-summary-bracket-head-row">
+            <h2 id="season-summary-bracket-head" className="season-summary-section-title">
+              Playoff bracket
+              {playoffView.viewClass ? (
+                <span className="season-summary-bracket-class"> · Class {playoffView.viewClass}</span>
+              ) : null}
+            </h2>
+            {bracketToolbar ? <div className="season-summary-bracket-toolbar">{bracketToolbar}</div> : null}
+          </div>
           <div className="season-summary-bracket-wrap">{bracketSlot}</div>
+        </section>
+      ) : playoffView.missingBracket && bracketToolbar ? (
+        <section className="season-summary-section" aria-labelledby="season-summary-bracket-head">
+          <div className="season-summary-bracket-head-row">
+            <h2 id="season-summary-bracket-head" className="season-summary-section-title">
+              Playoff bracket
+            </h2>
+            <div className="season-summary-bracket-toolbar">{bracketToolbar}</div>
+          </div>
+          <p className="teamhome-small" style={{ opacity: 0.88 }}>
+            No bracket saved for this classification. Try another class from the menu above.
+          </p>
         </section>
       ) : null}
 

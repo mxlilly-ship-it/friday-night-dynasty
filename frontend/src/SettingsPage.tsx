@@ -1,6 +1,10 @@
 import { useCallback, useRef, useState, type ChangeEvent } from 'react'
 import { suggestTeamForLogoFilename } from './logoMatch'
+import { guessMime, type SaveBundle } from './saveBundle'
 import './SettingsPage.css'
+
+const MAX_LOGO_FILES = 200
+const MAX_LOGO_BYTES = 5 * 1024 * 1024
 
 function filterLogoFiles(files: readonly File[]): File[] {
   return files.filter((f) => {
@@ -30,6 +34,8 @@ type Props = {
   onBackupNow?: () => void
   /** Server saves only: apply full state after bulk season simulation. */
   onApplySaveState?: (state: unknown) => void
+  /** Browser / zip saves: merge logos into the local bundle and persist to IndexedDB. */
+  onImportLogosToBundle?: (logos: SaveBundle['logos']) => Promise<void>
 }
 
 export default function SettingsPage({
@@ -44,6 +50,7 @@ export default function SettingsPage({
   onBackupReminderFrequencyChange,
   onBackupNow,
   onApplySaveState,
+  onImportLogosToBundle,
 }: Props) {
   const folderInputRef = useRef<HTMLInputElement | null>(null)
   const filesInputRef = useRef<HTMLInputElement | null>(null)
@@ -78,12 +85,17 @@ export default function SettingsPage({
       )
       return
     }
-    const next = logoFiles.map((file) => ({
+    const capped = logoFiles.length > MAX_LOGO_FILES ? logoFiles.slice(0, MAX_LOGO_FILES) : logoFiles
+    const next = capped.map((file) => ({
       file,
       team: suggestTeamForLogoFilename(file.name, teamNames),
     }))
     setRows(next)
-    setLastResult(null)
+    setLastResult(
+      logoFiles.length > MAX_LOGO_FILES
+        ? `Showing first ${MAX_LOGO_FILES} of ${logoFiles.length} images. Import in batches if needed.`
+        : null,
+    )
     onError('')
   }
 
@@ -121,35 +133,83 @@ export default function SettingsPage({
     }
     if (!saveId) return
 
+    const isLocalSave = saveId === '__local__' || saveId.startsWith('b_')
+    if (isLocalSave) {
+      if (!onImportLogosToBundle) {
+        onError('Logo import is not available for this save.')
+        return
+      }
+    } else if (!headers.Authorization) {
+      onError('Sign in to upload logos to a cloud save, or use a browser dynasty save.')
+      return
+    }
+
     setBusy(true)
     setProgress(null)
-    setLastResult(null)
     onError('')
 
     let ok = 0
     let failed = 0
     let lastErr = ''
 
-    for (let i = 0; i < toUpload.length; i++) {
-      const { file, team } = toUpload[i]
-      setProgress(`Uploading ${i + 1} / ${toUpload.length}: ${team}…`)
-      try {
-        const fd = new FormData()
-        fd.append('logo', file)
-        const r = await fetch(`${apiBase}/saves/logos/${encodeURIComponent(team)}`, {
-          method: 'POST',
-          headers,
-          body: fd,
-        })
-        if (!r.ok) {
-          const t = await r.text().catch(() => '')
-          throw new Error(t || `Failed for ${team}`)
+    if (isLocalSave) {
+      const logos: SaveBundle['logos'] = {}
+      for (let i = 0; i < toUpload.length; i++) {
+        const { file, team } = toUpload[i]
+        setProgress(`Importing ${i + 1} / ${toUpload.length}: ${team}…`)
+        try {
+          if (file.size > MAX_LOGO_BYTES) {
+            throw new Error(`${file.name} is too large (max 5 MB).`)
+          }
+          const buf = new Uint8Array(await file.arrayBuffer())
+          logos[team] = {
+            filename: file.name,
+            data: buf,
+            mime: file.type?.startsWith('image/') ? file.type : guessMime(file.name),
+          }
+          ok += 1
+        } catch (e: unknown) {
+          failed += 1
+          lastErr = e instanceof Error ? e.message : 'Import failed'
+          break
         }
-        ok += 1
-      } catch (e: any) {
-        failed += 1
-        lastErr = e?.message ?? 'Upload failed'
-        break
+      }
+      if (failed === 0 && ok > 0) {
+        try {
+          await onImportLogosToBundle!(logos)
+        } catch (e: unknown) {
+          failed += 1
+          lastErr = e instanceof Error ? e.message : 'Failed to save logos'
+        }
+      }
+    } else {
+      const uploadHeaders: Record<string, string> = {}
+      if (headers.Authorization) uploadHeaders.Authorization = headers.Authorization
+
+      for (let i = 0; i < toUpload.length; i++) {
+        const { file, team } = toUpload[i]
+        setProgress(`Uploading ${i + 1} / ${toUpload.length}: ${team}…`)
+        try {
+          if (file.size > MAX_LOGO_BYTES) {
+            throw new Error(`${file.name} is too large (max 5 MB).`)
+          }
+          const fd = new FormData()
+          fd.append('logo', file)
+          const r = await fetch(`${apiBase}/saves/logos/${encodeURIComponent(team)}`, {
+            method: 'POST',
+            headers: uploadHeaders,
+            body: fd,
+          })
+          if (!r.ok) {
+            const t = await r.text().catch(() => '')
+            throw new Error(t || `Failed for ${team}`)
+          }
+          ok += 1
+        } catch (e: unknown) {
+          failed += 1
+          lastErr = e instanceof Error ? e.message : 'Upload failed'
+          break
+        }
       }
     }
 
@@ -159,11 +219,11 @@ export default function SettingsPage({
 
     if (failed > 0) {
       onError(lastErr || 'Import stopped due to an error.')
-      setLastResult(`Uploaded ${ok} logo(s) before the error.`)
+      setLastResult(`Imported ${ok} logo(s) before the error.`)
       return
     }
 
-    setLastResult(`Uploaded ${ok} logo(s).`)
+    setLastResult(`Imported ${ok} logo(s).`)
     onError('')
     clearRows()
   }
@@ -226,6 +286,12 @@ export default function SettingsPage({
             Choose a <strong>folder</strong> or <strong>image files</strong>. For each picture, pick which school it belongs to. Names are
             guessed from the filename when possible (same rules as before: e.g. <code>Martinsburg.png</code> → Martinsburg). You can change
             any row before importing.
+            {isLocalSave ? (
+              <>
+                {' '}
+                Browser saves store logos on this device (included in backup .zip).
+              </>
+            ) : null}
           </p>
 
           <input ref={setFolderInputEl} type="file" className="settings-file-input" onChange={onFolderChange} />
