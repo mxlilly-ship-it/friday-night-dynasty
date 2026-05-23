@@ -497,6 +497,12 @@
   color: #fecaca;
 }
 
+.teamhome-improvements-alert--warn {
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  background: rgba(120, 83, 9, 0.28);
+  color: #fde68a;
+}
+
 .teamhome-improvements-foot {
   margin-top: 14px;
   font-size: 0.84rem;

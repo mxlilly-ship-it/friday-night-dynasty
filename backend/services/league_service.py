@@ -1163,6 +1163,15 @@ def _resolve_offseason_improvement_pillar(
     return from_lv, from_pts, to_lv, to_pts
 
 
+def _pillars_at_program_floor(ff: int, fp: int, cf: int, cp: int, bf: int, bp: int) -> bool:
+    """True when facilities, culture, and boosters are at minimum (grade 1, no progress)."""
+    return (
+        pillar_cumulative_pp_value(ff, fp) == 0
+        and pillar_cumulative_pp_value(cf, cp) == 0
+        and pillar_cumulative_pp_value(bf, bp) == 0
+    )
+
+
 def _apply_user_team_program_improvements(ut: Team, bank: Dict[str, Any], body: Dict[str, Any]) -> None:
     """Spend flex PP bank on the three program pillars (grades + partial progress)."""
     pp_remaining = int(bank.get("pp_remaining", bank.get("pp_total", 0)) or 0)
@@ -1215,7 +1224,11 @@ def _apply_user_team_program_improvements(ut: Team, bank: Dict[str, Any], body: 
         )
         new_remaining = pp_remaining + int(delta_pp)
     if new_remaining < 0:
-        raise ValueError("Not enough PP for those improvements.")
+        # Bad seasons can leave a PP deficit while all pillars are already at grade 1 — nothing left to downgrade.
+        if _pillars_at_program_floor(ff1, fp1, cf1, cp1, bf1, bp1):
+            new_remaining = 0
+        else:
+            raise ValueError("Not enough PP for those improvements.")
 
     ut.facilities_grade = ff1
     ut.facilities_progress_pts = fp1

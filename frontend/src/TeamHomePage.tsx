@@ -4202,7 +4202,12 @@ function TeamHomePageBody({
     const booD = vBooFrom - improveBooCumulative
     const deltaPp = facD + culD + booD
     const projectedRemaining = ppRemaining + deltaPp
-    const invalid = projectedRemaining < 0
+    const atProgramFloor = vFacFrom === 0 && vCulFrom === 0 && vBooFrom === 0
+    const targetsAtFloor =
+      improveFacCumulative === 0 && improveCulCumulative === 0 && improveBooCumulative === 0
+    /** PP bank underwater but every pillar already at grade 1 — nothing left to refund. */
+    const stuckAtFloorDebt = atProgramFloor && targetsAtFloor && projectedRemaining < 0
+    const invalid = projectedRemaining < 0 && !stuckAtFloorDebt
     const shortfall = invalid ? Math.max(0, Math.ceil(-projectedRemaining)) : 0
     const pillars = [
       {
@@ -4230,7 +4235,18 @@ function TeamHomePageBody({
         pillarDeltaPp: booD,
       },
     ]
-    return { invalid, projectedRemaining, shortfall, deltaPp, ppRemaining, ppTotal, pillars }
+    return {
+      invalid,
+      projectedRemaining,
+      shortfall,
+      deltaPp,
+      ppRemaining,
+      ppTotal,
+      pillars,
+      atProgramFloor,
+      targetsAtFloor,
+      stuckAtFloorDebt,
+    }
   }, [
     phase,
     offseasonCurrentStage,
@@ -6406,7 +6422,13 @@ function TeamHomePageBody({
                         </details>
                       ) : null}
 
-                      {improvementsBudget.invalid ? (
+                      {improvementsBudget.stuckAtFloorDebt ? (
+                        <div className="teamhome-improvements-alert teamhome-improvements-alert--warn" role="status">
+                          <b>Program at minimum.</b> Facilities, culture, and boosters are already grade 1, so you cannot
+                          refund more PP to balance a negative bank from this season. Use <b>Continue</b> to lock in and
+                          advance — your bank will reset to 0 PP for this step.
+                        </div>
+                      ) : improvementsBudget.invalid ? (
                         <div className="teamhome-improvements-alert teamhome-improvements-alert--error" role="alert">
                           <b>PP overspent.</b> These levels would drop your PP bank to{' '}
                           <b>{improvementsBudget.projectedRemaining}</b> ({improvementsBudget.ppRemaining} now
@@ -6440,6 +6462,8 @@ function TeamHomePageBody({
                       <div className="teamhome-improvements-hint teamhome-small">
                         {improvementsBudget.invalid ? (
                           <>Fix PP above, then use Continue.</>
+                        ) : improvementsBudget.atProgramFloor && improvementsBudget.projectedRemaining > 0 ? (
+                          <>At grade 1 on all pillars you cannot spend more PP here — use Continue with leftover bank or unchanged sliders.</>
                         ) : (
                           <>Use Continue to lock in pillar grades and advance.</>
                         )}
