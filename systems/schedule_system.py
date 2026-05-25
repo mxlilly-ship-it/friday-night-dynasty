@@ -56,7 +56,11 @@ def build_schedule_10_game(team_names: List[str], seed: Optional[int] = None) ->
     return schedule
 
 
-def build_weeks_10_game(team_names: List[str], seed: Optional[int] = None) -> List[List[Tuple[str, str]]]:
+def build_weeks_10_game(
+    team_names: List[str],
+    seed: Optional[int] = None,
+    max_rounds: Optional[int] = None,
+) -> List[List[Tuple[str, str]]]:
     """
     Build a regular season as ``weeks -> games`` (each week: list of (home, away)).
 
@@ -76,6 +80,8 @@ def build_weeks_10_game(team_names: List[str], seed: Optional[int] = None) -> Li
         n += 1
 
     num_rounds = _circle_rr_num_rounds(n)
+    if max_rounds is not None:
+        num_rounds = min(num_rounds, max(0, int(max_rounds)))
     fixed = teams[0]
     others = teams[1:n]
     weeks: List[List[Tuple[str, str]]] = []

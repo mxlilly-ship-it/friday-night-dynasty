@@ -25,6 +25,9 @@ DEFAULT_EMAIL_PACK = DEFAULT_PLAYOFF_SYSTEM_ID
 # playoff_system id -> (league_id, state display name, email_pack) when JSON omits fields
 _PLAYOFF_DEFAULTS: Dict[str, tuple[str, str, str]] = {
     "wv": ("wv", "West Virginia", "wv"),
+    "wv16": ("wv_3class", "West Virginia (3-Class)", "wv"),
+    "oh": ("oh_d5", "Ohio", "oh"),
+    "oh_d5": ("oh_d5", "Ohio", "oh"),
 }
 
 

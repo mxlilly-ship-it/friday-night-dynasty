@@ -388,7 +388,7 @@ export function NewSaveFlow({
             <div className="newsave-sub" style={{ marginBottom: 8 }}>
               Team dataset source
             </div>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'stretch', flexWrap: 'wrap' }}>
               <button
                 type="button"
                 className={`newsave-preset-card ${teamSource === 'default' ? 'selected' : ''}`}

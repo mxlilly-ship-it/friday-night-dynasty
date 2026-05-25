@@ -535,8 +535,11 @@ def _ensure_playoffs_migrated(state: Dict[str, Any], teams: Dict[str, Any]) -> D
     if p.get("seeds") is not None or p.get("bracket_results") is not None:
         ut = state.get("user_team")
         uc = _classification_of_team(teams, ut) if ut else "UNK"
+        legacy_size = int(p.get("num_teams") or 0)
+        if legacy_size < 2:
+            legacy_size = int(get_state_playoff_system(state).bracket_size)
         inner = {
-            "num_teams": int(p.get("num_teams") or 8),
+            "num_teams": legacy_size,
             "seeds": list(p.get("seeds") or []),
             "bracket_results": list(p.get("bracket_results") or []),
             "completed": bool(p.get("completed")),
@@ -710,6 +713,45 @@ def _ensure_all_eligible_playoff_brackets(
     ut = state.get("user_team")
     if ut and not playoffs.get("user_class"):
         playoffs["user_class"] = _classification_of_team(teams, ut)
+
+
+def _reconcile_playoff_brackets_to_config(
+    state: Dict[str, Any], teams: Dict[str, Any], standings: Dict[str, Any]
+) -> None:
+    """Align ``by_class`` bracket size with the save's ``playoff_system`` when not yet started.
+
+    Fixes dynasties created with the legacy 8-team ``wv`` id while using a 16-team
+    league file, and corrects stale ``num_teams`` before the first postseason game.
+    """
+    cfg = get_state_playoff_system(state)
+    desired = int(cfg.bracket_size)
+    min_teams = int(cfg.min_teams)
+    playoffs = state.get("playoffs")
+    if not isinstance(playoffs, dict):
+        return
+    bc = playoffs.get("by_class")
+    if not isinstance(bc, dict) or not bc:
+        return
+    groups = _team_names_by_classification(teams)
+    for cls, pdata in list(bc.items()):
+        if not isinstance(pdata, dict):
+            continue
+        if pdata.get("completed"):
+            continue
+        if pdata.get("bracket_results"):
+            continue
+        names = groups.get(cls) or []
+        if len(names) < min_teams:
+            continue
+        seeds = pdata.get("seeds") or []
+        current = int(pdata.get("num_teams") or len(seeds) or 0)
+        if current == desired and len(seeds) == desired:
+            continue
+        seeded = seed_teams(names, standings, top_n=desired)
+        pdata["num_teams"] = desired
+        pdata["seeds"] = [{"seed": int(seed), "team": str(name)} for (seed, name) in seeded]
+        bc[cls] = pdata
+    playoffs["by_class"] = bc
 
 
 def _flatten_playoff_bracket_results(playoffs: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -1621,6 +1663,52 @@ def _merge_carousel_job_applications(state: Dict[str, Any], body: Optional[Dict[
     state["offseason_carousel_job_applications"] = out
 
 
+def _annotate_carousel_events_for_user(
+    events: List[Any],
+    *,
+    user_team: Optional[str],
+    user_coach_name: Optional[str],
+) -> List[Dict[str, Any]]:
+    """Tag carousel rows for UI/news. Falls back if an older coach_carousel module lacks the helper."""
+    try:
+        from systems.coach_carousel import annotate_carousel_events_for_user
+
+        return annotate_carousel_events_for_user(
+            events,
+            user_team=user_team,
+            user_coach_name=user_coach_name,
+        )
+    except ImportError:
+        ut = str(user_team or "").strip()
+        ucn = str(user_coach_name or "").strip().lower()
+        out: List[Dict[str, Any]] = []
+        for raw in events or []:
+            if not isinstance(raw, dict):
+                continue
+            ev = dict(raw)
+            team = str(ev.get("team") or "").strip()
+            coach_key = " ".join(str(ev.get("coach") or "").strip().lower().split())
+            is_user_coach = bool(ucn and coach_key == ucn)
+            is_user_team = bool(ut and team == ut)
+            ev["is_user_coach"] = is_user_coach
+            ev["is_user_team"] = is_user_team
+            typ = str(ev.get("type") or "").strip().lower()
+            ev["affects_user_program"] = is_user_coach and (
+                is_user_team
+                or typ
+                in (
+                    "application_hire",
+                    "promotion",
+                    "firing",
+                    "resignation",
+                    "retirement",
+                    "user_scheme_reminder",
+                )
+            )
+            out.append(ev)
+        return out
+
+
 def _apply_coaching_carousel_churn(
     state: Dict[str, Any],
     teams: Dict[str, Any],
@@ -1651,14 +1739,11 @@ def _apply_coaching_carousel_churn(
     )
     _sync_user_team_with_saved_coach(state, teams)
     state["offseason_coach_carousel"] = persist
-    from systems.coach_carousel import annotate_carousel_events_for_user
-
-    tagged = annotate_carousel_events_for_user(
+    state["offseason_coach_carousel_last_events"] = _annotate_carousel_events_for_user(
         (events or [])[-40:],
         user_team=ut,
         user_coach_name=user_coach_key,
     )
-    state["offseason_coach_carousel_last_events"] = tagged
     state["offseason_coach_carousel_hot_seat"] = hs or {}
 
 
@@ -1702,14 +1787,11 @@ def _apply_coaching_carousel_stage(
     _sync_user_team_with_saved_coach(state, teams)
     _sync_user_team_from_carousel_events(state, events)
     state["offseason_coach_carousel"] = persist
-    from systems.coach_carousel import annotate_carousel_events_for_user
-
-    tagged = annotate_carousel_events_for_user(
+    state["offseason_coach_carousel_last_events"] = _annotate_carousel_events_for_user(
         (events or [])[-40:],
         user_team=ut,
         user_coach_name=user_coach_key,
     )
-    state["offseason_coach_carousel_last_events"] = tagged
     state["offseason_coach_carousel_hot_seat"] = hs or {}
     if step == 4:
         _refresh_user_scheme_change_notice(state, teams, ut, carousel_year)
@@ -3037,6 +3119,9 @@ def load_state(user_id: str, save_id: str) -> Tuple[Dict[str, Any], str]:
     # default (WV) so callers can always read a valid id from state.
     ensure_playoff_system_in_state(state)
     ensure_league_metadata_in_state(state)
+    if str(state.get("league_id") or "").strip().lower() == "wv_3class":
+        if state.get("playoff_system") in (None, "", "wv"):
+            state["playoff_system"] = "wv16"
 
     _migrate_save_dir_if_changed(user_id, save_id, save_dir, stored_dir)
     apply_team_program_totals_from_history_to_state(save_dir, state)
@@ -3060,6 +3145,7 @@ def _begin_playoffs_phase(state: Dict[str, Any], teams: Dict[str, Any], standing
     if not isinstance(state.get("playoffs"), dict) or not (state.get("playoffs") or {}).get("by_class"):
         state["playoffs"] = _init_playoffs_multiclass(state, teams, standings)
     _ensure_all_eligible_playoff_brackets(state, teams, standings)
+    _reconcile_playoff_brackets_to_config(state, teams, standings)
 
 
 def save_state(user_id: str, save_id: str, state: Dict[str, Any], save_dir: str) -> None:

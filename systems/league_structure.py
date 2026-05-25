@@ -243,7 +243,8 @@ def build_regular_season_weeks(
     def _merge_class_blocks(blocks: List[List[List[Tuple[str, str]]]]) -> List[List[Tuple[str, str]]]:
         if not blocks:
             return []
-        n_weeks = min(10, max(len(b) for b in blocks))
+        # Allow 11 weeks when a class uses 7 in-region + 4 cross (4×7 template); other classes idle that week.
+        n_weeks = max(len(b) for b in blocks)
         out: List[List[Tuple[str, str]]] = [[] for _ in range(n_weeks)]
         for b in blocks:
             for wi in range(n_weeks):
@@ -303,6 +304,58 @@ def build_regular_season_weeks(
                 cross_games: List[Tuple[str, str]] = []
                 for a, b in pairs:
                     cross_games.extend(_pair_two_regions_week(regs_list[a], regs_list[b], offset=(wk_idx + a + b) % 8))
+                block.append(cross_games)
+            class_blocks.append(block)
+            continue
+
+        # Rule template 3: 40 teams / 4 regions × 10 => 9 in-region + 1 out-of-region.
+        if len(region_names) == 4 and total == 40 and all(s == 10 for s in sizes):
+            handled_classes.add(cls)
+            regs_list = [list(regs[r]) for r in region_names]
+            rr_weeks = [build_weeks_10_game(lst) for lst in regs_list]
+            block = []
+            for wi in range(9):
+                week_games: List[Tuple[str, str]] = []
+                for rw in rr_weeks:
+                    if wi < len(rw):
+                        week_games.extend(rw[wi])
+                block.append(week_games)
+            cross_games: List[Tuple[str, str]] = []
+            cross_games.extend(
+                _pair_two_regions_week(regs_list[0], regs_list[1], offset=random.randrange(10))
+            )
+            cross_games.extend(
+                _pair_two_regions_week(regs_list[2], regs_list[3], offset=random.randrange(10))
+            )
+            block.append(cross_games)
+            class_blocks.append(block)
+            continue
+
+        # Rule template 4: 28 teams / 4 regions × 7 => 6 in-region (7 week slots) + 4 cross = 10 games.
+        if len(region_names) == 4 and total == 28 and all(s == 7 for s in sizes):
+            handled_classes.add(cls)
+            regs_list = [list(regs[r]) for r in region_names]
+            rr_weeks = [build_weeks_10_game(lst) for lst in regs_list]
+            block = []
+            for wi in range(7):
+                week_games: List[Tuple[str, str]] = []
+                for rw in rr_weeks:
+                    if wi < len(rw):
+                        week_games.extend(rw[wi])
+                block.append(week_games)
+
+            pair_weeks = [
+                ((0, 1), (2, 3)),
+                ((0, 2), (1, 3)),
+                ((0, 3), (1, 2)),
+                ((0, 1), (2, 3)),
+            ]
+            for wk_idx, pairs in enumerate(pair_weeks):
+                cross_games: List[Tuple[str, str]] = []
+                for a, b in pairs:
+                    cross_games.extend(
+                        _pair_two_regions_week(regs_list[a], regs_list[b], offset=(wk_idx + a + b) % 7)
+                    )
                 block.append(cross_games)
             class_blocks.append(block)
             continue

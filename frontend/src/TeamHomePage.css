@@ -1344,8 +1344,9 @@ td .teamhome-roster-name--profile {
 
 .teamhome-playoffs-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--playoff-cols, 3), minmax(180px, 1fr));
   gap: 14px;
+  overflow-x: auto;
 }
 
 /* regional_8x4: in-region rounds only (state rounds via Final Four view) */
@@ -2868,9 +2869,10 @@ td .teamhome-roster-name--profile {
 }
 .teamhome-league-history-playoffs-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--playoff-cols, 3), minmax(140px, 1fr));
   gap: 10px;
   align-items: start;
+  overflow-x: auto;
 }
 .teamhome-playoffs-microcol {
   min-width: 0;

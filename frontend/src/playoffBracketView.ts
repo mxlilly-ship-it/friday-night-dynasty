@@ -67,6 +67,94 @@ export function userRegionFromSeeds(seeds: PlayoffSeedRow[], userTeam: string): 
   return r || null
 }
 
+/** Overall (non-regional) round names from bracket size — matches systems/playoff_system.py. */
+export function roundNamesForBracketSize(bracketSize: number): string[] {
+  let n = Math.max(2, Math.floor(bracketSize))
+  const out: string[] = []
+  while (n >= 2) {
+    if (n === 2) out.push('Championship')
+    else if (n === 4) out.push('Semifinal')
+    else if (n === 8) out.push('Quarterfinal')
+    else out.push(`Round of ${n}`)
+    n = Math.floor(n / 2)
+  }
+  return out
+}
+
+/** First-round pairings by seed order (1vN, 2vN-1, …) — matches engine slot pairing. */
+export function firstRoundPairsFromSeeds(seeds: PlayoffSeedRow[], bracketSize: number): PlayoffMatchup[] {
+  const ordered = [...seeds]
+    .sort((a, b) => Number(a.seed) - Number(b.seed))
+    .slice(0, bracketSize)
+    .map((s) => String(s.team))
+  const n = ordered.length
+  if (n < 2) return []
+  const pairs: PlayoffMatchup[] = []
+  for (let i = 0; i < n / 2; i++) {
+    pairs.push({ home: ordered[i], away: ordered[n - 1 - i] })
+  }
+  return pairs
+}
+
+/** Standard fixed bracket columns (8, 16, 32, …) for overall seeding. */
+export function buildOverallPlayoffColumns(
+  seeds: PlayoffSeedRow[],
+  results: PlayoffGameRow[],
+  bracketSize: number,
+): PlayoffRoundColumn[] {
+  const size = Math.max(2, Math.floor(bracketSize))
+  const roundNames = roundNamesForBracketSize(size)
+  const columns: PlayoffRoundColumn[] = []
+  let priorPairs = firstRoundPairsFromSeeds(seeds, size)
+  let priorRoundGames: PlayoffGameRow[] = []
+
+  for (let ri = 0; ri < roundNames.length; ri++) {
+    const roundName = roundNames[ri]
+    const games = results.filter((g) => String(g.round || '') === roundName)
+    const isFirst = ri === 0
+    const isLast = ri === roundNames.length - 1
+
+    if (isFirst) {
+      columns.push({
+        title: roundName,
+        roundKey: roundName,
+        pairs: priorPairs,
+        games,
+        rows: [],
+      })
+      priorRoundGames = games
+      continue
+    }
+
+    if (isLast) {
+      const prevRoundName = roundNames[ri - 1]
+      const prevRows = buildTwoGameRoundRows(priorRoundGames, priorPairs, results.filter((g) => String(g.round || '') === prevRoundName))
+      const row = buildChampionshipRow(prevRows, games)
+      columns.push({
+        title: roundName,
+        roundKey: roundName,
+        pairs: [],
+        games,
+        rows: row ? [row] : [],
+      })
+      continue
+    }
+
+    const rows = buildTwoGameRoundRows(priorRoundGames, priorPairs, games)
+    columns.push({
+      title: roundName,
+      roundKey: roundName,
+      pairs: [],
+      games,
+      rows,
+    })
+    priorPairs = rows.map((r) => ({ home: String(r.home), away: String(r.away) }))
+    priorRoundGames = games
+  }
+
+  return columns
+}
+
 /** In-region round names (matches systems/playoff_system.py). */
 export function regionalInRegionRoundNames(teamsPerRegion: number): string[] {
   const tpr = Math.max(2, teamsPerRegion)

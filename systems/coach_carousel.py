@@ -18,6 +18,7 @@ from systems.coach_career_system import (
     _retirement_chance,
     _seasons_since_playoff,
     _should_fire,
+    build_user_scheme_change_notice,
 )
 from systems.prestige_system import get_coach_skill_sum
 from systems.save_system import coach_from_dict, coach_to_dict
@@ -181,14 +182,17 @@ def _maybe_fire_coach(
     # (no losing streak yet) so this only matters once history accumulates.
     threshold = 78 if name == user_team else 82
     if _should_fire(name, prestige, seasons) or hs >= threshold:
-        events.append(
+        _push_carousel_event(
+            events,
             {
                 "type": "firing",
                 "team": name,
                 "coach": coach.name,
                 "detail": f"{name} fires {coach.name}" + (f" (hot seat {hs})" if hs >= 70 else ""),
                 "hot_seat": hs,
-            }
+            },
+            user_team=user_team,
+            user_coach_name=user_coach_name,
         )
         unemployed.append(coach)
         old_skill = get_coach_skill_sum(coach)
@@ -216,11 +220,66 @@ def _is_users_head_coach(
     user_coach_name: Optional[str],
 ) -> bool:
     """True when this team/coach row is the human player's head coach."""
+    if coach is None:
+        return False
     if user_coach_name and _coach_matches_user(coach, user_coach_name):
         return True
-    if user_team and str(team_name) == str(user_team) and coach is not None:
-        return True
+    if user_team and str(team_name) == str(user_team):
+        # Legacy saves without user_coach_name: protect the user's school slot.
+        if not user_coach_name:
+            return True
+        return _coach_matches_user(coach, user_coach_name)
     return False
+
+
+def _annotate_carousel_event(
+    event: Dict[str, Any],
+    *,
+    user_team: Optional[str],
+    user_coach_name: Optional[str],
+) -> Dict[str, Any]:
+    """Tag carousel rows so UI/news can distinguish the human coach from league-wide churn."""
+    team = str(event.get("team") or "").strip()
+    coach_key = " ".join(str(event.get("coach") or "").strip().lower().split())
+    ut = str(user_team or "").strip()
+    ucn = _user_coach_name_key(user_coach_name)
+    is_user_coach = bool(ucn and coach_key == ucn)
+    is_user_team = bool(ut and team == ut)
+    event["is_user_coach"] = is_user_coach
+    event["is_user_team"] = is_user_team
+    typ = str(event.get("type") or "").strip().lower()
+    event["affects_user_program"] = is_user_coach and (
+        is_user_team
+        or typ in ("application_hire", "promotion", "firing", "resignation", "retirement", "user_scheme_reminder")
+    )
+    return event
+
+
+def _push_carousel_event(
+    events: List[Dict[str, Any]],
+    event: Dict[str, Any],
+    *,
+    user_team: Optional[str],
+    user_coach_name: Optional[str],
+) -> None:
+    events.append(_annotate_carousel_event(event, user_team=user_team, user_coach_name=user_coach_name))
+
+
+def annotate_carousel_events_for_user(
+    events: List[Dict[str, Any]],
+    *,
+    user_team: Optional[str],
+    user_coach_name: Optional[str],
+) -> List[Dict[str, Any]]:
+    """Re-tag persisted carousel rows (older saves) before UI/news ingest."""
+    out: List[Dict[str, Any]] = []
+    for raw in events or []:
+        if not isinstance(raw, dict):
+            continue
+        ev = dict(raw)
+        _annotate_carousel_event(ev, user_team=user_team, user_coach_name=user_coach_name)
+        out.append(ev)
+    return out
 
 
 def _find_unemployed_user_coach(
@@ -292,6 +351,7 @@ def _complete_user_application_hire(
     events: List[Dict[str, Any]],
     vacancies: List[str],
     *,
+    user_coach_name: Optional[str] = None,
     unemployed_idx: Optional[int] = None,
     unemployed: Optional[List[Coach]] = None,
     detail_suffix: str = "",
@@ -313,14 +373,17 @@ def _complete_user_application_hire(
     coach_changes[vacancy] = (old_skill, new_skill)
     coach_changes[user_team] = (poach_old_skill, 3.0)
     suffix = detail_suffix or ""
-    events.append(
+    _push_carousel_event(
+        events,
         {
             "type": "application_hire",
             "team": vacancy,
             "coach": hired_coach.name,
             "from_school": user_team,
             "detail": f"{hired_coach.name} accepts the {vacancy} job (user application — leaves {user_team}){suffix}",
-        }
+        },
+        user_team=user_team,
+        user_coach_name=user_coach_name or getattr(hired_coach, "name", None),
     )
     if user_team not in vacancies:
         vacancies.append(user_team)
@@ -384,6 +447,7 @@ def _try_user_application_hire(
         coach_changes,
         events,
         vacancies,
+        user_coach_name=user_coach_name,
         unemployed_idx=unemployed_idx,
         unemployed=unemployed,
     )
@@ -438,6 +502,7 @@ def _hiring_iteration(
                 coach_changes,
                 events,
                 vacancies,
+                user_coach_name=user_coach_name,
                 unemployed_idx=waitlist_idx,
                 unemployed=unemployed,
                 detail_suffix=" (waitlist)",
@@ -481,14 +546,17 @@ def _hiring_iteration(
         old_skill = coach_changes.get(vacancy, (3.0, 3.0))[0]
         coach_changes[vacancy] = (old_skill, new_skill)
         coach_changes[poach_school] = (poach_old_skill, 3.0)
-        events.append(
+        _push_carousel_event(
+            events,
             {
                 "type": "promotion",
                 "team": vacancy,
                 "coach": hired_coach.name,
                 "detail": f"{hired_coach.name} leaves {poach_school} for {vacancy}",
                 "from_school": poach_school,
-            }
+            },
+            user_team=user_team,
+            user_coach_name=user_coach_name,
         )
         vacancies.append(poach_school)
         return
@@ -514,7 +582,12 @@ def _hiring_iteration(
     new_skill = get_coach_skill_sum(new_coach)
     old_skill = coach_changes.get(vacancy, (3.0, 3.0))[0]
     coach_changes[vacancy] = (old_skill, new_skill)
-    events.append({"type": "hire", "team": vacancy, "coach": new_coach.name, "detail": f"{vacancy} hires {new_coach.name}"})
+    _push_carousel_event(
+        events,
+        {"type": "hire", "team": vacancy, "coach": new_coach.name, "detail": f"{vacancy} hires {new_coach.name}"},
+        user_team=user_team,
+        user_coach_name=user_coach_name,
+    )
     employed_coaches[vacancy] = (vacancy, new_coach)
 
 
@@ -644,6 +717,7 @@ def _ensure_user_coach_landed(
         coach_changes,
         events,
         vacancies,
+        user_coach_name=user_coach_name,
         detail_suffix=" (offseason landing spot)",
     )
     if from_school and from_school not in vacancies and not getattr(team_by_name.get(from_school), "coach", None):
@@ -772,13 +846,16 @@ def _carousel_init(
         if _is_users_head_coach(name, coach, user_team, user_coach_name):
             continue
         if random.random() < _retirement_chance(coach.age):
-            events.append(
+            _push_carousel_event(
+                events,
                 {
                     "type": "retirement",
                     "team": name,
                     "coach": coach.name,
                     "detail": f"{coach.name} (age {coach.age}) retires from {name}",
-                }
+                },
+                user_team=user_team,
+                user_coach_name=user_coach_name,
             )
             old_skill = get_coach_skill_sum(coach)
             team.coach = None
@@ -801,14 +878,17 @@ def _carousel_init(
         if _is_users_head_coach(name, coach, user_team, user_coach_name):
             continue
         if random.random() < _random_exit_chance(coach, hs, prestige):
-            events.append(
+            _push_carousel_event(
+                events,
                 {
                     "type": "resignation",
                     "team": name,
                     "coach": coach.name,
                     "detail": f"{coach.name} steps away from coaching at {name}",
                     "hot_seat": hs,
-                }
+                },
+                user_team=user_team,
+                user_coach_name=user_coach_name,
             )
             old_skill = get_coach_skill_sum(coach)
             team.coach = None
@@ -982,9 +1062,31 @@ def run_coach_carousel_step(
     )
     for team in teams.values():
         coach = getattr(team, "coach", None)
-        if not coach or not _consider_scheme_change(coach):
+        if not coach:
+            continue
+        if _is_users_head_coach(team.name, coach, user_team, user_coach_name):
+            notice = build_user_scheme_change_notice(coach, current_year)
+            if notice:
+                _push_carousel_event(
+                    events,
+                    {
+                        "type": "user_scheme_reminder",
+                        "team": team.name,
+                        "coach": coach.name,
+                        "detail": notice["detail"],
+                        "headline": notice["headline"],
+                        "playbooks_may_change": notice["playbooks_may_change"],
+                        "next_playbook_eligible_year": notice["next_playbook_eligible_year"],
+                    },
+                    user_team=user_team,
+                    user_coach_name=user_coach_name,
+                )
+            continue
+        if not _consider_scheme_change(coach):
             continue
         change_info = _apply_scheme_change(coach, current_year)
+        if not change_info:
+            continue
         detail = f"{coach.name} changes scheme at {team.name}"
         if "new_offensive_style" in change_info:
             detail += f" (offense: {change_info['old_offensive_style']} → {change_info['new_offensive_style']})"
@@ -994,9 +1096,14 @@ def run_coach_carousel_step(
             detail += f" (offensive playbook: {change_info['old_offensive_formation']} → {change_info['new_offensive_formation']})"
         elif "new_defensive_formation" in change_info:
             detail += f" (defensive playbook: {change_info['old_defensive_formation']} → {change_info['new_defensive_formation']})"
-        evt = {"type": "scheme_change", "team": team.name, "coach": coach.name, "detail": detail}
+        evt: Dict[str, Any] = {"type": "scheme_change", "team": team.name, "coach": coach.name, "detail": detail}
         evt.update(change_info)
-        events.append(evt)
+        _push_carousel_event(
+            events,
+            evt,
+            user_team=user_team,
+            user_coach_name=user_coach_name,
+        )
 
     unemp = _ensure_user_coach_landed(
         teams,

@@ -1,5 +1,8 @@
 .settings-root {
   min-height: 100vh;
+  width: 100%;
+  align-self: stretch;
+  text-align: left;
   background: #141418;
   color: #e8e8ee;
   padding: 24px 18px 48px;
@@ -30,6 +33,15 @@
   font-size: 1.35rem;
   font-weight: 900;
   letter-spacing: 0.02em;
+  color: #e8e8ee;
+}
+
+.settings-section {
+  margin-bottom: 28px;
+}
+
+.settings-section:last-of-type {
+  margin-bottom: 0;
 }
 
 .settings-close {
@@ -51,6 +63,7 @@
   margin: 0 0 12px;
   font-size: 1.05rem;
   font-weight: 850;
+  color: #e8e8ee;
 }
 
 .settings-copy {

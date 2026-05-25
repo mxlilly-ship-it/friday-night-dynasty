@@ -17,7 +17,12 @@ from systems.playbook_system import (
     normalize_coach_defensive_front,
     normalize_coach_offensive_playbook,
 )
-from systems.preferred_playbook import coach_may_change_preferred_playbooks, coach_record_preferred_playbook_change
+from systems.preferred_playbook import (
+    PREFERRED_PLAYBOOK_CHANGE_INTERVAL_SEASONS,
+    coach_may_change_preferred_playbooks,
+    coach_record_preferred_playbook_change,
+    next_eligible_season_for_preferred_playbooks,
+)
 
 # --- Retirement ---
 RETIREMENT_AGE_FORCED = 75
@@ -158,6 +163,51 @@ def _consider_scheme_change(coach: Coach) -> bool:
     """Whether coach changes scheme (offensive or defensive style) this year."""
     years = getattr(coach, "years_since_scheme_change", 0)
     return years >= SCHEME_CHANGE_YEARS and random.random() < SCHEME_CHANGE_CHANCE
+
+
+def build_user_scheme_change_notice(coach: Coach, current_year: int) -> Optional[Dict[str, Any]]:
+    """
+    Reminder payload for the human head coach — the league never auto-changes their schemes.
+    Playbooks: preseason Playbook Select (every PREFERRED_PLAYBOOK_CHANGE_INTERVAL_SEASONS seasons).
+    """
+    if coach is None:
+        return None
+    cy = max(1, int(current_year))
+    playbooks_may_change = coach_may_change_preferred_playbooks(coach, cy)
+    next_pb = next_eligible_season_for_preferred_playbooks(coach)
+    next_pb_year = None if playbooks_may_change else (next_pb if next_pb > 0 else None)
+    off_style = getattr(getattr(coach, "offensive_style", None), "value", str(getattr(coach, "offensive_style", "")))
+    def_style = getattr(getattr(coach, "defensive_style", None), "value", str(getattr(coach, "defensive_style", "")))
+    off_pb = str(getattr(coach, "offensive_formation", "") or "Spread")
+    def_pb = str(getattr(coach, "defensive_formation", "") or "4-3")
+    if playbooks_may_change:
+        detail = (
+            f"Your preferred schemes were not changed by the league. "
+            f"You may update offensive/defensive playbooks during preseason Playbook Select this year "
+            f"(current: {off_pb} / {def_pb}). "
+            f"Philosophy stays {off_style} offense · {def_style} defense unless you change it when eligible."
+        )
+        headline = "Playbook Select: you can change preferred playbooks this preseason"
+    else:
+        detail = (
+            f"Your preferred schemes were not changed by the league. "
+            f"Playbooks stay {off_pb} / {def_pb} until season {next_pb_year or '—'} "
+            f"(once every {PREFERRED_PLAYBOOK_CHANGE_INTERVAL_SEASONS} seasons). "
+            f"Next chance: preseason Playbook Select. "
+            f"Current philosophy: {off_style} offense · {def_style} defense."
+        )
+        headline = f"Preferred playbooks locked until season {next_pb_year or '—'}"
+    return {
+        "playbooks_may_change": playbooks_may_change,
+        "next_playbook_eligible_year": next_pb_year,
+        "playbook_interval_seasons": PREFERRED_PLAYBOOK_CHANGE_INTERVAL_SEASONS,
+        "offensive_style": off_style,
+        "defensive_style": def_style,
+        "offensive_playbook": off_pb,
+        "defensive_playbook": def_pb,
+        "headline": headline,
+        "detail": detail,
+    }
 
 
 def _apply_scheme_change(coach: Coach, current_year: int) -> Dict[str, Any]:

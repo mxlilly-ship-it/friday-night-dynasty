@@ -81,7 +81,12 @@ type Screen = 'title' | 'load' | 'new' | 'playing'
 type BackupReminderFrequency = 'none' | '3_weeks' | '6_weeks' | 'stage'
 type CloudSaveListItem = { save_id: string; save_name: string; updated_at: number }
 
-export default function App() {
+type AppProps = {
+  /** Vite dev without Firebase env — use POST /auth/dev-login instead of email/password. */
+  devNoFirebase?: boolean
+}
+
+export default function App({ devNoFirebase = false }: AppProps) {
   const [token, setToken] = useState<string>(() => localStorage.getItem('fnd_token') ?? '')
   const [username, setUsername] = useState(() => localStorage.getItem('fnd_username') ?? '')
   const [email, setEmail] = useState('')
@@ -322,6 +327,36 @@ export default function App() {
       setTimeout(() => setSuccessMessage(''), 4000)
     } catch (e: any) {
       setError(e?.message ? String(e.message) : 'Could not remove device')
+    }
+  }
+
+  async function devAuthSubmit(coachLabel?: string) {
+    setError('')
+    const name = (coachLabel ?? username).trim()
+    if (!name) {
+      setError('Enter a coach name.')
+      return false
+    }
+    setAuthBusy(true)
+    try {
+      const r = await fetch(`${API_BASE}/auth/dev-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: name }),
+      })
+      if (!r.ok) {
+        setError(await formatApiErrorBody(r))
+        return false
+      }
+      const data = (await r.json()) as { token: string; user_id: string }
+      applySession({ token: data.token, username: name })
+      return true
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Dev login failed'
+      setError(`${msg}.${apiConnectionHint()}`)
+      return false
+    } finally {
+      setAuthBusy(false)
     }
   }
 
@@ -1048,7 +1083,7 @@ export default function App() {
   }, [])
 
   async function onContinueLoad() {
-    const ok = await firebaseAuthSubmit(authMode)
+    const ok = devNoFirebase ? await devAuthSubmit() : await firebaseAuthSubmit(authMode)
     if (ok) {
       await loadBrowserSaveList()
       await loadCloudSaves()
@@ -1057,7 +1092,7 @@ export default function App() {
 
   async function onContinueNew() {
     setError('')
-    const ok = await firebaseAuthSubmit(authMode)
+    const ok = devNoFirebase ? await devAuthSubmit() : await firebaseAuthSubmit(authMode)
     if (ok) setScreen('new')
   }
 
@@ -1178,7 +1213,7 @@ export default function App() {
               records={inLocalRuntime && localBundle ? localBundle.records : undefined}
               seasonRecaps={inLocalRuntime && localBundle ? localBundle.seasonRecaps : undefined}
               onMergeLocalSimulationResult={inLocalRuntime ? mergeLocalSimulationResult : undefined}
-              onImportLogosToBundle={inLocalRuntime ? importLogosToBundle : undefined}
+              onImportLogosToBundle={localBundle ? importLogosToBundle : undefined}
               onRefreshDynasty={inLocalRuntime ? undefined : refreshDynastyFromServer}
           />
         </LocalAssetsProvider>
@@ -1421,46 +1456,64 @@ export default function App() {
             </button>
             <h2>New dynasty</h2>
             <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
-              Log in to create a new dynasty. It will be saved in this browser (IndexedDB); download backups anytime.
+              {devNoFirebase
+                ? 'Local dev mode: enter a coach name (no Firebase). Dynasties save in this browser and on the API when you create a save.'
+                : 'Log in to create a new dynasty. It will be saved in this browser (IndexedDB); download backups anytime.'}
             </p>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-              <button
-                type="button"
-                className={authMode === 'login' ? 'fnd-title-btn' : 'teamhome-select'}
-                style={{ flex: 1, maxWidth: 'none' }}
-                onClick={() => setAuthMode('login')}
-              >
-                Log in
-              </button>
-              <button
-                type="button"
-                className={authMode === 'signup' ? 'fnd-title-btn' : 'teamhome-select'}
-                style={{ flex: 1, maxWidth: 'none' }}
-                onClick={() => setAuthMode('signup')}
-              >
-                Sign up
-              </button>
-            </div>
-            <div className="fnd-login-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
-              <input
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email"
-              />
-              <input
-                type="password"
-                autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Password"
-                onKeyDown={(e) => e.key === 'Enter' && void onContinueNew()}
-              />
-              <button type="button" disabled={authBusy} onClick={() => void onContinueNew()}>
-                {authBusy ? 'Please wait…' : authMode === 'signup' ? 'Create account & continue' : 'Log in & continue'}
-              </button>
-            </div>
+            {devNoFirebase ? (
+              <div className="fnd-login-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+                <input
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Coach name"
+                  onKeyDown={(e) => e.key === 'Enter' && void onContinueNew()}
+                />
+                <button type="button" disabled={authBusy} onClick={() => void onContinueNew()}>
+                  {authBusy ? 'Please wait…' : 'Continue'}
+                </button>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  <button
+                    type="button"
+                    className={authMode === 'login' ? 'fnd-title-btn' : 'teamhome-select'}
+                    style={{ flex: 1, maxWidth: 'none' }}
+                    onClick={() => setAuthMode('login')}
+                  >
+                    Log in
+                  </button>
+                  <button
+                    type="button"
+                    className={authMode === 'signup' ? 'fnd-title-btn' : 'teamhome-select'}
+                    style={{ flex: 1, maxWidth: 'none' }}
+                    onClick={() => setAuthMode('signup')}
+                  >
+                    Sign up
+                  </button>
+                </div>
+                <div className="fnd-login-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Email"
+                  />
+                  <input
+                    type="password"
+                    autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Password"
+                    onKeyDown={(e) => e.key === 'Enter' && void onContinueNew()}
+                  />
+                  <button type="button" disabled={authBusy} onClick={() => void onContinueNew()}>
+                    {authBusy ? 'Please wait…' : authMode === 'signup' ? 'Create account & continue' : 'Log in & continue'}
+                  </button>
+                </div>
+              </>
+            )}
             {deviceLimitDevices.length > 0 ? (
               <div style={{ marginTop: 12, padding: 10, border: '1px solid #4a5568', borderRadius: 8 }}>
                 <p style={{ margin: '0 0 8px', fontSize: '0.85rem', color: '#cbd5e1' }}>Registered devices</p>

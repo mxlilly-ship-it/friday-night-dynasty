@@ -54,18 +54,24 @@ async function bootstrap() {
   const rootEl = document.getElementById('root')
   if (!rootEl) return
 
+  let devNoFirebase = false
   try {
     const config = await loadFirebaseConfig()
     initFirebase(config)
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : String(e)
-    createRoot(rootEl).render(<ConfigError message={message} />)
-    return
+    if (import.meta.env.DEV) {
+      // Local Vite dev: API may lack Firebase env — still run the game via /auth/dev-login.
+      devNoFirebase = true
+    } else {
+      const message = e instanceof Error ? e.message : String(e)
+      createRoot(rootEl).render(<ConfigError message={message} />)
+      return
+    }
   }
 
   createRoot(rootEl).render(
     <StrictMode>
-      <App />
+      <App devNoFirebase={devNoFirebase} />
     </StrictMode>,
   )
 }

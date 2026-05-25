@@ -107,6 +107,25 @@ def create_app() -> FastAPI:
         except Exception as e:
             return {"_schema": str(e), "teams": [], "_debug": {"cwd": os.getcwd()}}
 
+    @app.get("/league-presets")
+    def list_league_presets_route():
+        """Built-in optional league JSON files (not the default teams.json)."""
+        from systems.league_presets import list_league_presets
+
+        return {"presets": list_league_presets()}
+
+    @app.get("/league-presets/{preset_id}")
+    def get_league_preset_route(preset_id: str):
+        """Full league config for a built-in preset (teams + playoff_system, etc.)."""
+        from systems.league_presets import load_league_preset
+
+        data = load_league_preset(preset_id)
+        if data is None:
+            from fastapi import HTTPException
+
+            raise HTTPException(status_code=404, detail=f"Unknown or missing league preset: {preset_id}")
+        return data
+
     @app.get("/playbooks-data")
     def get_playbooks_data():
         """Offensive/defensive playbook options for coach setup UI."""

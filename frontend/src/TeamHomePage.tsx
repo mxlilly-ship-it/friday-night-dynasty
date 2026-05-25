@@ -50,14 +50,18 @@ import {
   prestigeBandLabel,
 } from './prestigeUtils'
 import {
+  buildOverallPlayoffColumns,
   buildRegionalPlayoffSlice,
   buildStatePlayoffFromResults,
   findPlayoffGame,
+  firstRoundPairsFromSeeds,
   isRegionalPlayoffSeeds,
   PLAYOFF_FINAL_FOUR_VIEW,
   playoffDisplaySeedForTeam,
   playoffRegionsFromSeeds,
+  roundNamesForBracketSize,
   userRegionFromSeeds,
+  type PlayoffGameRow,
   type PlayoffRoundColumn,
 } from './playoffBracketView'
 
@@ -238,6 +242,7 @@ type TeamHomePageBodyProps = Props & {
   setLogoVersion: (n: number) => void
   stadiumVersion: number
   setStadiumVersion: (n: number) => void
+  onOpenSettings: () => void
 }
 
 const OFFENSE_POSITIONS = ['QB', 'RB', 'WR', 'OL', 'TE'] as const
@@ -1334,6 +1339,7 @@ function buildPlayoffChRow(ch: any[], sf: any[]) {
 
 function buildPlayoffView(state: any, classKey?: string | null, regionKey?: string | null) {
   let inner: {
+    num_teams?: number
     seeds?: Array<{ seed: number; team: string }>
     bracket_results?: any[]
     completed?: boolean
@@ -1434,24 +1440,16 @@ function buildPlayoffView(state: any, classKey?: string | null, regionKey?: stri
     }
   }
 
-  const byRound = (round: string) => results.filter((g) => String(g?.round || '') === round)
-  const qf = byRound('Quarterfinal')
-  const sf = byRound('Semifinal')
-  const ch = byRound('Championship')
-
-  const seedName = (n: number) => seeds.find((s) => Number(s.seed) === n)?.team || `Seed ${n}`
-  // Match engine order: 1v8, 2v7, 3v6, 4v5
-  const qfPairs = missingBracket
-    ? []
-    : [
-        [1, 8],
-        [2, 7],
-        [3, 6],
-        [4, 5],
-      ].map(([a, b]) => ({ home: seedName(a), away: seedName(b) }))
-
-  const sfRows = missingBracket ? [] : buildPlayoffSfRows(qf, sf, qfPairs)
-  const chRow = missingBracket ? null : buildPlayoffChRow(ch, sf)
+  let bracketSize = Number((inner as { num_teams?: number })?.num_teams)
+  const seedCount = seeds.length
+  if (!Number.isFinite(bracketSize) || bracketSize < 2) {
+    bracketSize = seedCount >= 2 ? seedCount : 8
+  } else if (seedCount >= 2 && seedCount > bracketSize) {
+    bracketSize = seedCount
+  }
+  const overallColumns = missingBracket
+    ? ([] as PlayoffRoundColumn[])
+    : buildOverallPlayoffColumns(seeds, results, bracketSize)
 
   return {
     seeds,
@@ -1460,13 +1458,14 @@ function buildPlayoffView(state: any, classKey?: string | null, regionKey?: stri
     regions: [] as string[],
     selectedRegion: '',
     teamsPerRegion: 0,
-    inRegionColumns: [] as PlayoffRoundColumn[],
-    qfPairs,
-    qf,
-    sf,
-    ch,
-    sfRows,
-    chRow,
+    bracketSize,
+    inRegionColumns: overallColumns,
+    qfPairs: [] as { home: string; away: string }[],
+    qf: [] as any[],
+    sf: [] as any[],
+    ch: [] as any[],
+    sfRows: [] as any[],
+    chRow: null as PlayoffGameRow | null,
     completed,
     champion,
     viewClass,
@@ -1484,17 +1483,35 @@ function playoffSeedForTeam(seeds: Array<{ seed: number; team: string }>, teamNa
   return Number.isFinite(sn) && sn > 0 ? sn : null
 }
 
+function playoffBracketSizeFromInner(p: { num_teams?: number; seeds?: unknown[] } | null): number {
+  if (!p) return 8
+  const nt = Number(p.num_teams)
+  if (Number.isFinite(nt) && nt >= 2) return nt
+  const seeds = Array.isArray(p.seeds) ? p.seeds : []
+  return seeds.length >= 2 ? seeds.length : 8
+}
+
+function playoffGridStyle(columnCount: number): CSSProperties {
+  const cols = Math.max(1, Math.min(6, Math.floor(columnCount)))
+  return { ['--playoff-cols' as string]: String(cols) }
+}
+
 function playoffRoundLabel(saveState: any): string {
   const p = userPlayoffInner(saveState)
   if (!p) return '—'
   if (p.completed && p.champion) return `Champion · ${p.champion}`
   const results = Array.isArray(p.bracket_results) ? p.bracket_results : []
-  const n = results.length
-  if (n === 0) return 'Quarterfinals'
-  if (n < 4) return `Quarterfinals (${n}/4)`
-  if (n === 4) return 'Semifinals'
-  if (n < 6) return `Semifinals (${n - 4}/2)`
-  if (n === 6) return 'Championship'
+  const size = playoffBracketSizeFromInner(p)
+  const roundNames = roundNamesForBracketSize(size)
+  let remaining = size
+  for (const name of roundNames) {
+    const required = remaining / 2
+    const played = results.filter((g: any) => String(g.round || '') === name).length
+    if (played < required) {
+      return played > 0 ? `${name} (${played}/${required})` : name
+    }
+    remaining = required
+  }
   return '—'
 }
 
@@ -1512,35 +1529,61 @@ function playoffNextOpponent(state: any, userTeam: string): string {
     if (g.winner && g.winner !== userTeam) return 'Eliminated'
   }
 
-  const qf = results.filter((g: any) => g.round === 'Quarterfinal')
-  const sf = results.filter((g: any) => g.round === 'Semifinal')
+  const size = playoffBracketSizeFromInner(p)
+  const roundNames = roundNamesForBracketSize(size)
+  const firstRound = roundNames[0] ?? 'Quarterfinal'
+  const firstGames = results.filter((g: any) => String(g.round || '') === firstRound)
+  const firstPairs = firstRoundPairsFromSeeds(seeds, size)
+  const firstRequired = size / 2
 
-  if (qf.length < 4) {
-    const oppSeed = 9 - Number(userSeed.seed)
-    return seeds.find((x: any) => Number(x.seed) === oppSeed)?.team ?? '—'
-  }
-  if (sf.length < 2) {
-    const w = qf.map((g: any) => g.winner)
-    const pairs: [string, string][] = [
-      [w[0], w[3]],
-      [w[1], w[2]],
-    ]
-    const myQf = qf.find((g: any) => g.home === userTeam || g.away === userTeam)
-    if (!myQf || myQf.winner !== userTeam) return 'Eliminated'
-    for (const [a, b] of pairs) {
-      if (a === userTeam) return b
-      if (b === userTeam) return a
+  if (firstGames.length < firstRequired) {
+    const sn = Number(userSeed.seed)
+    const pair = firstPairs.find((m) => m.home === userTeam || m.away === userTeam)
+    if (pair) return pair.home === userTeam ? pair.away : pair.home
+    if (Number.isFinite(sn) && sn > 0) {
+      const oppSeed = size + 1 - sn
+      return seeds.find((x: any) => Number(x.seed) === oppSeed)?.team ?? '—'
     }
     return '—'
   }
-  if (sf.length === 2) {
-    const w1 = sf[0].winner
-    const w2 = sf[1].winner
-    if (userTeam === w1) return w2
-    if (userTeam === w2) return w1
-    return 'Eliminated'
+
+  let priorPairs = firstPairs
+  let priorGames = firstGames
+  for (let ri = 1; ri < roundNames.length; ri++) {
+    const roundName = roundNames[ri]
+    const roundGames = results.filter((g: any) => String(g.round || '') === roundName)
+    const required = priorPairs.length / 2
+    if (roundGames.length < required) {
+      const myPrior = priorGames.find((g: any) => g.home === userTeam || g.away === userTeam)
+      if (myPrior && myPrior.winner !== userTeam) return 'Eliminated'
+      const projPairs = projPairsFromRound(priorGames, priorPairs)
+      for (const pair of projPairs) {
+        if (pair.home === userTeam) return pair.away
+        if (pair.away === userTeam) return pair.home
+      }
+      return '—'
+    }
+    priorPairs = projPairsFromRound(priorGames, priorPairs)
+    priorGames = roundGames
   }
   return '—'
+}
+
+function projPairsFromRound(
+  priorGames: any[],
+  priorPairs: { home: string; away: string }[],
+): { home: string; away: string }[] {
+  const w = (i: number) => {
+    const pair = priorPairs[i]
+    if (!pair) return null
+    const g = findPlayoffGame(priorGames, pair)
+    const winner = g?.winner
+    return winner != null && String(winner).trim() !== '' ? String(winner) : null
+  }
+  return [
+    { home: w(0) ?? 'TBD', away: w(3) ?? 'TBD' },
+    { home: w(1) ?? 'TBD', away: w(2) ?? 'TBD' },
+  ]
 }
 
 function playoffLastResult(state: any, userTeam: string): string {
@@ -1576,6 +1619,7 @@ function TeamHomePageBody({
   setLogoVersion,
   stadiumVersion,
   setStadiumVersion,
+  onOpenSettings,
 }: TeamHomePageBodyProps) {
   const isLocalBundle = saveId === '__local__' || saveId.startsWith('b_')
   /** Browser/IDB saves use stateless /sim/game/* (no Bearer). Cloud saves need auth for /start-coach-game. */
@@ -1677,7 +1721,6 @@ function TeamHomePageBody({
     if (off && OFFENSIVE_PLAYBOOKS.includes(off as (typeof OFFENSIVE_PLAYBOOKS)[number])) setOffensivePlaybook(off)
     if (def && DEFENSIVE_PLAYBOOKS.includes(def as (typeof DEFENSIVE_PLAYBOOKS)[number])) setDefensivePlaybook(def)
   }, [saveState, userTeam])
-  const [showSettings, setShowSettings] = useState(false)
 
   const { record, rank, classRank, classification: teamBarClassification } = useMemo(
     () => buildRecordAndRank(saveState),
@@ -2644,67 +2687,12 @@ function TeamHomePageBody({
       )
     }
     return (
-      <div className="teamhome-playoffs-grid season-summary-bracket-readonly" key={bracketKey}>
-        <div className="teamhome-card">
-          <div className="teamhome-card-title">Quarterfinals</div>
-          <div className="teamhome-playoffs-list">
-            {playoffView.qfPairs.map((m) => {
-              const played = findQfGame(playoffView.qf, m)
-              const playedHomeScore =
-                played == null ? null : played?.home === m.home ? played?.home_score : played?.away_score
-              const playedAwayScore =
-                played == null ? null : played?.home === m.home ? played?.away_score : played?.home_score
-              return (
-                <div key={`${m.home}-${m.away}`} className="teamhome-playoffs-row teamhome-playoffs-row--stacked">
-                  <div className="teamhome-playoffs-matchup">
-                    {renderPlayoffBracketLine(m.home, playedHomeScore, {
-                      playoffSeed: playoffSeedForTeam(playoffView.seeds, m.home),
-                    })}
-                    {renderPlayoffBracketLine(m.away, playedAwayScore, {
-                      playoffSeed: playoffSeedForTeam(playoffView.seeds, m.away),
-                    })}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-        <div className="teamhome-card">
-          <div className="teamhome-card-title">Semifinals</div>
-          <div className="teamhome-playoffs-list">
-            {playoffView.sfRows.map((g: { home: string; away: string; home_score?: number | null; away_score?: number | null }, i: number) => (
-              <div key={`sf-${i}-${g.home}-${g.away}`} className="teamhome-playoffs-row teamhome-playoffs-row--stacked">
-                <div className="teamhome-playoffs-matchup">
-                  {renderPlayoffBracketLine(String(g.home), g.home_score, {
-                    playoffSeed: playoffSeedForTeam(playoffView.seeds, String(g.home)),
-                  })}
-                  {renderPlayoffBracketLine(String(g.away), g.away_score, {
-                    playoffSeed: playoffSeedForTeam(playoffView.seeds, String(g.away)),
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="teamhome-card">
-          <div className="teamhome-card-title">Championship</div>
-          <div className="teamhome-playoffs-list">
-            {playoffView.chRow ? (
-              <div className="teamhome-playoffs-row teamhome-playoffs-row--stacked">
-                <div className="teamhome-playoffs-matchup">
-                  {renderPlayoffBracketLine(String(playoffView.chRow.home), playoffView.chRow.home_score, {
-                    playoffSeed: playoffSeedForTeam(playoffView.seeds, String(playoffView.chRow.home)),
-                  })}
-                  {renderPlayoffBracketLine(String(playoffView.chRow.away), playoffView.chRow.away_score, {
-                    playoffSeed: playoffSeedForTeam(playoffView.seeds, String(playoffView.chRow.away)),
-                  })}
-                </div>
-              </div>
-            ) : (
-              <div className="teamhome-small teamhome-playoffs-empty">TBD</div>
-            )}
-          </div>
-        </div>
+      <div
+        className="teamhome-playoffs-grid season-summary-bracket-readonly"
+        key={bracketKey}
+        style={playoffGridStyle(playoffView.inRegionColumns.length)}
+      >
+        {playoffView.inRegionColumns.map((col) => renderSeasonSummaryRoundColumn(col))}
       </div>
     )
   }, [playoffView, bracketClassForView, renderPlayoffBracketLine])
@@ -3753,66 +3741,26 @@ function TeamHomePageBody({
                   .map(([clsName, pdata]) => {
                     const inner = pdata as Record<string, unknown>
                     const gamesRaw = inner?.bracket_results
-                    const games = Array.isArray(gamesRaw) ? (gamesRaw as Record<string, unknown>[]) : []
-                    const seeds = Array.isArray(inner?.seeds) ? (inner.seeds as { seed?: number; team?: string }[]) : []
-                    const qfGames = games.filter((g) => String(g.round) === 'Quarterfinal')
-                    const sfGames = games.filter((g) => String(g.round) === 'Semifinal')
-                    const chGames = games.filter((g) => String(g.round) === 'Championship')
+                    const results = Array.isArray(gamesRaw) ? (gamesRaw as PlayoffGameRow[]) : []
+                    const seeds = Array.isArray(inner?.seeds)
+                      ? (inner.seeds as { seed?: number; team?: string }[])
+                      : []
                     const seedForTeam = (name: string): number | null => {
                       const row = seeds.find((s) => String(s.team) === name)
                       const sn = Number(row?.seed)
                       return Number.isFinite(sn) && sn > 0 ? sn : null
                     }
-
-                    let qfDisplay
-                    const useSeedsShell = seeds.length >= 8
-                    if (useSeedsShell && qfGames.length < 4) {
-                      const sn = (n: number) => seeds.find((s) => Number(s.seed) === n)?.team ?? `Seed ${n}`
-                      const pairs = [
-                        { home: sn(1), away: sn(8) },
-                        { home: sn(2), away: sn(7) },
-                        { home: sn(3), away: sn(6) },
-                        { home: sn(4), away: sn(5) },
-                      ]
-                      qfDisplay = pairs.map((m) => {
-                        const played =
-                          qfGames.find((g) => (g.home === m.home && g.away === m.away) || (g.home === m.away && g.away === m.home)) ?? null
-                        const ph = played
-                          ? played.home === m.home
-                            ? played.home_score
-                            : played.away_score
-                          : null
-                        const pa = played
-                          ? played.home === m.home
-                            ? played.away_score
-                            : played.home_score
-                          : null
-                        return (
-                          <div key={`lh-qf-${clsName}-${m.home}-${m.away}`} className="teamhome-playoffs-matchup">
-                            {renderPlayoffBracketLine(String(m.home), typeof ph === 'number' ? ph : undefined, {
-                              playoffSeed: seedForTeam(m.home),
-                            })}
-                            {renderPlayoffBracketLine(String(m.away), typeof pa === 'number' ? pa : undefined, {
-                              playoffSeed: seedForTeam(m.away),
-                            })}
-                          </div>
-                        )
-                      })
-                    } else if (qfGames.length > 0) {
-                      qfDisplay = qfGames.map((g) => (
-                        <div key={`lh-qfc-${clsName}-${g.home}-${g.away}`} className="teamhome-playoffs-matchup">
-                          {renderPlayoffBracketLine(String(g.home), Number(g.home_score), {
-                            playoffSeed: seedForTeam(String(g.home)),
-                          })}
-                          {renderPlayoffBracketLine(String(g.away), Number(g.away_score), {
-                            playoffSeed: seedForTeam(String(g.away)),
-                          })}
-                        </div>
-                      ))
-                    } else {
-                      qfDisplay = (
-                        <div className="teamhome-small">Quarterfinal games not archived for this bracket.</div>
-                      )
+                    const bracketSize = playoffBracketSizeFromInner({
+                      num_teams: inner?.num_teams as number | undefined,
+                      seeds,
+                    })
+                    const columns = buildOverallPlayoffColumns(seeds, results, bracketSize)
+                    const roundShort = (title: string) => {
+                      if (title === 'Championship') return 'Final'
+                      if (title === 'Semifinal') return 'SF'
+                      if (title === 'Quarterfinal') return 'QF'
+                      if (title.startsWith('Round of ')) return title.replace('Round of ', 'R')
+                      return title
                     }
 
                     return (
@@ -3824,53 +3772,65 @@ function TeamHomePageBody({
                             <span className="teamhome-small teamhome-league-history-champ-pill">{` Champion: ${inner.champion}`}</span>
                           ) : null}
                         </div>
-                        <div className="teamhome-playoffs-grid teamhome-league-history-playoffs-grid">
-                          <div className="teamhome-playoffs-microcol">
-                            <div className="teamhome-microcol-title">QF</div>
-                            <div className="teamhome-playoffs-list">{qfDisplay}</div>
-                          </div>
-                          <div className="teamhome-playoffs-microcol">
-                            <div className="teamhome-microcol-title">SF</div>
-                            <div className="teamhome-playoffs-list">
-                              {sfGames.length === 0 && useSeedsShell ? (
-                                <div className="teamhome-small" style={{ opacity: 0.8 }}>
-                                  (Semifinal matchups populate after quarterfinal results.)
-                                </div>
-                              ) : (
-                                sfGames.map((g) => (
-                                  <div key={`lh-sf-${clsName}-${g.home}-${g.away}`} className="teamhome-playoffs-matchup">
-                                    {renderPlayoffBracketLine(String(g.home), Number(g.home_score), {
-                                      playoffSeed: seedForTeam(String(g.home)),
-                                    })}
-                                    {renderPlayoffBracketLine(String(g.away), Number(g.away_score), {
-                                      playoffSeed: seedForTeam(String(g.away)),
-                                    })}
-                                  </div>
-                                ))
-                              )}
+                        <div
+                          className="teamhome-playoffs-grid teamhome-league-history-playoffs-grid"
+                          style={playoffGridStyle(columns.length)}
+                        >
+                          {columns.map((col) => (
+                            <div key={`lh-po-${clsName}-${col.roundKey}`} className="teamhome-playoffs-microcol">
+                              <div className="teamhome-microcol-title">{roundShort(col.title)}</div>
+                              <div className="teamhome-playoffs-list">
+                                {col.pairs.length > 0
+                                  ? col.pairs.map((m) => {
+                                      const played = findPlayoffGame(col.games, m)
+                                      const ph =
+                                        played == null
+                                          ? undefined
+                                          : played.home === m.home
+                                            ? played.home_score
+                                            : played.away_score
+                                      const pa =
+                                        played == null
+                                          ? undefined
+                                          : played.home === m.home
+                                            ? played.away_score
+                                            : played.home_score
+                                      return (
+                                        <div
+                                          key={`lh-${clsName}-${col.roundKey}-${m.home}-${m.away}`}
+                                          className="teamhome-playoffs-matchup"
+                                        >
+                                          {renderPlayoffBracketLine(String(m.home), typeof ph === 'number' ? ph : undefined, {
+                                            playoffSeed: seedForTeam(m.home),
+                                          })}
+                                          {renderPlayoffBracketLine(String(m.away), typeof pa === 'number' ? pa : undefined, {
+                                            playoffSeed: seedForTeam(m.away),
+                                          })}
+                                        </div>
+                                      )
+                                    })
+                                  : col.rows.length > 0
+                                    ? col.rows.map((g, i) => (
+                                        <div
+                                          key={`lh-${clsName}-${col.roundKey}-row-${i}`}
+                                          className="teamhome-playoffs-matchup"
+                                        >
+                                          {renderPlayoffBracketLine(String(g.home), g.home_score ?? undefined, {
+                                            playoffSeed: seedForTeam(String(g.home)),
+                                          })}
+                                          {renderPlayoffBracketLine(String(g.away), g.away_score ?? undefined, {
+                                            playoffSeed: seedForTeam(String(g.away)),
+                                          })}
+                                        </div>
+                                      ))
+                                    : (
+                                      <div className="teamhome-small" style={{ opacity: 0.8 }}>
+                                        {col.title} pending.
+                                      </div>
+                                    )}
+                              </div>
                             </div>
-                          </div>
-                          <div className="teamhome-playoffs-microcol">
-                            <div className="teamhome-microcol-title">Final</div>
-                            <div className="teamhome-playoffs-list">
-                              {chGames.length === 0 ? (
-                                <div className="teamhome-small" style={{ opacity: 0.8 }}>
-                                  {(inner.completed === false ? 'Championship pending.' : '')}
-                                </div>
-                              ) : (
-                                chGames.map((g) => (
-                                  <div key={`lh-ch-${clsName}-${g.home}-${g.away}`} className="teamhome-playoffs-matchup">
-                                    {renderPlayoffBracketLine(String(g.home), Number(g.home_score), {
-                                      playoffSeed: seedForTeam(String(g.home)),
-                                    })}
-                                    {renderPlayoffBracketLine(String(g.away), Number(g.away_score), {
-                                      playoffSeed: seedForTeam(String(g.away)),
-                                    })}
-                                  </div>
-                                ))
-                              )}
-                            </div>
-                          </div>
+                          ))}
                         </div>
                       </div>
                     )
@@ -4308,25 +4268,6 @@ function TeamHomePageBody({
       cancelled = true
     }
   }, [apiBase, headers, isPlaySelectionResultsStage, saveId])
-
-  if (showSettings) {
-    return (
-      <SettingsPage
-        apiBase={apiBase}
-        headers={headers}
-        saveId={saveId}
-        teamNames={allTeamNames}
-        backupReminderFrequency={backupReminderFrequency ?? 'none'}
-        onBackupReminderFrequencyChange={onBackupReminderFrequencyChange}
-        onBackupNow={onBackupNow}
-        onApplySaveState={onSaveState}
-        onClose={() => setShowSettings(false)}
-        onError={onError}
-        onLogoVersionBump={() => setLogoVersion(Date.now())}
-        onImportLogosToBundle={onImportLogosToBundle}
-      />
-    )
-  }
 
   if (showPlaybookGamePlan && isPlaySelectionStage) {
     return (
@@ -5050,7 +4991,7 @@ function TeamHomePageBody({
                   ? 'Begin offseason'
                   : 'Continue'}
           </button>
-          <button type="button" className="teamhome-select" onClick={() => setShowSettings(true)} title="Settings">
+          <button type="button" className="teamhome-select" onClick={onOpenSettings} title="Settings">
             Settings
           </button>
           <button type="button" className="teamhome-select" onClick={onMainMenu} title="Back to main menu">
@@ -5719,7 +5660,7 @@ function TeamHomePageBody({
                 {playoffView.missingBracket ? (
                   <div className="teamhome-card teamhome-card-dark" style={{ marginBottom: 0 }}>
                     <div className="teamhome-small">
-                      No playoff bracket for this class. An 8-team bracket exists only when at least eight teams are in that classification.
+                      No playoff bracket for this class. A bracket is created only when enough teams are in that classification for the active playoff format.
                     </div>
                   </div>
                 ) : playoffView.isRegional && playoffView.viewFinalFour ? (
@@ -5770,203 +5711,13 @@ function TeamHomePageBody({
                     {playoffView.inRegionColumns.map((col) => renderPlayoffRoundColumn(col))}
                   </div>
                 ) : (
-                  <div className="teamhome-playoffs-grid" key={`playoff-bracket-${bracketClassForView}`}>
-                  <div className="teamhome-card">
-                    <div className="teamhome-card-title">Quarterfinals</div>
-                    <div className="teamhome-playoffs-list">
-                      {playoffView.qfPairs.map((m) => {
-                        const played = findQfGame(playoffView.qf, m)
-                        const playedHomeScore =
-                          played == null ? null : played?.home === m.home ? played?.home_score : played?.away_score
-                        const playedAwayScore =
-                          played == null ? null : played?.home === m.home ? played?.away_score : played?.home_score
-                        const exportHome = played?.home ?? m.home
-                        const exportAway = played?.away ?? m.away
-                        return (
-                          <div key={`${m.home}-${m.away}`} className="teamhome-playoffs-row teamhome-playoffs-row--stacked">
-                            <div className="teamhome-playoffs-matchup">
-                              {renderPlayoffBracketLine(m.home, playedHomeScore, {
-                                playoffSeed: playoffSeedForTeam(playoffView.seeds, m.home),
-                              })}
-                              {renderPlayoffBracketLine(m.away, playedAwayScore, {
-                                playoffSeed: playoffSeedForTeam(playoffView.seeds, m.away),
-                              })}
-                            </div>
-                            <div className="teamhome-playoffs-footer">
-                              <div className="teamhome-playoffs-actions">
-                                <button
-                                  type="button"
-                                  className="teamhome-playoffs-link"
-                                  disabled={!played}
-                                  onClick={async () => {
-                                    try {
-                                      await downloadPlayoffText(
-                                        'Quarterfinal',
-                                        exportHome,
-                                        exportAway,
-                                        'box-score',
-                                        playoffView.viewClass,
-                                      )
-                                    } catch (e: any) {
-                                      onError(e?.message ?? 'Failed to export box score')
-                                    }
-                                  }}
-                                >
-                                  Box score
-                                </button>
-                                <button
-                                  type="button"
-                                  className="teamhome-playoffs-link"
-                                  disabled={!played}
-                                  onClick={async () => {
-                                    try {
-                                      await downloadPlayoffText(
-                                        'Quarterfinal',
-                                        exportHome,
-                                        exportAway,
-                                        'game-log',
-                                        playoffView.viewClass,
-                                      )
-                                    } catch (e: any) {
-                                      onError(e?.message ?? 'Failed to export game log')
-                                    }
-                                  }}
-                                >
-                                  Game log
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
+                  <div
+                    className="teamhome-playoffs-grid"
+                    key={`playoff-bracket-${bracketClassForView}`}
+                    style={playoffGridStyle(playoffView.inRegionColumns.length)}
+                  >
+                    {playoffView.inRegionColumns.map((col) => renderPlayoffRoundColumn(col))}
                   </div>
-                  <div className="teamhome-card">
-                    <div className="teamhome-card-title">Semifinals</div>
-                    <div className="teamhome-playoffs-list">
-                      {playoffView.sfRows.map((g: any, i: number) => (
-                        <div key={`sf-${i}-${g.home}-${g.away}`} className="teamhome-playoffs-row teamhome-playoffs-row--stacked">
-                          <div className="teamhome-playoffs-matchup">
-                            {renderPlayoffBracketLine(String(g.home), g.home_score, {
-                              playoffSeed: playoffSeedForTeam(playoffView.seeds, String(g.home)),
-                            })}
-                            {renderPlayoffBracketLine(String(g.away), g.away_score, {
-                              playoffSeed: playoffSeedForTeam(playoffView.seeds, String(g.away)),
-                            })}
-                          </div>
-                          <div className="teamhome-playoffs-footer">
-                            <div className="teamhome-playoffs-actions">
-                              <button
-                                type="button"
-                                className="teamhome-playoffs-link"
-                                disabled={g.home_score == null}
-                                onClick={async () => {
-                                  try {
-                                    await downloadPlayoffText(
-                                      'Semifinal',
-                                      g.home,
-                                      g.away,
-                                      'box-score',
-                                      playoffView.viewClass,
-                                    )
-                                  } catch (e: any) {
-                                    onError(e?.message ?? 'Failed to export box score')
-                                  }
-                                }}
-                              >
-                                Box score
-                              </button>
-                              <button
-                                type="button"
-                                className="teamhome-playoffs-link"
-                                disabled={g.home_score == null}
-                                onClick={async () => {
-                                  try {
-                                    await downloadPlayoffText(
-                                      'Semifinal',
-                                      g.home,
-                                      g.away,
-                                      'game-log',
-                                      playoffView.viewClass,
-                                    )
-                                  } catch (e: any) {
-                                    onError(e?.message ?? 'Failed to export game log')
-                                  }
-                                }}
-                              >
-                                Game log
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="teamhome-card">
-                    <div className="teamhome-card-title">Championship</div>
-                    <div className="teamhome-playoffs-list">
-                      {playoffView.chRow ? (
-                        <div
-                          key={`ch-${playoffView.chRow.home}-${playoffView.chRow.away}`}
-                          className="teamhome-playoffs-row teamhome-playoffs-row--stacked"
-                        >
-                          <div className="teamhome-playoffs-matchup">
-                            {renderPlayoffBracketLine(String(playoffView.chRow.home), playoffView.chRow.home_score, {
-                              playoffSeed: playoffSeedForTeam(playoffView.seeds, String(playoffView.chRow.home)),
-                            })}
-                            {renderPlayoffBracketLine(String(playoffView.chRow.away), playoffView.chRow.away_score, {
-                              playoffSeed: playoffSeedForTeam(playoffView.seeds, String(playoffView.chRow.away)),
-                            })}
-                          </div>
-                          <div className="teamhome-playoffs-footer">
-                            <div className="teamhome-playoffs-actions">
-                              <button
-                                type="button"
-                                className="teamhome-playoffs-link"
-                                disabled={playoffView.chRow.home_score == null}
-                                onClick={async () => {
-                                  try {
-                                    await downloadPlayoffText(
-                                      'Championship',
-                                      playoffView.chRow!.home,
-                                      playoffView.chRow!.away,
-                                      'box-score',
-                                      playoffView.viewClass,
-                                    )
-                                  } catch (e: any) {
-                                    onError(e?.message ?? 'Failed to export box score')
-                                  }
-                                }}
-                              >
-                                Box score
-                              </button>
-                              <button
-                                type="button"
-                                className="teamhome-playoffs-link"
-                                disabled={playoffView.chRow.home_score == null}
-                                onClick={async () => {
-                                  try {
-                                    await downloadPlayoffText(
-                                      'Championship',
-                                      playoffView.chRow!.home,
-                                      playoffView.chRow!.away,
-                                      'game-log',
-                                      playoffView.viewClass,
-                                    )
-                                  } catch (e: any) {
-                                    onError(e?.message ?? 'Failed to export game log')
-                                  }
-                                }}
-                              >
-                                Game log
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
                 )}
               </div>
           )
@@ -7707,6 +7458,32 @@ function TeamHomePageBody({
 export default function TeamHomePage(props: Props) {
   const [logoVersion, setLogoVersion] = useState(0)
   const [stadiumVersion, setStadiumVersion] = useState(0)
+  const [showSettings, setShowSettings] = useState(false)
+  const allTeamNames = useMemo(() => {
+    const teams = props.saveState?.teams ?? []
+    const names = teams.map((t: any) => t?.name).filter(Boolean) as string[]
+    return [...new Set(names)].sort((a, b) => a.localeCompare(b))
+  }, [props.saveState?.teams])
+
+  if (showSettings) {
+    return (
+      <SettingsPage
+        apiBase={props.apiBase}
+        headers={props.headers}
+        saveId={props.saveId}
+        teamNames={allTeamNames}
+        backupReminderFrequency={props.backupReminderFrequency ?? 'none'}
+        onBackupReminderFrequencyChange={props.onBackupReminderFrequencyChange}
+        onBackupNow={props.onBackupNow}
+        onApplySaveState={props.onSaveState}
+        onClose={() => setShowSettings(false)}
+        onError={props.onError}
+        onLogoVersionBump={() => setLogoVersion(Date.now())}
+        onImportLogosToBundle={props.onImportLogosToBundle}
+      />
+    )
+  }
+
   return (
     <NewsProvider saveId={props.saveId} saveState={props.saveState}>
       <NewsStateSync saveId={props.saveId} saveState={props.saveState} leagueHistory={props.leagueHistory} />
@@ -7732,6 +7509,7 @@ export default function TeamHomePage(props: Props) {
             setLogoVersion={setLogoVersion}
             stadiumVersion={stadiumVersion}
             setStadiumVersion={setStadiumVersion}
+            onOpenSettings={() => setShowSettings(true)}
           />
         </CoachProfileProvider>
       </PlayerProfileProvider>
