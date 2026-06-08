@@ -189,8 +189,10 @@ def compute_season_program_pp_awards(
         str(postseason_tier or "none"),
         0,
     )
-    goal_rank = None
-    if stage_goal:
+    if stage_goal == "Just to have fun":
+        goal_met += 1
+    elif stage_goal:
+        goal_rank = None
         if stage_goal == "Winning Season":
             goal_rank = 0 if wins >= losses else 999
         elif stage_goal == "Playoffs":
@@ -202,13 +204,13 @@ def compute_season_program_pp_awards(
         elif stage_goal == "Title Winner":
             goal_rank = 4
 
-    if goal_rank is not None:
-        if goal_rank == 999:
-            goal_fail += 1
-        elif achieved_rank < goal_rank:
-            goal_fail += 1
-        else:
-            goal_met += 1
+        if goal_rank is not None:
+            if goal_rank == 999:
+                goal_fail += 1
+            elif achieved_rank < goal_rank:
+                goal_fail += 1
+            else:
+                goal_met += 1
 
     goal_pts = float(PP_PER_GOAL_MET) * float(goal_met) + float(PP_PER_GOAL_FAIL) * float(goal_fail)
     total_raw = float(rs_pp) + float(playoff_pp) + float(placing_pp) + float(goal_pts)

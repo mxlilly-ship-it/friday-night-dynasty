@@ -137,7 +137,9 @@ def compute_hot_seat(
                 else:
                     tier = 1
             need = 0
-            if stg == "Winning Season":
+            if stg == "Just to have fun":
+                need = 0
+            elif stg == "Winning Season":
                 need = 0 if wins >= losses else 999
             elif stg == "Playoffs":
                 need = 1

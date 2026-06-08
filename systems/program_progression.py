@@ -354,7 +354,9 @@ def count_season_goal_failures(
         goal_fail += 1
     achieved_rank = _postseason_rank(post_tier)
     goal_rank = None
-    if stage_goal == "Winning Season":
+    if stage_goal == "Just to have fun":
+        goal_rank = None
+    elif stage_goal == "Winning Season":
         goal_rank = 0 if w >= int(losses) else 999
     elif stage_goal == "Playoffs":
         goal_rank = 1

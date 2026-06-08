@@ -4,7 +4,8 @@ import './NewSaveFlow.css'
 import type { CSSProperties } from 'react'
 import { DEFENSIVE_PLAYBOOKS, OFFENSIVE_PLAYBOOKS } from './newSaveTypes'
 import PlaybookGamePlanPage from './PlaybookGamePlanPage'
-import { fetchPlayLearningSummary, saveDepthChart } from './browserSave'
+import { fetchPlayLearningSummary, fetchPlaySelection, saveDepthChart } from './browserSave'
+import { cachePlaySelectionResponse, hasPlaySelectionCache } from './playSelectionCache'
 import DepthChartPage from './DepthChartPage'
 import ScrimmagePanel from './ScrimmagePanel'
 import GamePlayPage from './GamePlayPage'
@@ -14,6 +15,9 @@ import SettingsPage from './SettingsPage'
 import { buildPlayerStatRows } from './playerSeasonStats'
 import { CoachProfileName, CoachProfileProvider } from './CoachProfileContext'
 import { PlayerProfileName, PlayerProfileProvider } from './PlayerProfileContext'
+import { buildOffseasonPlayerReport } from './offseasonPlayerReport'
+import OffseasonReportPlayerName from './OffseasonReportPlayerName'
+import PlayerOffseasonReportModal from './PlayerOffseasonReportModal'
 import CoachGameplanPage from './CoachGameplanPage'
 import ScoutingReportPage, { SCOUTING_MENU_DEFENSE, SCOUTING_MENU_OFFENSE } from './ScoutingReportPage'
 import {
@@ -42,7 +46,22 @@ import {
   standingsListToRecord,
 } from './leagueHistoryView'
 import SeasonSummaryPanel from './SeasonSummaryPanel'
+import HomeGameThemesPanel from './HomeGameThemesPanel'
+import { themeLabelForGame } from './homeGameThemes'
+import type { HomeThemeSelection } from './homeGameThemes'
 import CoachInboxPanel from './CoachInboxPanel'
+import ProgramDevelopmentPanel from './ProgramDevelopmentPanel'
+import TeamFacilitiesPage from './TeamFacilitiesPage'
+import catalogJson from './programEquipmentCatalog.json'
+import {
+  catalogById,
+  fmtProgramDollars,
+  hasTrainingEffects,
+  parsePpFromAttributeLines,
+  type ProgramDevAction,
+  type ProgramEquipmentCatalog,
+  type ProgramInventoryRow,
+} from './programDevelopmentUtils'
 import {
   buildPrestigeReportRows,
   formatTeamPoints,
@@ -192,6 +211,8 @@ type Props = {
     depthChart?: Record<string, string[]>
     positionChanges?: { player_name: string; position: string; secondary_position?: string | null }[]
     goals?: { win_goal: number; stage_goal: string }
+    homeGameThemes?: HomeThemeSelection[]
+    homeGameThemesAck?: boolean
     playoffsSim?: boolean
     seasonFinish?: boolean
     forcePreseasonAdvance?: boolean
@@ -212,6 +233,7 @@ type Props = {
       carousel_job_applications?: string[]
       transfer_stage_1_ack_results?: boolean
       transfer_stage_2_ack_results?: boolean
+      program_development_actions?: ProgramDevAction[]
     }
   }) => Promise<boolean>
   /** Latest save after sim (ref); use for back-to-back week sims before React re-renders. */
@@ -479,6 +501,7 @@ function derivePhaseFromSave(saveState: any): string {
 const CANONICAL_OFFSEASON_STAGES = [
   'Graduation',
   'Coach development',
+  'Program Development',
   'Winter 1',
   'Winter 2',
   'Spring Ball',
@@ -508,6 +531,9 @@ function normalizeOffseasonStageName(raw: unknown): string {
     .replace(/\s+/g, ' ')
   const compact = lower.replace(/[^a-z0-9]/g, '')
   if (compact === 'coachdevelopment' || compact === 'coachingdevelopment') return 'Coach development'
+  if (compact === 'programdevelopment' || compact === 'programdev' || compact === 'programbuilder') {
+    return 'Program Development'
+  }
   const aliases: Record<string, string> = {
     'coaching carousel i': 'Coaching carousel I',
     'coaching carousel ii': 'Coaching carousel II',
@@ -621,6 +647,13 @@ function getNextOpponent(state: any) {
   return opponent ? String(opponent) : '—'
 }
 
+/** Dashboard / schedule release: ``vs`` at home, ``@`` on the road. */
+function formatScheduleOpponentLabel(opponent: string, userHome: boolean): string {
+  const opp = String(opponent ?? '').trim()
+  if (!opp || /^bye$/i.test(opp)) return opp || '—'
+  return userHome ? `vs ${opp}` : `@ ${opp}`
+}
+
 function buildScheduleRows(state: any) {
   const userTeam = state?.user_team ?? ''
   const weeks = state?.weeks ?? []
@@ -634,6 +667,9 @@ function buildScheduleRows(state: any) {
     played: boolean
     scoreLine: string
     isRegionGame: boolean
+    userHome: boolean
+    gameIndex: number
+    homeThemeLabel: string | null
   }> = []
 
   for (let wi = 0; wi < weeks.length; wi++) {
@@ -667,6 +703,10 @@ function buildScheduleRows(state: any) {
         played,
         scoreLine,
         isRegionGame: isRegionGame(String(g.home), String(g.away), regionMap, clsMap),
+        userHome: g.home === userTeam,
+        gameIndex: gi,
+        homeThemeLabel:
+          g.home === userTeam ? themeLabelForGame(state, userTeam, wi + 1, gi) : null,
       })
     }
   }
@@ -691,6 +731,7 @@ type StateWeekGameRow = {
   ot: boolean
   recap: string
   gameIndex: number
+  homeThemeLabel: string | null
 }
 
 function buildStateWeekGames(state: any, week1Based: number): StateWeekGameRow[] {
@@ -702,8 +743,9 @@ function buildStateWeekGames(state: any, week1Based: number): StateWeekGameRow[]
   const weekRes = results[wi] ?? []
   return weekGames.map((g: any, gi: number) => {
     const r = weekRes[gi] ?? {}
+    const home = String(g?.home ?? '—')
     return {
-      home: String(g?.home ?? '—'),
+      home,
       away: String(g?.away ?? '—'),
       played: Boolean(r?.played),
       homeScore: Number(r?.home_score ?? 0),
@@ -711,6 +753,7 @@ function buildStateWeekGames(state: any, week1Based: number): StateWeekGameRow[]
       ot: Boolean(r?.ot),
       recap: typeof r?.recap === 'string' ? r.recap : '',
       gameIndex: gi,
+      homeThemeLabel: themeLabelForGame(state, home, week1Based, gi),
     }
   })
 }
@@ -730,6 +773,7 @@ type TeamScheduleRow = {
   result: 'W' | 'L' | 'T' | null
   /** True for in-region matchups (same classification + same non-empty region). */
   isRegionGame: boolean
+  homeThemeLabel: string | null
 }
 
 /** One row per game for `teamName` in the regular-season schedule. */
@@ -774,6 +818,7 @@ function buildTeamScheduleRows(state: any, teamName: string): TeamScheduleRow[] 
         ot: Boolean(r?.ot),
         result,
         isRegionGame: isRegionGame(String(g.home ?? ''), String(g.away ?? ''), regionMap, clsMap),
+        homeThemeLabel: userHome ? themeLabelForGame(state, teamName, wi + 1, gi) : null,
       })
     }
   }
@@ -1754,6 +1799,7 @@ function TeamHomePageBody({
   }, [saveState?.preseason_scrimmages])
   const [teamScheduleTeam, setTeamScheduleTeam] = useState('')
   const [teamInfoTeam, setTeamInfoTeam] = useState('')
+  const [facilitiesTeam, setFacilitiesTeam] = useState('')
   const [teamHistoryTeam, setTeamHistoryTeam] = useState('')
   const [graduationReportTeam, setGraduationReportTeam] = useState('')
   /** Must be declared before `leagueStatePanel` (Coaching changes view reads this). */
@@ -2338,6 +2384,17 @@ function TeamHomePageBody({
     )
   }, [allTeamNames, userTeam, saveId])
 
+  useEffect(() => {
+    if (!allTeamNames.length) return
+    setFacilitiesTeam((prev) =>
+      prev && allTeamNames.includes(prev)
+        ? prev
+        : userTeam && allTeamNames.includes(userTeam)
+          ? userTeam
+          : allTeamNames[0],
+    )
+  }, [allTeamNames, userTeam, saveId])
+
   const graduationReportTeamNames = useMemo(() => {
     const r = saveState?.offseason_graduation_report
     if (!r || typeof r !== 'object') return [] as string[]
@@ -2771,7 +2828,12 @@ function TeamHomePageBody({
                   key={`${g.home}-${g.away}-${g.gameIndex}`}
                   className="teamhome-schedule-row teamhome-schedule-row--weekly"
                 >
-                  <div className="teamhome-schedule-cell teamhome-schedule-team">{teamWithLogo(g.home)}</div>
+                  <div className="teamhome-schedule-cell teamhome-schedule-team">
+                    {teamWithLogo(g.home)}
+                    {g.homeThemeLabel ? (
+                      <div className="teamhome-schedule-theme teamhome-small">{g.homeThemeLabel}</div>
+                    ) : null}
+                  </div>
                   <div className="teamhome-schedule-cell teamhome-schedule-team">{teamWithLogo(g.away)}</div>
                   <div className="teamhome-schedule-cell teamhome-schedule-actions">
                     <span className="teamhome-schedule-score">{scoreShort}</span>
@@ -2960,6 +3022,9 @@ function TeamHomePageBody({
                     {teamWithLogo(g.opponent)}
                     {g.isRegionGame ? (
                       <span className="teamhome-region-mark" title="Region game">*</span>
+                    ) : null}
+                    {g.userHome && g.homeThemeLabel ? (
+                      <div className="teamhome-schedule-theme teamhome-small">{g.homeThemeLabel}</div>
                     ) : null}
                   </div>
                   <div className="teamhome-schedule-cell teamhome-schedule-team">
@@ -3318,6 +3383,16 @@ function TeamHomePageBody({
           </div>
         )
       })()
+    ) : stateMenu === 'Facilities' ? (
+      <TeamFacilitiesPage
+        apiBase={apiBase}
+        headers={headers}
+        saveState={saveState}
+        userTeam={userTeam}
+        allTeamNames={allTeamNames}
+        viewTeam={facilitiesTeam || userTeam}
+        onViewTeamChange={setFacilitiesTeam}
+      />
     ) : stateMenu === 'Coaching changes' ? (
       <div className="teamhome-roster-shell">
         <div className="teamhome-teaminfo-header">
@@ -3843,6 +3918,8 @@ function TeamHomePageBody({
     ) : null
 
   const userTeamObj = useMemo(() => findTeam(saveState, userTeam), [saveState, userTeam])
+  const programFundingBalance = Number(userTeamObj?.program_funding_balance ?? 0)
+  const programLastFundingIncome = Number(userTeamObj?.program_last_funding_income ?? 0)
   const userNickname = useMemo(() => {
     const raw = userTeamObj?.nickname ?? userTeamObj?.mascot
     const s = raw != null ? String(raw).trim() : ''
@@ -3919,7 +3996,10 @@ function TeamHomePageBody({
   const isPositionChangesStage = phase === 'preseason' && preseasonCurrentStage === 'Position changes'
   const isSetDepthChartStage = phase === 'preseason' && preseasonCurrentStage === 'Set Depth Chart'
   const isScrimmageStage = phase === 'preseason' && (preseasonCurrentStage === 'Scrimmage 1' || preseasonCurrentStage === 'Scrimmage 2')
+  const isHomeGameThemesStage = phase === 'preseason' && preseasonCurrentStage === 'Home Game Themes'
   const isSetGoalsStage = phase === 'preseason' && preseasonCurrentStage === 'Set Goals'
+  const homeGameThemesConfirmed = Boolean(saveState?.home_game_themes_user_confirmed)
+  const [confirmingHomeThemes, setConfirmingHomeThemes] = useState(false)
   const isCoachingCarouselApplyStage =
     phase === 'offseason' &&
     (offseasonCurrentStage === 'Coaching carousel I' ||
@@ -3952,6 +4032,30 @@ function TeamHomePageBody({
   ])
   const [confirmingPlaybook, setConfirmingPlaybook] = useState(false)
   const [showPlaybookGamePlan, setShowPlaybookGamePlan] = useState(false)
+
+  useEffect(() => {
+    setShowPlaybookGamePlan(false)
+  }, [preseasonCurrentStage])
+
+  useEffect(() => {
+    if (!isPlaySelectionStage || !saveId || hasPlaySelectionCache(saveId)) return
+    let cancelled = false
+    const stateSnapshot = saveState
+    fetchPlaySelection(apiBase, saveId, stateSnapshot, headers)
+      .then((json) => {
+        if (cancelled) return
+        cachePlaySelectionResponse(saveId, json)
+        if (json.state) onSaveState?.(json.state)
+      })
+      .catch(() => {
+        /* PlaybookGamePlanPage will fetch on open if prefetch fails */
+      })
+    return () => {
+      cancelled = true
+    }
+    // Prefetch once per stage entry; avoid re-running on every saveState tick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiBase, headers, isPlaySelectionStage, saveId])
   const [learningSummary, setLearningSummary] = useState<{
     offensive_pct_learned: number
     defensive_pct_learned: number
@@ -3960,7 +4064,14 @@ function TeamHomePageBody({
   const [learningLoading, setLearningLoading] = useState(false)
   const [confirmingResults, setConfirmingResults] = useState(false)
   const [positionDraft, setPositionDraft] = useState<Record<string, { position: string; secondary: string }>>({})
-  const STAGE_GOAL_OPTIONS = ['Winning Season', 'Playoffs', 'Semifinal', 'State Championship', 'Title Winner']
+  const STAGE_GOAL_OPTIONS = [
+    'Just to have fun',
+    'Winning Season',
+    'Playoffs',
+    'Semifinal',
+    'State Championship',
+    'Title Winner',
+  ]
   const seasonGoals = saveState?.season_goals
   const existingWinGoal = typeof seasonGoals?.win_goal === 'number' ? seasonGoals.win_goal : 6
   const existingStageGoal = typeof seasonGoals?.stage_goal === 'string' ? seasonGoals.stage_goal : 'Winning Season'
@@ -3978,7 +4089,9 @@ function TeamHomePageBody({
   const [improveCulCumulative, setImproveCulCumulative] = useState(0)
   const [improveBooCumulative, setImproveBooCumulative] = useState(0)
   const [coachDevAllocations, setCoachDevAllocations] = useState<Record<string, number>>(() => emptyCoachDevAllocations())
+  const [programDevPendingActions, setProgramDevPendingActions] = useState<ProgramDevAction[]>([])
   const [offseasonTrainingSort, setOffseasonTrainingSort] = useState<OffseasonTrainingSortMode>('position')
+  const [offseasonReportPlayer, setOffseasonReportPlayer] = useState<string | null>(null)
   const [freshmanSort, setFreshmanSort] = useState<FreshmanSortMode>('position')
   const [activeGame, setActiveGame] = useState<{
     gameId: string
@@ -4060,6 +4173,12 @@ function TeamHomePageBody({
     )
   }, [phase, offseasonCurrentStage, saveState, userTeam])
 
+  useEffect(() => {
+    if (phase !== 'offseason' || offseasonCurrentStage !== 'Program Development') {
+      setProgramDevPendingActions([])
+    }
+  }, [phase, offseasonCurrentStage])
+
   const coachDevTotalCp = Number(saveState?.offseason_coach_dev_bank?.cp_total ?? 0)
   const coachDevAllocatedCp = COACH_DEV_SKILLS.reduce((sum, { key }) => sum + Number(coachDevAllocations[key] ?? 0), 0)
   const coachDevAvailableCp = coachDevTotalCp - coachDevAllocatedCp
@@ -4070,6 +4189,7 @@ function TeamHomePageBody({
   const transferReview = saveState?.offseason_transfer_review ?? null
   const transferStage1PendingReview = Boolean(saveState?.offseason_transfer_stage_1_pending_review)
   const transferStage2PendingReview = Boolean(saveState?.offseason_transfer_stage_2_pending_review)
+  const transfersDisabled = Boolean(saveState?.transfers_disabled)
   const transferStage1EntriesSorted = useMemo(() => {
     const raw = saveState?.offseason_transfer_stage_1?.entries
     const e = (Array.isArray(raw) ? raw : []) as Array<Record<string, unknown>>
@@ -4109,6 +4229,7 @@ function TeamHomePageBody({
     const goalPts = Number((raw as { goal_points?: number }).goal_points ?? 0)
     const goalFails = Number((raw as { goal_fail_count?: number }).goal_fail_count ?? 0)
     const goalMetCount = Number((raw as { goal_met_count?: number }).goal_met_count ?? 0)
+    const equipmentPp = Number((raw as { equipment_pp_total?: number }).equipment_pp_total ?? 0)
     const net = Number((raw as { pp_total?: number }).pp_total ?? 0)
     return {
       rs,
@@ -4116,6 +4237,7 @@ function TeamHomePageBody({
       placementPp,
       placementLabel,
       goalPts,
+      equipmentPp,
       net,
       wins,
       losses,
@@ -4226,6 +4348,33 @@ function TeamHomePageBody({
     () => sortOffseasonTrainingRows(offseasonTrainingRowsRaw, offseasonTrainingSort),
     [offseasonTrainingRowsRaw, offseasonTrainingSort],
   )
+  const offseasonPlayerReport = useMemo(() => {
+    if (!offseasonReportPlayer || !userTeam) return null
+    return buildOffseasonPlayerReport(saveState, userTeam, offseasonReportPlayer)
+  }, [offseasonReportPlayer, saveState, userTeam])
+  const trainingEquipmentPreview = useMemo(() => {
+    if (phase !== 'offseason' || offseasonCurrentStage !== 'Training Results') return []
+    const t = findTeam(saveState, userTeam)
+    const inv = (t?.program_equipment || []) as ProgramInventoryRow[]
+    const byId = catalogById(catalogJson as ProgramEquipmentCatalog)
+    return inv
+      .filter((r) => Number(r.seasons_remaining ?? 0) > 0)
+      .map((r) => {
+        const spec = byId[String(r.item_id)]
+        if (!spec) return null
+        const attrs = spec.attributes_affected || []
+        return {
+          name: spec.name,
+          attrs,
+          hasTraining: hasTrainingEffects(attrs),
+          pp: parsePpFromAttributeLines(attrs),
+        }
+      })
+      .filter(Boolean) as Array<{ name: string; attrs: string[]; hasTraining: boolean; pp: number }>
+  }, [phase, offseasonCurrentStage, saveState, userTeam])
+  const trainingEquipmentApplied = saveState?.offseason_training_results?.equipment as
+    | { ui_rows?: Array<{ name: string; labels: string[] }>; equipment_points_applied?: number }
+    | undefined
   const freshmanRosterPlayers = useMemo(() => {
     const team = findTeam(saveState, userTeam)
     return (team?.roster ?? []).filter((p: any) => isFreshmanYear(p?.year))
@@ -4833,6 +4982,7 @@ function TeamHomePageBody({
             <option value="Rankings">Rankings</option>
             <option value="Stats">Stats</option>
             <option value="Team Info">Team Info</option>
+            <option value="Facilities">Facilities</option>
             <option value="Coaching changes">Coaching changes</option>
             <option value="Team History">Team History</option>
             <option value="Prestige report">Prestige report</option>
@@ -4856,6 +5006,15 @@ function TeamHomePageBody({
             </div>
           ) : null}
           <div className="teamhome-top-actions-end">
+          {phase === 'offseason' ? (
+            <div className="teamhome-program-balance" title="Program funding balance (carries over year to year, max $250,000)">
+              <span className="teamhome-program-balance-k">Program balance</span>
+              <span className="teamhome-program-balance-v">{fmtProgramDollars(programFundingBalance)}</span>
+              {programLastFundingIncome > 0 ? (
+                <span className="teamhome-program-balance-inc">+{fmtProgramDollars(programLastFundingIncome)} this season</span>
+              ) : null}
+            </div>
+          ) : null}
           <button
             type="button"
             className="teamhome-continue"
@@ -4870,7 +5029,8 @@ function TeamHomePageBody({
               isScrimmageStage ||
               isSetGoalsStage ||
               winterAllocationInvalid ||
-              (phase === 'offseason' && offseasonCurrentStage === 'Improvements' && improvementsBudget.invalid)
+              (phase === 'offseason' && offseasonCurrentStage === 'Improvements' && improvementsBudget.invalid) ||
+              (isHomeGameThemesStage && !homeGameThemesConfirmed)
             }
             onClick={async () => {
               try {
@@ -4892,6 +5052,7 @@ function TeamHomePageBody({
                     carousel_job_applications?: string[]
                     transfer_stage_1_ack_results?: boolean
                     transfer_stage_2_ack_results?: boolean
+                    program_development_actions?: ProgramDevAction[]
                   } = {}
                   if (offseasonCurrentStage === 'Winter 1' || offseasonCurrentStage === 'Winter 2') {
                     offseasonBody = winterTrainingResult
@@ -4909,6 +5070,8 @@ function TeamHomePageBody({
                     }
                   } else if (offseasonCurrentStage === 'Coach development') {
                     offseasonBody = { coach_dev_allocations: coachDevAllocations }
+                  } else if (offseasonCurrentStage === 'Program Development') {
+                    offseasonBody = { program_development_actions: programDevPendingActions }
                   } else if (
                     offseasonCurrentStage === 'Coaching carousel I' ||
                     offseasonCurrentStage === 'Coaching carousel II' ||
@@ -4939,6 +5102,8 @@ function TeamHomePageBody({
                     }
                   }
                   await onSimWeek({ positionChanges: out })
+                } else if (phase === 'preseason' && isHomeGameThemesStage) {
+                  await onSimWeek({ homeGameThemesAck: true })
                 } else if (phase === 'season_summary') {
                   await onSimWeek({ seasonFinish: true })
                 } else {
@@ -4978,9 +5143,11 @@ function TeamHomePageBody({
                                 ? 'Confirm depth chart first'
                                 : isScrimmageStage
                                   ? 'Use Play or Simulate in the panel below'
-                                  : isSetGoalsStage
-                                    ? 'Confirm goals below'
-                                    : 'Simulate the current week and advance'
+                                  : isHomeGameThemesStage
+                                    ? 'Confirm home game themes below first'
+                                    : isSetGoalsStage
+                                      ? 'Confirm goals below'
+                                      : 'Simulate the current week and advance'
             }
           >
             {phase === 'regular' && simmingWeek
@@ -5090,7 +5257,52 @@ function TeamHomePageBody({
             renderTeamMenuPanel()
           ) : (
           <div className="teamhome-preseason-shell">
-            <div className="teamhome-preseason-top">
+            <div
+              className={`teamhome-preseason-top${isHomeGameThemesStage ? ' teamhome-preseason-top--themes-stage' : ''}`}
+            >
+              {isHomeGameThemesStage ? (
+                <div className="teamhome-themes-stage-column">
+                  {completedScrimmages.length > 0 ? (
+                    <div className="teamhome-scrimmage-results-card">
+                      <div className="teamhome-preseason-title">Scrimmage results</div>
+                      <div className="teamhome-scrimmage-results-list">
+                        {completedScrimmages
+                          .slice()
+                          .sort((a, b) => String(a.name || a.stage).localeCompare(String(b.name || b.stage)))
+                          .map((s, i) => (
+                            <div key={`${s.name || s.stage}-${i}`} className="teamhome-scrimmage-results-item">
+                              <span className="teamhome-scrimmage-results-label">{s.name || s.stage}</span>
+                              <span className="teamhome-scrimmage-results-score">
+                                {s.home} {s.home_score}–{s.away} {s.away_score}
+                                {s.ot ? ' (OT)' : ''}
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  <HomeGameThemesPanel
+                    apiBase={apiBase}
+                    headers={headers}
+                    logoVersion={logoVersion}
+                    saveState={saveState}
+                    userTeam={userTeam}
+                    confirmed={homeGameThemesConfirmed}
+                    confirming={confirmingHomeThemes}
+                    onConfirm={async (selections) => {
+                      setConfirmingHomeThemes(true)
+                      try {
+                        await onSimWeek({ homeGameThemes: selections })
+                      } catch (e: any) {
+                        onError(e?.message ?? 'Failed to confirm themes')
+                      } finally {
+                        setConfirmingHomeThemes(false)
+                      }
+                    }}
+                  />
+                </div>
+              ) : (
+                <>
               {completedScrimmages.length > 0 ? (
                 <div className="teamhome-scrimmage-upcoming" style={{ marginBottom: 10, opacity: 0.92 }}>
                   <span className="teamhome-scrimmage-upcoming-label">Scrimmage results:</span>{' '}
@@ -5326,7 +5538,7 @@ function TeamHomePageBody({
                   </button>
                   </div>
                 </div>
-              ) : isSetGoalsStage ? (
+              ) : isHomeGameThemesStage ? null : isSetGoalsStage ? (
                 <div className="teamhome-preseason-panelA teamhome-goals-panel">
                   <div className="teamhome-preseason-title">Goal Selection</div>
                   <div className="teamhome-goals-row">
@@ -5359,6 +5571,11 @@ function TeamHomePageBody({
                       </select>
                     </div>
                   </div>
+                  {goalStage === 'Just to have fun' ? (
+                    <p className="teamhome-small teamhome-goals-hint">
+                      No postseason target — only your win total is graded for goals, PP, and coach pressure.
+                    </p>
+                  ) : null}
                   <button
                     type="button"
                     className="teamhome-goals-confirm"
@@ -5424,6 +5641,7 @@ function TeamHomePageBody({
                 </div>
               )}
 
+              {!isHomeGameThemesStage ? (
               <div className="teamhome-preseason-stages">
                 <div className="teamhome-preseason-title">Off-season stages</div>
                 <div className="teamhome-preseason-stage-list">
@@ -5437,8 +5655,12 @@ function TeamHomePageBody({
                   ))}
                 </div>
               </div>
+              ) : null}
+                </>
+              )}
             </div>
 
+            {!isHomeGameThemesStage ? (
             <div className="teamhome-preseason-bottom">
               <div className="teamhome-preseason-panelD">
                 <div className="teamhome-preseason-title">News wire</div>
@@ -5462,6 +5684,7 @@ function TeamHomePageBody({
                 </div>
               </div>
             </div>
+            ) : null}
           </div>
           )
         ) : phase === 'playoffs' ? (
@@ -5790,7 +6013,7 @@ function TeamHomePageBody({
                                           as="span"
                                         />
                                       </td>
-                                      <td>{p?.position ?? 'ΓÇö'}</td>
+                                      <td>{p?.position ?? '—'}</td>
                                       <td>{formatPlayerYear(p?.year)}</td>
                                     </tr>
                                   ))}
@@ -5877,9 +6100,25 @@ function TeamHomePageBody({
                       </table>
                     </div>
                   </>
-                ) : offseasonCurrentStage === 'Improvements' ? (
+                ) : offseasonCurrentStage === 'Program Development' ? (
                   <>
                     <div className="teamhome-preseason-title">Program development</div>
+                    <div className="teamhome-preseason-sub" style={{ marginTop: 8, maxWidth: 860 }}>
+                      Invest annual funding in equipment and facilities. Purchases apply when you press Continue; CPU schools
+                      shop automatically afterward.
+                    </div>
+                    <div style={{ marginTop: 14, width: '100%', maxWidth: 980 }}>
+                      <ProgramDevelopmentPanel
+                        saveState={saveState}
+                        userTeam={userTeam}
+                        pendingActions={programDevPendingActions}
+                        onPendingActionsChange={setProgramDevPendingActions}
+                      />
+                    </div>
+                  </>
+                ) : offseasonCurrentStage === 'Improvements' ? (
+                  <>
+                    <div className="teamhome-preseason-title">Program improvements</div>
                     <div className="teamhome-preseason-sub teamhome-improvements-lead">
                       Use <b>− / +</b> (5 PP per click) or drag each <b>pillar slider</b> to invest your flex <b>program points (PP)</b> into
                       that program track. You can sit
@@ -5939,8 +6178,7 @@ function TeamHomePageBody({
                         {improvementsSeasonLedger ? (
                           <>
                             <p className="teamhome-improvements-ledger-summary">
-                              How your PP bank was credited from the season that just ended — wins and margins add PP; missed goals
-                              subtract.
+                              How your PP bank was credited — season results, goals, and active program equipment that grants PP.
                             </p>
                             <ul className="teamhome-improvements-ledger-rows">
                               <li>
@@ -6001,6 +6239,14 @@ function TeamHomePageBody({
                                   {formatProgramPpDelta(improvementsSeasonLedger.goalPts)}
                                 </span>
                               </li>
+                              {improvementsSeasonLedger.equipmentPp > 0 ? (
+                                <li>
+                                  <span>Program equipment (owned facilities)</span>
+                                  <span className="teamhome-improvements-num--good">
+                                    {formatProgramPpDelta(improvementsSeasonLedger.equipmentPp)}
+                                  </span>
+                                </li>
+                              ) : null}
                               <li className="teamhome-improvements-ledger-net">
                                 <span>Net PP credited</span>
                                 <span className="teamhome-improvements-num--highlight">
@@ -6169,6 +6415,16 @@ function TeamHomePageBody({
                                 <b>{Number((saveState.offseason_improvements_bank.breakdown as any).goal_fail_count)}</b>
                               </div>
                             ) : null}
+                            {(saveState.offseason_improvements_bank.breakdown as any).equipment_pp_total > 0 ? (
+                              <div style={{ marginTop: 4 }}>
+                                Program equipment PP:{' '}
+                                <b>
+                                  {Number(
+                                    (saveState.offseason_improvements_bank.breakdown as any).equipment_pp_total ?? 0,
+                                  )}
+                                </b>
+                              </div>
+                            ) : null}
                           </div>
                         </details>
                       ) : null}
@@ -6227,7 +6483,7 @@ function TeamHomePageBody({
                     {isCoachingCarouselSummaryStage ? (
                       <div className="teamhome-preseason-sub">
                         Coaching carousel recap for the offseason that just finished. This summary is archived under{' '}
-                        <b>State ΓåÆ Coaching changes</b> for that season year.
+                        <b>State → Coaching changes</b> for that season year.
                       </div>
                     ) : offseasonCurrentStage === 'Coaching carousel I' ? (
                       <div className="teamhome-preseason-sub">
@@ -6286,7 +6542,7 @@ function TeamHomePageBody({
                           if (!summ?.headline && !(summ?.bullets && summ.bullets.length)) {
                             return (
                               <div className="teamhome-small" style={{ marginBottom: 10 }}>
-                                Summary will appear once you finish stage III ΓÇö if this is stuck empty, Continue once more from{' '}
+                                Summary will appear once you finish stage III — if this is stuck empty, Continue once more from{' '}
                                 <b>stage III</b>.
                               </div>
                             )
@@ -6304,7 +6560,7 @@ function TeamHomePageBody({
                                   ? ['retirement', 'resignation', 'firing', 'hire', 'promotion', 'application_hire', 'scheme_change']
                                       .filter((k) => Number(counts[k] ?? 0) > 0)
                                       .map((k) => `${k.replace(/_/g, ' ')}: ${counts[k]}`)
-                                      .join(' ┬╖ ')
+                                      .join(' · ')
                                   : null}
                               </div>
                               <div className="teamhome-small" style={{ opacity: 0.9, marginBottom: 8 }}>
@@ -6371,12 +6627,12 @@ function TeamHomePageBody({
                                 <div className="teamhome-small" style={{ marginBottom: 8, fontWeight: 700 }}>
                                   Apply for open HC jobs ({vacancySet.size} open){' '}
                                   <span style={{ fontWeight: 400, opacity: 0.85 }}>
-                                    ┬╖ Your application list persists until the carousel completes
+                                    · Your application list persists until the carousel completes
                                   </span>
                                 </div>
                                 <div className="teamhome-small" style={{ marginBottom: 10 }}>
                                   Top-ranked schools are prioritized when your coach evaluates offers; you can reorder between
-                                  stages IΓÇôIII as new vacancies appear.
+                                  stages I–III as new vacancies appear.
                                 </div>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end', marginBottom: 10 }}>
                                   <select
@@ -6386,10 +6642,10 @@ function TeamHomePageBody({
                                     onChange={(e) => setCarouselVacancyPick(e.target.value)}
                                     style={{ minWidth: 220 }}
                                   >
-                                    <option value="">Add vacancyΓÇª</option>
+                                    <option value="">Add vacancy…</option>
                                     {availAdd.map((n) => (
                                       <option key={n} value={n}>
-                                        {prestigeOf(n)}Γÿà {n}
+                                        {prestigeOf(n)}★ {n}
                                       </option>
                                     ))}
                                   </select>
@@ -6487,10 +6743,10 @@ function TeamHomePageBody({
                             const fromMap = userTeam && hsMap ? hsMap[userTeam] : undefined
                             const fromCoach = Number(findTeam(saveState, userTeam)?.coach?.hot_seat)
                             const v = fromMap ?? (Number.isFinite(fromCoach) ? fromCoach : undefined)
-                            return v !== undefined ? `${v} / 100` : 'ΓÇö'
+                            return v !== undefined ? `${v} / 100` : '—'
                           })()}
                         </b>
-                        <span style={{ opacity: 0.85 }}> ┬╖ Higher = more pressure (losing seasons, missed goals, playoff drought).</span>
+                        <span style={{ opacity: 0.85 }}> · Higher = more pressure (losing seasons, missed goals, playoff drought).</span>
                       </div>
                       {(() => {
                         const hsMap = (saveState?.offseason_coach_carousel_hot_seat ?? {}) as Record<string, number>
@@ -6499,7 +6755,7 @@ function TeamHomePageBody({
                           .filter((t) => t?.name && t?.coach)
                           .map((t) => {
                             const teamName = String(t.name)
-                            const coachName = String(t.coach?.name ?? 'ΓÇö')
+                            const coachName = String(t.coach?.name ?? '—')
                             const fromMap = hsMap[teamName]
                             const fromCoach = Number(t.coach?.hot_seat)
                             const hotSeat =
@@ -6515,7 +6771,7 @@ function TeamHomePageBody({
                         return (
                           <div className="teamhome-carousel-hotseat-block" style={{ marginTop: 14, marginBottom: 14 }}>
                             <div className="teamhome-small" style={{ marginBottom: 8, fontWeight: 800 }}>
-                              League hot seat ΓÇö all head coaches
+                              League hot seat — all head coaches
                             </div>
                             <label className="teamhome-small" htmlFor="carousel-hotseat-select" style={{ display: 'block', marginBottom: 6 }}>
                               Jump to program
@@ -6526,10 +6782,10 @@ function TeamHomePageBody({
                               value={carouselHotSeatTeamFilter}
                               onChange={(e) => setCarouselHotSeatTeamFilter(e.target.value)}
                             >
-                              <option value="">ΓÇö Show full list (no highlight) ΓÇö</option>
+                              <option value="">— Show full list (no highlight) —</option>
                               {rows.map((r) => (
                                 <option key={r.teamName} value={r.teamName}>
-                                  {r.hotSeat}/100 ┬╖ {r.teamName} ΓÇö {r.coachName}
+                                  {r.hotSeat}/100 · {r.teamName} — {r.coachName}
                                 </option>
                               ))}
                             </select>
@@ -6604,7 +6860,7 @@ function TeamHomePageBody({
                         style={{ textAlign: 'left', paddingLeft: 18, maxHeight: 280, overflow: 'auto' }}
                       >
                         {(saveState?.offseason_coach_carousel_last_events ?? []).length === 0 ? (
-                          <li className="teamhome-small">No moves logged at this carousel step yet ΓÇö press Continue.</li>
+                          <li className="teamhome-small">No moves logged at this carousel step yet — press Continue.</li>
                         ) : (
                           (saveState?.offseason_coach_carousel_last_events ?? []).map((ev: any, i: number) => {
                             const yours =
@@ -6624,7 +6880,7 @@ function TeamHomePageBody({
                         )}
                       </ul>
                       <div className="teamhome-small" style={{ marginTop: 12 }}>
-                        Review past offseasons under <b>State ΓåÆ Coaching changes</b>.
+                        Review past offseasons under <b>State → Coaching changes</b>.
                       </div>
                       </>
                       ) : null}
@@ -6735,10 +6991,19 @@ function TeamHomePageBody({
                         </table>
 
                         <div className="teamhome-preseason-title" style={{ marginTop: 14, fontSize: 15 }}>Notable players</div>
+                        <p className="teamhome-small" style={{ marginTop: 4, opacity: 0.85 }}>
+                          Click a name to see that player&apos;s offseason growth so far.
+                        </p>
                         <ul style={{ marginTop: 8 }}>
                           {((winterTrainingResult.notable_players ?? []) as any[]).slice(0, 5).map((n, i) => (
                             <li key={`${n.player_name}-${n.attribute}-${i}`}>
-                              {String(n.player_name ?? 'Player')} ({String(n.position ?? '')}) +{Number(n.delta ?? 0)} {String(n.attribute ?? '')}
+                              <OffseasonReportPlayerName
+                                saveState={saveState}
+                                userTeam={userTeam}
+                                playerName={String(n.player_name ?? 'Player')}
+                                onOpen={setOffseasonReportPlayer}
+                              />{' '}
+                              ({String(n.position ?? '')}) +{Number(n.delta ?? 0)} {String(n.attribute ?? '')}
                             </li>
                           ))}
                           {(!winterTrainingResult.notable_players || winterTrainingResult.notable_players.length === 0) ? (
@@ -6815,7 +7080,7 @@ function TeamHomePageBody({
                           <tbody>
                             {((springBallResult.position_group_changes ?? []) as any[]).map((r, i) => (
                               <tr key={`${r?.label ?? 'grp'}-${i}`}>
-                                <td>{String(r?.label ?? 'ΓÇö')}</td>
+                                <td>{String(r?.label ?? '—')}</td>
                                 <td>{Number(r?.delta ?? 0) >= 0 ? `+${Number(r?.delta ?? 0).toFixed(1)}` : Number(r?.delta ?? 0).toFixed(1)}</td>
                               </tr>
                             ))}
@@ -6823,10 +7088,20 @@ function TeamHomePageBody({
                         </table>
 
                         <div className="teamhome-preseason-title" style={{ fontSize: 15, marginTop: 12 }}>Notable player improvements</div>
+                        <p className="teamhome-small" style={{ marginTop: 4, opacity: 0.85 }}>
+                          Click a name to see that player&apos;s offseason growth so far.
+                        </p>
                         <ul className="teamhome-list" style={{ marginTop: 6 }}>
                           {((springBallResult.notable_players ?? []) as any[]).slice(0, 5).map((n, i) => (
                             <li key={`notable-${i}`} className="teamhome-small">
-                              {String(n?.position ?? 'ΓÇö')} {String(n?.player_name ?? 'Player')}: +{Number(n?.delta ?? 0)} {String(n?.attribute ?? '')}
+                              {String(n?.position ?? '—')}{' '}
+                              <OffseasonReportPlayerName
+                                saveState={saveState}
+                                userTeam={userTeam}
+                                playerName={String(n?.player_name ?? 'Player')}
+                                onOpen={setOffseasonReportPlayer}
+                              />
+                              : +{Number(n?.delta ?? 0)} {String(n?.attribute ?? '')}
                             </li>
                           ))}
                           {(!springBallResult.notable_players || springBallResult.notable_players.length === 0) ? (
@@ -6848,7 +7123,21 @@ function TeamHomePageBody({
                   </>
                 ) : offseasonCurrentStage === 'Transfers I' ? (
                   <>
-                    <div className="teamhome-preseason-title">Transfers I ΓÇö Portal entrants</div>
+                    <div className="teamhome-preseason-title">Transfers I — Portal entrants</div>
+                    {transfersDisabled ? (
+                      <>
+                        <div className="teamhome-preseason-sub">
+                          Transfers are disabled for this dynasty. No players will enter the portal and no moves will
+                          occur.
+                        </div>
+                        <div className="teamhome-small" style={{ marginTop: 8 }}>
+                          {transferStage1?.disabled || transferStage1?.entries != null
+                            ? 'No portal entrants this offseason. Press Continue to advance.'
+                            : 'Press Continue once to acknowledge and advance.'}
+                        </div>
+                      </>
+                    ) : (
+                      <>
                     <div className="teamhome-preseason-sub">
                       First <b>Continue</b> builds the portal class from the season that just ended (using final
                       standings). Review the list, then <b>Continue</b> again to lock entrants before destinations run
@@ -6857,12 +7146,12 @@ function TeamHomePageBody({
                     {transferStage1?.entries?.length ? (
                       <div style={{ marginTop: 12 }}>
                         <div className="teamhome-small" style={{ marginBottom: 8 }}>
-                          League portal cap: <b>{Number(transferStage1.pool_pct ?? 0).toFixed(1)}%</b> ┬╖ In portal:{' '}
+                          League portal cap: <b>{Number(transferStage1.pool_pct ?? 0).toFixed(1)}%</b> · In portal:{' '}
                           <b>{Number(transferStage1.selected_count ?? 0)}</b>
                           {transferStage1.eligible_count != null ? (
                             <>
                               {' '}
-                              ┬╖ Candidates considered: <b>{Number(transferStage1.eligible_count)}</b>
+                              · Candidates considered: <b>{Number(transferStage1.eligible_count)}</b>
                             </>
                           ) : null}
                         </div>
@@ -6879,17 +7168,17 @@ function TeamHomePageBody({
                             <div className="teamhome-roster-cell">Pressure</div>
                           </div>
                           {transferStage1EntriesSorted.map((r: any, i: number) => {
-                            const fromSchool = String(r.from_team ?? r.team ?? 'ΓÇö')
+                            const fromSchool = String(r.from_team ?? r.team ?? '—')
                             return (
                               <div
                                 key={`tr1-${fromSchool}-${String(r.player)}-${i}`}
                                 className="teamhome-roster-row teamhome-transfer-portal-row"
                               >
-                                <div className="teamhome-roster-cell">{String(r.player ?? 'ΓÇö')}</div>
-                                <div className="teamhome-roster-cell">{String(r.position ?? 'ΓÇö')}</div>
+                                <div className="teamhome-roster-cell">{String(r.player ?? '—')}</div>
+                                <div className="teamhome-roster-cell">{String(r.position ?? '—')}</div>
                                 <div className="teamhome-roster-cell">{formatTransferPortalClassYear(r.year)}</div>
                                 <div className="teamhome-roster-cell">{teamWithLogo(fromSchool, 22)}</div>
-                                <div className="teamhome-roster-cell">{String(r.region ?? 'ΓÇö')}</div>
+                                <div className="teamhome-roster-cell">{String(r.region ?? '—')}</div>
                                 <div className="teamhome-roster-cell">{Number(r.score ?? 0).toFixed(1)}</div>
                               </div>
                             )
@@ -6907,10 +7196,25 @@ function TeamHomePageBody({
                         Portal class not generated yet. Press <b>Continue</b> once to run the evaluation.
                       </div>
                     )}
+                      </>
+                    )}
                   </>
                 ) : offseasonCurrentStage === 'Transfers II' ? (
                   <>
-                    <div className="teamhome-preseason-title">Transfers II ΓÇö Destinations</div>
+                    <div className="teamhome-preseason-title">Transfers II — Destinations</div>
+                    {transfersDisabled ? (
+                      <>
+                        <div className="teamhome-preseason-sub">
+                          Transfers are disabled for this dynasty. Destination resolution is skipped.
+                        </div>
+                        <div className="teamhome-small" style={{ marginTop: 8 }}>
+                          {transferStage2?.disabled || transferStage2?.entries != null
+                            ? 'No transfers occurred. Press Continue to advance.'
+                            : 'Press Continue once to acknowledge and advance.'}
+                        </div>
+                      </>
+                    ) : (
+                      <>
                     <div className="teamhome-preseason-sub">
                       First <b>Continue</b> resolves destinations from the locked portal class. Review, then{' '}
                       <b>Continue</b> again to advance.
@@ -6918,13 +7222,13 @@ function TeamHomePageBody({
                     {transferStage2?.entries?.length ? (
                       <div style={{ marginTop: 10 }}>
                         <div className="teamhome-small">
-                          Finalized moves: <b>{Number(transferStage2.moved_count ?? 0)}</b> ┬╖ Blocked:{' '}
+                          Finalized moves: <b>{Number(transferStage2.moved_count ?? 0)}</b> · Blocked:{' '}
                           <b>{Number(transferStage2.blocked_count ?? 0)}</b>
                         </div>
                         <ul className="teamhome-list" style={{ marginTop: 8 }}>
                           {(transferStage2.entries as any[]).slice(0, 12).map((r: any, i: number) => (
                             <li key={`tr2-${i}`} className="teamhome-small">
-                              {String(r.player)} ({String(r.position)}) ┬╖ {String(r.from_team)} ΓåÆ {String(r.to_team)}
+                              {String(r.player)} ({String(r.position)}) · {String(r.from_team)} → {String(r.to_team)}
                             </li>
                           ))}
                         </ul>
@@ -6939,29 +7243,44 @@ function TeamHomePageBody({
                         Destinations not resolved yet. Press <b>Continue</b> once to run resolution.
                       </div>
                     )}
+                      </>
+                    )}
                   </>
                 ) : offseasonCurrentStage === 'Transfers III' ? (
                   <>
-                    <div className="teamhome-preseason-title">Transfers III ΓÇö Review</div>
+                    <div className="teamhome-preseason-title">Transfers III — Review</div>
+                    {transfersDisabled ? (
+                      <>
+                        <div className="teamhome-preseason-sub">
+                          Transfers are disabled for this dynasty. There is no transfer ledger for this offseason.
+                        </div>
+                        <div className="teamhome-small" style={{ marginTop: 8 }}>
+                          No transfers occurred. Press Continue to advance.
+                        </div>
+                      </>
+                    ) : (
+                      <>
                     <div className="teamhome-preseason-sub">
                       Final offseason transfer ledger. Review every completed move before advancing.
                     </div>
                     {transferReview?.entries?.length ? (
                       <div style={{ marginTop: 10 }}>
                         <div className="teamhome-small">
-                          Completed transfers: <b>{Number(transferReview.moved_count ?? transferReview.entries.length ?? 0)}</b> ┬╖ Blocked:{' '}
+                          Completed transfers: <b>{Number(transferReview.moved_count ?? transferReview.entries.length ?? 0)}</b> · Blocked:{' '}
                           <b>{Number(transferReview.blocked_count ?? 0)}</b>
                         </div>
                         <ul className="teamhome-list" style={{ marginTop: 8 }}>
                           {(transferReview.entries as any[]).map((r: any, i: number) => (
                             <li key={`tr3-${i}`} className="teamhome-small">
-                              {String(r.player)} ({String(r.position)}) ┬╖ {String(r.from_team)} ΓåÆ {String(r.to_team)}
+                              {String(r.player)} ({String(r.position)}) · {String(r.from_team)} → {String(r.to_team)}
                             </li>
                           ))}
                         </ul>
                       </div>
                     ) : (
                       <div className="teamhome-small" style={{ marginTop: 8 }}>No transfers finalized this offseason.</div>
+                    )}
+                      </>
                     )}
                   </>
                 ) : offseasonCurrentStage === '7 on 7' ? (
@@ -6973,9 +7292,44 @@ function TeamHomePageBody({
                   <>
                     <div className="teamhome-preseason-title">Training &amp; development</div>
                     <div className="teamhome-preseason-sub">
-                      Continue runs the main offseason development for all programs. You get a full-roster before/after
-                      report next (Freshman Class) with sorting by position, OVR change, and more.
+                      Continue runs the main offseason development pass for every program. Active program equipment adds
+                      flat training bonuses (position-filtered where noted). PP-granting gear credits your Improvements
+                      bank later this offseason. Click a player name for the full offseason growth report (winter,
+                      spring, and training).
                     </div>
+                    {trainingEquipmentPreview.length > 0 ? (
+                      <div className="teamhome-improvements-ledger" style={{ marginTop: 14, textAlign: 'left' }}>
+                        <div className="teamhome-improvements-ledger-head">
+                          <span className="teamhome-improvements-ledger-title">Active program equipment</span>
+                        </div>
+                        <ul className="teamhome-improvements-ledger-rows" style={{ marginTop: 8 }}>
+                          {trainingEquipmentPreview.map((row) => (
+                            <li key={row.name}>
+                              <span>{row.name}</span>
+                              <span className="teamhome-small" style={{ opacity: 0.85 }}>
+                                {row.hasTraining ? row.attrs.filter((a) => !/^\d+\s*PP/i.test(a)).join(' · ') || 'Training bonus' : null}
+                                {row.pp > 0 ? `${row.hasTraining ? ' · ' : ''}+${row.pp} PP at Improvements` : ''}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    {trainingEquipmentApplied?.ui_rows?.length ? (
+                      <div className="teamhome-improvements-ledger" style={{ marginTop: 14, textAlign: 'left' }}>
+                        <div className="teamhome-improvements-ledger-head">
+                          <span className="teamhome-improvements-ledger-title">Equipment applied this training cycle</span>
+                        </div>
+                        <ul className="teamhome-improvements-ledger-rows" style={{ marginTop: 8 }}>
+                          {trainingEquipmentApplied.ui_rows.map((row) => (
+                            <li key={row.name}>
+                              <span>{row.name}</span>
+                              <span className="teamhome-small">{(row.labels || []).join(' · ')}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
                     {offseasonTrainingRowsRaw.length > 0 ? (
                       <div style={{ marginTop: 16 }}>
                         <div className="teamhome-playbook-row" style={{ alignItems: 'flex-end' }}>
@@ -6989,7 +7343,7 @@ function TeamHomePageBody({
                               <option value="position">Position</option>
                               <option value="delta">OVR change (largest first)</option>
                               <option value="after">OVR after (high to low)</option>
-                              <option value="name">Name (AΓÇôZ)</option>
+                              <option value="name">Name (A–Z)</option>
                             </select>
                           </div>
                           <span className="teamhome-small">{sortedOffseasonTrainingRows.length} players</span>
@@ -7009,9 +7363,14 @@ function TeamHomePageBody({
                               {sortedOffseasonTrainingRows.map((row, i) => (
                                 <tr key={`${row.name}-${i}`}>
                                   <td>
-                                    <PlayerProfileName teamName={userTeam} playerName={row.name} as="span" />
+                                    <OffseasonReportPlayerName
+                                      saveState={saveState}
+                                      userTeam={userTeam}
+                                      playerName={row.name}
+                                      onOpen={setOffseasonReportPlayer}
+                                    />
                                   </td>
-                                  <td>{row.position ?? 'ΓÇö'}</td>
+                                  <td>{row.position ?? '—'}</td>
                                   <td>{row.before}</td>
                                   <td>{row.after}</td>
                                   <td>{row.delta >= 0 ? `+${row.delta}` : row.delta}</td>
@@ -7045,7 +7404,7 @@ function TeamHomePageBody({
                               <option value="position">Position</option>
                               <option value="delta">OVR change (largest first)</option>
                               <option value="after">OVR after (high to low)</option>
-                              <option value="name">Name (AΓÇôZ)</option>
+                              <option value="name">Name (A–Z)</option>
                             </select>
                           </div>
                           <span className="teamhome-small">{sortedOffseasonTrainingRows.length} players</span>
@@ -7065,9 +7424,14 @@ function TeamHomePageBody({
                               {sortedOffseasonTrainingRows.map((row, i) => (
                                 <tr key={`${row.name}-tr-${i}`}>
                                   <td>
-                                    <PlayerProfileName teamName={userTeam} playerName={row.name} as="span" />
+                                    <OffseasonReportPlayerName
+                                      saveState={saveState}
+                                      userTeam={userTeam}
+                                      playerName={row.name}
+                                      onOpen={setOffseasonReportPlayer}
+                                    />
                                   </td>
-                                  <td>{row.position ?? 'ΓÇö'}</td>
+                                  <td>{row.position ?? '—'}</td>
                                   <td>{row.before}</td>
                                   <td>{row.after}</td>
                                   <td>{row.delta >= 0 ? `+${row.delta}` : row.delta}</td>
@@ -7091,7 +7455,7 @@ function TeamHomePageBody({
                         >
                           <option value="position">Position</option>
                           <option value="overall">Overall (high to low)</option>
-                          <option value="name">Name (AΓÇôZ)</option>
+                          <option value="name">Name (A–Z)</option>
                         </select>
                       </div>
                     </div>
@@ -7117,12 +7481,12 @@ function TeamHomePageBody({
                                 <td>
                                   <PlayerProfileName teamName={userTeam} playerName={p?.name} as="span" />
                                 </td>
-                                <td>{p?.position ?? 'ΓÇö'}</td>
+                                <td>{p?.position ?? '—'}</td>
                                 <td>{formatPlayerYear(p?.year)}</td>
                                 <td>{computePlayerOverall(p)}</td>
-                                <td>{p?.potential ?? 'ΓÇö'}</td>
-                                <td>{p?.height != null ? `${p.height}` : 'ΓÇö'}</td>
-                                <td>{p?.weight != null ? `${p.weight}` : 'ΓÇö'}</td>
+                                <td>{p?.potential ?? '—'}</td>
+                                <td>{p?.height != null ? `${p.height}` : '—'}</td>
+                                <td>{p?.weight != null ? `${p.weight}` : '—'}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -7144,7 +7508,7 @@ function TeamHomePageBody({
                         ) : (
                           scheduleRows.map((r) => (
                             <li key={`wk-${r.week}`}>
-                              Week {r.week}: vs {r.opponent}
+                              Week {r.week}: {formatScheduleOpponentLabel(r.opponent, r.userHome)}
                               {r.isRegionGame ? (
                                 <span className="teamhome-region-mark" title="Region game">*</span>
                               ) : null}
@@ -7163,7 +7527,7 @@ function TeamHomePageBody({
                       </div>
                       <ul style={{ margin: '8px 0', paddingLeft: 20 }}>
                         {(saveState?.preseason_scrimmage_opponents ?? []).length === 0 ? (
-                          <li>ΓÇö</li>
+                          <li>—</li>
                         ) : (
                           (saveState.preseason_scrimmage_opponents as { opponent?: string; user_home?: boolean }[]).map(
                             (s, i) => (
@@ -7191,7 +7555,7 @@ function TeamHomePageBody({
               </div>
               <div className="teamhome-preseason-panelC">
                 <div className="teamhome-preseason-title">Season</div>
-                <div className="teamhome-preseason-sub">Year {saveState?.current_year ?? 'ΓÇö'}</div>
+                <div className="teamhome-preseason-sub">Year {saveState?.current_year ?? '—'}</div>
               </div>
             </div>
           </div>
@@ -7206,7 +7570,13 @@ function TeamHomePageBody({
             <div className="teamhome-card">
               <div className="teamhome-card-title">Game Actions</div>
               <div className="teamhome-small" style={{ marginBottom: 10 }}>
-                Week {currentWeek} · {hasUnplayedGameThisWeek ? `vs ${nextOpponent || '—'}` : 'No game this week'}
+                Week {currentWeek} ·{' '}
+                {hasUnplayedGameThisWeek
+                  ? formatScheduleOpponentLabel(
+                      nextOpponent || '—',
+                      scheduleRows.find((r) => r.week === currentWeek)?.userHome ?? true,
+                    )
+                  : 'No game this week'}
               </div>
               <div className="teamhome-actions-grid">
                 <button type="button" className="teamhome-action-btn" disabled>
@@ -7401,12 +7771,15 @@ function TeamHomePageBody({
                               <TeamLogo apiBase={apiBase} headers={headers} teamName={r.opponent} logoVersion={logoVersion} size={16} />
                             ) : null}
                             <span>
-                              {r.opponent}
+                              {formatScheduleOpponentLabel(r.opponent, r.userHome)}
                               {r.isRegionGame ? (
                                 <span className="teamhome-region-mark" title="Region game">*</span>
                               ) : null}
                             </span>
                           </div>
+                          {r.userHome && r.homeThemeLabel ? (
+                            <div className="teamhome-schedule-theme teamhome-small">{r.homeThemeLabel}</div>
+                          ) : null}
                         </div>
                         <div className="teamhome-small teamhome-schedule-mini-score">{r.played ? r.scoreLine : 'Scheduled'}</div>
                       </div>
@@ -7451,6 +7824,12 @@ function TeamHomePageBody({
         ) : renderTeamMenuPanel()}
       </div>
 
+      {offseasonPlayerReport ? (
+        <PlayerOffseasonReportModal
+          report={offseasonPlayerReport}
+          onClose={() => setOffseasonReportPlayer(null)}
+        />
+      ) : null}
     </div>
   )
 }

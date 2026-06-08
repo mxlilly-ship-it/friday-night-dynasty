@@ -7,6 +7,11 @@ Season results add/subtract TP; prestige changes only when crossing a band floor
 
 from typing import Any, Dict, List, Optional, Tuple
 
+from systems.league_history import (
+    team_had_postseason_bracket_appearance,
+    team_won_state_in_season_entry,
+)
+
 # Minimum TP to be at each prestige level (index 0 = prestige 1, index 14 = prestige 15).
 PRESTIGE_FLOORS: Tuple[float, ...] = (
     0.0,
@@ -177,6 +182,19 @@ def _coach_turnover_penalty(
     return max(-0.15, TP_COACH_TURNOVER_LEGENDARY_LOST * drop)
 
 
+def _team_was_runner_up_in_season(team_name: str, season_entry: Dict[str, Any]) -> bool:
+    if not team_name or not isinstance(season_entry, dict):
+        return False
+    if str(season_entry.get("runner_up") or "") == team_name:
+        return True
+    pbc = season_entry.get("playoffs_by_class")
+    if isinstance(pbc, dict):
+        for inner in pbc.values():
+            if isinstance(inner, dict) and str(inner.get("runner_up") or "") == team_name:
+                return True
+    return False
+
+
 def compute_team_points_delta(
     team_name: str,
     seasons: List[Dict[str, Any]],
@@ -194,8 +212,6 @@ def compute_team_points_delta(
 
     delta = 0.0
     standings_list = latest.get("standings") or []
-    champion = latest.get("state_champion") or ""
-    runner_up = latest.get("runner_up") or ""
     poy = latest.get("player_of_the_year")
     league_leaders = latest.get("league_leaders") or {}
 
@@ -209,12 +225,13 @@ def compute_team_points_delta(
 
     delta += wins * TP_PER_WIN + losses * TP_PER_LOSS
 
-    playoff_teams = _get_playoff_teams(standings_list, 8)
-    made_playoffs = team_name in playoff_teams
+    won_championship = team_won_state_in_season_entry(team_name, latest)
+    was_runner_up = _team_was_runner_up_in_season(team_name, latest)
+    made_playoffs = team_had_postseason_bracket_appearance(team_name, latest)
 
-    if team_name == champion:
+    if won_championship:
         delta += TP_CHAMPIONSHIP
-    elif team_name == runner_up:
+    elif was_runner_up:
         delta += TP_RUNNER_UP
     elif made_playoffs:
         delta += TP_PLAYOFF_APPEARANCE
@@ -232,8 +249,7 @@ def compute_team_points_delta(
         delta += TP_LOSING_SEASON
 
     def made_playoffs_pred(entry: Dict, name: str) -> bool:
-        playoff = _get_playoff_teams(entry.get("standings") or [], 8)
-        return name in playoff
+        return team_had_postseason_bracket_appearance(name, entry)
 
     years_since_playoff = _seasons_since_last(team_name, seasons, made_playoffs_pred)
     if years_since_playoff > TP_PLAYOFF_DROUGHT_THRESHOLD:
@@ -241,7 +257,7 @@ def compute_team_points_delta(
         delta += min(TP_PLAYOFF_DROUGHT_CAP, excess * TP_PLAYOFF_DROUGHT_PER_YEAR)
 
     def won_championship_pred(entry: Dict, name: str) -> bool:
-        return (entry.get("state_champion") or "") == name
+        return team_won_state_in_season_entry(name, entry)
 
     years_since_champ = _seasons_since_last(team_name, seasons, won_championship_pred)
     if years_since_champ > TP_CHAMPIONSHIP_DROUGHT_THRESHOLD:

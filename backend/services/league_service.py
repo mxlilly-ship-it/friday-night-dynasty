@@ -70,6 +70,16 @@ from systems.coach_career_log import (
     rebuild_coach_career_log_from_league_history,
 )
 from systems.prestige_system import migrate_state_team_points_fields, update_prestige
+from systems.program_development_system import (
+    apply_program_funding_for_season,
+    apply_user_program_actions,
+    build_inventory_view,
+    credit_equipment_pp_to_improvements_bank,
+    load_equipment_catalog,
+    prepare_program_development_stage,
+    program_development_summary_for_team,
+    run_ai_program_purchases,
+)
 from systems.development_system import (
     build_ai_winter_training_allocations,
     normalize_winter_training_allocations,
@@ -115,6 +125,8 @@ from systems.play_selection import (
     run_play_selection_for_team,
     run_play_selection_results_for_team,
     compute_learning_summary,
+    get_install_meter_meta,
+    normalize_game_plan_payload_for_storage,
     OFFENSIVE_CATEGORIES,
     DEFENSIVE_CATEGORIES,
 )
@@ -816,6 +828,40 @@ def _clear_offseason_transfer_ui_state(state: Dict[str, Any]) -> None:
         state.pop(k, None)
 
 
+def _transfers_disabled(state: Dict[str, Any]) -> bool:
+    return bool(state.get("transfers_disabled"))
+
+
+def _disabled_transfer_stage_1_payload() -> Dict[str, Any]:
+    return {
+        "disabled": True,
+        "entries": [],
+        "selected_count": 0,
+        "pool_pct": 0.0,
+        "eligible_count": 0,
+    }
+
+
+def _disabled_transfer_stage_2_payload() -> Dict[str, Any]:
+    return {
+        "disabled": True,
+        "entries": [],
+        "moved_count": 0,
+        "blocked_count": 0,
+    }
+
+
+def _apply_disabled_transfer_stage_2(state: Dict[str, Any]) -> None:
+    payload = _disabled_transfer_stage_2_payload()
+    state["offseason_transfer_stage_2"] = payload
+    state["offseason_transfer_review"] = {
+        "disabled": True,
+        "entries": [],
+        "moved_count": 0,
+        "blocked_count": 0,
+    }
+
+
 def _transfer_stage_1_apply_news(state: Dict[str, Any], payload: Dict[str, Any]) -> None:
     transfer_events: List[Dict[str, Any]] = []
     for i, row in enumerate(payload.get("entries") or []):
@@ -1058,8 +1104,51 @@ PRESEASON_STAGES: List[str] = [
     "Set Depth Chart",
     "Scrimmage 1",
     "Scrimmage 2",
+    "Home Game Themes",
     "Set Goals",
 ]
+
+
+def normalize_preseason_stages(state: Dict[str, Any]) -> bool:
+    """Insert new preseason stages into in-progress saves (by stage name)."""
+    phase = str(state.get("season_phase") or "").strip().lower()
+    if phase not in ("preseason", "regular"):
+        return False
+    canonical = list(PRESEASON_STAGES)
+    current = list(state.get("preseason_stages") or [])
+    if current == canonical:
+        return False
+    raw_idx = int(state.get("preseason_stage_index", 0))
+    if current:
+        idx = max(0, min(raw_idx, len(current) - 1))
+        old_stage = str(current[idx] or "").strip()
+    else:
+        old_stage = None
+    state["preseason_stages"] = canonical
+    if old_stage and old_stage in canonical:
+        state["preseason_stage_index"] = canonical.index(old_stage)
+    else:
+        state["preseason_stage_index"] = max(0, min(raw_idx, len(canonical) - 1))
+    return True
+
+
+def _apply_home_game_themes_from_playbook(
+    state: Dict[str, Any],
+    team_names: List[str],
+    user_team_name: Optional[str],
+    playbook: Dict[str, Any],
+) -> None:
+    from systems.home_game_themes import apply_user_home_game_themes, assign_ai_home_game_themes
+
+    ut = str(user_team_name or "").strip()
+    raw = playbook.get("home_game_themes")
+    if ut:
+        if isinstance(raw, list):
+            apply_user_home_game_themes(state, ut, raw)
+        elif bool(playbook.get("home_game_themes_ack")):
+            state["home_game_themes_user_confirmed"] = True
+    seed = int(state.get("current_year", 1) or 1) * 7919 + hash(ut) % 100_000
+    assign_ai_home_game_themes(state, team_names, ut or None, rng=random.Random(seed))
 
 
 def _apply_preseason_position_changes_stage(
@@ -1080,6 +1169,7 @@ def _apply_preseason_position_changes_stage(
 OFFSEASON_UI_STAGES: List[str] = [
     "Graduation",
     "Coach development",
+    "Program Development",
     "Winter 1",
     "Winter 2",
     "Spring Ball",
@@ -1106,6 +1196,8 @@ def _normalize_offseason_stage_name(raw: Any) -> str:
     compact = "".join(ch for ch in lowered if ch.isalnum())
     if compact in ("coachdevelopment", "coachingdevelopment"):
         return "Coach development"
+    if compact in ("programdevelopment", "programdev", "programbuilder"):
+        return "Program Development"
     if compact in ("coachingcarouseliv", "coachingcarousel4"):
         return "Coaching carousel IV"
     if compact in ("transfers", "transfer"):
@@ -1212,6 +1304,18 @@ def _pillars_at_program_floor(ff: int, fp: int, cf: int, cp: int, bf: int, bp: i
         and pillar_cumulative_pp_value(cf, cp) == 0
         and pillar_cumulative_pp_value(bf, bp) == 0
     )
+
+
+def _ensure_improvements_bank_equipment_pp(state: Dict[str, Any], ut: Optional[Team]) -> None:
+    """Credit annual PP from owned program equipment into the user Improvements bank."""
+    if ut is None:
+        return
+    bank = state.get("offseason_improvements_bank")
+    if not isinstance(bank, dict):
+        bank = {"pp_total": 0, "pp_remaining": 0, "breakdown": None, "applied": {}}
+        state["offseason_improvements_bank"] = bank
+    cy = int(state.get("current_year") or 0)
+    credit_equipment_pp_to_improvements_bank(bank, ut, current_year=cy)
 
 
 def _apply_user_team_program_improvements(ut: Team, bank: Dict[str, Any], body: Dict[str, Any]) -> None:
@@ -1347,11 +1451,15 @@ def _season_pp_awards_for_team(
 
 
 def _ensure_user_coach_and_firing_defaults(state: Dict[str, Any]) -> None:
-    """Backfill user_coach_name / allow_user_coach_firing for older league_save.json files."""
+    """Backfill user_coach_name / league option flags for older league_save.json files."""
     if "allow_user_coach_firing" not in state:
         state["allow_user_coach_firing"] = False
     else:
         state["allow_user_coach_firing"] = bool(state.get("allow_user_coach_firing"))
+    if "transfers_disabled" not in state:
+        state["transfers_disabled"] = False
+    else:
+        state["transfers_disabled"] = bool(state.get("transfers_disabled"))
     ucn = state.get("user_coach_name")
     if isinstance(ucn, str) and ucn.strip():
         state["user_coach_name"] = ucn.strip()
@@ -1493,6 +1601,55 @@ def _refresh_user_coach_unemployed_flag(state: Dict[str, Any]) -> None:
     state["user_coach_unemployed"] = True
 
 
+def _award_program_funding_for_all_teams(
+    teams: Dict[str, Any],
+    standings: Dict[str, Any],
+    *,
+    current_year: int,
+) -> None:
+    """Season-review funding deposit for every program."""
+    for name, team in teams.items():
+        st = standings.get(name) if isinstance(standings, dict) else None
+        if not isinstance(st, dict):
+            st = {}
+        wins = int(st.get("wins", getattr(team, "wins", 0) or 0) or 0)
+        losses = int(st.get("losses", getattr(team, "losses", 0) or 0) or 0)
+        apply_program_funding_for_season(team, wins=wins, losses=losses, current_year=current_year)
+
+
+def _ensure_program_development_inventory_aged(state: Dict[str, Any], teams: Dict[str, Any]) -> None:
+    cy = int(state.get("current_year", 1) or 1)
+    if int(state.get("program_development_prepared_year") or 0) == cy:
+        return
+    expired_rows: List[Dict[str, Any]] = []
+    for team in teams.values():
+        summary = prepare_program_development_stage(team)
+        for row in summary.get("expired") or []:
+            if isinstance(row, dict):
+                expired_rows.append(row)
+    state["program_development_prepared_year"] = cy
+    if expired_rows:
+        state["program_development_last_expired"] = expired_rows[-20:]
+
+
+def _apply_program_development_stage(
+    state: Dict[str, Any],
+    teams: Dict[str, Any],
+    body: Dict[str, Any],
+) -> None:
+    _ensure_program_development_inventory_aged(state, teams)
+    user_team_name = str(state.get("user_team") or "").strip()
+    cy = int(state.get("current_year", 1) or 1)
+    ut = teams.get(user_team_name) if user_team_name else None
+    raw_actions = body.get("program_development_actions")
+    if ut and isinstance(raw_actions, list) and raw_actions:
+        apply_user_program_actions(ut, raw_actions, current_year=cy)
+    for name, t in teams.items():
+        if name == user_team_name:
+            continue
+        run_ai_program_purchases(t, current_year=cy)
+
+
 def normalize_offseason_stages(state: Dict[str, Any]) -> bool:
     """
     Migrate in-memory offseason stage list/index when OFFSEASON_UI_STAGES grows (old saves on disk).
@@ -1610,6 +1767,8 @@ def _finalize_offseason_to_preseason(state: Dict[str, Any], teams: Dict[str, Any
     state.pop("offseason_coach_dev_banks", None)
     state.pop("offseason_spring_ball_results", None)
     state.pop("offseason_winter_training_results", None)
+    state.pop("offseason_winter_history", None)
+    state.pop("offseason_spring_history", None)
     state.pop("offseason_coach_carousel", None)
     state.pop("offseason_coach_carousel_last_events", None)
     state.pop("offseason_coach_carousel_hot_seat", None)
@@ -1916,6 +2075,7 @@ def advance_offseason(
         winter_results = state.get("offseason_winter_training_results")
         ack_winter = bool(body.get("winter_training_ack_results"))
         if isinstance(winter_results, dict) and str(winter_results.get("stage") or "") == current and ack_winter:
+            _archive_winter_training_session(state)
             state.pop("offseason_winter_training_results", None)
         elif isinstance(winter_results, dict) and str(winter_results.get("stage") or "") == current and not ack_winter:
             raise ValueError("Review Winter training results, then press Continue again to advance.")
@@ -1956,6 +2116,7 @@ def advance_offseason(
         spring_results = state.get("offseason_spring_ball_results")
         ack = bool(body.get("spring_ball_ack_results"))
         if isinstance(spring_results, dict) and ack:
+            _archive_spring_ball_session(state)
             state.pop("offseason_spring_ball_results", None)
             # Results acknowledged; allow normal stage advance.
         elif isinstance(spring_results, dict) and not ack:
@@ -1990,6 +2151,7 @@ def advance_offseason(
 
     elif current == "Improvements":
         if ut:
+            _ensure_improvements_bank_equipment_pp(state, ut)
             bank = state.get("offseason_improvements_bank")
             if not isinstance(bank, dict):
                 bank = {"pp_total": 0, "pp_remaining": 0, "breakdown": None, "applied": {}}
@@ -2022,6 +2184,9 @@ def advance_offseason(
                 state["offseason_coach_dev_bank"] = ub
         state["offseason_coach_dev_banks"] = banks_cd
 
+    elif current == "Program Development":
+        _apply_program_development_stage(state, teams, body)
+
     elif current in ("Coaching carousel I", "Coaching carousel II", "Coaching carousel III"):
         lh = load_league_history(league_history_path(save_dir))
         _apply_coaching_carousel_stage(state, teams, lh, current, body)
@@ -2042,24 +2207,27 @@ def advance_offseason(
         elif isinstance(stage1_existing, dict) and stage1_existing.get("entries") is not None:
             pass
         else:
-            tph, tbr = _transfer_playoff_snapshot(state)
-            sg_tr = state.get("season_goals") if isinstance(state.get("season_goals"), dict) else None
-            payload = run_transfer_stage_1(
-                teams,
-                st_xfer,
-                current_year=max(1, int(state.get("current_year", 1))),
-                season_goals=sg_tr,
-                user_team=str(state.get("user_team") or "") or None,
-                bracket_results=tbr,
-                champion=tph,
-            )
-            state["offseason_transfer_stage_1"] = payload
-            _transfer_stage_1_apply_news(state, payload)
-            state["offseason_transfer_stage_1_pending_review"] = True
-            state["offseason_stage_index"] = idx
-            state["teams"] = [team_to_dict(t) for t in teams.values()]
-            save_state(user_id, save_id, state, save_dir)
-            return _attach_league_history_to_result(save_dir, {"state": state})
+            if _transfers_disabled(state):
+                state["offseason_transfer_stage_1"] = _disabled_transfer_stage_1_payload()
+            else:
+                tph, tbr = _transfer_playoff_snapshot(state)
+                sg_tr = state.get("season_goals") if isinstance(state.get("season_goals"), dict) else None
+                payload = run_transfer_stage_1(
+                    teams,
+                    st_xfer,
+                    current_year=max(1, int(state.get("current_year", 1))),
+                    season_goals=sg_tr,
+                    user_team=str(state.get("user_team") or "") or None,
+                    bracket_results=tbr,
+                    champion=tph,
+                )
+                state["offseason_transfer_stage_1"] = payload
+                _transfer_stage_1_apply_news(state, payload)
+                state["offseason_transfer_stage_1_pending_review"] = True
+                state["offseason_stage_index"] = idx
+                state["teams"] = [team_to_dict(t) for t in teams.values()]
+                save_state(user_id, save_id, state, save_dir)
+                return _attach_league_history_to_result(save_dir, {"state": state})
     elif current == "Transfers II":
         pending = bool(state.get("offseason_transfer_stage_2_pending_review"))
         ack = bool(body.get("transfer_stage_2_ack_results"))
@@ -2075,19 +2243,22 @@ def advance_offseason(
         ):
             pass
         else:
-            stage1 = state.get("offseason_transfer_stage_1") if isinstance(state.get("offseason_transfer_stage_1"), dict) else {}
-            payload = run_transfer_stage_2(
-                teams,
-                st_xfer,
-                stage1,
-                current_year=max(1, int(state.get("current_year", 1))),
-            )
-            _transfer_stage_2_apply_news_and_review(state, payload)
-            state["offseason_transfer_stage_2_pending_review"] = True
-            state["offseason_stage_index"] = idx
-            state["teams"] = [team_to_dict(t) for t in teams.values()]
-            save_state(user_id, save_id, state, save_dir)
-            return _attach_league_history_to_result(save_dir, {"state": state})
+            if _transfers_disabled(state):
+                _apply_disabled_transfer_stage_2(state)
+            else:
+                stage1 = state.get("offseason_transfer_stage_1") if isinstance(state.get("offseason_transfer_stage_1"), dict) else {}
+                payload = run_transfer_stage_2(
+                    teams,
+                    st_xfer,
+                    stage1,
+                    current_year=max(1, int(state.get("current_year", 1))),
+                )
+                _transfer_stage_2_apply_news_and_review(state, payload)
+                state["offseason_transfer_stage_2_pending_review"] = True
+                state["offseason_stage_index"] = idx
+                state["teams"] = [team_to_dict(t) for t in teams.values()]
+                save_state(user_id, save_id, state, save_dir)
+                return _attach_league_history_to_result(save_dir, {"state": state})
     elif current in ("Transfers III", "7 on 7", "Graduation"):
         pass
 
@@ -2103,24 +2274,29 @@ def advance_offseason(
                         "before": calculate_player_overall(p),
                     }
                 )
+        user_equipment_training: Optional[Dict[str, Any]] = None
         for t in teams.values():
-            run_offseason_development(t)
+            dev_summary = run_offseason_development(t)
+            if ut and t.name == ut.name:
+                user_equipment_training = dev_summary
         deltas: List[Dict[str, Any]] = []
         if ut:
-            after_roster = list(ut.roster)
-            for i, p in enumerate(after_roster):
-                b = int(before_rows[i]["before"]) if i < len(before_rows) else calculate_player_overall(p)
-                a = calculate_player_overall(p)
-                deltas.append(
-                    {
-                        "name": p.name,
-                        "position": p.position or (before_rows[i].get("position") if i < len(before_rows) else None),
-                        "before": b,
-                        "after": a,
-                        "delta": a - b,
-                    }
-                )
-        state["offseason_training_results"] = {"players": deltas}
+            deltas = _training_player_rows_from_development(
+                ut,
+                before_rows,
+                (user_equipment_training or {}).get("player_reports") if isinstance(user_equipment_training, dict) else None,
+            )
+        training_payload: Dict[str, Any] = {"players": deltas}
+        if user_equipment_training:
+            from systems.program_equipment_effects import summarize_equipment_for_training_ui
+
+            training_payload["equipment"] = {
+                "by_item": user_equipment_training.get("by_item") or [],
+                "item_count": int(user_equipment_training.get("item_count") or 0),
+                "equipment_points_applied": int(user_equipment_training.get("equipment_points_applied") or 0),
+                "ui_rows": summarize_equipment_for_training_ui(user_equipment_training),
+            }
+        state["offseason_training_results"] = training_payload
 
     elif current == "Freshman Class":
         pass
@@ -2134,6 +2310,11 @@ def advance_offseason(
         _apply_coaching_carousel_churn(state, teams, lh)
 
     state["offseason_stage_index"] = idx + 1
+    new_idx = int(state["offseason_stage_index"])
+    if new_idx < len(stages) and _normalize_offseason_stage_name(stages[new_idx]) == "Program Development":
+        _ensure_program_development_inventory_aged(state, teams)
+    if new_idx < len(stages) and _normalize_offseason_stage_name(stages[new_idx]) == "Improvements":
+        _ensure_improvements_bank_equipment_pp(state, ut)
     if current == "Spring Ball":
         state.pop("offseason_spring_ball_results", None)
     if current in ("Winter 1", "Winter 2"):
@@ -2417,6 +2598,7 @@ def create_save(
     start_year: Optional[int] = None,
     teams_data: Optional[Dict[str, Any]] = None,
     allow_user_coach_firing: bool = False,
+    transfers_disabled: bool = False,
 ) -> Dict[str, Any]:
     provided_rows = None
     league_cfg: Dict[str, Any] = {}
@@ -2486,6 +2668,7 @@ def create_save(
         user_team=user_team,
         user_coach_name=user_coach_name,
         allow_user_coach_firing=bool(allow_user_coach_firing),
+        transfers_disabled=bool(transfers_disabled),
         current_week=1,
         season_phase="regular",
         weeks=weeks,
@@ -2764,6 +2947,8 @@ def get_save(user_id: str, save_id: str) -> Dict[str, Any]:
     _migrate_save_dir_if_changed(user_id, save_id, save_dir, stored_dir)
 
     if normalize_offseason_stages(state):
+        save_state(user_id, save_id, state, save_dir)
+    if normalize_preseason_stages(state):
         save_state(user_id, save_id, state, save_dir)
 
     if str(state.get("season_phase") or "").strip().lower() == "playoffs":
@@ -3114,6 +3299,7 @@ def load_state(user_id: str, save_id: str) -> Tuple[Dict[str, Any], str]:
     _repair_user_team_from_serialized_teams(state)
     _refresh_user_coach_unemployed_flag(state)
     normalize_offseason_stages(state)
+    normalize_preseason_stages(state)
     ensure_league_structure_in_state(state)
     # Migration: legacy saves predate the playoff_system field. Stamp the
     # default (WV) so callers can always read a valid id from state.
@@ -3192,6 +3378,77 @@ def save_state(user_id: str, save_id: str, state: Dict[str, Any], save_dir: str)
         conn.execute("UPDATE saves SET updated_at=? WHERE id=? AND user_id=?", (now, save_id, user_id))
 
 
+def _archive_winter_training_session(state: Dict[str, Any]) -> None:
+    """Keep Winter 1/2 player rows after user acknowledges results (Option 5 report)."""
+    wr = state.get("offseason_winter_training_results")
+    if not isinstance(wr, dict):
+        return
+    utr = wr.get("user_team_result")
+    if not isinstance(utr, dict):
+        return
+    hist = state.get("offseason_winter_history")
+    if not isinstance(hist, list):
+        hist = []
+    hist.append({"stage": str(wr.get("stage") or ""), "user_team_result": utr})
+    state["offseason_winter_history"] = hist
+
+
+def _archive_spring_ball_session(state: Dict[str, Any]) -> None:
+    sr = state.get("offseason_spring_ball_results")
+    if not isinstance(sr, dict):
+        return
+    utr = sr.get("user_team_result")
+    if isinstance(utr, dict):
+        state["offseason_spring_history"] = utr
+
+
+def _training_player_rows_from_development(
+    ut: Any,
+    before_rows: List[Dict[str, Any]],
+    player_reports: Optional[List[Dict[str, Any]]],
+) -> List[Dict[str, Any]]:
+    """Merge OVR snapshots with per-attribute training payload for the user team."""
+    from systems.team_ratings import calculate_player_overall
+
+    report_by_name: Dict[str, Dict[str, Any]] = {}
+    for rep in player_reports or []:
+        if isinstance(rep, dict) and rep.get("name"):
+            report_by_name[str(rep["name"])] = rep
+
+    out: List[Dict[str, Any]] = []
+    after_roster = list(getattr(ut, "roster", []) or [])
+    for i, p in enumerate(after_roster):
+        name = getattr(p, "name", None) or (before_rows[i].get("name") if i < len(before_rows) else None)
+        if not name:
+            continue
+        rep = report_by_name.get(str(name))
+        if rep:
+            out.append(
+                {
+                    "name": str(name),
+                    "position": rep.get("position") or getattr(p, "position", None),
+                    "before": int(rep.get("before", 0)),
+                    "after": int(rep.get("after", 0)),
+                    "delta": int(rep.get("delta", 0)),
+                    "attributes": rep.get("attributes") if isinstance(rep.get("attributes"), dict) else {},
+                }
+            )
+            continue
+        b = int(before_rows[i]["before"]) if i < len(before_rows) else int(calculate_player_overall(p))
+        a = int(calculate_player_overall(p))
+        out.append(
+            {
+                "name": str(name),
+                "position": getattr(p, "position", None) or (before_rows[i].get("position") if i < len(before_rows) else None),
+                "before": b,
+                "after": a,
+                "delta": a - b,
+                "attributes": {},
+            }
+        )
+    return out
+
+
 def _pct_map_from_season_selection(entries: Any) -> Dict[str, float]:
     """Parse season_*_play_selection category list into play_id -> pct."""
     m: Dict[str, float] = {}
@@ -3209,18 +3466,29 @@ def _pct_map_from_season_selection(entries: Any) -> Dict[str, float]:
 
 
 def _normalize_category_pcts(rows: List[Dict[str, Any]]) -> None:
-    """In-place: scale rows so pcts sum to ~100 when off; equal split if all zero."""
+    """In-place: scale active (non-zero) rows to ~100%; leave 0% plays at 0."""
     if not rows:
         return
-    total = sum(float(r.get("pct", 0) or 0) for r in rows)
-    if total < 99.5 or total > 100.5:
-        if total <= 0:
-            eq = 100.0 / len(rows)
-            for r in rows:
-                r["pct"] = eq
-        else:
-            for r in rows:
-                r["pct"] = (float(r.get("pct", 0) or 0) / total) * 100.0
+    active_threshold = 0.01
+    active = [r for r in rows if float(r.get("pct", 0) or 0) > active_threshold]
+    if not active:
+        return
+    total = sum(float(r.get("pct", 0) or 0) for r in active)
+    if 99.5 <= total <= 100.5:
+        for r in rows:
+            if float(r.get("pct", 0) or 0) <= active_threshold:
+                r["pct"] = 0.0
+        return
+    if total <= 0:
+        eq = 100.0 / len(active)
+        for r in active:
+            r["pct"] = eq
+    else:
+        for r in active:
+            r["pct"] = (float(r.get("pct", 0) or 0) / total) * 100.0
+    for r in rows:
+        if float(r.get("pct", 0) or 0) <= active_threshold and r not in active:
+            r["pct"] = 0.0
 
 
 def _merge_offensive_playbook_for_display(pb: Any, off_sel: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
@@ -3305,9 +3573,11 @@ def get_play_selection_from_state(state: Dict[str, Any]) -> Dict[str, Any]:
     off_sel = getattr(team, "season_offensive_play_selection", None) or {}
     def_sel = getattr(team, "season_defensive_play_selection", None) or {}
 
+    meta = get_install_meter_meta(team)
     out: Dict[str, Any] = {
         "offensive": _merge_offensive_playbook_for_display(pb, off_sel),
         "defensive": _merge_defensive_playbook_for_display(pb, def_sel),
+        "install_meta": meta,
     }
     if state_changed:
         out["state"] = state
@@ -4611,8 +4881,9 @@ def advance_preseason_state(state: Dict[str, Any], playbook: Optional[Dict[str, 
                         if abs(total - 100.0) > 0.01:
                             label = cat_display.get(cat_name, cat_name)
                             raise ValueError(f"Defensive category '{label}' must total 100% (got {total:.1f}%)")
-                ut.season_offensive_play_selection = {k: [(e["play_id"], float(e["pct"])) for e in v] for k, v in off_sel.items() if v}
-                ut.season_defensive_play_selection = {k: [(e["play_id"], float(e["pct"])) for e in v] for k, v in def_sel.items() if v}
+                off_stored, def_stored = normalize_game_plan_payload_for_storage(off_sel, def_sel)
+                ut.season_offensive_play_selection = off_stored
+                ut.season_defensive_play_selection = def_stored
             else:
                 if not getattr(ut, "season_offensive_play_selection", None):
                     try:
@@ -4636,7 +4907,14 @@ def advance_preseason_state(state: Dict[str, Any], playbook: Optional[Dict[str, 
                 ut = teams[user_team_name]
                 ut.depth_chart_order = {k: [str(n) for n in v] if isinstance(v, list) else [] for k, v in depth_chart.items() if isinstance(k, str) and k.strip()}
     elif current_stage == "Set Goals":
-        STAGE_GOALS = ["Winning Season", "Playoffs", "Semifinal", "State Championship", "Title Winner"]
+        STAGE_GOALS = [
+            "Just to have fun",
+            "Winning Season",
+            "Playoffs",
+            "Semifinal",
+            "State Championship",
+            "Title Winner",
+        ]
         goals = playbook.get("goals") if isinstance(playbook, dict) else None
         if goals and isinstance(goals, dict):
             win_goal = goals.get("win_goal")
@@ -4653,6 +4931,16 @@ def advance_preseason_state(state: Dict[str, Any], playbook: Optional[Dict[str, 
             state["season_goals"] = state.get("season_goals") or {"win_goal": 6, "stage_goal": "Winning Season"}
     elif current_stage in ("Scrimmage 1", "Scrimmage 2"):
         _apply_preseason_scrimmage_stage(state, teams, team_names, current_stage)
+    elif current_stage == "Home Game Themes":
+        _apply_home_game_themes_from_playbook(
+            state,
+            team_names,
+            user_team_name,
+            playbook if isinstance(playbook, dict) else {},
+        )
+        if not bool((playbook or {}).get("home_game_themes_ack")):
+            state["teams"] = [team_to_dict(t) for t in teams.values()]
+            return {"state": state, "phase_completed": None}
     # --- End: core stage effects ---
 
     state["teams"] = [team_to_dict(t) for t in teams.values()]
@@ -4700,6 +4988,7 @@ def advance_offseason_state(
         winter_results = state.get("offseason_winter_training_results")
         ack_winter = bool(body.get("winter_training_ack_results"))
         if isinstance(winter_results, dict) and str(winter_results.get("stage") or "") == current and ack_winter:
+            _archive_winter_training_session(state)
             state.pop("offseason_winter_training_results", None)
         elif isinstance(winter_results, dict) and str(winter_results.get("stage") or "") == current and not ack_winter:
             raise ValueError("Review Winter training results, then press Continue again to advance.")
@@ -4737,6 +5026,7 @@ def advance_offseason_state(
         spring_results = state.get("offseason_spring_ball_results")
         ack = bool(body.get("spring_ball_ack_results"))
         if isinstance(spring_results, dict) and ack:
+            _archive_spring_ball_session(state)
             state.pop("offseason_spring_ball_results", None)
         elif isinstance(spring_results, dict) and not ack:
             raise ValueError("Review Spring Ball results, then press Continue again to advance.")
@@ -4767,6 +5057,8 @@ def advance_offseason_state(
             return state
     elif current == "Improvements":
         # Reuse the same logic as advance_offseason (Improvements case)
+        if ut:
+            _ensure_improvements_bank_equipment_pp(state, ut)
         bank = state.get("offseason_improvements_bank")
         if not isinstance(bank, dict):
             bank = {"pp_total": 0, "pp_remaining": 0, "breakdown": None, "applied": {}}
@@ -4803,6 +5095,8 @@ def advance_offseason_state(
             if isinstance(ub, dict):
                 state["offseason_coach_dev_bank"] = ub
         state["offseason_coach_dev_banks"] = banks_cd
+    elif current == "Program Development":
+        _apply_program_development_stage(state, teams, body)
     elif current == "Transfers I":
         pending = bool(state.get("offseason_transfer_stage_1_pending_review"))
         ack = bool(body.get("transfer_stage_1_ack_results"))
@@ -4816,23 +5110,26 @@ def advance_offseason_state(
         elif isinstance(stage1_existing, dict) and stage1_existing.get("entries") is not None:
             pass
         else:
-            tph, tbr = _transfer_playoff_snapshot(state)
-            sg_tr = state.get("season_goals") if isinstance(state.get("season_goals"), dict) else None
-            payload = run_transfer_stage_1(
-                teams,
-                st_xfer,
-                current_year=max(1, int(state.get("current_year", 1))),
-                season_goals=sg_tr,
-                user_team=str(state.get("user_team") or "") or None,
-                bracket_results=tbr,
-                champion=tph,
-            )
-            state["offseason_transfer_stage_1"] = payload
-            _transfer_stage_1_apply_news(state, payload)
-            state["offseason_transfer_stage_1_pending_review"] = True
-            state["offseason_stage_index"] = idx
-            state["teams"] = [team_to_dict(t) for t in teams.values()]
-            return state
+            if _transfers_disabled(state):
+                state["offseason_transfer_stage_1"] = _disabled_transfer_stage_1_payload()
+            else:
+                tph, tbr = _transfer_playoff_snapshot(state)
+                sg_tr = state.get("season_goals") if isinstance(state.get("season_goals"), dict) else None
+                payload = run_transfer_stage_1(
+                    teams,
+                    st_xfer,
+                    current_year=max(1, int(state.get("current_year", 1))),
+                    season_goals=sg_tr,
+                    user_team=str(state.get("user_team") or "") or None,
+                    bracket_results=tbr,
+                    champion=tph,
+                )
+                state["offseason_transfer_stage_1"] = payload
+                _transfer_stage_1_apply_news(state, payload)
+                state["offseason_transfer_stage_1_pending_review"] = True
+                state["offseason_stage_index"] = idx
+                state["teams"] = [team_to_dict(t) for t in teams.values()]
+                return state
     elif current == "Transfers II":
         pending = bool(state.get("offseason_transfer_stage_2_pending_review"))
         ack = bool(body.get("transfer_stage_2_ack_results"))
@@ -4848,18 +5145,21 @@ def advance_offseason_state(
         ):
             pass
         else:
-            stage1 = state.get("offseason_transfer_stage_1") if isinstance(state.get("offseason_transfer_stage_1"), dict) else {}
-            payload = run_transfer_stage_2(
-                teams,
-                st_xfer,
-                stage1,
-                current_year=max(1, int(state.get("current_year", 1))),
-            )
-            _transfer_stage_2_apply_news_and_review(state, payload)
-            state["offseason_transfer_stage_2_pending_review"] = True
-            state["offseason_stage_index"] = idx
-            state["teams"] = [team_to_dict(t) for t in teams.values()]
-            return state
+            if _transfers_disabled(state):
+                _apply_disabled_transfer_stage_2(state)
+            else:
+                stage1 = state.get("offseason_transfer_stage_1") if isinstance(state.get("offseason_transfer_stage_1"), dict) else {}
+                payload = run_transfer_stage_2(
+                    teams,
+                    st_xfer,
+                    stage1,
+                    current_year=max(1, int(state.get("current_year", 1))),
+                )
+                _transfer_stage_2_apply_news_and_review(state, payload)
+                state["offseason_transfer_stage_2_pending_review"] = True
+                state["offseason_stage_index"] = idx
+                state["teams"] = [team_to_dict(t) for t in teams.values()]
+                return state
     elif current in ("Transfers III", "7 on 7", "Graduation", "Freshman Class", "Schedule Release"):
         pass
     elif current == "Training Results":
@@ -4867,30 +5167,40 @@ def advance_offseason_state(
         if ut:
             for p in list(ut.roster):
                 before_rows.append({"name": p.name, "position": p.position, "before": calculate_player_overall(p)})
+        user_equipment_training: Optional[Dict[str, Any]] = None
         for t in teams.values():
-            run_offseason_development(t)
+            dev_summary = run_offseason_development(t)
+            if ut and t.name == ut.name:
+                user_equipment_training = dev_summary
         deltas: List[Dict[str, Any]] = []
         if ut:
-            after_roster = list(ut.roster)
-            for i, p in enumerate(after_roster):
-                b = int(before_rows[i]["before"]) if i < len(before_rows) else calculate_player_overall(p)
-                a = calculate_player_overall(p)
-                deltas.append(
-                    {
-                        "name": p.name,
-                        "position": p.position or (before_rows[i].get("position") if i < len(before_rows) else None),
-                        "before": b,
-                        "after": a,
-                        "delta": a - b,
-                    }
-                )
-        state["offseason_training_results"] = {"players": deltas}
+            deltas = _training_player_rows_from_development(
+                ut,
+                before_rows,
+                (user_equipment_training or {}).get("player_reports") if isinstance(user_equipment_training, dict) else None,
+            )
+        training_payload: Dict[str, Any] = {"players": deltas}
+        if user_equipment_training:
+            from systems.program_equipment_effects import summarize_equipment_for_training_ui
+
+            training_payload["equipment"] = {
+                "by_item": user_equipment_training.get("by_item") or [],
+                "item_count": int(user_equipment_training.get("item_count") or 0),
+                "equipment_points_applied": int(user_equipment_training.get("equipment_points_applied") or 0),
+                "ui_rows": summarize_equipment_for_training_ui(user_equipment_training),
+            }
+        state["offseason_training_results"] = training_payload
 
     if current == "Improvements":
         lh = league_history if isinstance(league_history, dict) else {"seasons": []}
         _apply_coaching_carousel_churn(state, teams, lh)
 
     state["offseason_stage_index"] = idx + 1
+    new_idx = int(state["offseason_stage_index"])
+    if new_idx < len(stages) and _normalize_offseason_stage_name(stages[new_idx]) == "Program Development":
+        _ensure_program_development_inventory_aged(state, teams)
+    if new_idx < len(stages) and _normalize_offseason_stage_name(stages[new_idx]) == "Improvements":
+        _ensure_improvements_bank_equipment_pp(state, ut)
     if current == "Spring Ball":
         state.pop("offseason_spring_ball_results", None)
     if current in ("Winter 1", "Winter 2"):
@@ -5172,6 +5482,13 @@ def finish_season_state(
         standings=standings,
     )
     update_prestige(teams, league_history)
+    if int(state.get("program_funding_awarded_year") or 0) != int(year_num):
+        _award_program_funding_for_all_teams(teams, standings, current_year=int(year_num))
+        state["program_funding_awarded_year"] = int(year_num)
+
+    from systems.home_game_themes import compute_league_home_theme_summaries
+
+    state["home_theme_season_rewards"] = compute_league_home_theme_summaries(state, team_names)
 
     if not bulk_autopilot:
         state["season_phase"] = "season_summary"
@@ -5272,17 +5589,10 @@ def advance_preseason(user_id: str, save_id: str, playbook: Optional[Dict[str, A
                             raise ValueError(
                                 f"Defensive category '{label}' must total 100% (got {total:.1f}%)"
                             )
-                # Convert to team format: { "INSIDE_RUN": [(play_id, pct), ...], ... }
-                ut.season_offensive_play_selection = {
-                    k: [(e["play_id"], float(e["pct"])) for e in v]
-                    for k, v in off_sel.items()
-                    if v
-                }
-                ut.season_defensive_play_selection = {
-                    k: [(e["play_id"], float(e["pct"])) for e in v]
-                    for k, v in def_sel.items()
-                    if v
-                }
+                # Convert to team format: { "INSIDE_RUN": [(play_id, pct), ...], ... } — active plays only.
+                off_stored, def_stored = normalize_game_plan_payload_for_storage(off_sel, def_sel)
+                ut.season_offensive_play_selection = off_stored
+                ut.season_defensive_play_selection = def_stored
                 state["teams"] = [team_to_dict(t) for t in teams.values()]
             else:
                 # First time entering: run auto-selection if not yet populated.
@@ -5321,7 +5631,14 @@ def advance_preseason(user_id: str, save_id: str, playbook: Optional[Dict[str, A
                 }
                 state["teams"] = [team_to_dict(t) for t in teams.values()]
     elif current_stage == "Set Goals":
-        STAGE_GOALS = ["Winning Season", "Playoffs", "Semifinal", "State Championship", "Title Winner"]
+        STAGE_GOALS = [
+            "Just to have fun",
+            "Winning Season",
+            "Playoffs",
+            "Semifinal",
+            "State Championship",
+            "Title Winner",
+        ]
         goals = playbook.get("goals") if isinstance(playbook, dict) else None
         if goals and isinstance(goals, dict):
             win_goal = goals.get("win_goal")
@@ -5344,6 +5661,17 @@ def advance_preseason(user_id: str, save_id: str, playbook: Optional[Dict[str, A
             }
     elif current_stage in ("Scrimmage 1", "Scrimmage 2"):
         _apply_preseason_scrimmage_stage(state, teams, team_names, current_stage)
+    elif current_stage == "Home Game Themes":
+        _apply_home_game_themes_from_playbook(
+            state,
+            team_names,
+            user_team_name,
+            playbook if isinstance(playbook, dict) else {},
+        )
+        if not bool((playbook or {}).get("home_game_themes_ack")):
+            state["teams"] = [team_to_dict(t) for t in teams.values()]
+            save_state(user_id, save_id, state, save_dir)
+            return {"state": state, "phase_completed": None}
 
     state["preseason_stage_index"] = idx + 1
     if state["preseason_stage_index"] >= len(stages):
@@ -6411,8 +6739,20 @@ def _finish_season_apply_offseason_transition(
     state["offseason_graduation_report"] = graduation_report
     state["offseason_training_results"] = None
     state["offseason_winter_training_results"] = None
+    state["offseason_winter_history"] = []
+    state["offseason_spring_history"] = None
     user_team_name = str(state.get("user_team") or "")
     sg_fin = state.get("season_goals") if isinstance(state.get("season_goals"), dict) else None
+    from systems.home_game_themes import apply_home_theme_cash_rewards, compute_league_home_theme_summaries
+
+    theme_rewards = state.get("home_theme_season_rewards")
+    if not isinstance(theme_rewards, dict):
+        theme_rewards = compute_league_home_theme_summaries(state, team_names)
+        state["home_theme_season_rewards"] = theme_rewards
+    apply_home_theme_cash_rewards(teams, theme_rewards)
+    user_theme_pp = 0
+    if user_team_name and isinstance(theme_rewards.get(user_team_name), dict):
+        user_theme_pp = int(theme_rewards[user_team_name].get("pp_total") or 0)
     if user_team_name:
         try:
             breakdown = _season_pp_awards_for_team(
@@ -6431,6 +6771,13 @@ def _finish_season_apply_offseason_transition(
     else:
         breakdown = None
         pp_total = 0
+    if user_theme_pp:
+        pp_total = int(pp_total) + int(user_theme_pp)
+        if isinstance(breakdown, dict):
+            breakdown = dict(breakdown)
+            breakdown["home_theme_pp"] = int(user_theme_pp)
+            breakdown["home_theme_games"] = (theme_rewards.get(user_team_name) or {}).get("games") if user_team_name else []
+            breakdown["pp_total"] = int(pp_total)
     try:
         cd_banks = build_offseason_coach_dev_banks_for_league(
             team_names,
@@ -6470,6 +6817,9 @@ def _finish_season_apply_offseason_transition(
     state["preseason_scrimmages"] = []
     state["preseason_scrimmage_opponents"] = []
     state["season_goals"] = state.get("season_goals") or []
+    state.pop("home_game_themes", None)
+    state.pop("home_game_themes_user_confirmed", None)
+    state.pop("home_theme_season_rewards", None)
     ensure_league_structure_in_state(state)
     wk, wr = _regular_season_week_boards(teams, state)
     state["weeks"] = wk
@@ -6789,6 +7139,9 @@ def finish_season(
     league_history = load_league_history(league_history_path(save_dir))
     update_prestige(teams, league_history)
     state["prestige_applied_for_year"] = year_num
+    if int(state.get("program_funding_awarded_year") or 0) != int(year_num):
+        _award_program_funding_for_all_teams(teams, standings, current_year=int(year_num))
+        state["program_funding_awarded_year"] = int(year_num)
 
     if not bulk_autopilot:
         state["season_phase"] = "season_summary"
@@ -7100,6 +7453,8 @@ def _bulk_cpu_offseason_advance_body(state: Dict[str, Any]) -> Dict[str, Any]:
         }
         ut_name = state.get("user_team")
         ut_team = teams_m.get(str(ut_name or "").strip())
+        if ut_team is not None:
+            _ensure_improvements_bank_equipment_pp(state, ut_team)
         bank = (
             state.get("offseason_improvements_bank")
             if isinstance(state.get("offseason_improvements_bank"), dict)

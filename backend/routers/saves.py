@@ -108,9 +108,17 @@ class CreateSaveRequest(BaseModel):
     start_year: Optional[int] = None
     teams_data: Optional[Dict[str, Any]] = None
     allow_user_coach_firing: bool = False
+    transfers_disabled: bool = False
 
 
-STAGE_GOAL_OPTIONS = ["Winning Season", "Playoffs", "Semifinal", "State Championship", "Title Winner"]
+STAGE_GOAL_OPTIONS = [
+    "Just to have fun",
+    "Winning Season",
+    "Playoffs",
+    "Semifinal",
+    "State Championship",
+    "Title Winner",
+]
 
 
 class AdvancePreseasonBody(BaseModel):
@@ -121,6 +129,8 @@ class AdvancePreseasonBody(BaseModel):
     depth_chart: Optional[Dict[str, List[str]]] = None  # position -> [player names in order]
     position_changes: Optional[List[Dict[str, Any]]] = None  # [{ player_name, position, secondary_position? }]
     goals: Optional[Dict[str, Any]] = None  # { win_goal: int, stage_goal: str }
+    home_game_themes: Optional[List[Dict[str, Any]]] = None  # [{ week, game_index, theme_id, reward_choice? }]
+    home_game_themes_ack: Optional[bool] = None  # advance after confirm
 
 
 class AdvanceOffseasonBody(BaseModel):
@@ -148,6 +158,7 @@ class AdvanceOffseasonBody(BaseModel):
     # Transfer portal: second Continue on Transfers I / II after reviewing results.
     transfer_stage_1_ack_results: Optional[bool] = None
     transfer_stage_2_ack_results: Optional[bool] = None
+    program_development_actions: Optional[List[Dict[str, Any]]] = None
 
 
 class StartCoachGameBody(BaseModel):
@@ -181,6 +192,7 @@ def create_save_route(body: CreateSaveRequest, user=Depends(require_user)):
             start_year=body.start_year,
             teams_data=body.teams_data,
             allow_user_coach_firing=body.allow_user_coach_firing,
+            transfers_disabled=body.transfers_disabled,
         )
     except Exception as e:
         msg = str(e)
@@ -197,6 +209,15 @@ def create_save_route(body: CreateSaveRequest, user=Depends(require_user)):
 def list_teams_meta_route(user=Depends(require_user)):
     teams = load_teams_from_json()
     return [{"name": t.get("name", ""), "prestige": t.get("prestige", 5), "classification": t.get("classification")} for t in teams if t.get("name")]
+
+
+@router.get("/meta/program-equipment", response_model=Dict[str, Any])
+def program_equipment_catalog_route():
+    """Equipment catalog for Program Development shop UI."""
+    from systems.program_development_system import load_equipment_catalog
+
+    cat = load_equipment_catalog()
+    return {k: v for k, v in cat.items() if not str(k).startswith("_")}
 
 
 @router.get("/meta/teams-data", response_model=Dict[str, Any])

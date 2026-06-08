@@ -67,7 +67,9 @@ export function evaluateSeasonGoals(
 
   const achievedRank = TIER_RANK[postseasonTier] ?? 0
   let stageMet: boolean | null = null
-  if (stageGoal) {
+  if (stageGoal === 'Just to have fun') {
+    stageMet = true
+  } else if (stageGoal) {
     let goalRank: number | null = null
     if (stageGoal === 'Winning Season') goalRank = wins >= losses ? 0 : 999
     else if (stageGoal === 'Playoffs') goalRank = 1

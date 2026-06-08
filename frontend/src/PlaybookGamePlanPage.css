@@ -129,8 +129,125 @@
 .playbook-gp-panel-head {
   display: flex;
   align-items: center;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 10px 16px;
   padding: 12px 18px;
+}
+
+.playbook-gp-install-meter {
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 16px 24px 0;
+  box-sizing: border-box;
+}
+
+.playbook-gp-install-meter-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 16px 24px;
+  padding: 16px 18px;
+  border: 2px solid rgba(220, 224, 234, 0.35);
+  background: rgba(37, 38, 45, 0.95);
+  border-radius: 2px;
+}
+
+.playbook-gp-install-grade {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 140px;
+}
+
+.playbook-gp-install-grade-label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(238, 241, 248, 0.65);
+}
+
+.playbook-gp-install-grade-value {
+  font-size: 2rem;
+  font-weight: 1000;
+  line-height: 1;
+  color: #93c5fd;
+}
+
+.playbook-gp-install-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 28px;
+  flex: 1;
+}
+
+.playbook-gp-install-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.playbook-gp-install-stat-label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(238, 241, 248, 0.6);
+}
+
+.playbook-gp-install-stat-value {
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.playbook-gp-install-stat-sub {
+  margin-left: 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: rgba(238, 241, 248, 0.75);
+}
+
+.playbook-gp-install-hint {
+  margin: 10px 0 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: rgba(238, 241, 248, 0.72);
+}
+
+.playbook-gp-install-badge {
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 2px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.playbook-gp-install-badge--focused {
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(134, 239, 172, 0.35);
+}
+
+.playbook-gp-install-badge--stretch {
+  color: #fde047;
+  background: rgba(234, 179, 8, 0.12);
+  border-color: rgba(253, 224, 71, 0.35);
+}
+
+.playbook-gp-install-badge--overload {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(252, 165, 165, 0.35);
+}
+
+.playbook-gp-play-row--inactive {
+  opacity: 0.45;
+}
+
+.playbook-gp-play-row--inactive .playbook-gp-play-name {
+  font-weight: 600;
 }
 
 .playbook-gp-cat-select {

@@ -2,6 +2,25 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchPlaySelection } from './browserSave'
 import './PlaybookGamePlanPage.css'
 import TeamLogo from './TeamLogo'
+import {
+  cachePlaySelectionResponse,
+  getPlaySelectionCache,
+  hasPlaySelectionCache,
+  setPlaySelectionCache,
+  parseInstallMeta,
+  parsePlaySelectionRows,
+  type PlaySelectionPlayRow,
+} from './playSelectionCache'
+import {
+  categoryInstallBand,
+  computeProjectedInstallSummary,
+  countActivePlays,
+  DEFAULT_INSTALL_META,
+  filterActivePlayEntries,
+  installBandLabel,
+  isActivePlayPct,
+  type InstallMeta,
+} from './playSelectionUtils'
 
 export const OFFENSIVE_CATEGORIES = [
   { key: 'INSIDE_RUN', label: 'Inside Run' },
@@ -19,7 +38,7 @@ export const DEFENSIVE_CATEGORIES = [
   { key: 'MAN_PRESSURE', label: 'Man Pressure' },
 ] as const
 
-type PlayEntry = { play_id: string; name: string; formation?: string; pct: number }
+type PlayEntry = PlaySelectionPlayRow
 
 type Props = {
   apiBase: string
@@ -36,10 +55,38 @@ type Props = {
   onSaveState?: (state: any) => void
   readOnly?: boolean
   headerBackLabel?: string
+  /** Prefetched on the preseason hub so the first open skips the loading flash. */
+  prefetchedData?: {
+    offensive?: Record<string, PlayEntry[]>
+    defensive?: Record<string, PlayEntry[]>
+    install_meta?: InstallMeta
+  } | null
 }
 
 function roundPct(n: number) {
   return Math.round(n * 10) / 10
+}
+
+function hydrateFromSource(
+  saveId: string,
+  prefetchedData?: Props['prefetchedData'],
+): { offensive: Record<string, PlayEntry[]>; defensive: Record<string, PlayEntry[]>; installMeta: InstallMeta } {
+  const cached = getPlaySelectionCache(saveId)
+  if (cached) {
+    return {
+      offensive: cached.offensive,
+      defensive: cached.defensive,
+      installMeta: cached.installMeta ?? DEFAULT_INSTALL_META,
+    }
+  }
+  if (prefetchedData) {
+    return {
+      offensive: prefetchedData.offensive ?? {},
+      defensive: prefetchedData.defensive ?? {},
+      installMeta: prefetchedData.install_meta ?? DEFAULT_INSTALL_META,
+    }
+  }
+  return { offensive: {}, defensive: {}, installMeta: DEFAULT_INSTALL_META }
 }
 
 export default function PlaybookGamePlanPage({
@@ -54,13 +101,20 @@ export default function PlaybookGamePlanPage({
   onSaveState,
   readOnly = false,
   headerBackLabel = 'Back to Preseason',
+  prefetchedData = null,
 }: Props) {
-  const [loading, setLoading] = useState(true)
+  const initial = hydrateFromSource(saveId, prefetchedData)
+  const hasInitialData =
+    Object.values(initial.offensive).some((arr) => arr.length > 0) ||
+    Object.values(initial.defensive).some((arr) => arr.length > 0)
+
+  const [loading, setLoading] = useState(!hasInitialData)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [offensiveCategory, setOffensiveCategory] = useState<string>(OFFENSIVE_CATEGORIES[0].key)
   const [defensiveCategory, setDefensiveCategory] = useState<string>(DEFENSIVE_CATEGORIES[0].key)
-  const [localOffensive, setLocalOffensive] = useState<Record<string, PlayEntry[]>>({})
-  const [localDefensive, setLocalDefensive] = useState<Record<string, PlayEntry[]>>({})
+  const [localOffensive, setLocalOffensive] = useState<Record<string, PlayEntry[]>>(initial.offensive)
+  const [localDefensive, setLocalDefensive] = useState<Record<string, PlayEntry[]>>(initial.defensive)
+  const [installMeta, setInstallMeta] = useState<InstallMeta>(initial.installMeta)
   const [confirming, setConfirming] = useState(false)
   const userTeam = String(saveState?.user_team ?? '')
 
@@ -70,38 +124,82 @@ export default function PlaybookGamePlanPage({
   onSaveStateRef.current = onSaveState
   const headersRef = useRef(headers)
   headersRef.current = headers
+  const localOffensiveRef = useRef(localOffensive)
+  localOffensiveRef.current = localOffensive
+  const localDefensiveRef = useRef(localDefensive)
+  localDefensiveRef.current = localDefensive
+  const installMetaRef = useRef(installMeta)
+  installMetaRef.current = installMeta
 
-  const fetchData = useCallback(async (opts?: { showLoading?: boolean }) => {
-    if (!saveId) {
-      setFetchError('Missing configuration')
-      setLoading(false)
-      return
-    }
-    const showLoading = opts?.showLoading ?? true
-    if (showLoading) setLoading(true)
-    setFetchError(null)
-    try {
-      const json = await fetchPlaySelection(
-        apiBase ?? '',
-        saveId,
-        saveStateRef.current,
-        headersRef.current,
-      )
-      if (json.state) onSaveStateRef.current?.(json.state)
-      setLocalOffensive(json.offensive || {})
-      setLocalDefensive(json.defensive || {})
-    } catch (e: any) {
-      const msg = e?.message ?? 'Failed to load'
-      setFetchError(msg)
-    } finally {
-      if (showLoading) setLoading(false)
-    }
-  }, [apiBase, saveId])
+  const applyPayload = useCallback(
+    (json: {
+      offensive?: unknown
+      defensive?: unknown
+      install_meta?: unknown
+      state?: unknown
+    }) => {
+      const offensive = parsePlaySelectionRows(json.offensive)
+      const defensive = parsePlaySelectionRows(json.defensive)
+      const meta = parseInstallMeta(json.install_meta) ?? DEFAULT_INSTALL_META
+      setLocalOffensive(offensive)
+      setLocalDefensive(defensive)
+      setInstallMeta(meta)
+      setPlaySelectionCache(saveId, { offensive, defensive, installMeta: meta })
+      return { offensive, defensive, meta, state: json.state }
+    },
+    [saveId],
+  )
+
+  const fetchData = useCallback(
+    async (opts?: { showLoading?: boolean }) => {
+      if (!saveId) {
+        setFetchError('Missing configuration')
+        setLoading(false)
+        return
+      }
+      const hasCached = hasPlaySelectionCache(saveId)
+      const showLoading = opts?.showLoading ?? !hasCached
+      if (showLoading) setLoading(true)
+      setFetchError(null)
+      try {
+        const json = await fetchPlaySelection(
+          apiBase ?? '',
+          saveId,
+          saveStateRef.current,
+          headersRef.current,
+        )
+        const applied = applyPayload(json)
+        if (json.state && !hasCached) {
+          onSaveStateRef.current?.(json.state)
+        }
+        return applied
+      } catch (e: any) {
+        const msg = e?.message ?? 'Failed to load'
+        if (!hasCached) setFetchError(msg)
+      } finally {
+        if (showLoading) setLoading(false)
+      }
+    },
+    [apiBase, saveId, applyPayload],
+  )
 
   useEffect(() => {
-    if (saveId) void fetchData({ showLoading: true })
+    if (!saveId) return
+    if (hasPlaySelectionCache(saveId)) return
+    void fetchData({ showLoading: !hasInitialData })
     // Intentionally only when saveId changes — saveState updates from onSaveState must not re-fetch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saveId])
+
+  useEffect(() => {
+    return () => {
+      if (!saveId) return
+      setPlaySelectionCache(saveId, {
+        offensive: localOffensiveRef.current,
+        defensive: localDefensiveRef.current,
+        installMeta: installMetaRef.current,
+      })
+    }
   }, [saveId])
 
   const updateOffensivePct = (catKey: string, playId: string, pct: number) => {
@@ -121,6 +219,51 @@ export default function PlaybookGamePlanPage({
       return { ...prev, [catKey]: list }
     })
   }
+
+  const offCategoryKeys = useMemo(() => OFFENSIVE_CATEGORIES.map((c) => c.key), [])
+  const defCategoryKeys = useMemo(() => DEFENSIVE_CATEGORIES.map((c) => c.key), [])
+
+  const projectedInstall = useMemo(
+    () =>
+      computeProjectedInstallSummary(
+        installMeta,
+        localOffensive,
+        localDefensive,
+        offCategoryKeys,
+        defCategoryKeys,
+      ),
+    [installMeta, localOffensive, localDefensive, offCategoryKeys, defCategoryKeys],
+  )
+
+  const offensiveCategoryActive = useMemo(
+    () => countActivePlays(localOffensive[offensiveCategory] || []),
+    [localOffensive, offensiveCategory],
+  )
+
+  const defensiveCategoryActive = useMemo(
+    () => countActivePlays(localDefensive[defensiveCategory] || []),
+    [localDefensive, defensiveCategory],
+  )
+
+  const offensiveCategoryBand = useMemo(
+    () =>
+      categoryInstallBand(
+        offensiveCategoryActive,
+        installMeta.recommended_plays_per_category,
+        installMeta.teachable_plays_per_category,
+      ),
+    [offensiveCategoryActive, installMeta],
+  )
+
+  const defensiveCategoryBand = useMemo(
+    () =>
+      categoryInstallBand(
+        defensiveCategoryActive,
+        installMeta.recommended_plays_per_category,
+        installMeta.teachable_plays_per_category,
+      ),
+    [defensiveCategoryActive, installMeta],
+  )
 
   const offensiveTotal = useMemo(() => {
     const list = localOffensive[offensiveCategory] || []
@@ -158,14 +301,14 @@ export default function PlaybookGamePlanPage({
         offensive: Object.fromEntries(
           Object.entries(localOffensive).map(([k, v]) => [
             k,
-            v.map((p) => ({ play_id: p.play_id, pct: p.pct })),
-          ])
+            filterActivePlayEntries(v).map((p) => ({ play_id: p.play_id, pct: p.pct })),
+          ]),
         ),
         defensive: Object.fromEntries(
           Object.entries(localDefensive).map(([k, v]) => [
             k,
-            v.map((p) => ({ play_id: p.play_id, pct: p.pct })),
-          ])
+            filterActivePlayEntries(v).map((p) => ({ play_id: p.play_id, pct: p.pct })),
+          ]),
         ),
       }
       await onConfirm(gamePlan)
@@ -231,6 +374,41 @@ export default function PlaybookGamePlanPage({
         }
         return (
       <>
+      {!readOnly ? (
+        <div className="playbook-gp-install-meter">
+          <div className="playbook-gp-install-meter-main">
+            <div className="playbook-gp-install-grade">
+              <span className="playbook-gp-install-grade-label">Projected understanding</span>
+              <span className="playbook-gp-install-grade-value">{projectedInstall.overall_grade}</span>
+            </div>
+            <div className="playbook-gp-install-stats">
+              <div className="playbook-gp-install-stat">
+                <span className="playbook-gp-install-stat-label">Offense install</span>
+                <span className="playbook-gp-install-stat-value">
+                  {projectedInstall.offensive_active_plays_per_category} plays / category
+                  <span className="playbook-gp-install-stat-sub">
+                    ({projectedInstall.offensive_pct_learned}% learned)
+                  </span>
+                </span>
+              </div>
+              <div className="playbook-gp-install-stat">
+                <span className="playbook-gp-install-stat-label">Defense install</span>
+                <span className="playbook-gp-install-stat-value">
+                  {projectedInstall.defensive_active_plays_per_category} plays / category
+                  <span className="playbook-gp-install-stat-sub">
+                    ({projectedInstall.defensive_pct_learned}% learned)
+                  </span>
+                </span>
+              </div>
+            </div>
+          </div>
+          <p className="playbook-gp-install-hint">
+            Coach recommends about <strong>{installMeta.recommended_plays_per_category}</strong> plays
+            per category (scheme teach {installMeta.scheme_teach}/10). Only plays above 0% count
+            toward your install — set unused plays to 0%.
+          </p>
+        </div>
+      ) : null}
       <div className="playbook-gp-panels">
         <div className="playbook-gp-panel">
           <h2 className="playbook-gp-panel-title">OFFENSIVE PLAYBOOK</h2>
@@ -249,6 +427,12 @@ export default function PlaybookGamePlanPage({
             <span className={`playbook-gp-total ${Math.abs(offensiveTotal - 100) < 0.1 ? 'ok' : 'bad'}`}>
               TOTAL: {offensiveTotal}%
             </span>
+            {!readOnly ? (
+              <span className={`playbook-gp-install-badge playbook-gp-install-badge--${offensiveCategoryBand}`}>
+                Installing {offensiveCategoryActive} / {installMeta.recommended_plays_per_category} recommended
+                · {installBandLabel(offensiveCategoryBand)}
+              </span>
+            ) : null}
           </div>
           <div className="playbook-gp-play-list">
             <div className="playbook-gp-play-header">
@@ -259,7 +443,10 @@ export default function PlaybookGamePlanPage({
               <div className="playbook-gp-empty">No plays in this category.</div>
             ) : (
               offPlays.map((p) => (
-                <div key={p.play_id} className="playbook-gp-play-row">
+                <div
+                  key={p.play_id}
+                  className={`playbook-gp-play-row${isActivePlayPct(p.pct) ? '' : ' playbook-gp-play-row--inactive'}`}
+                >
                   <span className="playbook-gp-play-name">
                     {p.formation ? `${p.formation} — ${p.name}` : p.name}
                   </span>
@@ -301,6 +488,12 @@ export default function PlaybookGamePlanPage({
             <span className={`playbook-gp-total ${Math.abs(defensiveTotal - 100) < 0.1 ? 'ok' : 'bad'}`}>
               TOTAL: {defensiveTotal}%
             </span>
+            {!readOnly ? (
+              <span className={`playbook-gp-install-badge playbook-gp-install-badge--${defensiveCategoryBand}`}>
+                Installing {defensiveCategoryActive} / {installMeta.recommended_plays_per_category} recommended
+                · {installBandLabel(defensiveCategoryBand)}
+              </span>
+            ) : null}
           </div>
           <div className="playbook-gp-play-list">
             <div className="playbook-gp-play-header">
@@ -311,7 +504,10 @@ export default function PlaybookGamePlanPage({
               <div className="playbook-gp-empty">No plays in this category.</div>
             ) : (
               defPlays.map((p) => (
-                <div key={p.play_id} className="playbook-gp-play-row">
+                <div
+                  key={p.play_id}
+                  className={`playbook-gp-play-row${isActivePlayPct(p.pct) ? '' : ' playbook-gp-play-row--inactive'}`}
+                >
                   <span className="playbook-gp-play-name">
                     {p.formation ? `${p.formation} — ${p.name}` : p.name}
                   </span>

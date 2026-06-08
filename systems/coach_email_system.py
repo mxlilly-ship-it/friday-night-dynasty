@@ -67,12 +67,8 @@ def ensure_coach_inbox(state: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def seed_starter_coach_emails(state: Dict[str, Any], inbox: Dict[str, Any]) -> None:
-    """One-time starter mail for the save's ``email_pack`` (from league JSON / save state)."""
-    from systems.league_metadata import email_pack_from_state
-
-    pack = email_pack_from_state(state)
-    if pack == "wv":
-        seed_wv_starter_coach_emails(state, inbox)
+    """One-time generic starter mail; ``[State]`` comes from league JSON / save ``state`` field."""
+    seed_generic_starter_coach_emails(state, inbox)
 
 
 def _clamp_meter(v: Any, lo: int = 0, hi: int = 100) -> int:
@@ -216,7 +212,7 @@ def _make_email(
 STARTER_PACK_VERSION = 1
 
 
-def _wv_display_coach_name(state: Dict[str, Any]) -> str:
+def _starter_display_coach_name(state: Dict[str, Any]) -> str:
     row = _user_team_row(state)
     if not row:
         return "Coach"
@@ -227,352 +223,34 @@ def _wv_display_coach_name(state: Dict[str, Any]) -> str:
     return "Coach"
 
 
-def _wv_subst_placeholders(text: str, school: str, coach: str) -> str:
+def _starter_state_name(state: Dict[str, Any]) -> str:
+    from systems.league_metadata import ensure_league_metadata_in_state
+
+    meta = ensure_league_metadata_in_state(state)
+    return str(meta.get("state") or "your state").strip() or "your state"
+
+
+def _subst_starter_placeholders(text: str, school: str, coach: str, state_name: str) -> str:
     return (
         text.replace("[school name]", school)
         .replace("[coach name]", coach)
+        .replace("[State]", state_name)
         .replace("[School name]", school)
         .replace("[Coach name]", coach)
     )
 
 
-def _wv_starter_specs() -> List[Dict[str, Any]]:
-    """Static copy for one-time inbox seed (West Virginia flavor). Placeholders: [school name], [coach name]."""
-    # Each block: performance, player_issue, admin, boosters, recruiting, media, community — 2 positive then 2 negative.
-    return [
-        # --- performance (positive) ---
-        {
-            "sender_type": SENDER_FOOTBALL_PROGRAM,
-            "sender_name": "Program office",
-            "subject": "Friday nights start here",
-            "body": (
-                "[coach name] — welcome back. Around here the bleachers fill when the band hits the tunnel and "
-                "the lights come on. [school name] has a real shot to be the team folks talk about on the drive home "
-                "along I-79 and the two-lanes. Let's build week-to-week and keep the standard mountain-tough."
-            ),
-            "category": "performance",
-            "tone": "positive",
-        },
-        {
-            "sender_type": SENDER_ASSISTANT_COACH,
-            "sender_name": "Staff notes",
-            "subject": "Conditioning check-in",
-            "body": (
-                "Coach — the kids looked sharp in the summer heat. WV humidity is no joke; if we keep tackling "
-                "angles and ball security where we left off, [school name] can hang with anybody on the schedule."
-            ),
-            "category": "performance",
-            "tone": "positive",
-        },
-        # --- performance (negative) ---
-        {
-            "sender_type": SENDER_FANS_ALUMNI,
-            "sender_name": "Alumni thread",
-            "subject": "Expectations in coal country",
-            "body": (
-                "[coach name], no disrespect — but around here people remember who won the hard games in the mud "
-                "and who didn't. [school name] has talent; the question is whether we finish drives when it gets loud "
-                "on a county-road Friday. Prove it early or the radio lines get hot."
-            ),
-            "category": "performance",
-            "tone": "negative",
-        },
-        {
-            "sender_type": SENDER_REPORTER,
-            "sender_name": "Sports desk",
-            "subject": "Notebook: non-conference reality",
-            "body": (
-                "Coach — I'm piecing together a preseason capsule on [school name]. Give me one honest line on what "
-                "has to improve before WVSSAC-style playoff football, or I'll quote 'still evaluating' and let readers fill in the blanks."
-            ),
-            "category": "performance",
-            "tone": "negative",
-        },
-        # --- player_issue (positive) ---
-        {
-            "sender_type": SENDER_TEAM_CAPTAIN,
-            "sender_name": "Captains",
-            "subject": "Locker room is locked in",
-            "body": (
-                "[coach name] — we want you to know the room is together. Upperclassmen are picking freshmen up for "
-                "study hall and nobody's ducking accountability. [school name] feels like one team, not cliques."
-            ),
-            "category": "player_issue",
-            "tone": "positive",
-        },
-        {
-            "sender_type": SENDER_GUIDANCE,
-            "sender_name": "Guidance office",
-            "subject": "Shout-out on leadership",
-            "body": (
-                "Hi [coach name] — several teachers mentioned your players holding doors and helping with freshman orientation. "
-                "That matters in a small-town WV school where everybody knows whose jersey is hanging in the window."
-            ),
-            "category": "player_issue",
-            "tone": "positive",
-        },
-        # --- player_issue (negative) ---
-        {
-            "sender_type": SENDER_PARENTS,
-            "sender_name": "Parent committee",
-            "subject": "Playing time concerns",
-            "body": (
-                "[coach name], a few families are asking fair questions about rotations and special teams snaps. "
-                "Nothing formal — yet — but in AA/A football in West Virginia, hurt feelings turn into parking-lot politics fast. "
-                "A short, consistent message goes a long way."
-            ),
-            "category": "player_issue",
-            "tone": "negative",
-        },
-        {
-            "sender_type": SENDER_DISGRUNTLED_PLAYER,
-            "sender_name": "Anonymous player channel",
-            "subject": "Not trying to stir the pot",
-            "body": (
-                "Coach — some guys feel like the depth chart message doesn't match what happens in practice. "
-                "If [school name] is supposed to be family, it can't feel like favorites from the valley clubs. "
-                "We just want straight answers."
-            ),
-            "category": "player_issue",
-            "tone": "negative",
-        },
-        # --- admin (positive) ---
-        {
-            "sender_type": SENDER_PRINCIPAL,
-            "sender_name": "Principal's office",
-            "subject": "Proud of the program's footprint",
-            "body": (
-                "[coach name], I walked the hall between bells and saw your players tutoring after school. "
-                "In a lot of West Virginia communities, the football program is the heartbeat — [school name] is representing us well."
-            ),
-            "category": "admin",
-            "tone": "positive",
-        },
-        {
-            "sender_type": SENDER_AD,
-            "sender_name": "Athletic director",
-            "subject": "Chain of command on safety",
-            "body": (
-                "[coach name] — quick thanks for running concussion protocol the way the county wants it. "
-                "If trainers need anything on Friday nights, we're one text away. Keep [school name] sharp and legal."
-            ),
-            "category": "admin",
-            "tone": "positive",
-        },
-        # --- admin (negative) ---
-        {
-            "sender_type": SENDER_ASST_PRINCIPAL,
-            "sender_name": "Discipline office",
-            "subject": "Social media smoke (not a formal write-up)",
-            "body": (
-                "[coach name] — there's chatter online about a weekend gathering involving a few players. "
-                "Nothing verified, but in WV towns the scanner page and Facebook groups move faster than facts. "
-                "Please get ahead of it with your leaders before I have to."
-            ),
-            "category": "admin",
-            "tone": "negative",
-        },
-        {
-            "sender_type": SENDER_SCHOOL_BOARD,
-            "sender_name": "Board office",
-            "subject": "Budget season reminder",
-            "body": (
-                "Coach — levy conversations are coming. Folks love Friday lights, but they also ask hard questions about "
-                "travel, equipment, and coaching stipends. Be ready to explain how [school name] earns every dollar."
-            ),
-            "category": "admin",
-            "tone": "negative",
-        },
-        # --- boosters (positive) ---
-        {
-            "sender_type": SENDER_BOOSTER_CLUB,
-            "sender_name": "Boosters",
-            "subject": "Concession stand schedule",
-            "body": (
-                "[coach name] — we filled every slot for the first home game. Local businesses donated water and chips; "
-                "one bank in town wants a small banner near the end zone. [school name] boosters are all-in this fall."
-            ),
-            "category": "boosters",
-            "tone": "positive",
-        },
-        {
-            "sender_type": SENDER_SPONSOR,
-            "sender_name": "County Ford & Tire",
-            "subject": "Sponsor packet signed",
-            "body": (
-                "Coach — we locked in the sideline sign and the program ad. Tell the kids thanks for wearing the shirts "
-                "at the county fair parade — that's the kind of WV community tie-in that keeps small sponsors coming back."
-            ),
-            "category": "boosters",
-            "tone": "positive",
-        },
-        # --- boosters (negative) ---
-        {
-            "sender_type": SENDER_BOOSTER_PRESIDENT,
-            "sender_name": "Booster president",
-            "subject": "Donor temperature",
-            "body": (
-                "[coach name], a couple longtime donors asked why fundraising results didn't match playoff expectations last year. "
-                "Nobody's pulling money — yet — but [school name] needs a clean narrative before the banquet circuit starts."
-            ),
-            "category": "boosters",
-            "tone": "negative",
-        },
-        {
-            "sender_type": SENDER_FUNDRAISING,
-            "sender_name": "Athletics finance",
-            "subject": "Equipment invoice timing",
-            "body": (
-                "Coach — we're short on the helmet refurb line item until receipts clear. "
-                "If boosters hear 'no new gear' while rival schools up the road post haul photos, it gets ugly in a hurry."
-            ),
-            "category": "boosters",
-            "tone": "negative",
-        },
-        # --- recruiting (positive) ---
-        {
-            "sender_type": SENDER_COLLEGE_RECRUITER,
-            "sender_name": "Regional scouting",
-            "subject": "WV pipeline check-in",
-            "body": (
-                "[coach name] — we're updating profiles on a few [school name] underclassmen who popped on camp film. "
-                "Nothing binding — just keeping the in-state and tri-state map honest. Send verified measurables when you can."
-            ),
-            "category": "recruiting",
-            "tone": "positive",
-        },
-        {
-            "sender_type": SENDER_RECRUITING_SERVICE,
-            "sender_name": "Mountain rankings desk",
-            "subject": "Spotlight request",
-            "body": (
-                "Coach — we'd like a short quote on [school name]'s identity this year: physical? spread? "
-                "West Virginia kids still get labeled wrong by out-of-state evaluators; help us tell the story straight."
-            ),
-            "category": "recruiting",
-            "tone": "positive",
-        },
-        # --- recruiting (negative) ---
-        {
-            "sender_type": SENDER_7ON7,
-            "sender_name": "Skills circuit",
-            "subject": "Sunday work vs. church/legs",
-            "body": (
-                "[coach name] — we've got a 7-on-7 window two hours across the state. Some families are torn between "
-                "extra reps and Sunday commitments. If [school name] doesn't show, rival programs will — fair warning."
-            ),
-            "category": "recruiting",
-            "tone": "negative",
-        },
-        {
-            "sender_type": SENDER_YOUTH_COACH,
-            "sender_name": "Youth league president",
-            "subject": "Kids hearing noise",
-            "body": (
-                "Coach — little league parents repeat what they read online. A few rankings dropped [school name] after "
-                "a scrimmage and now twelve-year-olds are acting like scouts. Can we get a grounded message from the staff?"
-            ),
-            "category": "recruiting",
-            "tone": "negative",
-        },
-        # --- media (positive) ---
-        {
-            "sender_type": SENDER_REPORTER,
-            "sender_name": "Statewide prep desk",
-            "subject": "Welcome back to Friday lights",
-            "body": (
-                "[coach name] — we're running a WVSSAC-flavored roundup and want [school name] in the mix. "
-                "Send a sentence on your opener and a player to watch; we like highlighting programs that lift small towns."
-            ),
-            "category": "media",
-            "tone": "positive",
-        },
-        {
-            "sender_type": SENDER_REPORTER,
-            "sender_name": "Local paper",
-            "subject": "Photo day",
-            "body": (
-                "Coach — if [school name] can give us 10 minutes after practice, we'll get a clean front-page shot before "
-                "the first home crowd. Rain in the forecast — classic West Virginia August — so we may move fast."
-            ),
-            "category": "media",
-            "tone": "positive",
-        },
-        # --- media (negative) ---
-        {
-            "sender_type": SENDER_REPORTER,
-            "sender_name": "Talk radio producer",
-            "subject": "Hot take segment (heads up)",
-            "body": (
-                "[coach name] — a host wants a 'pressure index' segment on [school name] based on last year's close losses. "
-                "You don't have to call in, but silence becomes a sound bite. Your choice."
-            ),
-            "category": "media",
-            "tone": "negative",
-        },
-        {
-            "sender_type": SENDER_REPORTER,
-            "sender_name": "Prep podcast",
-            "subject": "Comments section moderation",
-            "body": (
-                "Coach — we posted a harmless clip from practice and the comments turned personal about a couple players. "
-                "We're deleting trash, but in WV everybody shares the same three Facebook groups — shield your kids."
-            ),
-            "category": "media",
-            "tone": "negative",
-        },
-        # --- community (positive) ---
-        {
-            "sender_type": SENDER_COMMUNITY_LEADER,
-            "sender_name": "Chamber of Commerce",
-            "subject": "Friday night drives business",
-            "body": (
-                "[coach name] — restaurants and gas stations on the corridor told us home games are their best nights. "
-                "If [school name] runs a clean, safe crowd, we'll keep pushing the county to support field projects."
-            ),
-            "category": "community",
-            "tone": "positive",
-        },
-        {
-            "sender_type": SENDER_COMMUNITY,
-            "sender_name": "Rotary Club",
-            "subject": "Pancake breakfast invite",
-            "body": (
-                "Coach — we'd love a few players in jerseys at the Labor Day breakfast. Short speech optional. "
-                "It's the kind of small-town WV thing that makes grandparents proud and recruits nobody — but it builds capital."
-            ),
-            "category": "community",
-            "tone": "positive",
-        },
-        # --- community (negative) ---
-        {
-            "sender_type": SENDER_COMMUNITY,
-            "sender_name": "Neighbors group",
-            "subject": "Traffic and parking",
-            "body": (
-                "[coach name] — a few folks on the road behind the school are frustrated with pickup after scrimmages. "
-                "Nobody wants to be 'that neighbor,' but when horns start blowing, it lands on [school name]."
-            ),
-            "category": "community",
-            "tone": "negative",
-        },
-        {
-            "sender_type": SENDER_TEACHER,
-            "sender_name": "Faculty senate liaison",
-            "subject": "Kickoff vs. evening events",
-            "body": (
-                "[coach name] — we have a school concert the same night as a late JV finish. Families are split. "
-                "Can we coordinate announcements so kids aren't forced to pick between the band room and the locker room?"
-            ),
-            "category": "community",
-            "tone": "negative",
-        },
-    ]
+def _starter_pack_already_seeded(inbox: Dict[str, Any]) -> bool:
+    return bool(
+        inbox.get("starter_coach_emails_v1")
+        or inbox.get("wv_starter_coach_emails_v1")
+        or inbox.get("oh_starter_coach_emails_v1")
+    )
 
 
-def seed_wv_starter_coach_emails(state: Dict[str, Any], inbox: Dict[str, Any]) -> None:
-    """Append WV-flavored starter mail once (empty inbox + user team). Sets ``wv_starter_coach_emails_v1``."""
-    if inbox.get("wv_starter_coach_emails_v1"):
+def seed_generic_starter_coach_emails(state: Dict[str, Any], inbox: Dict[str, Any]) -> None:
+    """Append generic starter mail once; [State] from save metadata (league JSON)."""
+    if _starter_pack_already_seeded(inbox):
         return
     ut = str(state.get("user_team") or "").strip()
     if not ut:
@@ -581,33 +259,37 @@ def seed_wv_starter_coach_emails(state: Dict[str, Any], inbox: Dict[str, Any]) -
     if not isinstance(emails, list):
         return
     if len(emails) > 0:
-        inbox["wv_starter_coach_emails_v1"] = STARTER_PACK_VERSION
+        inbox["starter_coach_emails_v1"] = STARTER_PACK_VERSION
         return
 
-    school, coach = ut, _wv_display_coach_name(state)
+    from systems.starter_email_specs import GENERIC_STARTER_SPECS
+
+    school = ut
+    coach = _starter_display_coach_name(state)
+    state_name = _starter_state_name(state)
     year = int(state.get("current_year", 1) or 1)
     week = max(1, int(state.get("current_week", 1) or 1))
     rng = random.Random((hash(ut) ^ STARTER_PACK_VERSION) % (2**32))
 
     built: List[Dict[str, Any]] = []
-    for i, spec in enumerate(_wv_starter_specs()):
+    for i, spec in enumerate(GENERIC_STARTER_SPECS):
         tone = str(spec.get("tone") or "neutral")
         built.append(
             _make_email(
                 sender_type=str(spec["sender_type"]),
                 sender_name=str(spec["sender_name"]),
-                subject=_wv_subst_placeholders(str(spec["subject"]), school, coach),
-                body=_wv_subst_placeholders(str(spec["body"]), school, coach),
+                subject=_subst_starter_placeholders(str(spec["subject"]), school, coach, state_name),
+                body=_subst_starter_placeholders(str(spec["body"]), school, coach, state_name),
                 category=str(spec["category"]),
                 year=year,
                 week=week,
                 virtual_day=DAYS_ORDER[i % 7],
-                trigger_conditions=["starter_pack", f"wv_{tone}"],
+                trigger_conditions=["starter_pack", f"generic_{tone}"],
                 rng=rng,
             )
         )
     _append_emails(inbox, built)
-    inbox["wv_starter_coach_emails_v1"] = STARTER_PACK_VERSION
+    inbox["starter_coach_emails_v1"] = STARTER_PACK_VERSION
 
 
 def _append_emails(inbox: Dict[str, Any], new_rows: List[Dict[str, Any]]) -> None:

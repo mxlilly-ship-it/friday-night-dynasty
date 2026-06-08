@@ -4,7 +4,7 @@ Links to Community for base ratings and holds roster of Players.
 """
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Any
 
 from .community import CommunityType, get_community_rating
 
@@ -44,6 +44,11 @@ class Team:
     culture_progress_pts: int = 0
     boosters_progress_pts: int = 0
 
+    # Program development (funding + equipment inventory)
+    program_funding_balance: int = 0
+    program_last_funding_income: int = 0
+    program_equipment: List[Dict[str, Any]] = field(default_factory=list)
+
     # Roster: list of Player objects on this team
     roster: List["Player"] = field(default_factory=list)
 
@@ -80,6 +85,10 @@ class Team:
         self.facilities_progress_pts = max(0, min(3500, int(self.facilities_progress_pts)))
         self.culture_progress_pts = max(0, min(3500, int(self.culture_progress_pts)))
         self.boosters_progress_pts = max(0, min(3500, int(self.boosters_progress_pts)))
+        self.program_funding_balance = max(0, min(250_000, int(getattr(self, "program_funding_balance", 0) or 0)))
+        self.program_last_funding_income = max(0, int(getattr(self, "program_last_funding_income", 0) or 0))
+        if not isinstance(getattr(self, "program_equipment", None), list):
+            self.program_equipment = []
         self.wins = max(0, self.wins)
         self.losses = max(0, self.losses)
         self.regional_championships = max(0, self.regional_championships)

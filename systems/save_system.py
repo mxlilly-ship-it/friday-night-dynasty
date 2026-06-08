@@ -274,6 +274,9 @@ def team_to_dict(t: Team) -> Dict[str, Any]:
         "facilities_progress_pts": getattr(t, "facilities_progress_pts", 0),
         "culture_progress_pts": getattr(t, "culture_progress_pts", 0),
         "boosters_progress_pts": getattr(t, "boosters_progress_pts", 0),
+        "program_funding_balance": int(getattr(t, "program_funding_balance", 0) or 0),
+        "program_last_funding_income": int(getattr(t, "program_last_funding_income", 0) or 0),
+        "program_equipment": list(getattr(t, "program_equipment", []) or []),
         "roster": [player_to_dict(p) for p in t.roster],
         "coach": coach_to_dict(t.coach) if t.coach else None,
         "season_offensive_play_selection": t.season_offensive_play_selection,
@@ -318,6 +321,13 @@ def team_from_dict(d: Dict[str, Any]) -> Team:
         sub_stamina_thresholds=d.get("sub_stamina_thresholds"),
         depth_chart_order=d.get("depth_chart_order"),
     )
+    if d.get("program_funding_balance") is not None:
+        t.program_funding_balance = int(d.get("program_funding_balance") or 0)
+    if d.get("program_last_funding_income") is not None:
+        t.program_last_funding_income = int(d.get("program_last_funding_income") or 0)
+    pe = d.get("program_equipment")
+    if isinstance(pe, list):
+        t.program_equipment = [x for x in pe if isinstance(x, dict)]
     if d.get("team_points") is not None:
         try:
             t.team_points = float(d["team_points"])
@@ -330,6 +340,9 @@ def team_from_dict(d: Dict[str, Any]) -> Team:
     from systems.prestige_system import ensure_team_points_initialized
 
     ensure_team_points_initialized(t)
+    from systems.program_development_system import ensure_team_program_fields
+
+    ensure_team_program_fields(t)
     return t
 
 
@@ -345,6 +358,7 @@ def build_league_state(
     user_team: Optional[str] = None,
     user_coach_name: Optional[str] = None,
     allow_user_coach_firing: bool = False,
+    transfers_disabled: bool = False,
     current_week: int = 1,
     season_phase: str = "regular",  # "regular" | "playoffs" | "season_summary" | "offseason" | "done"
     weeks: Optional[List[List[Dict[str, str]]]] = None,  # week -> [{home, away}]
@@ -365,6 +379,7 @@ def build_league_state(
         "standings": standings or {},
         "teams": [team_to_dict(t) for t in teams.values()],
         "allow_user_coach_firing": bool(allow_user_coach_firing),
+        "transfers_disabled": bool(transfers_disabled),
     }
     if user_coach_name is not None and str(user_coach_name).strip():
         out["user_coach_name"] = str(user_coach_name).strip()
@@ -381,6 +396,7 @@ def save_league(
     user_team: Optional[str] = None,
     user_coach_name: Optional[str] = None,
     allow_user_coach_firing: bool = False,
+    transfers_disabled: bool = False,
     current_week: int = 1,
     season_phase: str = "regular",
     weeks: Optional[List[List[Dict[str, str]]]] = None,
@@ -402,6 +418,7 @@ def save_league(
         user_team=user_team,
         user_coach_name=user_coach_name,
         allow_user_coach_firing=allow_user_coach_firing,
+        transfers_disabled=transfers_disabled,
         current_week=current_week,
         season_phase=season_phase,
         weeks=weeks,

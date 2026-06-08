@@ -509,7 +509,7 @@ def run_winter_training_session(
         "efficiency_rows": efficiency_rows,
         "notable_players": notable,
         "feedback": _winter_feedback_messages(alloc),
-        "player_rows": player_rows[:30],
+        "player_rows": player_rows,
     }
 
 
@@ -692,6 +692,29 @@ def run_spring_ball_development(team: "Team") -> dict:
     notable = focused_rows[:5]
     total_points = sum(int(r["delta"]) for r in all_deltas)
 
+    player_attr_totals: Dict[str, Dict[str, int]] = {}
+    player_positions: Dict[str, str] = {}
+    for row in all_deltas:
+        pname = str(row.get("player_name") or "")
+        if not pname:
+            continue
+        attr = str(row.get("attribute") or "")
+        if not attr:
+            continue
+        player_positions[pname] = str(row.get("position") or player_positions.get(pname, ""))
+        bucket = player_attr_totals.setdefault(pname, {})
+        bucket[attr] = bucket.get(attr, 0) + int(row.get("delta") or 0)
+    spring_player_rows: List[dict] = []
+    for pname, attrs in sorted(player_attr_totals.items()):
+        spring_player_rows.append(
+            {
+                "player_name": pname,
+                "position": player_positions.get(pname, ""),
+                "total_delta": int(sum(attrs.values())),
+                "attribute_deltas": {k: int(v) for k, v in attrs.items()},
+            }
+        )
+
     position_group_changes = [
         {"label": "OL Run Block Avg", "delta": _group_avg_delta(all_deltas, "OL", "run_blocking")},
         {"label": "QB Throw Accuracy Avg", "delta": _group_avg_delta(all_deltas, "QB", "throw_accuracy")},
@@ -717,15 +740,89 @@ def run_spring_ball_development(team: "Team") -> dict:
         "notable_players": notable,
         "overall_pop_players": sorted(set(ovr_pop_players))[:3],
         "neutral_feedback": neutral_feedback[:3],
+        "player_rows": spring_player_rows,
     }
 
 
-def run_offseason_development(team: "Team") -> None:
-    """Training Results: full offseason development for every player (main growth period)."""
+def snapshot_developable_attributes(player: "Player") -> Dict[str, int]:
+    """Current values for attributes that can change during development."""
+    out: Dict[str, int] = {}
+    for attr in DEVELOPABLE_ATTRIBUTES:
+        if hasattr(player, attr):
+            out[attr] = int(getattr(player, attr, 50) or 50)
+    return out
+
+
+def _build_training_attribute_payload(
+    before_attrs: Dict[str, int],
+    after_attrs: Dict[str, int],
+    base_deltas: Dict[str, int],
+    equipment_deltas: Dict[str, int],
+) -> Dict[str, Dict[str, int]]:
+    payload: Dict[str, Dict[str, int]] = {}
+    for attr in set(before_attrs) | set(after_attrs):
+        before = int(before_attrs.get(attr, after_attrs.get(attr, 50)))
+        after = int(after_attrs.get(attr, before))
+        if before == after:
+            continue
+        payload[attr] = {
+            "before": before,
+            "after": after,
+            "delta": after - before,
+            "base": int(base_deltas.get(attr, 0)),
+            "equipment": int(equipment_deltas.get(attr, 0)),
+        }
+    return payload
+
+
+def run_offseason_development(team: "Team") -> Dict[str, Any]:
+    """
+    Training Results: full offseason development for every player (main growth period),
+    then flat bonuses from active program equipment.
+    """
+    from systems.program_equipment_effects import (
+        aggregate_equipment_training_effects,
+        apply_equipment_training_bonuses_to_player_detailed,
+    )
+    from systems.team_ratings import calculate_player_overall
+
+    equipment = aggregate_equipment_training_effects(team)
+    effects = list(equipment.get("effects") or [])
+    equipment_points = 0
+    player_reports: List[Dict[str, Any]] = []
     for player in list(team.roster):
         if not _player_receives_offseason_training(player):
             continue
+        before_attrs = snapshot_developable_attributes(player)
+        before_ovr = int(calculate_player_overall(player))
         develop_player(player, team, is_offseason=True)
+        mid_attrs = snapshot_developable_attributes(player)
+        base_deltas = {
+            attr: mid_attrs[attr] - before_attrs.get(attr, mid_attrs[attr])
+            for attr in mid_attrs
+            if mid_attrs[attr] != before_attrs.get(attr, mid_attrs[attr])
+        }
+        eq_total, equipment_deltas = apply_equipment_training_bonuses_to_player_detailed(player, effects)
+        equipment_points += eq_total
+        after_attrs = snapshot_developable_attributes(player)
+        after_ovr = int(calculate_player_overall(player))
+        player_reports.append(
+            {
+                "name": getattr(player, "name", "Player"),
+                "position": getattr(player, "position", None),
+                "before": before_ovr,
+                "after": after_ovr,
+                "delta": after_ovr - before_ovr,
+                "attributes": _build_training_attribute_payload(
+                    before_attrs, after_attrs, base_deltas, equipment_deltas
+                ),
+            }
+        )
+    return {
+        **equipment,
+        "equipment_points_applied": int(equipment_points),
+        "player_reports": player_reports,
+    }
 
 
 def in_season_development(team: "Team", games_played: int = 1) -> None:

@@ -63,6 +63,7 @@ export function NewSaveFlow({
   )
   const [creating, setCreating] = useState(false)
   const [allowCoachFiring, setAllowCoachFiring] = useState(false)
+  const [disableTransfers, setDisableTransfers] = useState(false)
   const [teamSource, setTeamSource] = useState<'default' | 'upload'>('default')
   const [uploadedFileName, setUploadedFileName] = useState('')
 
@@ -275,6 +276,7 @@ export function NewSaveFlow({
           start_year: startYear,
           teams_data: teamSource === 'upload' ? teamsData : undefined,
           allow_user_coach_firing: allowCoachFiring,
+          transfers_disabled: disableTransfers,
         }),
       })
       if (!r.ok) {
@@ -381,6 +383,23 @@ export function NewSaveFlow({
               <span className="newsave-sub" style={{ display: 'block', marginTop: 4 }}>
                 Leave unchecked for a stable job: the school will not fire, bench, or auto-resign your head coach. You can
                 still leave for another school only if you rank that job during the coaching carousel.
+              </span>
+            </span>
+          </label>
+          <label
+            style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 12, cursor: 'pointer' }}
+          >
+            <input
+              type="checkbox"
+              checked={disableTransfers}
+              onChange={(e) => setDisableTransfers(e.target.checked)}
+              style={{ marginTop: 3 }}
+            />
+            <span>
+              <strong>Disable transfers</strong>
+              <span className="newsave-sub" style={{ display: 'block', marginTop: 4 }}>
+                When checked, the transfer portal stages still appear in the offseason but no players enter the portal
+                and no transfers occur league-wide.
               </span>
             </span>
           </label>

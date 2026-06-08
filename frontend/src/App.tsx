@@ -3,6 +3,7 @@ import './index.css'
 import './TitleScreen.css'
 import { NewSaveFlow } from './NewSaveFlow'
 import TeamHomePage from './TeamHomePage'
+import type { HomeThemeSelection } from './homeGameThemes'
 import { importSaveZip, type SaveBundle } from './saveBundle'
 import { downloadBackupJson, downloadBackupZip } from './backupDownload'
 import {
@@ -831,6 +832,8 @@ export default function App({ devNoFirebase = false }: AppProps) {
     depthChart?: Record<string, string[]>
     positionChanges?: { player_name: string; position: string; secondary_position?: string | null }[]
     goals?: { win_goal: number; stage_goal: string }
+    homeGameThemes?: HomeThemeSelection[]
+    homeGameThemesAck?: boolean
     playoffsSim?: boolean
     seasonFinish?: boolean
     /** Scrimmage Simulate — always hit preseason advance (avoids wrong URL if season_phase in React state is stale). */
@@ -852,6 +855,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
       carousel_job_applications?: string[]
       transfer_stage_1_ack_results?: boolean
       transfer_stage_2_ack_results?: boolean
+      program_development_actions?: { item_id: string; action: 'purchase' | 'renew' }[]
     }
   }): Promise<boolean> {
     if (!saveId) {
@@ -894,6 +898,8 @@ export default function App({ devNoFirebase = false }: AppProps) {
           else if (opts?.depthChart) payload.body = { depth_chart: opts.depthChart }
           else if (opts?.positionChanges !== undefined) payload.body = { position_changes: opts.positionChanges }
           else if (opts?.goals) payload.body = { goals: opts.goals }
+          else if (opts?.homeGameThemes) payload.body = { home_game_themes: opts.homeGameThemes }
+          else if (opts?.homeGameThemesAck) payload.body = { home_game_themes_ack: true }
           else payload.body = {}
         }
 
@@ -1020,6 +1026,10 @@ export default function App({ devNoFirebase = false }: AppProps) {
       body = JSON.stringify({ position_changes: opts.positionChanges })
     } else if (inPreseason && opts?.goals) {
       body = JSON.stringify({ goals: opts.goals })
+    } else if (inPreseason && opts?.homeGameThemes) {
+      body = JSON.stringify({ home_game_themes: opts.homeGameThemes })
+    } else if (inPreseason && opts?.homeGameThemesAck) {
+      body = JSON.stringify({ home_game_themes_ack: true })
     } else if (inPreseason) {
       body = '{}'
     } else {

@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import TeamLogo from './TeamLogo'
 import { evaluateSeasonGoals, postseasonTierForTeam } from './seasonSummaryGoals'
+import { userHomeThemeSummary } from './homeGameThemes'
+import { fmtProgramDollars } from './programDevelopmentUtils'
 import { formatTeamPoints, formatTeamPointsDelta } from './prestigeUtils'
 import { findSeasonEntryByCalendarYear } from './leagueHistoryView'
 
@@ -93,6 +95,7 @@ export default function SeasonSummaryPanel({
   const goalEval = evaluateSeasonGoals(wins, losses, goals, tier)
   const winPill = goalStatusPill(goalEval.winMet)
   const stagePill = goalStatusPill(goalEval.stageMet)
+  const homeThemeSummary = userHomeThemeSummary(saveState, ut)
 
   const teamRow = (saveState?.teams ?? []).find((t: { name?: string }) => t?.name === ut)
   const tpDelta = formatTeamPointsDelta(Number(teamRow?.team_points_last_delta ?? 0))
@@ -189,10 +192,77 @@ export default function SeasonSummaryPanel({
                   <span className={stagePill.className}>{stagePill.label}</span>
                 </div>
                 <p className="season-summary-goal-detail">
-                  Reached <strong>{goalEval.postseasonLabel}</strong>
+                  {goalEval.stageGoal === 'Just to have fun' ? (
+                    <>
+                      No postseason bar — <strong>win total only</strong>
+                    </>
+                  ) : (
+                    <>
+                      Reached <strong>{goalEval.postseasonLabel}</strong>
+                    </>
+                  )}
                 </p>
               </div>
             ) : null}
+          </div>
+        </section>
+      ) : null}
+
+      {homeThemeSummary && (homeThemeSummary.games?.length ?? 0) > 0 ? (
+        <section className="season-summary-section season-summary-goals" aria-labelledby="season-summary-themes-head">
+          <h2 id="season-summary-themes-head" className="season-summary-section-title">
+            Home game themes
+          </h2>
+          <p className="teamhome-small season-summary-lead" style={{ marginTop: 0 }}>
+            Won home games with a theme earn PP or program funding (credited when you begin the offseason).
+          </p>
+          <div className="season-summary-stats-grid" style={{ marginBottom: 12 }}>
+            <div className="season-summary-stat-card">
+              <span className="season-summary-stat-label">Theme PP earned</span>
+              <span className="season-summary-stat-value">{homeThemeSummary.pp_total}</span>
+            </div>
+            <div className="season-summary-stat-card">
+              <span className="season-summary-stat-label">Theme funding earned</span>
+              <span className="season-summary-stat-value">{fmtProgramDollars(homeThemeSummary.cash_total)}</span>
+            </div>
+          </div>
+          <div className="season-summary-goals-grid">
+            {homeThemeSummary.games.map((g) => (
+              <div key={`${g.week}-${g.theme_label}`} className="season-summary-goal-card">
+                <div className="season-summary-goal-head">
+                  <span className="season-summary-goal-type">
+                    Week {g.week} · {g.theme_label}
+                  </span>
+                  <span
+                    className={
+                      g.earned
+                        ? 'season-summary-goal-pill season-summary-goal-pill--met'
+                        : g.won === false
+                          ? 'season-summary-goal-pill season-summary-goal-pill--miss'
+                          : 'season-summary-goal-pill'
+                    }
+                  >
+                    {g.earned ? 'Earned' : g.won === false ? 'Lost' : '—'}
+                  </span>
+                </div>
+                <p className="season-summary-goal-detail">
+                  vs <strong>{g.opponent}</strong>
+                  {g.earned ? (
+                    <>
+                      {' '}
+                      ·{' '}
+                      {g.pp > 0 ? (
+                        <strong>{g.pp} PP</strong>
+                      ) : g.cash > 0 ? (
+                        <strong>{fmtProgramDollars(g.cash)}</strong>
+                      ) : null}
+                    </>
+                  ) : g.won === false ? (
+                    <> · no bonus (home loss)</>
+                  ) : null}
+                </p>
+              </div>
+            ))}
           </div>
         </section>
       ) : null}

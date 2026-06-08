@@ -162,6 +162,10 @@ def pick_offensive_play(
         cat = candidates[0].offensive_category
         entries = _season_off_entries_for_category(selection, cat)
         if entries:
+            from systems.play_selection import filter_active_play_entries
+
+            entries = filter_active_play_entries(entries)
+        if entries:
             selected_ids = {play_id for play_id, _ in entries}
             candidates = [p for p in candidates if p.id in selected_ids]
             weights_from_selection = {play_id: max(0.1, float(pct)) for play_id, pct in entries}
@@ -214,6 +218,10 @@ def pick_defensive_play(
     if selection and candidates:
         cat = candidates[0].defensive_category
         entries = _season_def_entries_for_category(selection, cat)
+        if entries:
+            from systems.play_selection import filter_active_play_entries
+
+            entries = filter_active_play_entries(entries)
         if entries:
             selected_ids = {play_id for play_id, _ in entries}
             candidates = [p for p in candidates if p.id in selected_ids]

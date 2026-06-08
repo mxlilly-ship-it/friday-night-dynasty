@@ -33,6 +33,9 @@ UNDERSTANDING_GRADES = [
     "A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "D-", "F+", "F", "F-",
 ]
 
+# Plays at or below this pct are treated as not installed (UI lists full playbook; only active plays count).
+ACTIVE_PLAY_PCT_THRESHOLD = 0.01
+
 # Score thresholds: index 0 = A+ (93+), ..., index -1 = F- (0-52). Ranges [lo, hi] for each grade.
 UNDERSTANDING_SCORE_BANDS = [
     (93, 100),   # A+
@@ -51,6 +54,84 @@ UNDERSTANDING_SCORE_BANDS = [
     (50, 52),    # F
     (0, 49),     # F-
 ]
+
+
+def is_active_play_pct(pct: float) -> bool:
+    """True when a play is part of the season install (non-zero weight)."""
+    try:
+        return float(pct) > ACTIVE_PLAY_PCT_THRESHOLD
+    except (TypeError, ValueError):
+        return False
+
+
+def filter_active_play_entries(
+    entries: List[Tuple[str, float]],
+) -> List[Tuple[str, float]]:
+    """Keep only plays with meaningful call weight."""
+    out: List[Tuple[str, float]] = []
+    for play_id, pct in entries or []:
+        try:
+            p = float(pct)
+        except (TypeError, ValueError):
+            continue
+        if is_active_play_pct(p):
+            out.append((str(play_id), p))
+    return out
+
+
+def normalize_selection_for_storage(
+    selection: Optional[Dict[str, List[Tuple[str, float]]]],
+) -> Dict[str, List[Tuple[str, float]]]:
+    """Drop 0% plays so grading and sim only see the installed package."""
+    if not selection:
+        return {}
+    out: Dict[str, List[Tuple[str, float]]] = {}
+    for cat, entries in selection.items():
+        active = filter_active_play_entries(entries or [])
+        if active:
+            out[str(cat)] = active
+    return out
+
+
+def normalize_game_plan_payload_for_storage(
+    offensive: Optional[Dict[str, Any]],
+    defensive: Optional[Dict[str, Any]],
+) -> Tuple[Dict[str, List[Tuple[str, float]]], Dict[str, List[Tuple[str, float]]]]:
+    """Convert UI game-plan dicts to stored season selection (active plays only)."""
+
+    def _from_payload(side: Optional[Dict[str, Any]]) -> Dict[str, List[Tuple[str, float]]]:
+        if not isinstance(side, dict):
+            return {}
+        raw: Dict[str, List[Tuple[str, float]]] = {}
+        for cat, entries in side.items():
+            if not entries:
+                continue
+            rows: List[Tuple[str, float]] = []
+            for e in entries:
+                if not isinstance(e, dict):
+                    continue
+                play_id = e.get("play_id")
+                if not play_id:
+                    continue
+                try:
+                    pct = float(e.get("pct", 0))
+                except (TypeError, ValueError):
+                    continue
+                rows.append((str(play_id), pct))
+            active = filter_active_play_entries(rows)
+            if active:
+                raw[str(cat)] = active
+        return raw
+
+    return _from_payload(offensive), _from_payload(defensive)
+
+
+def _active_plays_per_category(selection: Dict[str, List[Tuple[str, float]]]) -> float:
+    """Average count of active (non-zero pct) plays per populated category."""
+    counts = [len(filter_active_play_entries(v)) for v in selection.values() if v]
+    if not counts:
+        return 0.0
+    return sum(counts) / len(counts)
 
 
 def _plays_per_category_from_scheme_teach(scheme_teach: int) -> int:
@@ -171,14 +252,22 @@ def compute_understanding_grade(
     # How many plays can they effectively teach per category? 2 to 10 based on teaching_score.
     teachable_per_cat = 2 + (teaching_score / 100.0) * 8.0
 
-    # Actual load: average plays per category (off has 6 categories, def has 4).
-    num_off_cats = max(1, len([k for k, v in off_selection.items() if v]))
-    num_def_cats = max(1, len([k for k, v in def_selection.items() if v]))
-    total_off_plays = sum(len(v) for v in off_selection.values())
-    total_def_plays = sum(len(v) for v in def_selection.values())
-    avg_off_per_cat = total_off_plays / num_off_cats if num_off_cats else 0
-    avg_def_per_cat = total_def_plays / num_def_cats if num_def_cats else 0
-    avg_plays_per_cat = (avg_off_per_cat + avg_def_per_cat) / 2.0 if (num_off_cats or num_def_cats) else 0
+    off_selection = normalize_selection_for_storage(off_selection)
+    def_selection = normalize_selection_for_storage(def_selection)
+
+    # Actual load: average active plays per category (off has 6 categories, def has 4).
+    off_cats = [v for v in off_selection.values() if filter_active_play_entries(v)]
+    def_cats = [v for v in def_selection.values() if filter_active_play_entries(v)]
+    avg_off_per_cat = _active_plays_per_category(off_selection) if off_cats else 0.0
+    avg_def_per_cat = _active_plays_per_category(def_selection) if def_cats else 0.0
+    if off_cats and def_cats:
+        avg_plays_per_cat = (avg_off_per_cat + avg_def_per_cat) / 2.0
+    elif off_cats:
+        avg_plays_per_cat = avg_off_per_cat
+    elif def_cats:
+        avg_plays_per_cat = avg_def_per_cat
+    else:
+        avg_plays_per_cat = 0.0
 
     # Overload: ratio of selected plays per category to teachable. >1 = overloaded.
     if teachable_per_cat <= 0:
@@ -187,15 +276,39 @@ def compute_understanding_grade(
         overload = avg_plays_per_cat / teachable_per_cat
 
     # Understanding score 0-100: low overload + high teaching = high score.
-    # overload 0.5 -> bonus; 1.0 -> neutral; 1.5+ -> penalty
-    raw_score = 100.0 - (overload - 0.7) * 45.0  # 0.7 overload -> 100; 2.0 -> 41.5
-    understanding_score = max(0, min(100, raw_score))
+    understanding_score = _understanding_score_from_overload(overload)
+    return _score_to_grade(understanding_score)
 
-    # Map to letter grade
+
+def _understanding_score_from_overload(overload: float) -> float:
+    raw_score = 100.0 - (overload - 0.7) * 45.0
+    return max(0.0, min(100.0, raw_score))
+
+
+def _score_to_grade(understanding_score: float) -> str:
     for i, (lo, hi) in enumerate(UNDERSTANDING_SCORE_BANDS):
         if lo <= understanding_score <= hi:
             return UNDERSTANDING_GRADES[i]
     return "F-"
+
+
+def get_install_meter_meta(team: Any) -> Dict[str, Any]:
+    """Coach/roster inputs for the Play Selection install meter UI."""
+    coach = getattr(team, "coach", None)
+    scheme_teach = getattr(coach, "scheme_teach", 5) if coach else 5
+    scheme_teach = max(1, min(10, scheme_teach))
+    avg_iq, avg_coach = _roster_avg_football_iq_and_coachability(team)
+    teaching_score = (scheme_teach * 10 + avg_iq + avg_coach) / 3.0
+    teaching_score = max(0, min(100, teaching_score))
+    teachable_per_cat = 2 + (teaching_score / 100.0) * 8.0
+    recommended = _plays_per_category_from_scheme_teach(scheme_teach)
+    return {
+        "scheme_teach": int(scheme_teach),
+        "recommended_plays_per_category": int(recommended),
+        "teachable_plays_per_category": round(teachable_per_cat, 1),
+        "avg_football_iq": round(avg_iq, 1),
+        "avg_coachability": round(avg_coach, 1),
+    }
 
 
 def compute_learning_summary(team: Any) -> Dict[str, Any]:
@@ -218,24 +331,67 @@ def compute_learning_summary(team: Any) -> Dict[str, Any]:
     teaching_score = max(0, min(100, teaching_score))
     teachable_per_cat = 2 + (teaching_score / 100.0) * 8.0
 
+    off_selection = normalize_selection_for_storage(off_selection)
+    def_selection = normalize_selection_for_storage(def_selection)
+
     def _side_learning_pct(selection: Dict[str, List[Tuple[str, float]]]) -> float:
-        num_cats = max(1, len([k for k, v in selection.items() if v]))
-        total_plays = sum(len(v) for v in selection.values())
-        avg_per_cat = total_plays / num_cats if num_cats else 0.0
+        if not any(filter_active_play_entries(v) for v in selection.values()):
+            return 0.0
+        avg_per_cat = _active_plays_per_category(selection)
         if teachable_per_cat <= 0:
             return 0.0
         overload = avg_per_cat / teachable_per_cat
-        raw_score = 100.0 - (overload - 0.7) * 45.0
-        return max(0.0, min(100.0, raw_score))
+        return _understanding_score_from_overload(overload)
 
     off_pct = round(_side_learning_pct(off_selection))
     def_pct = round(_side_learning_pct(def_selection))
     grade = compute_understanding_grade(team, off_selection, def_selection)
 
+    meta = get_install_meter_meta(team)
     return {
         "offensive_pct_learned": int(off_pct),
         "defensive_pct_learned": int(def_pct),
         "overall_grade": grade,
+        **meta,
+    }
+
+
+def compute_learning_preview(
+    team: Any,
+    offensive: Optional[Dict[str, List[Tuple[str, float]]]] = None,
+    defensive: Optional[Dict[str, List[Tuple[str, float]]]] = None,
+) -> Dict[str, Any]:
+    """
+    Projected learning summary from draft selections (Play Selection UI live meter).
+    """
+    off_selection = normalize_selection_for_storage(offensive or {})
+    def_selection = normalize_selection_for_storage(defensive or {})
+    grade = compute_understanding_grade(team, off_selection, def_selection)
+    coach = getattr(team, "coach", None)
+    scheme_teach = getattr(coach, "scheme_teach", 5) if coach else 5
+    scheme_teach = max(1, min(10, scheme_teach))
+    avg_iq, avg_coach = _roster_avg_football_iq_and_coachability(team)
+    teaching_score = (scheme_teach * 10 + avg_iq + avg_coach) / 3.0
+    teaching_score = max(0, min(100, teaching_score))
+    teachable_per_cat = 2 + (teaching_score / 100.0) * 8.0
+
+    def _side(selection: Dict[str, List[Tuple[str, float]]]) -> Dict[str, Any]:
+        avg_per_cat = _active_plays_per_category(selection)
+        overload = (avg_per_cat / teachable_per_cat) if teachable_per_cat > 0 else 2.0
+        return {
+            "active_plays_per_category": round(avg_per_cat, 1),
+            "pct_learned": int(round(_understanding_score_from_overload(overload))),
+        }
+
+    off_side = _side(off_selection)
+    def_side = _side(def_selection)
+    return {
+        "offensive_pct_learned": off_side["pct_learned"],
+        "defensive_pct_learned": def_side["pct_learned"],
+        "offensive_active_plays_per_category": off_side["active_plays_per_category"],
+        "defensive_active_plays_per_category": def_side["active_plays_per_category"],
+        "overall_grade": grade,
+        **get_install_meter_meta(team),
     }
 
 

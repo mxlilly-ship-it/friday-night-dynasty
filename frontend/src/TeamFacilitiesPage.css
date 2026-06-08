@@ -1,0 +1,120 @@
+.team-facilities-shell {
+  text-align: left;
+}
+
+.team-facilities-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  align-items: flex-start;
+  margin: 14px 0 18px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.team-facilities-logo {
+  flex: 0 0 auto;
+}
+
+.team-facilities-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px 20px;
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.team-facilities-metrics > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.team-facilities-metric-val {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.team-facilities-empty {
+  margin: 12px 0;
+  opacity: 0.82;
+  font-size: 0.9rem;
+  max-width: 640px;
+}
+
+.team-facilities-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.team-facilities-cat-head {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.team-facilities-table-wrap {
+  overflow-x: auto;
+}
+
+.team-facilities-table {
+  width: 100%;
+  min-width: 640px;
+}
+
+.team-facilities-item-name {
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
+.team-facilities-item-cost {
+  font-size: 0.75rem;
+  opacity: 0.72;
+  margin-top: 2px;
+}
+
+.team-facilities-effects {
+  font-size: 0.78rem;
+  max-width: 280px;
+  line-height: 1.35;
+}
+
+.team-facilities-dur {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.72rem;
+  min-width: 100px;
+}
+
+.team-facilities-dur-bar {
+  width: 72px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.team-facilities-dur-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.team-facilities-dur-fill.good {
+  background: #639922;
+}
+
+.team-facilities-dur-fill.mid {
+  background: #ba7517;
+}
+
+.team-facilities-dur-fill.low {
+  background: #e24b4a;
+}
+
+.team-facilities-row-expiring {
+  background: rgba(250, 199, 117, 0.08);
+}

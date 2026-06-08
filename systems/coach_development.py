@@ -83,7 +83,9 @@ def _goal_evaluation(
         win_goal_met = wins >= win_goal
 
     stage_goal = str(season_goals.get("stage_goal") or "").strip() or None
-    if stage_goal:
+    if stage_goal == "Just to have fun":
+        pass  # stage facet auto-passes; only win total is evaluated
+    elif stage_goal:
         goal_rank = None
         if stage_goal == "Winning Season":
             goal_rank = 0 if wins >= losses else 999

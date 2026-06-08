@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 export type CoachEmail = {
   id: string
@@ -69,6 +69,14 @@ function sortEmails(a: CoachEmail, b: CoachEmail): number {
   return String(b.id).localeCompare(String(a.id))
 }
 
+function nextEmailIdAfterDelete(emailId: string, list: CoachEmail[]): string | null {
+  const idx = list.findIndex((e) => e.id === emailId)
+  if (idx < 0) return list[0]?.id ?? null
+  if (idx < list.length - 1) return list[idx + 1].id
+  if (idx > 0) return list[idx - 1].id
+  return null
+}
+
 export default function CoachInboxPanel({
   saveState,
   saveId,
@@ -107,6 +115,17 @@ export default function CoachInboxPanel({
     [emails, selectedId],
   )
 
+  useEffect(() => {
+    if (!selectedId) return
+    if (filtered.some((e) => e.id === selectedId)) return
+    setSelectedId(filtered[0]?.id ?? null)
+  }, [filtered, selectedId])
+
+  useEffect(() => {
+    if (!selectedId) return
+    document.querySelector(`[data-coach-inbox-id="${selectedId}"]`)?.scrollIntoView({ block: 'nearest' })
+  }, [selectedId])
+
   const patchInbox = useCallback(
     async (body: {
       mark_read?: string[]
@@ -130,9 +149,49 @@ export default function CoachInboxPanel({
     [apiBase, headers, onError, onSaveState, saveId],
   )
 
+  const openEmail = useCallback(
+    async (e: CoachEmail) => {
+      setSelectedId(e.id)
+      if (!e.read && !readOnly) {
+        await patchInbox({ mark_read: [e.id] })
+      }
+    },
+    [patchInbox, readOnly],
+  )
+
+  const moveSelection = useCallback(
+    (direction: -1 | 1) => {
+      if (filtered.length === 0) return
+      const idx = selectedId ? filtered.findIndex((e) => e.id === selectedId) : -1
+      let nextIdx: number
+      if (idx < 0) {
+        nextIdx = direction === 1 ? 0 : filtered.length - 1
+      } else {
+        nextIdx = idx + direction
+        if (nextIdx < 0 || nextIdx >= filtered.length) return
+      }
+      void openEmail(filtered[nextIdx])
+    },
+    [filtered, openEmail, selectedId],
+  )
+
+  useEffect(() => {
+    const onKeyDown = (ev: KeyboardEvent) => {
+      if (ev.key !== 'ArrowUp' && ev.key !== 'ArrowDown') return
+      const target = ev.target as HTMLElement | null
+      if (target?.closest('input, textarea, select, button.coach-inbox-choice')) return
+      if (filtered.length === 0) return
+      ev.preventDefault()
+      moveSelection(ev.key === 'ArrowDown' ? 1 : -1)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [filtered.length, moveSelection])
+
   const deleteEmail = useCallback(
     async (email: CoachEmail) => {
       if (!email?.id) return
+      const nextId = nextEmailIdAfterDelete(email.id, filtered)
 
       if (readOnly) {
         if (!onSaveState) return
@@ -145,22 +204,37 @@ export default function CoachInboxPanel({
             emails: list.filter((row) => row.id !== email.id),
           },
         })
-        setSelectedId(null)
+        setSelectedId(nextId)
         return
       }
 
       const ok = await patchInbox({ delete: [email.id] })
-      if (ok) setSelectedId(null)
+      if (ok) setSelectedId(nextId)
     },
-    [onSaveState, patchInbox, readOnly, saveState],
+    [filtered, onSaveState, patchInbox, readOnly, saveState],
   )
 
-  const openEmail = async (e: CoachEmail) => {
-    setSelectedId(e.id)
-    if (!e.read && !readOnly) {
-      await patchInbox({ mark_read: [e.id] })
+  const deleteAllEmails = useCallback(async () => {
+    if (emails.length === 0) return
+    if (!window.confirm(`Delete all ${emails.length} message${emails.length === 1 ? '' : 's'}?`)) return
+
+    if (readOnly) {
+      if (!onSaveState) return
+      const prev = (saveState?.coach_inbox || {}) as CoachInboxState
+      onSaveState({
+        ...saveState,
+        coach_inbox: {
+          ...prev,
+          emails: [],
+        },
+      })
+      setSelectedId(null)
+      return
     }
-  }
+
+    const ok = await patchInbox({ delete: emails.map((e) => e.id) })
+    if (ok) setSelectedId(null)
+  }, [emails, onSaveState, patchInbox, readOnly, saveState])
 
   const meter = (label: string, v: number | undefined) => (
     <div className="coach-inbox-meter">
@@ -206,21 +280,32 @@ export default function CoachInboxPanel({
 
       <div className="coach-inbox-toolbar">
         <span className="coach-inbox-unread">{unread} unread</span>
-        <label className="coach-inbox-filter">
-          Filter
-          <select
-            className="teamhome-select"
-            value={filterCat}
-            onChange={(ev) => setFilterCat(ev.target.value)}
-            aria-label="Filter by category"
+        <div className="coach-inbox-toolbar-actions">
+          <button
+            type="button"
+            className="coach-inbox-delete"
+            disabled={emails.length === 0}
+            onClick={() => void deleteAllEmails()}
+            title={readOnly ? 'Remove all mail from this imported save (not synced to cloud)' : 'Delete all messages'}
           >
-            {CATEGORIES.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-        </label>
+            Delete all
+          </button>
+          <label className="coach-inbox-filter">
+            Filter
+            <select
+              className="teamhome-select"
+              value={filterCat}
+              onChange={(ev) => setFilterCat(ev.target.value)}
+              aria-label="Filter by category"
+            >
+              {CATEGORIES.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
 
       <div className="coach-inbox-panes">
@@ -238,8 +323,9 @@ export default function CoachInboxPanel({
                   <button
                     key={e.id}
                     type="button"
+                    data-coach-inbox-id={e.id}
                     className={`coach-inbox-row${selectedId === e.id ? ' coach-inbox-row--active' : ''}${e.read ? '' : ' coach-inbox-row--unread'}`}
-                    onClick={() => openEmail(e)}
+                    onClick={() => void openEmail(e)}
                   >
                     <div className="coach-inbox-row-top">
                       <span className="coach-inbox-sender">{e.sender_name || 'Unknown'}</span>
@@ -259,7 +345,9 @@ export default function CoachInboxPanel({
 
         <div className="coach-inbox-detail" role="region" aria-label="Message detail">
           {!selected ? (
-            <div className="coach-inbox-empty coach-inbox-empty--detail">Select a message</div>
+            <div className="coach-inbox-empty coach-inbox-empty--detail">
+              Select a message{filtered.length > 0 ? ' (↑ ↓ to browse)' : ''}
+            </div>
           ) : (
             <>
               <div className="coach-inbox-detail-head">
