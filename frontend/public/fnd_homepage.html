@@ -326,20 +326,11 @@
     function startNew() { fndPost('new'); }
     function loadGame() { fndPost('load'); }
 
-    // "Build last updated" stamp — pulls the file's HTTP Last-Modified
-    // timestamp (the same one shown by document.lastModified) and renders
-    // it as "Last updated MMM D, YYYY" so we don't have to hand-edit a
-    // date string every time we ship a homepage change. Falls back
-    // silently if the browser can't parse the value.
+    // Homepage "Last updated" label — bump when shipping visible title-screen changes.
     (function setBuildDate() {
       var el = document.getElementById('build-date');
       if (!el) return;
-      var raw = document.lastModified;
-      if (!raw) return;
-      var d = new Date(raw);
-      if (isNaN(d.getTime())) { el.textContent = 'Last updated ' + raw; return; }
-      var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      el.textContent = 'Last updated ' + months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+      el.textContent = 'Last updated Jun 7, 2026';
     })();
   </script>
 </body>
