@@ -33,6 +33,7 @@ from backend.services.league_service import (
     get_team_stadium_path,
     load_state,
     match_logo_filename_to_team,
+    match_stadium_filename_to_team,
     save_team_logo,
     save_team_stadium,
     get_coach_gameplan_v2,
@@ -159,6 +160,8 @@ class AdvanceOffseasonBody(BaseModel):
     transfer_stage_1_ack_results: Optional[bool] = None
     transfer_stage_2_ack_results: Optional[bool] = None
     program_development_actions: Optional[List[Dict[str, Any]]] = None
+    seven_on_seven_tournament: Optional[str] = None  # area | regional | state
+    seven_on_seven_ack_results: Optional[bool] = None
 
 
 class StartCoachGameBody(BaseModel):
@@ -311,6 +314,53 @@ def get_team_logo_route(team_name: str, user=Depends(require_user)):
     return FileResponse(path, media_type=media_type)
 
 
+    return FileResponse(path, media_type=media_type)
+
+
+# `/stadiums/bulk` MUST be registered before `/stadiums/{team_name}` or "bulk" is captured as a team name.
+@router.post("/stadiums/bulk", response_model=Dict[str, Any])
+async def bulk_upload_team_stadiums_route(
+    save_id: str = Query(..., description="Save ID used to resolve valid team names"),
+    stadiums: List[UploadFile] = File(...),
+    user=Depends(require_user),
+):
+    try:
+        state, _save_dir = load_state(user["user_id"], save_id)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to load save: {e}")
+    valid_teams = [str(t.get("name", "")).strip() for t in (state.get("teams") or []) if isinstance(t, dict) and t.get("name")]
+    imported: List[Dict[str, str]] = []
+    skipped: List[Dict[str, str]] = []
+    for item in stadiums or []:
+        raw_name = str(item.filename or "").strip()
+        if not raw_name:
+            skipped.append({"file": "(unnamed)", "reason": "Missing file name"})
+            continue
+        stem, ext = os.path.splitext(raw_name)
+        ext = ext.lower()
+        if ext not in (".png", ".jpg", ".jpeg", ".webp"):
+            skipped.append({"file": raw_name, "reason": "Unsupported file type"})
+            continue
+        team_name = match_stadium_filename_to_team(valid_teams, stem)
+        if not team_name:
+            skipped.append({"file": raw_name, "reason": "No matching team name found"})
+            continue
+        data = await item.read()
+        try:
+            save_team_stadium(user["user_id"], team_name, data, ext)
+            imported.append({"file": raw_name, "team_name": team_name})
+        except ValueError as e:
+            skipped.append({"file": raw_name, "reason": str(e)})
+    return {
+        "ok": True,
+        "total": len(stadiums or []),
+        "imported_count": len(imported),
+        "skipped_count": len(skipped),
+        "imported": imported,
+        "skipped": skipped,
+    }
+
+
 @router.post("/stadiums/{team_name}", response_model=Dict[str, Any])
 async def upload_team_stadium_route(team_name: str, stadium: UploadFile = File(...), user=Depends(require_user)):
     name = (team_name or "").strip()
@@ -373,6 +423,10 @@ class CoachGameplanV2Body(BaseModel):
     offense: Optional[Dict[str, Any]] = None
     defense: Optional[Dict[str, Any]] = None
     fourth_down: Optional[Dict[str, Any]] = None
+    add_offense_library: Optional[Dict[str, Any]] = None
+    delete_offense_library_id: Optional[str] = None
+    add_defense_library: Optional[Dict[str, Any]] = None
+    delete_defense_library_id: Optional[str] = None
 
 
 class CoachInboxChooseBody(BaseModel):
@@ -407,6 +461,10 @@ def save_coach_gameplan_v2_route(save_id: str, body: CoachGameplanV2Body, user=D
             offense=body.offense,
             defense=body.defense,
             fourth_down=body.fourth_down,
+            add_offense_library=body.add_offense_library,
+            delete_offense_library_id=body.delete_offense_library_id,
+            add_defense_library=body.add_defense_library,
+            delete_defense_library_id=body.delete_defense_library_id,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=_save_route_exception_detail(e))

@@ -43,16 +43,21 @@ const STALE_SESSION_MSG =
 
 async function formatApiErrorBody(r: Response): Promise<string> {
   const raw = await r.text()
+  const fallback = `Request failed (${r.status})`
   try {
     const j = JSON.parse(raw) as { detail?: unknown }
     const d = j.detail
-    if (typeof d === 'string') return d
+    if (typeof d === 'string') {
+      const trimmed = d.trim()
+      if (trimmed && trimmed.toLowerCase() !== 'none') return trimmed
+    }
     if (Array.isArray(d))
       return d.map((x: any) => (typeof x?.msg === 'string' ? x.msg : JSON.stringify(x))).join('; ')
   } catch {
     /* use raw */
   }
-  return raw || `Request failed (${r.status})`
+  const trimmedRaw = raw.trim()
+  return trimmedRaw && trimmedRaw.toLowerCase() !== 'none' ? trimmedRaw : fallback
 }
 
 function apiConnectionHint() {
@@ -125,6 +130,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
 
   const saveStateRef = useRef<any>(null)
   saveStateRef.current = saveState
+  const scheduleBrowserPersistRef = useRef<(() => void) | null>(null)
 
   /** Apply API simulation payload immediately (ref + React state) so back-to-back simWeek() calls stay in sync. */
   const applySimulationState = useCallback(
@@ -153,6 +159,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
           }
         })
       }
+      scheduleBrowserPersistRef.current?.()
     },
     [localBundle],
   )
@@ -179,6 +186,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
       leagueHistory: dynastyLeagueHistory ?? { seasons: [] },
       records: {},
       logos: {},
+      stadiums: {},
       seasonRecaps: {},
     }
   }, [localBundle, dynastyLeagueHistory])
@@ -199,6 +207,13 @@ export default function App({ devNoFirebase = false }: AppProps) {
       bundle: { ...localBundle, state: live },
     })
   }, [saveId, localBundle])
+
+  useEffect(() => {
+    scheduleBrowserPersistRef.current = () => {
+      if (!localBundle || !saveId) return
+      void persistCurrentBrowserSave()
+    }
+  }, [localBundle, saveId, persistCurrentBrowserSave])
 
   const headers = useMemo((): Record<string, string> => {
     if (!token) return EMPTY_AUTH_HEADERS
@@ -227,6 +242,35 @@ export default function App({ devNoFirebase = false }: AppProps) {
           bundle: next,
         }).catch((e: unknown) =>
           setError(e instanceof Error ? e.message : 'Failed to save logos to browser'),
+        )
+        return next
+      })
+    },
+    [saveId],
+  )
+
+  const importStadiumsToBundle = useCallback(
+    async (newStadiums: SaveBundle['stadiums']) => {
+      const live = saveStateRef.current
+      setLocalBundle((prev) => {
+        if (!prev) return prev
+        const next: SaveBundle = {
+          ...prev,
+          stadiums: { ...(prev.stadiums ?? {}), ...newStadiums },
+          state: live ?? prev.state,
+        }
+        let id = saveId.startsWith('b_') ? saveId : createBrowserSaveId()
+        if (!saveId.startsWith('b_')) {
+          setSaveId(id)
+        }
+        const saveName = String((live ?? prev.state)?.save_name ?? 'Dynasty').trim() || 'Dynasty'
+        void putBrowserSave({
+          id,
+          saveName,
+          updatedAt: Date.now(),
+          bundle: next,
+        }).catch((e: unknown) =>
+          setError(e instanceof Error ? e.message : 'Failed to save stadium photos to browser'),
         )
         return next
       })
@@ -518,6 +562,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
       leagueHistory: (maybePayload as any).leagueHistory ?? { seasons: [] },
       records: (maybePayload as any).records ?? {},
       logos: (maybePayload as any).logos ?? {},
+      stadiums: (maybePayload as any).stadiums ?? {},
       seasonRecaps: (maybePayload as any).seasonRecaps ?? {},
     }
   }
@@ -704,9 +749,23 @@ export default function App({ devNoFirebase = false }: AppProps) {
       setError('Save not found in this browser.')
       return
     }
-    setLocalBundle(rec.bundle)
+    let state = rec.bundle.state
+    try {
+      const r = await fetch(`${API_BASE}/sim/hydrate-inbox`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state }),
+      })
+      if (r.ok) {
+        const data = await r.json()
+        if (data?.state) state = data.state
+      }
+    } catch {
+      /* API offline — load save as stored */
+    }
+    setLocalBundle({ ...rec.bundle, state })
     setSaveId(id)
-    setSaveState(rec.bundle.state)
+    setSaveState(state)
     setDynastyLeagueHistory(
       rec.bundle.leagueHistory && typeof rec.bundle.leagueHistory === 'object'
         ? rec.bundle.leagueHistory
@@ -739,6 +798,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
         leagueHistory: data.league_history ?? { seasons: [] },
         records: data.records ?? {},
         logos: {},
+        stadiums: {},
         seasonRecaps: {},
       }
       const localId = createBrowserSaveId()
@@ -815,6 +875,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
           leagueHistory: data.league_history ?? { seasons: [] },
           records: data.records ?? {},
           logos: {},
+          stadiums: {},
           seasonRecaps: {},
         },
       })
@@ -856,6 +917,8 @@ export default function App({ devNoFirebase = false }: AppProps) {
       transfer_stage_1_ack_results?: boolean
       transfer_stage_2_ack_results?: boolean
       program_development_actions?: { item_id: string; action: 'purchase' | 'renew' }[]
+      seven_on_seven_tournament?: string
+      seven_on_seven_ack_results?: boolean
     }
   }): Promise<boolean> {
     if (!saveId) {
@@ -1166,7 +1229,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
     const timer = window.setTimeout(() => {
       const payload: SaveBundle = localBundle
         ? { ...localBundle, state: live }
-        : { state: live, leagueHistory: { seasons: [] }, records: {}, logos: {}, seasonRecaps: {} }
+        : { state: live, leagueHistory: { seasons: [] }, records: {}, logos: {}, stadiums: {}, seasonRecaps: {} }
       const rec: BrowserAutosaveRecord = {
         savedAt: Date.now(),
         saveId: saveId || '__unknown__',
@@ -1224,6 +1287,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
               seasonRecaps={inLocalRuntime && localBundle ? localBundle.seasonRecaps : undefined}
               onMergeLocalSimulationResult={inLocalRuntime ? mergeLocalSimulationResult : undefined}
               onImportLogosToBundle={localBundle ? importLogosToBundle : undefined}
+              onImportStadiumsToBundle={localBundle ? importStadiumsToBundle : undefined}
               onRefreshDynasty={inLocalRuntime ? undefined : refreshDynastyFromServer}
           />
         </LocalAssetsProvider>
@@ -1572,6 +1636,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
                     leagueHistory: data.league_history ?? { seasons: [] },
                     records: data.records ?? {},
                     logos: {},
+                    stadiums: {},
                     seasonRecaps: {},
                   },
                 })

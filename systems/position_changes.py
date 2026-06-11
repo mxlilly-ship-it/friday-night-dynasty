@@ -59,8 +59,8 @@ def apply_position_changes_to_team(team: "Team", changes: List[Dict[str, Any]]) 
         p.secondary_position = sec_val
 
 
-def reassign_player_position_by_ratings(p: "Player") -> None:
-    """CPU: set primary to best-fitting position; secondary if the other side has a strong fit."""
+def recommend_player_positions(p: "Player") -> Dict[str, Optional[str]]:
+    """Best primary (and optional two-way secondary) by attribute fit — same rules as CPU coaches."""
     candidates: List[tuple] = []
     for pos in OFFENSE_POSITIONS:
         candidates.append((pos, _position_rating_offense(p, pos), _side_for_position(pos)))
@@ -70,15 +70,21 @@ def reassign_player_position_by_ratings(p: "Player") -> None:
         candidates.append((pos, _position_rating_specialist(p, pos), _side_for_position(pos)))
     candidates.sort(key=lambda x: -x[1])
     best_pos, _best_r, side = candidates[0]
-    p.position = best_pos
-    p.secondary_position = None
-    if side == "sp":
-        return
-    other = "def" if side == "off" else "off"
-    for pos, r, s in candidates:
-        if s == other and pos != best_pos and r >= TWO_WAY_POSITION_FIT_THRESHOLD:
-            p.secondary_position = pos
-            break
+    secondary: Optional[str] = None
+    if side != "sp":
+        other = "def" if side == "off" else "off"
+        for pos, r, s in candidates:
+            if s == other and pos != best_pos and r >= TWO_WAY_POSITION_FIT_THRESHOLD:
+                secondary = pos
+                break
+    return {"position": best_pos, "secondary_position": secondary}
+
+
+def reassign_player_position_by_ratings(p: "Player") -> None:
+    """CPU: set primary to best-fitting position; secondary if the other side has a strong fit."""
+    rec = recommend_player_positions(p)
+    p.position = str(rec["position"] or p.position)
+    p.secondary_position = rec.get("secondary_position")
 
 
 def run_ai_position_changes_for_team(team: "Team") -> None:

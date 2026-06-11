@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { fetchCoachGameplan, saveCoachGameplan } from './browserSave'
+import { fetchCoachGameplan, saveCoachGameplan, type GamePlanLibrary } from './browserSave'
 import './CoachGameplanPage.css'
 
 type Side = 'offense' | 'defense'
@@ -28,14 +28,6 @@ const DEF_CATS = ['Zones', 'Man', 'Zone Pressure', 'Man Pressure'] as const
 
 type PlanCell = Record<string, number>
 type Plan = Record<string, Record<string, Record<string, PlanCell>>>
-
-type ApiResp = {
-  matchup_key: string | null
-  offense: Plan
-  defense: Plan
-  fourth_down?: { go_for_it_max_ytg?: number }
-  meta?: any
-}
 
 type Props = {
   apiBase: string
@@ -204,6 +196,8 @@ export default function CoachGameplanPage({
 
   const [offense, setOffense] = useState<Plan | null>(null)
   const [defense, setDefense] = useState<Plan | null>(null)
+  const [offenseLibrary, setOffenseLibrary] = useState<GamePlanLibrary | null>(null)
+  const [defenseLibrary, setDefenseLibrary] = useState<GamePlanLibrary | null>(null)
   const [goForItMaxYtg, setGoForItMaxYtg] = useState<number>(2)
 
   const [scoreSituation, setScoreSituation] = useState<(typeof SCORE_SITUATIONS)[number]>(SCORE_SITUATIONS[3])
@@ -212,6 +206,8 @@ export default function CoachGameplanPage({
   const cats = useMemo(() => (side === 'offense' ? OFF_CATS : DEF_CATS), [side])
   const plan = side === 'offense' ? offense : defense
   const setPlan = side === 'offense' ? setOffense : setDefense
+
+  const sideLibrary = side === 'offense' ? offenseLibrary : defenseLibrary
 
   const saveStateRef = useRef(saveState)
   saveStateRef.current = saveState
@@ -239,6 +235,8 @@ export default function CoachGameplanPage({
       setMatchupKey(j.matchup_key ?? null)
       setOffense(j.offense as Plan)
       setDefense(j.defense as Plan)
+      setOffenseLibrary((j.offense_library as GamePlanLibrary | undefined) ?? null)
+      setDefenseLibrary((j.defense_library as GamePlanLibrary | undefined) ?? null)
       const raw = Number(j.fourth_down?.go_for_it_max_ytg)
       setGoForItMaxYtg(Number.isFinite(raw) ? Math.max(0, Math.min(10, Math.round(raw))) : 2)
     } catch (e: unknown) {
@@ -346,6 +344,55 @@ export default function CoachGameplanPage({
     importInputRef.current?.click()
   }
 
+  const applyLibraryPlan = (source: Plan) => {
+    setPlan(structuredClone(source))
+    onError('')
+  }
+
+  const persistImportedPlan = async (nextPlan: Plan, rawName: string) => {
+    if (!saveId) return
+    const base = rawName.replace(/\.[^.]+$/, '').trim() || 'Imported plan'
+    const name = window.prompt('Name this saved game plan:', base)?.trim() || base
+    setBusy(true)
+    try {
+      const body =
+        side === 'offense'
+          ? { add_offense_library: { name, plan: nextPlan } }
+          : { add_defense_library: { name, plan: nextPlan } }
+      const j = await saveCoachGameplan(apiBase ?? '', saveId, saveStateRef.current, headersRef.current, body)
+      if (j.state) onSaveStateRef.current?.(j.state)
+      setOffenseLibrary(j.offense_library ?? null)
+      setDefenseLibrary(j.defense_library ?? null)
+      setPlan(nextPlan)
+      onError('')
+    } catch (e: any) {
+      onError(e?.message ?? 'Failed to save imported game plan')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const deleteSavedPlan = async (entryId: string) => {
+    if (!saveId) return
+    if (!window.confirm('Delete this saved game plan from your library?')) return
+    setBusy(true)
+    try {
+      const body =
+        side === 'offense'
+          ? { delete_offense_library_id: entryId }
+          : { delete_defense_library_id: entryId }
+      const j = await saveCoachGameplan(apiBase ?? '', saveId, saveStateRef.current, headersRef.current, body)
+      if (j.state) onSaveStateRef.current?.(j.state)
+      setOffenseLibrary(j.offense_library ?? null)
+      setDefenseLibrary(j.defense_library ?? null)
+      onError('')
+    } catch (e: any) {
+      onError(e?.message ?? 'Failed to delete saved game plan')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const onImportFile = async (file: File) => {
     const name = (file.name || '').toLowerCase()
     const text = await file.text()
@@ -370,7 +417,7 @@ export default function CoachGameplanPage({
 
     const v = validateEntirePlan(nextPlan)
     if (!v.ok) throw new Error(v.msg)
-    setPlan(nextPlan)
+    await persistImportedPlan(nextPlan, file.name || 'Imported plan')
   }
 
   const onConfirm = async () => {
@@ -390,6 +437,8 @@ export default function CoachGameplanPage({
       setMatchupKey(j.matchup_key ?? null)
       setOffense(j.offense as Plan)
       setDefense(j.defense as Plan)
+      setOffenseLibrary((j.offense_library as GamePlanLibrary | undefined) ?? null)
+      setDefenseLibrary((j.defense_library as GamePlanLibrary | undefined) ?? null)
       const raw = Number(j.fourth_down?.go_for_it_max_ytg)
       setGoForItMaxYtg(Number.isFinite(raw) ? Math.max(0, Math.min(10, Math.round(raw))) : 2)
       onError('')
@@ -422,7 +471,74 @@ export default function CoachGameplanPage({
       ) : !plan ? (
         <div className="gp2-card">No gameplan loaded.</div>
       ) : (
-        <div className="gp2-card">
+        <div className="gp2-layout">
+          {sideLibrary ? (
+            <aside className="gp2-library">
+              <div className="gp2-library-head">
+                <div className="gp2-label">Saved game plans</div>
+                <p className="gp2-library-note">Pick a plan to load into this week&apos;s editor, then Confirm.</p>
+              </div>
+
+              <div className="gp2-library-section">
+                <div className="gp2-library-section-title">Built-in</div>
+                <div className="gp2-library-list">
+                  {sideLibrary.presets.map((entry) => (
+                    <div key={entry.id} className="gp2-library-item">
+                      <div className="gp2-library-item-main">
+                        <div className="gp2-library-name">{entry.name}</div>
+                        {entry.description ? <div className="gp2-library-desc">{entry.description}</div> : null}
+                      </div>
+                      <button
+                        type="button"
+                        className="gp2-library-apply"
+                        onClick={() => applyLibraryPlan(entry.plan as Plan)}
+                        disabled={busy}
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="gp2-library-section">
+                <div className="gp2-library-section-title">Imported</div>
+                {sideLibrary.saved.length === 0 ? (
+                  <p className="gp2-library-empty">Import JSON/CSV to add a custom plan here.</p>
+                ) : (
+                  <div className="gp2-library-list">
+                    {sideLibrary.saved.map((entry) => (
+                      <div key={entry.id} className="gp2-library-item">
+                        <div className="gp2-library-item-main">
+                          <div className="gp2-library-name">{entry.name}</div>
+                        </div>
+                        <div className="gp2-library-item-actions">
+                          <button
+                            type="button"
+                            className="gp2-library-apply"
+                            onClick={() => applyLibraryPlan(entry.plan as Plan)}
+                            disabled={busy}
+                          >
+                            Apply
+                          </button>
+                          <button
+                            type="button"
+                            className="gp2-library-delete"
+                            onClick={() => void deleteSavedPlan(entry.id)}
+                            disabled={busy}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </aside>
+          ) : null}
+
+          <div className="gp2-card">
           <input
             ref={importInputRef}
             type="file"
@@ -542,6 +658,7 @@ export default function CoachGameplanPage({
             <button type="button" className="gp2-refresh" onClick={() => void fetchPlan({ showLoading: true })} disabled={busy}>
               Reload
             </button>
+          </div>
           </div>
         </div>
       )}

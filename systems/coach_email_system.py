@@ -327,7 +327,16 @@ def generate_week_sim_emails(
     year = int(state.get("current_year", 1))
     batch_key = f"{year}|{phase}|{completed_week}|week_sim"
     if inbox.get("last_week_sim_batch_key") == batch_key:
-        return
+        # Recover if batch key was persisted without sim emails (e.g. stale browser state).
+        has_sim_mail = any(
+            isinstance(e, dict)
+            and int(e.get("week", 0) or 0) == int(completed_week)
+            and not any("starter" in str(t) for t in (e.get("trigger_conditions") or []))
+            for e in (inbox.get("emails") or [])
+        )
+        if has_sim_mail:
+            return
+        inbox["last_week_sim_batch_key"] = None
 
     row = _user_team_row(state)
     prestige = int(row.get("prestige", 5) or 5) if row else 5
@@ -694,7 +703,7 @@ def generate_week_sim_emails(
             em(
                 sender_type=st,
                 sender_name=nm,
-                subject="Quick note",
+                subject=nm,
                 body=body_fn(),
                 category=cat,
                 year=year,

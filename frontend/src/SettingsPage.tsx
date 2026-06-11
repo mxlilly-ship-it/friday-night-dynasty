@@ -1,12 +1,13 @@
 import { useCallback, useRef, useState, type ChangeEvent } from 'react'
-import { suggestTeamForLogoFilename } from './logoMatch'
-import { guessMime, type SaveBundle } from './saveBundle'
+import { suggestTeamForLogoFilename, suggestTeamForStadiumFilename } from './logoMatch'
+import { guessMime, type SaveBundle, type SaveBundleAssetMap } from './saveBundle'
 import './SettingsPage.css'
 
-const MAX_LOGO_FILES = 200
+const MAX_IMAGE_FILES = 200
 const MAX_LOGO_BYTES = 5 * 1024 * 1024
+const MAX_STADIUM_BYTES = 8 * 1024 * 1024
 
-function filterLogoFiles(files: readonly File[]): File[] {
+function filterImageFiles(files: readonly File[]): File[] {
   return files.filter((f) => {
     const n = f.name
     if (!n || n.startsWith('.')) return false
@@ -29,6 +30,7 @@ type Props = {
   onClose: () => void
   onError: (msg: string) => void
   onLogoVersionBump: () => void
+  onStadiumVersionBump?: () => void
   backupReminderFrequency: 'none' | '3_weeks' | '6_weeks' | 'stage'
   onBackupReminderFrequencyChange?: (value: 'none' | '3_weeks' | '6_weeks' | 'stage') => void
   onBackupNow?: () => void
@@ -36,6 +38,8 @@ type Props = {
   onApplySaveState?: (state: unknown) => void
   /** Browser / zip saves: merge logos into the local bundle and persist to IndexedDB. */
   onImportLogosToBundle?: (logos: SaveBundle['logos']) => Promise<void>
+  /** Browser / zip saves: merge stadium photos into the local bundle and persist to IndexedDB. */
+  onImportStadiumsToBundle?: (stadiums: SaveBundle['stadiums']) => Promise<void>
 }
 
 export default function SettingsPage({
@@ -46,22 +50,30 @@ export default function SettingsPage({
   onClose,
   onError,
   onLogoVersionBump,
+  onStadiumVersionBump,
   backupReminderFrequency,
   onBackupReminderFrequencyChange,
   onBackupNow,
   onApplySaveState,
   onImportLogosToBundle,
+  onImportStadiumsToBundle,
 }: Props) {
   const folderInputRef = useRef<HTMLInputElement | null>(null)
   const filesInputRef = useRef<HTMLInputElement | null>(null)
+  const stadiumFolderInputRef = useRef<HTMLInputElement | null>(null)
+  const stadiumFilesInputRef = useRef<HTMLInputElement | null>(null)
   const [busy, setBusy] = useState(false)
+  const [stadiumBusy, setStadiumBusy] = useState(false)
   const [progress, setProgress] = useState<string | null>(null)
+  const [stadiumProgress, setStadiumProgress] = useState<string | null>(null)
   const [lastResult, setLastResult] = useState<string | null>(null)
+  const [stadiumLastResult, setStadiumLastResult] = useState<string | null>(null)
   const [bulkSeasonCount, setBulkSeasonCount] = useState<1 | 5 | 10 | 20>(5)
   const [bulkBusy, setBulkBusy] = useState(false)
 
   /** Rows: one file + which team it maps to (empty string = skip). */
   const [rows, setRows] = useState<{ file: File; team: string }[]>([])
+  const [stadiumRows, setStadiumRows] = useState<{ file: File; team: string }[]>([])
 
   const setFolderInputEl = useCallback((el: HTMLInputElement | null) => {
     folderInputRef.current = el
@@ -75,9 +87,26 @@ export default function SettingsPage({
     }
   }, [])
 
-  const buildRowsFromFiles = (raw: File[]) => {
-    const logoFiles = filterLogoFiles(raw)
-    if (logoFiles.length === 0) {
+  const setStadiumFolderInputEl = useCallback((el: HTMLInputElement | null) => {
+    stadiumFolderInputRef.current = el
+    if (!el) return
+    try {
+      el.setAttribute('webkitdirectory', '')
+      el.setAttribute('directory', '')
+      el.multiple = true
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  const buildRowsFromFiles = (
+    raw: File[],
+    suggest: (filename: string, teams: string[]) => string,
+    setRowState: (rows: { file: File; team: string }[]) => void,
+    setResult: (msg: string | null) => void,
+  ) => {
+    const imageFiles = filterImageFiles(raw)
+    if (imageFiles.length === 0) {
       onError(
         raw.length > 0
           ? `Found ${raw.length} file(s), but none were PNG, JPG, or WEBP.`
@@ -85,15 +114,15 @@ export default function SettingsPage({
       )
       return
     }
-    const capped = logoFiles.length > MAX_LOGO_FILES ? logoFiles.slice(0, MAX_LOGO_FILES) : logoFiles
+    const capped = imageFiles.length > MAX_IMAGE_FILES ? imageFiles.slice(0, MAX_IMAGE_FILES) : imageFiles
     const next = capped.map((file) => ({
       file,
-      team: suggestTeamForLogoFilename(file.name, teamNames),
+      team: suggest(file.name, teamNames),
     }))
-    setRows(next)
-    setLastResult(
-      logoFiles.length > MAX_LOGO_FILES
-        ? `Showing first ${MAX_LOGO_FILES} of ${logoFiles.length} images. Import in batches if needed.`
+    setRowState(next)
+    setResult(
+      imageFiles.length > MAX_IMAGE_FILES
+        ? `Showing first ${MAX_IMAGE_FILES} of ${imageFiles.length} images. Import in batches if needed.`
         : null,
     )
     onError('')
@@ -102,13 +131,25 @@ export default function SettingsPage({
   const onFolderChange = (e: ChangeEvent<HTMLInputElement>) => {
     const snap = snapshotFiles(e.target.files)
     e.target.value = ''
-    buildRowsFromFiles(snap)
+    buildRowsFromFiles(snap, suggestTeamForLogoFilename, setRows, setLastResult)
   }
 
   const onFilesChange = (e: ChangeEvent<HTMLInputElement>) => {
     const snap = snapshotFiles(e.target.files)
     e.target.value = ''
-    buildRowsFromFiles(snap)
+    buildRowsFromFiles(snap, suggestTeamForLogoFilename, setRows, setLastResult)
+  }
+
+  const onStadiumFolderChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const snap = snapshotFiles(e.target.files)
+    e.target.value = ''
+    buildRowsFromFiles(snap, suggestTeamForStadiumFilename, setStadiumRows, setStadiumLastResult)
+  }
+
+  const onStadiumFilesChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const snap = snapshotFiles(e.target.files)
+    e.target.value = ''
+    buildRowsFromFiles(snap, suggestTeamForStadiumFilename, setStadiumRows, setStadiumLastResult)
   }
 
   const setTeamAt = (index: number, team: string) => {
@@ -119,10 +160,78 @@ export default function SettingsPage({
     })
   }
 
+  const setStadiumTeamAt = (index: number, team: string) => {
+    setStadiumRows((prev) => {
+      const copy = [...prev]
+      if (copy[index]) copy[index] = { ...copy[index], team }
+      return copy
+    })
+  }
+
   const clearRows = () => {
     setRows([])
     setProgress(null)
     setLastResult(null)
+  }
+
+  const clearStadiumRows = () => {
+    setStadiumRows([])
+    setStadiumProgress(null)
+    setStadiumLastResult(null)
+  }
+
+  const importAssetsToBundle = async (
+    toUpload: { file: File; team: string }[],
+    maxBytes: number,
+    merge: (assets: SaveBundleAssetMap) => Promise<void>,
+  ) => {
+    const assets: SaveBundleAssetMap = {}
+    for (let i = 0; i < toUpload.length; i++) {
+      const { file, team } = toUpload[i]
+      if (file.size > maxBytes) {
+        throw new Error(`${file.name} is too large (max ${Math.round(maxBytes / (1024 * 1024))} MB).`)
+      }
+      const buf = new Uint8Array(await file.arrayBuffer())
+      assets[team] = {
+        filename: file.name,
+        data: buf,
+        mime: file.type?.startsWith('image/') ? file.type : guessMime(file.name),
+      }
+    }
+    if (Object.keys(assets).length > 0) {
+      await merge(assets)
+    }
+    return toUpload.length
+  }
+
+  const uploadAssetsToApi = async (
+    toUpload: { file: File; team: string }[],
+    maxBytes: number,
+    fieldName: 'logo' | 'stadium',
+    pathSegment: 'logos' | 'stadiums',
+    setProgressText: (msg: string | null) => void,
+  ) => {
+    const uploadHeaders: Record<string, string> = {}
+    if (headers.Authorization) uploadHeaders.Authorization = headers.Authorization
+    for (let i = 0; i < toUpload.length; i++) {
+      const { file, team } = toUpload[i]
+      setProgressText(`Uploading ${i + 1} / ${toUpload.length}: ${team}…`)
+      if (file.size > maxBytes) {
+        throw new Error(`${file.name} is too large (max ${Math.round(maxBytes / (1024 * 1024))} MB).`)
+      }
+      const fd = new FormData()
+      fd.append(fieldName, file)
+      const r = await fetch(`${apiBase}/saves/${pathSegment}/${encodeURIComponent(team)}`, {
+        method: 'POST',
+        headers: uploadHeaders,
+        body: fd,
+      })
+      if (!r.ok) {
+        const t = await r.text().catch(() => '')
+        throw new Error(t || `Failed for ${team}`)
+      }
+    }
+    return toUpload.length
   }
 
   const runImport = async () => {
@@ -148,84 +257,65 @@ export default function SettingsPage({
     setProgress(null)
     onError('')
 
-    let ok = 0
-    let failed = 0
-    let lastErr = ''
-
-    if (isLocalSave) {
-      const logos: SaveBundle['logos'] = {}
-      for (let i = 0; i < toUpload.length; i++) {
-        const { file, team } = toUpload[i]
-        setProgress(`Importing ${i + 1} / ${toUpload.length}: ${team}…`)
-        try {
-          if (file.size > MAX_LOGO_BYTES) {
-            throw new Error(`${file.name} is too large (max 5 MB).`)
-          }
-          const buf = new Uint8Array(await file.arrayBuffer())
-          logos[team] = {
-            filename: file.name,
-            data: buf,
-            mime: file.type?.startsWith('image/') ? file.type : guessMime(file.name),
-          }
-          ok += 1
-        } catch (e: unknown) {
-          failed += 1
-          lastErr = e instanceof Error ? e.message : 'Import failed'
-          break
-        }
+    try {
+      let ok = 0
+      if (isLocalSave) {
+        ok = await importAssetsToBundle(toUpload, MAX_LOGO_BYTES, onImportLogosToBundle ?? (async () => {}))
+      } else {
+        ok = await uploadAssetsToApi(toUpload, MAX_LOGO_BYTES, 'logo', 'logos', setProgress)
       }
-      if (failed === 0 && ok > 0) {
-        try {
-          await onImportLogosToBundle!(logos)
-        } catch (e: unknown) {
-          failed += 1
-          lastErr = e instanceof Error ? e.message : 'Failed to save logos'
-        }
-      }
-    } else {
-      const uploadHeaders: Record<string, string> = {}
-      if (headers.Authorization) uploadHeaders.Authorization = headers.Authorization
-
-      for (let i = 0; i < toUpload.length; i++) {
-        const { file, team } = toUpload[i]
-        setProgress(`Uploading ${i + 1} / ${toUpload.length}: ${team}…`)
-        try {
-          if (file.size > MAX_LOGO_BYTES) {
-            throw new Error(`${file.name} is too large (max 5 MB).`)
-          }
-          const fd = new FormData()
-          fd.append('logo', file)
-          const r = await fetch(`${apiBase}/saves/logos/${encodeURIComponent(team)}`, {
-            method: 'POST',
-            headers: uploadHeaders,
-            body: fd,
-          })
-          if (!r.ok) {
-            const t = await r.text().catch(() => '')
-            throw new Error(t || `Failed for ${team}`)
-          }
-          ok += 1
-        } catch (e: unknown) {
-          failed += 1
-          lastErr = e instanceof Error ? e.message : 'Upload failed'
-          break
-        }
-      }
+      onLogoVersionBump()
+      setLastResult(`Imported ${ok} logo(s).`)
+      onError('')
+      clearRows()
+    } catch (e: unknown) {
+      onError(e instanceof Error ? e.message : 'Import stopped due to an error.')
+    } finally {
+      setProgress(null)
+      setBusy(false)
     }
+  }
 
-    onLogoVersionBump()
-    setProgress(null)
-    setBusy(false)
+  const runStadiumImport = async () => {
+    const toUpload = stadiumRows.filter((r) => r.team.trim())
+    if (toUpload.length === 0) {
+      onError('Pick a team for at least one stadium photo, or use Skip on all rows.')
+      return
+    }
+    if (!saveId) return
 
-    if (failed > 0) {
-      onError(lastErr || 'Import stopped due to an error.')
-      setLastResult(`Imported ${ok} logo(s) before the error.`)
+    const isLocalSave = saveId === '__local__' || saveId.startsWith('b_')
+    if (isLocalSave) {
+      if (!onImportStadiumsToBundle) {
+        onError('Stadium import is not available for this save.')
+        return
+      }
+    } else if (!headers.Authorization) {
+      onError('Sign in to upload stadium photos to a cloud save, or use a browser dynasty save.')
       return
     }
 
-    setLastResult(`Imported ${ok} logo(s).`)
+    setStadiumBusy(true)
+    setStadiumProgress(null)
     onError('')
-    clearRows()
+
+    try {
+      let ok = 0
+      if (isLocalSave) {
+        ok = await importAssetsToBundle(toUpload, MAX_STADIUM_BYTES, onImportStadiumsToBundle!)
+      } else {
+        ok = await uploadAssetsToApi(toUpload, MAX_STADIUM_BYTES, 'stadium', 'stadiums', setStadiumProgress)
+      }
+      onStadiumVersionBump?.()
+      setStadiumLastResult(`Imported ${ok} stadium photo(s).`)
+      onError('')
+      clearStadiumRows()
+    } catch (e: unknown) {
+      onError(e instanceof Error ? e.message : 'Import stopped due to an error.')
+    } finally {
+      setStadiumProgress(null)
+      setStadiumBusy(false)
+    }
   }
 
   const sortedTeams = [...teamNames].sort((a, b) => a.localeCompare(b))
@@ -374,6 +464,113 @@ export default function SettingsPage({
               </div>
             </div>
           ) : null}
+        </section>
+
+        <section className="settings-section">
+          <h2 className="settings-section-title">Stadium photos</h2>
+          <p className="settings-copy">
+            Import home field or stadium shots the same way as logos — choose a <strong>folder</strong> or{' '}
+            <strong>image files</strong>, assign each to a school, then import. Filenames like{' '}
+            <code>Martinsburg_stadium.jpg</code> or <code>Beckley.png</code> are matched automatically.
+            {isLocalSave ? (
+              <>
+                {' '}
+                Browser saves store stadium photos on this device (included in backup .zip).
+              </>
+            ) : null}
+          </p>
+
+          <input
+            ref={setStadiumFolderInputEl}
+            type="file"
+            className="settings-file-input"
+            onChange={onStadiumFolderChange}
+          />
+
+          <input
+            ref={stadiumFilesInputRef}
+            type="file"
+            multiple
+            accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+            className="settings-file-input"
+            onChange={onStadiumFilesChange}
+          />
+
+          <div className="settings-actions settings-actions-row">
+            <button
+              type="button"
+              className="settings-primary"
+              disabled={stadiumBusy || busy || !saveId}
+              onClick={() => stadiumFolderInputRef.current?.click()}
+            >
+              Choose folder…
+            </button>
+            <button
+              type="button"
+              className="settings-secondary"
+              disabled={stadiumBusy || busy || !saveId}
+              onClick={() => stadiumFilesInputRef.current?.click()}
+            >
+              Choose image files…
+            </button>
+          </div>
+
+          {stadiumRows.length > 0 ? (
+            <div className="settings-review">
+              <div className="settings-review-head">
+                <span>{stadiumRows.length} image(s)</span>
+                <button type="button" className="settings-linkbtn" onClick={clearStadiumRows} disabled={stadiumBusy}>
+                  Clear list
+                </button>
+              </div>
+              <div className="settings-review-table-wrap">
+                <table className="settings-review-table">
+                  <thead>
+                    <tr>
+                      <th>File</th>
+                      <th>Team</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stadiumRows.map((row, i) => (
+                      <tr key={`stadium-${row.file.name}-${i}-${row.file.size}`}>
+                        <td className="settings-filecell" title={row.file.name}>
+                          {row.file.name}
+                        </td>
+                        <td>
+                          <select
+                            className="settings-team-select"
+                            value={row.team}
+                            onChange={(e) => setStadiumTeamAt(i, e.target.value)}
+                            disabled={stadiumBusy}
+                          >
+                            <option value="">— Skip —</option>
+                            {sortedTeams.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="settings-import-row">
+                <button
+                  type="button"
+                  className="settings-import-btn"
+                  disabled={stadiumBusy || busy || !saveId}
+                  onClick={() => void runStadiumImport()}
+                >
+                  {stadiumBusy ? 'Working…' : 'Import stadium photos'}
+                </button>
+                {stadiumProgress ? <span className="settings-progress">{stadiumProgress}</span> : null}
+              </div>
+            </div>
+          ) : null}
+          {stadiumLastResult ? <p className="settings-result">{stadiumLastResult}</p> : null}
         </section>
 
         <section className="settings-section">

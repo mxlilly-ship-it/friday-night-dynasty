@@ -13,8 +13,8 @@ from backend.services.game_service import (
     sim_to_half,
     sim_to_end,
 )
+from backend.services.game_state import get_teams_for_coach_game
 from backend.services.league_service import attach_user_coach_gameplan_v2_from_save_state, get_save
-from systems.save_system import team_from_dict
 
 
 router = APIRouter()
@@ -23,19 +23,6 @@ router = APIRouter()
 class PlayRequest(BaseModel):
     offense_play_id: str
     defense_play_id: str
-
-
-def _get_teams_for_game(save_state: dict, game) -> tuple:
-    """Get home_team and away_team from save. Use game.home_team_name/away_team_name if set."""
-    teams = {t["name"]: team_from_dict(t) for t in save_state.get("teams", [])}
-    home_name = getattr(game, "home_team_name", None)
-    away_name = getattr(game, "away_team_name", None)
-    if home_name and away_name and home_name in teams and away_name in teams:
-        return teams[home_name], teams[away_name]
-    team_names = list(teams.keys())
-    if len(team_names) < 2:
-        raise ValueError("not enough teams")
-    return teams[team_names[0]], teams[team_names[1]]
 
 
 @router.get("/{game_id}", response_model=Dict[str, Any])
@@ -53,7 +40,7 @@ def options_route(game_id: str, save_id: str, user=Depends(require_user)):
         save = get_save(user["user_id"], save_id)
         state = save["state"]
         game = get_game(game_id)
-        home_team, away_team = _get_teams_for_game(state, game)
+        home_team, away_team = get_teams_for_coach_game(state, game)
         attach_user_coach_gameplan_v2_from_save_state(
             state, home_team, away_team, getattr(game, "user_team_name", None)
         )
@@ -68,7 +55,7 @@ def play_route(game_id: str, save_id: str, body: PlayRequest, user=Depends(requi
         save = get_save(user["user_id"], save_id)
         state = save["state"]
         game = get_game(game_id)
-        home_team, away_team = _get_teams_for_game(state, game)
+        home_team, away_team = get_teams_for_coach_game(state, game)
         attach_user_coach_gameplan_v2_from_save_state(
             state, home_team, away_team, getattr(game, "user_team_name", None)
         )
@@ -85,7 +72,7 @@ def sim_next_route(game_id: str, save_id: str, user=Depends(require_user)):
         save = get_save(user["user_id"], save_id)
         state = save["state"]
         game = get_game(game_id)
-        home_team, away_team = _get_teams_for_game(state, game)
+        home_team, away_team = get_teams_for_coach_game(state, game)
         attach_user_coach_gameplan_v2_from_save_state(
             state, home_team, away_team, getattr(game, "user_team_name", None)
         )
@@ -102,7 +89,7 @@ def sim_to_half_route(game_id: str, save_id: str, user=Depends(require_user)):
         save = get_save(user["user_id"], save_id)
         state = save["state"]
         game = get_game(game_id)
-        home_team, away_team = _get_teams_for_game(state, game)
+        home_team, away_team = get_teams_for_coach_game(state, game)
         attach_user_coach_gameplan_v2_from_save_state(
             state, home_team, away_team, getattr(game, "user_team_name", None)
         )
@@ -119,7 +106,7 @@ def sim_to_end_route(game_id: str, save_id: str, user=Depends(require_user)):
         save = get_save(user["user_id"], save_id)
         state = save["state"]
         game = get_game(game_id)
-        home_team, away_team = _get_teams_for_game(state, game)
+        home_team, away_team = get_teams_for_coach_game(state, game)
         attach_user_coach_gameplan_v2_from_save_state(
             state, home_team, away_team, getattr(game, "user_team_name", None)
         )

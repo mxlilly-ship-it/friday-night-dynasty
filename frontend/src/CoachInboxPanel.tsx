@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { isBrowserSaveId } from './browserSave'
+import { sortInboxEmailsForDisplay, inboxEmailDisplayTitle } from './inSeasonDashboardData'
 
 export type CoachEmail = {
   id: string
@@ -29,6 +31,7 @@ type Props = {
   saveId: string
   apiBase: string
   headers: Record<string, string>
+  getLiveSaveState?: () => any
   onSaveState?: (s: any) => void
   onError: (msg: string) => void
   /** Local zip / offline bundle: inbox actions cannot hit the API */
@@ -52,23 +55,6 @@ function groupKey(e: CoachEmail): string {
   return `${y}-W${w}`
 }
 
-function sortEmails(a: CoachEmail, b: CoachEmail): number {
-  const ya = Number(a.year ?? 0)
-  const yb = Number(b.year ?? 0)
-  if (yb !== ya) return yb - ya
-  const wa = Number(a.week ?? 0)
-  const wb = Number(b.week ?? 0)
-  if (wb !== wa) return wb - wa
-  const da = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(
-    String(a.virtual_day || ''),
-  )
-  const db = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(
-    String(b.virtual_day || ''),
-  )
-  if (da !== db) return db - da
-  return String(b.id).localeCompare(String(a.id))
-}
-
 function nextEmailIdAfterDelete(emailId: string, list: CoachEmail[]): string | null {
   const idx = list.findIndex((e) => e.id === emailId)
   if (idx < 0) return list[0]?.id ?? null
@@ -82,6 +68,7 @@ export default function CoachInboxPanel({
   saveId,
   apiBase,
   headers,
+  getLiveSaveState,
   onSaveState,
   onError,
   readOnly = false,
@@ -94,10 +81,9 @@ export default function CoachInboxPanel({
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
-    const rows = [...emails]
-    rows.sort(sortEmails)
-    if (filterCat === 'all') return rows
-    return rows.filter((e) => String(e.category || '') === filterCat)
+    const rows =
+      filterCat === 'all' ? emails : emails.filter((e) => String(e.category || '') === filterCat)
+    return sortInboxEmailsForDisplay(rows) as CoachEmail[]
   }, [emails, filterCat])
 
   const grouped = useMemo(() => {
@@ -132,10 +118,16 @@ export default function CoachInboxPanel({
       choose?: { email_id: string; choice_id: string }
       delete?: string[]
     }) => {
-      const r = await fetch(`${apiBase}/saves/${saveId}/coach-inbox`, {
+      const isLocalBundle = isBrowserSaveId(saveId)
+      const live = getLiveSaveState?.() ?? saveState
+      const url = isLocalBundle
+        ? `${apiBase}/sim/coach-inbox`
+        : `${apiBase}/saves/${saveId}/coach-inbox`
+      const reqBody = isLocalBundle ? { state: live, ...body } : body
+      const r = await fetch(url, {
         method: 'PATCH',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(reqBody),
       })
       if (!r.ok) {
         const err = await r.json().catch(() => ({}))
@@ -146,17 +138,17 @@ export default function CoachInboxPanel({
       if (data?.state) onSaveState?.(data.state)
       return true
     },
-    [apiBase, headers, onError, onSaveState, saveId],
+    [apiBase, headers, getLiveSaveState, onError, onSaveState, saveId, saveState],
   )
 
   const openEmail = useCallback(
     async (e: CoachEmail) => {
       setSelectedId(e.id)
-      if (!e.read && !readOnly) {
+      if (!e.read) {
         await patchInbox({ mark_read: [e.id] })
       }
     },
-    [patchInbox, readOnly],
+    [patchInbox],
   )
 
   const moveSelection = useCallback(
@@ -193,48 +185,19 @@ export default function CoachInboxPanel({
       if (!email?.id) return
       const nextId = nextEmailIdAfterDelete(email.id, filtered)
 
-      if (readOnly) {
-        if (!onSaveState) return
-        const prev = (saveState?.coach_inbox || {}) as CoachInboxState
-        const list = Array.isArray(prev.emails) ? prev.emails : []
-        onSaveState({
-          ...saveState,
-          coach_inbox: {
-            ...prev,
-            emails: list.filter((row) => row.id !== email.id),
-          },
-        })
-        setSelectedId(nextId)
-        return
-      }
-
       const ok = await patchInbox({ delete: [email.id] })
       if (ok) setSelectedId(nextId)
     },
-    [filtered, onSaveState, patchInbox, readOnly, saveState],
+    [filtered, patchInbox],
   )
 
   const deleteAllEmails = useCallback(async () => {
     if (emails.length === 0) return
     if (!window.confirm(`Delete all ${emails.length} message${emails.length === 1 ? '' : 's'}?`)) return
 
-    if (readOnly) {
-      if (!onSaveState) return
-      const prev = (saveState?.coach_inbox || {}) as CoachInboxState
-      onSaveState({
-        ...saveState,
-        coach_inbox: {
-          ...prev,
-          emails: [],
-        },
-      })
-      setSelectedId(null)
-      return
-    }
-
     const ok = await patchInbox({ delete: emails.map((e) => e.id) })
     if (ok) setSelectedId(null)
-  }, [emails, onSaveState, patchInbox, readOnly, saveState])
+  }, [emails, patchInbox])
 
   const meter = (label: string, v: number | undefined) => (
     <div className="coach-inbox-meter">
@@ -331,7 +294,7 @@ export default function CoachInboxPanel({
                       <span className="coach-inbox-sender">{e.sender_name || 'Unknown'}</span>
                       <span className="coach-inbox-day">{e.virtual_day || '—'}</span>
                     </div>
-                    <div className="coach-inbox-subject">{e.subject || '(no subject)'}</div>
+                    <div className="coach-inbox-subject">{inboxEmailDisplayTitle(e)}</div>
                     <div className="coach-inbox-meta">
                       <span className="coach-inbox-tag">{e.sender_type || ''}</span>
                       {e.category ? <span className="coach-inbox-tag coach-inbox-tag--muted">{e.category}</span> : null}

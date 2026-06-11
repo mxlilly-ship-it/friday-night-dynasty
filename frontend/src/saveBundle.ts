@@ -1,5 +1,7 @@
 import JSZip from 'jszip'
-import { suggestTeamForLogoFilename } from './logoMatch'
+import { suggestTeamForLogoFilename, suggestTeamForStadiumFilename } from './logoMatch'
+
+export type SaveBundleAssetMap = Record<string, { filename: string; data: Uint8Array; mime: string }>
 
 export type SaveBundle = {
   state: any
@@ -9,7 +11,9 @@ export type SaveBundle = {
    * key: normalized team name (exact match used elsewhere in UI)
    * value: { filename, data, mime }
    */
-  logos: Record<string, { filename: string; data: Uint8Array; mime: string }>
+  logos: SaveBundleAssetMap
+  /** Optional home stadium / field photos keyed by team name. */
+  stadiums: SaveBundleAssetMap
   /** Optional recap text files (path -> text) */
   seasonRecaps: Record<string, string>
 }
@@ -50,6 +54,7 @@ export async function importSaveZip(file: File): Promise<SaveBundle> {
   const records = recordsText ? safeJsonParse(recordsText, 'records.json') : {}
 
   const logos: SaveBundle['logos'] = {}
+  const stadiums: SaveBundle['stadiums'] = {}
   const seasonRecaps: SaveBundle['seasonRecaps'] = {}
   const teamNames = Array.isArray(state?.teams) ? state.teams.map((t: any) => String(t?.name ?? '')).filter(Boolean) : []
 
@@ -64,12 +69,18 @@ export async function importSaveZip(file: File): Promise<SaveBundle> {
       const guess = teamNames.length ? suggestTeamForLogoFilename(filename, teamNames) : ''
       const key = guess || filename.replace(/\.[^.]+$/, '')
       logos[key] = { filename, data, mime: guessMime(filename) }
+    } else if (norm.toLowerCase().startsWith('stadiums/')) {
+      const filename = norm.split('/').pop() || norm
+      const data = await entry.async('uint8array')
+      const guess = teamNames.length ? suggestTeamForStadiumFilename(filename, teamNames) : ''
+      const key = guess || filename.replace(/\.[^.]+$/, '')
+      stadiums[key] = { filename, data, mime: guessMime(filename) }
     } else if (norm.toLowerCase().startsWith('season_recaps/') && norm.toLowerCase().endsWith('.txt')) {
       seasonRecaps[norm] = await entry.async('text')
     }
   }
 
-  return { state, leagueHistory, records, logos, seasonRecaps }
+  return { state, leagueHistory, records, logos, stadiums, seasonRecaps }
 }
 
 export async function exportSaveZip(bundle: SaveBundle): Promise<Blob> {
@@ -81,6 +92,11 @@ export async function exportSaveZip(bundle: SaveBundle): Promise<Blob> {
   for (const [team, logo] of Object.entries(bundle.logos ?? {})) {
     const fn = logo.filename || `${team}.png`
     zip.file(`logos/${fn}`, logo.data)
+  }
+
+  for (const [team, stadium] of Object.entries(bundle.stadiums ?? {})) {
+    const fn = stadium.filename || `${team}.jpg`
+    zip.file(`stadiums/${fn}`, stadium.data)
   }
 
   for (const [path, text] of Object.entries(bundle.seasonRecaps ?? {})) {

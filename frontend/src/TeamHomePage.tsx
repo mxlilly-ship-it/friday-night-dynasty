@@ -8,6 +8,8 @@ import { fetchPlayLearningSummary, fetchPlaySelection, saveDepthChart } from './
 import { cachePlaySelectionResponse, hasPlaySelectionCache } from './playSelectionCache'
 import DepthChartPage from './DepthChartPage'
 import ScrimmagePanel from './ScrimmagePanel'
+import PreseasonHubHeader from './PreseasonHubHeader'
+import { formatPositionRecommendation, recommendPlayerPositions } from './positionRecommendations'
 import GamePlayPage from './GamePlayPage'
 import TeamLogo from './TeamLogo'
 import TeamStadium from './TeamStadium'
@@ -50,6 +52,7 @@ import HomeGameThemesPanel from './HomeGameThemesPanel'
 import { themeLabelForGame } from './homeGameThemes'
 import type { HomeThemeSelection } from './homeGameThemes'
 import CoachInboxPanel from './CoachInboxPanel'
+import InSeasonDashboard from './InSeasonDashboard'
 import ProgramDevelopmentPanel from './ProgramDevelopmentPanel'
 import TeamFacilitiesPage from './TeamFacilitiesPage'
 import catalogJson from './programEquipmentCatalog.json'
@@ -75,6 +78,7 @@ import {
   findPlayoffGame,
   firstRoundPairsFromSeeds,
   isRegionalPlayoffSeeds,
+  type PlayoffSeedRow,
   PLAYOFF_FINAL_FOUR_VIEW,
   playoffDisplaySeedForTeam,
   playoffRegionsFromSeeds,
@@ -122,6 +126,32 @@ const SPRING_DEFENSE_OPTIONS: { value: string; label: string }[] = [
   { value: 'tackling', label: 'Tackling' },
   { value: 'pass_defense', label: 'Pass Defense' },
   { value: 'block_defeat', label: 'Block Defeat' },
+]
+
+const SEVEN_ON_SEVEN_TOURNAMENTS: {
+  id: 'area' | 'regional' | 'state'
+  label: string
+  difficulty: string
+  description: string
+}[] = [
+  {
+    id: 'area',
+    label: 'Area',
+    difficulty: 'Easiest',
+    description: 'Local programs. Softer competition and a friendly group stage.',
+  },
+  {
+    id: 'regional',
+    label: 'Regional',
+    difficulty: 'Medium',
+    description: 'Regional rivals and balanced fields. Standard 7-on-7 difficulty.',
+  },
+  {
+    id: 'state',
+    label: 'State',
+    difficulty: 'Hardest',
+    description: 'Statewide elite programs. Toughest bracket and crossover games.',
+  },
 ]
 
 const WINTER_TRAINING_CATEGORIES: { key: string; label: string; primary: string; secondary: string }[] = [
@@ -234,6 +264,8 @@ type Props = {
       transfer_stage_1_ack_results?: boolean
       transfer_stage_2_ack_results?: boolean
       program_development_actions?: ProgramDevAction[]
+      seven_on_seven_tournament?: string
+      seven_on_seven_ack_results?: boolean
     }
   }) => Promise<boolean>
   /** Latest save after sim (ref); use for back-to-back week sims before React re-renders. */
@@ -255,6 +287,8 @@ type Props = {
   }) => void
   /** Browser saves: merge imported logos into the zip bundle and IndexedDB. */
   onImportLogosToBundle?: (logos: import('./saveBundle').SaveBundle['logos']) => Promise<void>
+  /** Browser saves: merge stadium photos into the zip bundle and IndexedDB. */
+  onImportStadiumsToBundle?: (stadiums: import('./saveBundle').SaveBundle['stadiums']) => Promise<void>
   /** API saves: reload league_history.json when opening Team History. */
   onRefreshDynasty?: () => void | Promise<void>
 }
@@ -1300,88 +1334,6 @@ function normalizePlayoffsByClass(state: any): Record<string, any> | null {
   return null
 }
 
-function findQfGame(qf: any[], pair: { home: string; away: string }) {
-  return qf.find(
-    (g: any) =>
-      (g?.home === pair.home && g?.away === pair.away) ||
-      (g?.home === pair.away && g?.away === pair.home),
-  )
-}
-
-function qfWinnerByIndex(qf: any[], qfPairs: { home: string; away: string }[], i: number): string | null {
-  const p = qfPairs[i]
-  if (!p) return null
-  const g = findQfGame(qf, p)
-  const w = g?.winner
-  return w != null && String(w).trim() !== '' ? String(w) : null
-}
-
-/** Semifinal rows: real results plus projected matchups (QF winners → SF pairings) before the round is simmed. */
-function buildPlayoffSfRows(qf: any[], sf: any[], qfPairs: { home: string; away: string }[]) {
-  const w = (i: number) => qfWinnerByIndex(qf, qfPairs, i)
-  const projRow = (which: 1 | 2) => {
-    if (which === 1) {
-      const home = w(0) ?? 'TBD'
-      const away = w(3) ?? 'TBD'
-      return { home, away, home_score: null, away_score: null, projected: true }
-    }
-    const home = w(1) ?? 'TBD'
-    const away = w(2) ?? 'TBD'
-    return { home, away, home_score: null, away_score: null, projected: true }
-  }
-  const matchesSf1 = (g: any) => {
-    const a = w(0),
-      b = w(3)
-    if (!a || !b) return false
-    return (g.home === a && g.away === b) || (g.home === b && g.away === a)
-  }
-  const matchesSf2 = (g: any) => {
-    const a = w(1),
-      b = w(2)
-    if (!a || !b) return false
-    return (g.home === a && g.away === b) || (g.home === b && g.away === a)
-  }
-
-  if (sf.length >= 2) {
-    return sf.map((g) => ({ ...g, projected: false }))
-  }
-  if (sf.length === 1) {
-    const g = sf[0]
-    if (matchesSf1(g)) return [g, projRow(2)]
-    if (matchesSf2(g)) return [projRow(1), g]
-    return [g, projRow(2)]
-  }
-  return [projRow(1), projRow(2)]
-}
-
-/** Championship row: final game or projected matchup (both SF winners) before the title game. */
-function buildPlayoffChRow(ch: any[], sf: any[]) {
-  if (ch.length) return { ...ch[0], projected: false }
-  if (sf.length === 2) {
-    const w1 = sf[0]?.winner
-    const w2 = sf[1]?.winner
-    if (w1 && w2) {
-      return {
-        home: String(w1),
-        away: String(w2),
-        home_score: null,
-        away_score: null,
-        projected: true,
-      }
-    }
-  }
-  if (sf.length === 1 && sf[0]?.winner) {
-    return {
-      home: String(sf[0].winner),
-      away: 'TBD',
-      home_score: null,
-      away_score: null,
-      projected: true,
-    }
-  }
-  return { home: 'TBD', away: 'TBD', home_score: null, away_score: null, projected: true }
-}
-
 function buildPlayoffView(state: any, classKey?: string | null, regionKey?: string | null) {
   let inner: {
     num_teams?: number
@@ -1666,6 +1618,10 @@ function TeamHomePageBody({
   setStadiumVersion,
   onOpenSettings,
 }: TeamHomePageBodyProps) {
+  void backupReminderFrequency
+  void onBackupReminderFrequencyChange
+  void onBackupNow
+  void setLogoVersion
   const isLocalBundle = saveId === '__local__' || saveId.startsWith('b_')
   /** Browser/IDB saves use stateless /sim/game/* (no Bearer). Cloud saves need auth for /start-coach-game. */
   const canStartCoachPlay = Boolean(saveId) && (isLocalBundle || Boolean(headers?.Authorization))
@@ -1978,6 +1934,10 @@ function TeamHomePageBody({
     [saveState, leagueClassFilter],
   )
   const userClassification = useMemo(() => classificationOfUserTeam(saveState), [saveState])
+  const inSeasonClassStandings = useMemo(
+    () => buildStandingsRows(saveState, userClassification),
+    [saveState, userClassification],
+  )
   const seasonSummaryStandingsRows = useMemo(
     () => buildStandingsRows(saveState, bracketClassForView || userClassification).slice(0, 10),
     [saveState, bracketClassForView, userClassification],
@@ -2064,6 +2024,17 @@ function TeamHomePageBody({
     () => buildTeamStatRows(saveState, leagueClassFilter),
     [saveState, leagueClassFilter],
   )
+  const inSeasonUserStatsRow = useMemo(() => {
+    const my = teamStatRows.find((r) => r.teamName === userTeam)
+    if (!my) return null
+    return {
+      pointsFor: my.pointsFor,
+      pointsAgainst: my.pointsAgainst,
+      games: my.games,
+      totalYards: my.totalYards,
+      turnovers: my.turnovers,
+    }
+  }, [teamStatRows, userTeam])
   const playerStatRows = useMemo(() => buildPlayerStatRows(saveState), [saveState])
   const leagueRosterPlayerCount = useMemo(() => {
     let n = 0
@@ -3357,8 +3328,10 @@ function TeamHomePageBody({
                 stadiumVersion={stadiumVersion}
               />
               <p className="teamhome-teaminfo-stadium-hint">
-                Optional home field or stadium shot (PNG, JPG, or WEBP). Shown for whichever school you select above;
-                files are stored with your account like team logos.
+                Optional home field or stadium shot (PNG, JPG, or WEBP). Shown for whichever school you select above.
+                {isLocalBundle
+                  ? ' Import stadium photos in bulk from Settings (included in backup .zip).'
+                  : ' Files are stored with your account; bulk import is also available in Settings.'}
               </p>
             </div>
             <div className="teamhome-teaminfo-banners">
@@ -3817,8 +3790,8 @@ function TeamHomePageBody({
                     const inner = pdata as Record<string, unknown>
                     const gamesRaw = inner?.bracket_results
                     const results = Array.isArray(gamesRaw) ? (gamesRaw as PlayoffGameRow[]) : []
-                    const seeds = Array.isArray(inner?.seeds)
-                      ? (inner.seeds as { seed?: number; team?: string }[])
+                    const seeds: PlayoffSeedRow[] = Array.isArray(inner?.seeds)
+                      ? (inner.seeds as PlayoffSeedRow[])
                       : []
                     const seedForTeam = (name: string): number | null => {
                       const row = seeds.find((s) => String(s.team) === name)
@@ -3926,12 +3899,6 @@ function TeamHomePageBody({
     return s || '—'
   }, [userTeamObj])
   const coach = userTeamObj?.coach ?? null
-  const offensePlan = coach
-    ? `Offense: ${safeStr(coach.offensive_style)} · ${safeStr(coach.offensive_formation)}`
-    : 'Offense: (not set yet)'
-  const defensePlan = coach
-    ? `Defense: ${safeStr(coach.defensive_style)} · ${safeStr(coach.defensive_formation)}`
-    : 'Defense: (not set yet)'
 
   const nextOpponentText =
     phase === 'regular'
@@ -3970,6 +3937,15 @@ function TeamHomePageBody({
     }
     return 'Preseason'
   }, [phase, offseasonStages, offseasonStageIndex])
+  const preseasonNextStageLabel = useMemo(() => {
+    if (phase !== 'preseason' || !preseasonStages.length) return ''
+    const i = preseasonStageIndex
+    if (i < 0 || i >= preseasonStages.length) return '—'
+    if (i < preseasonStages.length - 1) {
+      return displayOffseasonStageLabel(preseasonStages[i + 1] ?? '')
+    }
+    return 'Regular season'
+  }, [phase, preseasonStages, preseasonStageIndex])
   const lastOpponentText =
     phase === 'playoffs'
       ? playoffLast
@@ -4085,6 +4061,7 @@ function TeamHomePageBody({
   const [winterTrainingAllocations, setWinterTrainingAllocations] = useState<Record<string, number>>(() => defaultWinterAllocations())
   const [springOffense, setSpringOffense] = useState('run_game')
   const [springDefense, setSpringDefense] = useState('pass_defense')
+  const [sevenOnSevenTier, setSevenOnSevenTier] = useState<'area' | 'regional' | 'state'>('regional')
   const [improveFacCumulative, setImproveFacCumulative] = useState(0)
   const [improveCulCumulative, setImproveCulCumulative] = useState(0)
   const [improveBooCumulative, setImproveBooCumulative] = useState(0)
@@ -4120,6 +4097,16 @@ function TeamHomePageBody({
       }
     }
     setPositionDraft(next)
+  }, [isPositionChangesStage, saveState, userTeam])
+  const positionCoachRecommendations = useMemo(() => {
+    if (!isPositionChangesStage || !userTeam) return {} as Record<string, ReturnType<typeof recommendPlayerPositions>>
+    const roster = findTeam(saveState, userTeam)?.roster ?? []
+    const out: Record<string, ReturnType<typeof recommendPlayerPositions>> = {}
+    for (const p of roster) {
+      if (!p?.name) continue
+      out[String(p.name)] = recommendPlayerPositions(p as Record<string, unknown>)
+    }
+    return out
   }, [isPositionChangesStage, saveState, userTeam])
   useEffect(() => {
     if (phase !== 'offseason' || !coach) return
@@ -4183,6 +4170,7 @@ function TeamHomePageBody({
   const coachDevAllocatedCp = COACH_DEV_SKILLS.reduce((sum, { key }) => sum + Number(coachDevAllocations[key] ?? 0), 0)
   const coachDevAvailableCp = coachDevTotalCp - coachDevAllocatedCp
   const springBallResult = saveState?.offseason_spring_ball_results?.user_team_result ?? null
+  const sevenOnSevenResult = saveState?.offseason_7on7_results ?? null
   const winterTrainingResult = saveState?.offseason_winter_training_results?.user_team_result ?? null
   const transferStage1 = saveState?.offseason_transfer_stage_1 ?? null
   const transferStage2 = saveState?.offseason_transfer_stage_2 ?? null
@@ -4443,6 +4431,7 @@ function TeamHomePageBody({
         headers={headers}
         saveId={saveId}
         saveState={saveState}
+        getLiveSaveState={getLiveSaveState}
         gameId={activeGame.gameId}
         homeTeam={activeGame.homeTeam}
         awayTeam={activeGame.awayTeam}
@@ -4463,10 +4452,11 @@ function TeamHomePageBody({
                     : activeGame.gameContext === 'playoff'
                       ? `${apiBase}/sim/game/finish-playoff`
                       : `${apiBase}/sim/game/finish-scrimmage?scrimmage_stage=${encodeURIComponent(activeGame.scrimmageStage ?? 'Scrimmage 1')}`
+                const live = getLiveSaveState?.() ?? saveState
                 const r = await fetch(path, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ state: saveState, game }),
+                  body: JSON.stringify({ state: live, game }),
                 })
                 if (!r.ok) {
                   const errText = await r.text()
@@ -4892,9 +4882,9 @@ function TeamHomePageBody({
             saveId={saveId}
             apiBase={apiBase}
             headers={headers}
+            getLiveSaveState={getLiveSaveState}
             onSaveState={onSaveState}
             onError={onError}
-            readOnly={isLocalBundle}
           />
         </div>
       )
@@ -4990,18 +4980,22 @@ function TeamHomePageBody({
           </select>
         </div>
         <div className="teamhome-top-actions">
-          {phase === 'offseason' ? (
+          {phase === 'offseason' || phase === 'preseason' ? (
             <div className="teamhome-offseason-stage-inline" aria-live="polite">
               <div className="teamhome-offseason-stage-inline-row">
                 <span className="teamhome-offseason-stage-k">Now</span>
                 <span className="teamhome-offseason-stage-v">
-                  {displayOffseasonStageLabel(offseasonCurrentStage || 'Offseason')}
+                  {phase === 'preseason'
+                    ? displayOffseasonStageLabel(preseasonCurrentStage || 'Preseason')
+                    : displayOffseasonStageLabel(offseasonCurrentStage || 'Offseason')}
                 </span>
                 <span className="teamhome-offseason-stage-sep" aria-hidden>
                   ·
                 </span>
                 <span className="teamhome-offseason-stage-k">Next</span>
-                <span className="teamhome-offseason-stage-v">{offseasonNextStageLabel || '—'}</span>
+                <span className="teamhome-offseason-stage-v">
+                  {phase === 'preseason' ? preseasonNextStageLabel || '—' : offseasonNextStageLabel || '—'}
+                </span>
               </div>
             </div>
           ) : null}
@@ -5053,6 +5047,8 @@ function TeamHomePageBody({
                     transfer_stage_1_ack_results?: boolean
                     transfer_stage_2_ack_results?: boolean
                     program_development_actions?: ProgramDevAction[]
+                    seven_on_seven_tournament?: string
+                    seven_on_seven_ack_results?: boolean
                   } = {}
                   if (offseasonCurrentStage === 'Winter 1' || offseasonCurrentStage === 'Winter 2') {
                     offseasonBody = winterTrainingResult
@@ -5086,6 +5082,10 @@ function TeamHomePageBody({
                     offseasonBody = transferStage2PendingReview
                       ? { transfer_stage_2_ack_results: true }
                       : {}
+                  } else if (offseasonCurrentStage === '7 on 7') {
+                    offseasonBody = sevenOnSevenResult
+                      ? { seven_on_seven_ack_results: true }
+                      : { seven_on_seven_tournament: sevenOnSevenTier }
                   }
                   await onSimWeek({ offseasonBody })
                 } else if (phase === 'preseason' && isPositionChangesStage) {
@@ -5173,9 +5173,9 @@ function TeamHomePageBody({
           <div className="teamhome-top-label">STAGE</div>
           <div className="teamhome-top-value">
             {phase === 'preseason'
-              ? preseasonCurrentStage
+              ? displayOffseasonStageLabel(preseasonCurrentStage || 'Preseason')
               : phase === 'offseason'
-                ? offseasonCurrentStage || 'Offseason'
+                ? displayOffseasonStageLabel(offseasonCurrentStage || 'Offseason')
                 : phase === 'season_summary'
                   ? 'Season summary'
                   : formatStage(phase)}
@@ -5187,6 +5187,8 @@ function TeamHomePageBody({
               ? 'PLAYOFF STATUS'
               : phase === 'offseason'
                 ? 'OFFSEASON STEP'
+                : phase === 'preseason'
+                  ? 'PRESEASON STEP'
                 : phase === 'season_summary'
                   ? 'SEASON YEAR'
                   : 'CURRENT WEEK'}
@@ -5198,6 +5200,10 @@ function TeamHomePageBody({
                 ? offseasonStages.length
                   ? `${Math.min(offseasonStageIndex + 1, offseasonStages.length)} / ${offseasonStages.length}`
                   : '—'
+                : phase === 'preseason'
+                  ? preseasonStages.length
+                    ? `${Math.min(preseasonStageIndex + 1, preseasonStages.length)} / ${preseasonStages.length}`
+                    : '—'
                 : phase === 'season_summary'
                   ? saveState?.current_year ?? '—'
                   : saveState?.current_week ?? '—'}
@@ -5205,10 +5211,20 @@ function TeamHomePageBody({
         </div>
         <div className="teamhome-top-group">
           <div className="teamhome-top-label">
-            {phase === 'season_summary' ? 'NEXT STEP' : 'NEXT OPPONENT'}
+            {phase === 'season_summary'
+              ? 'NEXT STEP'
+              : phase === 'preseason' || phase === 'offseason'
+                ? 'NEXT STAGE'
+                : 'NEXT OPPONENT'}
           </div>
           <div className="teamhome-top-value">
-            {phase === 'season_summary' ? 'Offseason · Graduation' : nextOpponentText}
+            {phase === 'season_summary'
+              ? 'Offseason · Graduation'
+              : phase === 'preseason'
+                ? preseasonNextStageLabel || 'Regular season'
+                : phase === 'offseason'
+                  ? offseasonNextStageLabel || '—'
+                  : nextOpponentText}
           </div>
         </div>
         <div className="teamhome-top-group">
@@ -5257,78 +5273,60 @@ function TeamHomePageBody({
             renderTeamMenuPanel()
           ) : (
           <div className="teamhome-preseason-shell">
-            <div
-              className={`teamhome-preseason-top${isHomeGameThemesStage ? ' teamhome-preseason-top--themes-stage' : ''}`}
-            >
-              {isHomeGameThemesStage ? (
-                <div className="teamhome-themes-stage-column">
-                  {completedScrimmages.length > 0 ? (
-                    <div className="teamhome-scrimmage-results-card">
-                      <div className="teamhome-preseason-title">Scrimmage results</div>
-                      <div className="teamhome-scrimmage-results-list">
-                        {completedScrimmages
-                          .slice()
-                          .sort((a, b) => String(a.name || a.stage).localeCompare(String(b.name || b.stage)))
-                          .map((s, i) => (
-                            <div key={`${s.name || s.stage}-${i}`} className="teamhome-scrimmage-results-item">
-                              <span className="teamhome-scrimmage-results-label">{s.name || s.stage}</span>
-                              <span className="teamhome-scrimmage-results-score">
-                                {s.home} {s.home_score}–{s.away} {s.away_score}
-                                {s.ot ? ' (OT)' : ''}
-                              </span>
-                            </div>
-                          ))}
-                      </div>
+            <PreseasonHubHeader
+              seasonYear={Number(saveState?.current_year)}
+              stages={preseasonStages}
+              stageIndex={preseasonStageIndex}
+              formatStageLabel={displayOffseasonStageLabel}
+            />
+            <div className="teamhome-preseason-top teamhome-preseason-top--offseason-single">
+              <div className="teamhome-preseason-main">
+              {completedScrimmages.length > 0 && !isScrimmageStage ? (
+                isHomeGameThemesStage ? (
+                  <div className="teamhome-scrimmage-results-card teamhome-preseason-main-banner">
+                    <div className="teamhome-preseason-title">Scrimmage results</div>
+                    <div className="teamhome-scrimmage-results-list">
+                      {completedScrimmages
+                        .slice()
+                        .sort((a, b) => String(a.name || a.stage).localeCompare(String(b.name || b.stage)))
+                        .map((s, i) => (
+                          <div key={`${s.name || s.stage}-${i}`} className="teamhome-scrimmage-results-item">
+                            <span className="teamhome-scrimmage-results-label">{s.name || s.stage}</span>
+                            <span className="teamhome-scrimmage-results-score">
+                              {s.home} {s.home_score}–{s.away} {s.away_score}
+                              {s.ot ? ' (OT)' : ''}
+                            </span>
+                          </div>
+                        ))}
                     </div>
-                  ) : null}
-                  <HomeGameThemesPanel
-                    apiBase={apiBase}
-                    headers={headers}
-                    logoVersion={logoVersion}
-                    saveState={saveState}
-                    userTeam={userTeam}
-                    confirmed={homeGameThemesConfirmed}
-                    confirming={confirmingHomeThemes}
-                    onConfirm={async (selections) => {
-                      setConfirmingHomeThemes(true)
-                      try {
-                        await onSimWeek({ homeGameThemes: selections })
-                      } catch (e: any) {
-                        onError(e?.message ?? 'Failed to confirm themes')
-                      } finally {
-                        setConfirmingHomeThemes(false)
-                      }
-                    }}
-                  />
-                </div>
-              ) : (
-                <>
-              {completedScrimmages.length > 0 ? (
-                <div className="teamhome-scrimmage-upcoming" style={{ marginBottom: 10, opacity: 0.92 }}>
-                  <span className="teamhome-scrimmage-upcoming-label">Scrimmage results:</span>{' '}
-                  {completedScrimmages
-                    .slice()
-                    .sort((a, b) => String(a.name || a.stage).localeCompare(String(b.name || b.stage)))
-                    .map((s, i) => (
-                      <span key={`${s.name || s.stage}-${i}`}>
-                        {i > 0 && ' · '}
-                        {s.name || s.stage}: {s.home} {s.home_score}–{s.away} {s.away_score}
-                        {s.ot ? ' (OT)' : ''}
-                      </span>
-                    ))}
-                </div>
+                  </div>
+                ) : (
+                  <div className="teamhome-scrimmage-upcoming teamhome-preseason-main-banner">
+                    <span className="teamhome-scrimmage-upcoming-label">Scrimmage results:</span>{' '}
+                    {completedScrimmages
+                      .slice()
+                      .sort((a, b) => String(a.name || a.stage).localeCompare(String(b.name || b.stage)))
+                      .map((s, i) => (
+                        <span key={`${s.name || s.stage}-${i}`}>
+                          {i > 0 && ' · '}
+                          {s.name || s.stage}: {s.home} {s.home_score}–{s.away} {s.away_score}
+                          {s.ot ? ' (OT)' : ''}
+                        </span>
+                      ))}
+                  </div>
+                )
               ) : null}
               {isPlaybookSelectStage ? (
                 <div className="teamhome-playbook-select">
                   <div className="teamhome-playbook-title">Select playbooks for the upcoming season</div>
                   {!canChangePreferredPlaybooks ? (
-                    <p className="teamhome-playbook-lock" style={{ marginBottom: 12, opacity: 0.92, maxWidth: 520 }}>
+                    <p className="teamhome-playbook-lock">
                       Preferred playbooks are locked until season {nextPreferredPlaybookEligibleYear ?? '—'} (once every{' '}
                       {PREFERRED_PLAYBOOK_LOCK_SEASONS} seasons). The league never changes your schemes — only you can, here when
                       eligible. You can still confirm to advance using your current playbooks.
                     </p>
                   ) : (
-                    <p className="teamhome-playbook-lock" style={{ marginBottom: 12, opacity: 0.92, maxWidth: 520 }}>
+                    <p className="teamhome-playbook-lock">
                       You may change offensive and defensive playbooks now (once every {PREFERRED_PLAYBOOK_LOCK_SEASONS}{' '}
                       seasons). Philosophy ({safeStr(findTeam(saveState, userTeam)?.coach?.offensive_style)} /{' '}
                       {safeStr(findTeam(saveState, userTeam)?.coach?.defensive_style)}) stays as set until you change it at
@@ -5391,24 +5389,54 @@ function TeamHomePageBody({
                   </button>
                 </div>
               ) : isPlaySelectionStage ? (
-                <div className="teamhome-preseason-panelA">
-                  <div className="teamhome-preseason-title">Play Selection</div>
-                  <div className="teamhome-preseason-sub">Assign percentages to plays in each category</div>
-                  <div className="teamhome-preseason-stage">Each category must total 100%</div>
+                <div className="teamhome-preseason-panelA teamhome-preseason-panelA--play-selection teamhome-preseason-panelA--compact">
+                  <div className="teamhome-preseason-title">Play selection</div>
+                  <p className="teamhome-preseason-stage-copy">
+                    Assign play percentages within each category. Only plays above 0% count toward your install grade — set
+                    unused plays to 0% for a focused game plan.
+                  </p>
+                  <div className="teamhome-preseason-playbook-chips">
+                    <span className="teamhome-preseason-playbook-chip">
+                      Offense · {safeStr(findTeam(saveState, userTeam)?.offensive_playbook ?? offensivePlaybook)}
+                    </span>
+                    <span className="teamhome-preseason-playbook-chip">
+                      Defense · {safeStr(findTeam(saveState, userTeam)?.defensive_playbook ?? defensivePlaybook)}
+                    </span>
+                  </div>
                   <button
                     type="button"
-                    className="teamhome-playbook-confirm"
-                    style={{ marginTop: 16 }}
+                    className="teamhome-playbook-confirm teamhome-preseason-main-action"
                     onClick={() => setShowPlaybookGamePlan(true)}
                   >
-                    Configure Game Plan
+                    Configure game plan
                   </button>
                 </div>
               ) : isPositionChangesStage ? (
                 <div className="teamhome-preseason-panelA teamhome-position-changes">
                   <div className="teamhome-preseason-title">Position changes</div>
-                  <div className="teamhome-preseason-sub">
-                    Set each player&apos;s primary position (and optional secondary for two-way). CPU teams are reassigned automatically when you continue.
+                  <p className="teamhome-preseason-stage-copy">
+                    Set each player&apos;s primary position (and optional secondary for two-way). CPU teams reassign
+                    automatically when you continue. Coach recommendations use the same attribute-fit rules as AI staffs.
+                  </p>
+                  <div className="teamhome-position-changes-toolbar">
+                    <button
+                      type="button"
+                      className="teamhome-position-changes-apply-all"
+                      onClick={() => {
+                        setPositionDraft((prev) => {
+                          const next = { ...prev }
+                          for (const [name, rec] of Object.entries(positionCoachRecommendations)) {
+                            next[name] = {
+                              position: rec.position,
+                              secondary: rec.secondary ?? '',
+                            }
+                          }
+                          return next
+                        })
+                      }}
+                    >
+                      Apply all coach recommendations
+                    </button>
                   </div>
                   <div className="teamhome-position-changes-table-wrap">
                     <div className="teamhome-roster-row teamhome-roster-row-attrs teamhome-position-changes-head">
@@ -5416,12 +5444,17 @@ function TeamHomePageBody({
                       <div className="teamhome-roster-cell">Ovr</div>
                       <div className="teamhome-roster-cell">Primary</div>
                       <div className="teamhome-roster-cell">Secondary</div>
+                      <div className="teamhome-roster-cell teamhome-position-changes-rec-col">Coach recommends</div>
                     </div>
                     {(findTeam(saveState, userTeam)?.roster ?? []).map((p: any) => {
                       const d = positionDraft[p.name] ?? {
                         position: String(p.position || 'WR'),
                         secondary: p.secondary_position ? String(p.secondary_position) : '',
                       }
+                      const rec = positionCoachRecommendations[p.name] ?? recommendPlayerPositions(p)
+                      const recLabel = formatPositionRecommendation(rec)
+                      const matchesDraft =
+                        d.position === rec.position && (d.secondary || '') === (rec.secondary || '')
                       return (
                         <div key={p.name} className="teamhome-roster-row teamhome-position-changes-row">
                           <PlayerProfileName
@@ -5468,6 +5501,34 @@ function TeamHomePageBody({
                               ))}
                             </select>
                           </div>
+                          <div className="teamhome-roster-cell teamhome-position-changes-rec-col">
+                            <span
+                              className={
+                                matchesDraft
+                                  ? 'teamhome-position-changes-rec teamhome-position-changes-rec--match'
+                                  : 'teamhome-position-changes-rec'
+                              }
+                            >
+                              {recLabel}
+                            </span>
+                            {!matchesDraft ? (
+                              <button
+                                type="button"
+                                className="teamhome-position-changes-rec-apply"
+                                onClick={() =>
+                                  setPositionDraft((prev) => ({
+                                    ...prev,
+                                    [p.name]: {
+                                      position: rec.position,
+                                      secondary: rec.secondary ?? '',
+                                    },
+                                  }))
+                                }
+                              >
+                                Use
+                              </button>
+                            ) : null}
+                          </div>
                         </div>
                       )
                     })}
@@ -5496,8 +5557,12 @@ function TeamHomePageBody({
                   />
                 </div>
               ) : isPlaySelectionResultsStage ? (
-                <div className="teamhome-preseason-panelA teamhome-preseason-panelA--play-results">
+                <div className="teamhome-preseason-panelA teamhome-preseason-panelA--play-results teamhome-preseason-panelA--compact">
                   <div className="teamhome-play-results">
+                  <p className="teamhome-preseason-stage-copy">
+                    Your staff finished installing the game plan. Review how much the team learned before locking it in for the
+                    season.
+                  </p>
                   <div className="teamhome-play-results-columns">
                     <div className="teamhome-play-results-col">
                       <div className="teamhome-play-results-heading">OFFENSIVE PLAYBOOK</div>
@@ -5538,9 +5603,34 @@ function TeamHomePageBody({
                   </button>
                   </div>
                 </div>
-              ) : isHomeGameThemesStage ? null : isSetGoalsStage ? (
-                <div className="teamhome-preseason-panelA teamhome-goals-panel">
-                  <div className="teamhome-preseason-title">Goal Selection</div>
+              ) : isHomeGameThemesStage ? (
+                <div className="teamhome-preseason-panelA teamhome-preseason-panelA--themes">
+                  <HomeGameThemesPanel
+                    apiBase={apiBase}
+                    headers={headers}
+                    logoVersion={logoVersion}
+                    saveState={saveState}
+                    userTeam={userTeam}
+                    confirmed={homeGameThemesConfirmed}
+                    confirming={confirmingHomeThemes}
+                    onConfirm={async (selections) => {
+                      setConfirmingHomeThemes(true)
+                      try {
+                        await onSimWeek({ homeGameThemes: selections })
+                      } catch (e: any) {
+                        onError(e?.message ?? 'Failed to confirm themes')
+                      } finally {
+                        setConfirmingHomeThemes(false)
+                      }
+                    }}
+                  />
+                </div>
+              ) : isSetGoalsStage ? (
+                <div className="teamhome-preseason-panelA teamhome-goals-panel teamhome-preseason-panelA--compact">
+                  <div className="teamhome-preseason-title">Goal selection</div>
+                  <p className="teamhome-preseason-stage-copy">
+                    Set win and postseason targets for the year. Goals drive program points and coach pressure at season end.
+                  </p>
                   <div className="teamhome-goals-row">
                     <div className="teamhome-goals-col">
                       <div className="teamhome-goals-label">WIN TOTAL</div>
@@ -5634,57 +5724,22 @@ function TeamHomePageBody({
                   }}
                 />
               ) : (
-                <div className="teamhome-preseason-panelA">
-                  <div className="teamhome-preseason-title">Panel A</div>
-                  <div className="teamhome-preseason-sub">Stage {preseasonStageNumber}</div>
-                  <div className="teamhome-preseason-stage">{preseasonCurrentStage || 'Playbook Select'}</div>
+                <div className="teamhome-preseason-panelA teamhome-preseason-panelA--placeholder">
+                  <div className="teamhome-preseason-title">{displayOffseasonStageLabel(preseasonCurrentStage || 'Preseason')}</div>
+                  <div className="teamhome-preseason-sub">Stage {preseasonStageNumber} of {preseasonStages.length || '—'}</div>
+                  <div className="teamhome-preseason-stage">Use Continue when this stage is complete.</div>
                 </div>
               )}
 
-              {!isHomeGameThemesStage ? (
-              <div className="teamhome-preseason-stages">
-                <div className="teamhome-preseason-title">Off-season stages</div>
-                <div className="teamhome-preseason-stage-list">
-                  {preseasonStages.map((s: string, i: number) => (
-                    <div
-                      key={`${s}-${i}`}
-                      className={`teamhome-preseason-stage-item ${i === preseasonStageIndex ? 'active' : i < preseasonStageIndex ? 'done' : ''}`}
-                    >
-                      Stage {i + 1}: {displayOffseasonStageLabel(s)}
-                    </div>
-                  ))}
-                </div>
               </div>
-              ) : null}
-                </>
-              )}
             </div>
 
-            {!isHomeGameThemesStage ? (
             <div className="teamhome-preseason-bottom">
-              <div className="teamhome-preseason-panelD">
+              <div className="teamhome-preseason-panelD teamhome-preseason-panelD--news">
                 <div className="teamhome-preseason-title">News wire</div>
                 <NewsFeedPanel limit={5} compact />
               </div>
-
-              <div className="teamhome-preseason-panelC">
-                <div className="teamhome-preseason-title">Panel C</div>
-                <div className="teamhome-preseason-sub">Team stats</div>
-                <div className="teamhome-preseason-stat-list">
-                  <div>Offensive PPG</div>
-                  <div>Defensive PPG</div>
-                  <div>Explosives per game</div>
-                  <div>Total yards per game</div>
-                  <div>Rushing per game</div>
-                  <div>Passing per game</div>
-                  <div>Defensive total yards</div>
-                  <div>Defensive rushing yards</div>
-                  <div>Defensive passing yards</div>
-                  <div>Turnovers</div>
-                </div>
-              </div>
             </div>
-            ) : null}
           </div>
           )
         ) : phase === 'playoffs' ? (
@@ -7285,8 +7340,134 @@ function TeamHomePageBody({
                   </>
                 ) : offseasonCurrentStage === '7 on 7' ? (
                   <>
-                    <div className="teamhome-preseason-title">{offseasonCurrentStage}</div>
-                    <div className="teamhome-preseason-sub">Coming soon.</div>
+                    <div className="teamhome-preseason-title">7-on-7 passing tournament</div>
+                    {!sevenOnSevenResult ? (
+                      <>
+                        <div className="teamhome-preseason-sub" style={{ maxWidth: 720 }}>
+                          Pick one tournament, then press Continue to sim the full event — four group games
+                          (round-robin plus crossover), then a single-elimination bracket. Passing only; no coach
+                          play.
+                        </div>
+                        <div className="teamhome-7on7-tournament-grid">
+                          {SEVEN_ON_SEVEN_TOURNAMENTS.map((t) => (
+                            <button
+                              key={t.id}
+                              type="button"
+                              className={`teamhome-7on7-tournament-card${sevenOnSevenTier === t.id ? ' teamhome-7on7-tournament-card--active' : ''}`}
+                              onClick={() => setSevenOnSevenTier(t.id)}
+                            >
+                              <div className="teamhome-7on7-tournament-label">{t.label}</div>
+                              <div className="teamhome-7on7-tournament-diff">{t.difficulty}</div>
+                              <div className="teamhome-7on7-tournament-desc">{t.description}</div>
+                            </button>
+                          ))}
+                        </div>
+                        <div className="teamhome-small" style={{ marginTop: 14, opacity: 0.9 }}>
+                          Selected: <b>{SEVEN_ON_SEVEN_TOURNAMENTS.find((t) => t.id === sevenOnSevenTier)?.label ?? '—'}</b>
+                          {' · '}8 teams · 4 group games · single elimination
+                        </div>
+                      </>
+                    ) : (
+                      <div className="teamhome-7on7-results" style={{ marginTop: 10, textAlign: 'left', width: '100%' }}>
+                        <div className="teamhome-small" style={{ marginBottom: 10 }}>
+                          <b>{String(sevenOnSevenResult.tier_label ?? 'Tournament')}</b>
+                          {' · '}
+                          Finish: <b>{String(sevenOnSevenResult.user_finish ?? '—')}</b>
+                          {' · '}
+                          Group record: <b>{String(sevenOnSevenResult.user_record ?? '—')}</b>
+                          {' · '}
+                          Champion: <b>{String(sevenOnSevenResult.champion ?? '—')}</b>
+                        </div>
+
+                        <div className="teamhome-preseason-title" style={{ fontSize: 15 }}>Group stage</div>
+                        <div className="teamhome-7on7-group-labels teamhome-small" style={{ marginTop: 6, opacity: 0.85 }}>
+                          Group A: {(sevenOnSevenResult.group_a as string[] | undefined)?.join(', ') ?? '—'}
+                          <br />
+                          Group B: {(sevenOnSevenResult.group_b as string[] | undefined)?.join(', ') ?? '—'}
+                        </div>
+                        <table className="teamhome-roster-table teamhome-7on7-table" style={{ width: '100%', marginTop: 10 }}>
+                          <thead>
+                            <tr>
+                              <th style={{ textAlign: 'left' }}>Game</th>
+                              <th>Score</th>
+                              <th>Passing</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {((sevenOnSevenResult.group_games as any[]) ?? []).map((g, i) => {
+                              const userGame = Boolean(g.user_involved)
+                              const hs = g.home_stats ?? {}
+                              const as = g.away_stats ?? {}
+                              return (
+                                <tr key={`7g-${i}`} className={userGame ? 'teamhome-7on7-row-user' : undefined}>
+                                  <td>
+                                    {String(g.home)} vs {String(g.away)}
+                                    {userGame ? ' ★' : ''}
+                                  </td>
+                                  <td>
+                                    {g.home_score}–{g.away_score}
+                                  </td>
+                                  <td className="teamhome-small">
+                                    {String(g.home)} {hs.comp ?? 0}/{hs.att ?? 0}, {hs.pass_yds ?? 0} yds
+                                    {' · '}
+                                    {String(g.away)} {as.comp ?? 0}/{as.att ?? 0}, {as.pass_yds ?? 0} yds
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+
+                        <div className="teamhome-preseason-title" style={{ fontSize: 15, marginTop: 14 }}>Standings</div>
+                        <table className="teamhome-roster-table teamhome-7on7-table" style={{ width: '100%', marginTop: 8 }}>
+                          <thead>
+                            <tr>
+                              <th>#</th>
+                              <th style={{ textAlign: 'left' }}>Team</th>
+                              <th>W-L</th>
+                              <th>PF</th>
+                              <th>PA</th>
+                              <th>+/−</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {((sevenOnSevenResult.standings as any[]) ?? []).map((row) => (
+                              <tr
+                                key={`7s-${row.team}`}
+                                className={row.team === userTeam ? 'teamhome-7on7-row-user' : undefined}
+                              >
+                                <td>{row.seed}</td>
+                                <td>{String(row.team)}</td>
+                                <td>
+                                  {row.w}-{row.l}
+                                </td>
+                                <td>{row.pf}</td>
+                                <td>{row.pa}</td>
+                                <td>{row.diff >= 0 ? `+${row.diff}` : row.diff}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+
+                        <div className="teamhome-preseason-title" style={{ fontSize: 15, marginTop: 14 }}>Playoffs</div>
+                        <ul className="teamhome-list teamhome-small" style={{ marginTop: 8 }}>
+                          {((sevenOnSevenResult.semifinals as any[]) ?? []).map((g, i) => (
+                            <li key={`7sf-${i}`}>
+                              Semifinal: {String(g.home)} {g.home_score}–{g.away_score} {String(g.away)}
+                            </li>
+                          ))}
+                          {sevenOnSevenResult.final ? (
+                            <li>
+                              Final: {String(sevenOnSevenResult.final.home)} {sevenOnSevenResult.final.home_score}–
+                              {sevenOnSevenResult.final.away_score} {String(sevenOnSevenResult.final.away)}
+                            </li>
+                          ) : null}
+                        </ul>
+                        <div className="teamhome-small" style={{ marginTop: 10, opacity: 0.9 }}>
+                          Press <b>Continue</b> to lock results and advance.
+                        </div>
+                      </div>
+                    )}
                   </>
                 ) : offseasonCurrentStage === 'Training Results' ? (
                   <>
@@ -7564,262 +7745,102 @@ function TeamHomePageBody({
           <div className="teamhome-roster-shell teamhome-playoffs-league-view">{leagueStatePanel}</div>
         ) : teamMenu === 'Overview' && phase === 'regular' ? (
           leagueStatePanel ?? (
-          <div className="teamhome-grid">
-          {/* Left column */}
-          <div className="teamhome-actions-grid">
-            <div className="teamhome-card">
-              <div className="teamhome-card-title">Game Actions</div>
-              <div className="teamhome-small" style={{ marginBottom: 10 }}>
-                Week {currentWeek} ·{' '}
-                {hasUnplayedGameThisWeek
-                  ? formatScheduleOpponentLabel(
-                      nextOpponent || '—',
-                      scheduleRows.find((r) => r.week === currentWeek)?.userHome ?? true,
-                    )
-                  : 'No game this week'}
-              </div>
-              <div className="teamhome-actions-grid">
-                <button type="button" className="teamhome-action-btn" disabled>
-                  Game plan
-                  <span className="teamhome-action-sub">Coming soon (play selection UI)</span>
-                </button>
-                <button
-                  type="button"
-                  className="teamhome-action-btn"
-                  disabled={!canStartCoachPlay || playingWeek || !hasUnplayedGameThisWeek}
-                  onClick={async () => {
-                    if (!canStartCoachPlay) return
-                    setPlayingWeek(true)
-                    try {
-                          const r = isLocalBundle
-                            ? await fetch(`${apiBase}/sim/game/start`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ state: saveState, context: 'week' }),
-                              })
-                            : await fetch(`${apiBase}/saves/${saveId}/start-coach-game`, {
-                                method: 'POST',
-                                headers: { ...headers, 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ context: 'week' }),
-                              })
-                      if (!r.ok) {
-                        const errText = await r.text()
-                        let errMsg = 'Failed to start game'
-                        try {
-                          const j = JSON.parse(errText)
-                          errMsg = (j?.detail ?? errText) || errMsg
-                        } catch {
-                          errMsg = errText || errMsg
-                        }
-                        onError(typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg))
-                        return
-                      }
-                      const data = await r.json()
-                          if ((!isLocalBundle && (!data?.game_id || !data?.state)) || (isLocalBundle && (!data?.game || !data?.state))) {
-                        onError('Invalid response from server')
-                        return
-                      }
-                      onError('')
-                      setActiveGame({
-                            gameId: isLocalBundle ? '__local_game__' : data.game_id,
-                            homeTeam: data.home_team_name,
-                            awayTeam: data.away_team_name,
-                            userTeam: data.user_team_name,
-                            initialState: isLocalBundle ? { ...data.state, __game: data.game } : data.state,
-                        gameContext: 'week',
-                      })
-                    } catch (e: any) {
-                      onError(e?.message ?? 'Failed to start game')
-                    } finally {
-                      setPlayingWeek(false)
-                    }
-                  }}
-                >
-                  {playingWeek ? 'Loading…' : 'Play game'}
-                  <span className="teamhome-action-sub">Coach the game play-by-play</span>
-                </button>
-                <button
-                  type="button"
-                  className="teamhome-action-btn"
-                  disabled={!canContinue || simmingWeek}
-                  onClick={async () => {
-                    setSimmingWeek(true)
-                    try {
-                      await onSimWeek()
-                    } catch (e: any) {
-                      onError(e?.message ?? 'Sim failed')
-                    } finally {
-                      setSimmingWeek(false)
-                    }
-                  }}
-                >
-                  {simmingWeek ? 'Simming week…' : 'Sim game'}
-                  <span className="teamhome-action-sub">
-                    Sims every game this week (skips your game if you already played it), then advances
-                  </span>
-                </button>
-                <div className="teamhome-sim-multi-row">
-                  <span className="teamhome-action-sub">Sim multiple weeks:</span>
-                  {[2, 3, 4].map((n) => (
-                    <button
-                      key={n}
-                      type="button"
-                      className="teamhome-action-btn teamhome-action-btn-small"
-                      disabled={simMultipleCount > 0 || simmingWeek || !canContinue || phase !== 'regular'}
-                      onClick={async () => {
-                        setSimMultipleCount(n)
-                        try {
-                          for (let i = 0; i < n; i++) {
-                            const ok = await onSimWeek()
-                            if (!ok) break
-                            const st = getLiveSaveState?.() ?? saveState
-                            const simPhase = String(st?.season_phase ?? '').toLowerCase()
-                            const cw = Number(st?.current_week ?? 1)
-                            const totalWeeks = Array.isArray(st?.weeks) ? st.weeks.length : 0
-                            if (simPhase !== 'regular' || (totalWeeks > 0 && cw > totalWeeks)) break
-                          }
-                        } finally {
-                          setSimMultipleCount(0)
-                        }
-                      }}
-                    >
-                      {simMultipleCount === n ? 'Simulating…' : `${n}`}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="teamhome-card">
-              <div className="teamhome-card-title">Season goals</div>
-              <div className="teamhome-list">
-                <div className="teamhome-row">
-                  <span className="teamhome-small">Win total</span>
-                  <strong>{typeof seasonGoals?.win_goal === 'number' ? seasonGoals.win_goal : '—'}</strong>
-                </div>
-                <div className="teamhome-row">
-                  <span className="teamhome-small">Stage goal</span>
-                  <strong>{seasonGoals?.stage_goal ?? '—'}</strong>
-                </div>
-              </div>
-            </div>
-
-            <div className="teamhome-card teamhome-card-dark">
-              <div className="teamhome-card-title">Standings</div>
-              <div className="teamhome-list">
-                {standingsRows.slice(0, 8).map((r) => (
-                  <div key={r.teamName} className="teamhome-row teamhome-row-standings-mini">
-                    <span className="teamhome-small">#{r.rank}</span>
-                    <div className="teamhome-name-with-logo" style={{ flex: 1, minWidth: 0 }}>
-                      <TeamLogo apiBase={apiBase} headers={headers} teamName={r.teamName} logoVersion={logoVersion} size={26} />
-                      <strong>{r.teamName}</strong>
-                    </div>
-                    <span>{r.wins}-{r.losses}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Middle column */}
-          <div className="teamhome-actions-grid">
-            <div className="teamhome-card">
-              <div className="teamhome-card-title">Game plan</div>
-              <div className="teamhome-list">
-                <div className="teamhome-row">
-                  <div>
-                    <strong>Offensive</strong>
-                    <div className="teamhome-small">{offensePlan}</div>
-                  </div>
-                </div>
-                <div className="teamhome-row">
-                  <div>
-                    <strong>Defensive</strong>
-                    <div className="teamhome-small">{defensePlan}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="teamhome-card teamhome-card-dark">
-              <div className="teamhome-card-title">News feed</div>
-              <NewsFeedPanel limit={8} />
-            </div>
-          </div>
-
-          {/* Right column */}
-          <div className="teamhome-actions-grid">
-            <div className="teamhome-card">
-              <div className="teamhome-card-title">Schedule</div>
-              <div className="teamhome-list">
-                {scheduleRows.length === 0 ? (
-                  <div className="teamhome-small">No schedule data yet.</div>
-                ) : (
-                  scheduleRows
-                    .slice()
-                    .sort((a, b) => a.week - b.week)
-                    .map((r) => (
-                      <div
-                        key={r.week}
-                        className="teamhome-row teamhome-schedule-mini-row"
-                        style={{ background: r.played ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.03)' }}
-                      >
-                        <div>
-                          <strong>Week {r.week}</strong>
-                          <div className="teamhome-name-with-logo teamhome-small teamhome-schedule-mini-opponent" style={{ gap: 6 }}>
-                            {r.opponent && !/^bye$/i.test(String(r.opponent)) ? (
-                              <TeamLogo apiBase={apiBase} headers={headers} teamName={r.opponent} logoVersion={logoVersion} size={16} />
-                            ) : null}
-                            <span>
-                              {formatScheduleOpponentLabel(r.opponent, r.userHome)}
-                              {r.isRegionGame ? (
-                                <span className="teamhome-region-mark" title="Region game">*</span>
-                              ) : null}
-                            </span>
-                          </div>
-                          {r.userHome && r.homeThemeLabel ? (
-                            <div className="teamhome-schedule-theme teamhome-small">{r.homeThemeLabel}</div>
-                          ) : null}
-                        </div>
-                        <div className="teamhome-small teamhome-schedule-mini-score">{r.played ? r.scoreLine : 'Scheduled'}</div>
-                      </div>
-                    ))
-                )}
-              </div>
-              {scheduleRows.some((r) => r.isRegionGame) ? (
-                <div className="teamhome-schedule-region-legend teamhome-small">
-                  <span className="teamhome-region-mark">*</span> Region game
-                </div>
-              ) : null}
-            </div>
-
-            <div className="teamhome-card teamhome-card-dark">
-              <div className="teamhome-card-title">Team stats</div>
-              <div className="teamhome-list">
-                {(() => {
-                  const my = statsRows.find((r) => r.teamName === userTeam)
-                  if (!my) return <div className="teamhome-small">No stats yet.</div>
-                  return (
-                    <>
-                      <div className="teamhome-row">
-                        <span className="teamhome-small">Offensive PPG</span>
-                        <strong>{(my.pointsFor / Math.max(1, my.games)).toFixed(1)}</strong>
-                      </div>
-                      <div className="teamhome-row">
-                        <span className="teamhome-small">Defensive PPG</span>
-                        <strong>{(my.pointsAgainst / Math.max(1, my.games)).toFixed(1)}</strong>
-                      </div>
-                      <div className="teamhome-row">
-                        <span className="teamhome-small">Point diff</span>
-                        <strong>{my.diff >= 0 ? '+' : ''}{my.diff}</strong>
-                      </div>
-                    </>
-                  )
-                })()}
-              </div>
-            </div>
-          </div>
-        </div>
+          <InSeasonDashboard
+            apiBase={apiBase}
+            headers={headers}
+            logoVersion={logoVersion}
+            stadiumVersion={stadiumVersion}
+            saveState={saveState}
+            userTeam={userTeam}
+            currentWeek={currentWeek}
+            scheduleRows={scheduleRows}
+            classStandings={inSeasonClassStandings}
+            teamStatsRow={inSeasonUserStatsRow}
+            hasUnplayedGameThisWeek={hasUnplayedGameThisWeek}
+            canContinue={canContinue}
+            canStartCoachPlay={canStartCoachPlay}
+            playingWeek={playingWeek}
+            simmingWeek={simmingWeek}
+            simMultipleCount={simMultipleCount}
+            onPlayGame={async () => {
+              if (!canStartCoachPlay) return
+              setPlayingWeek(true)
+              try {
+                const live = getLiveSaveState?.() ?? saveState
+                const r = isLocalBundle
+                  ? await fetch(`${apiBase}/sim/game/start`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ state: live, context: 'week' }),
+                    })
+                  : await fetch(`${apiBase}/saves/${saveId}/start-coach-game`, {
+                      method: 'POST',
+                      headers: { ...headers, 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ context: 'week' }),
+                    })
+                if (!r.ok) {
+                  const errText = await r.text()
+                  let errMsg = 'Failed to start game'
+                  try {
+                    const j = JSON.parse(errText)
+                    errMsg = (j?.detail ?? errText) || errMsg
+                  } catch {
+                    errMsg = errText || errMsg
+                  }
+                  onError(typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg))
+                  return
+                }
+                const data = await r.json()
+                if ((!isLocalBundle && (!data?.game_id || !data?.state)) || (isLocalBundle && (!data?.game || !data?.state))) {
+                  onError('Invalid response from server')
+                  return
+                }
+                onError('')
+                setActiveGame({
+                  gameId: isLocalBundle ? '__local_game__' : data.game_id,
+                  homeTeam: data.home_team_name,
+                  awayTeam: data.away_team_name,
+                  userTeam: data.user_team_name,
+                  initialState: isLocalBundle ? { ...data.state, __game: data.game } : data.state,
+                  gameContext: 'week',
+                })
+              } catch (e: any) {
+                onError(e?.message ?? 'Failed to start game')
+              } finally {
+                setPlayingWeek(false)
+              }
+            }}
+            onSimGame={async () => {
+              setSimmingWeek(true)
+              try {
+                await onSimWeek()
+              } catch (e: any) {
+                onError(e?.message ?? 'Sim failed')
+              } finally {
+                setSimmingWeek(false)
+              }
+            }}
+            onSimMultiple={async (n) => {
+              setSimMultipleCount(n)
+              try {
+                for (let i = 0; i < n; i++) {
+                  const ok = await onSimWeek()
+                  if (!ok) break
+                  const st = getLiveSaveState?.() ?? saveState
+                  const simPhase = String(st?.season_phase ?? '').toLowerCase()
+                  const cw = Number(st?.current_week ?? 1)
+                  const totalWeeks = Array.isArray(st?.weeks) ? st.weeks.length : 0
+                  if (simPhase !== 'regular' || (totalWeeks > 0 && cw > totalWeeks)) break
+                }
+              } finally {
+                setSimMultipleCount(0)
+              }
+            }}
+            onOpenOffGameplan={() => setTeamMenu('OFF Gameplan')}
+            onOpenDefGameplan={() => setTeamMenu('DEF Gameplan')}
+            onOpenScouting={() => setTeamMenu(SCOUTING_MENU_OFFENSE)}
+            onOpenInbox={() => setTeamMenu(COACH_INBOX_MENU)}
+          />
           )
         ) : renderTeamMenuPanel()}
       </div>
@@ -7858,7 +7879,9 @@ export default function TeamHomePage(props: Props) {
         onClose={() => setShowSettings(false)}
         onError={props.onError}
         onLogoVersionBump={() => setLogoVersion(Date.now())}
+        onStadiumVersionBump={() => setStadiumVersion(Date.now())}
         onImportLogosToBundle={props.onImportLogosToBundle}
+        onImportStadiumsToBundle={props.onImportStadiumsToBundle}
       />
     )
   }

@@ -96,6 +96,7 @@ from systems.program_progression import (
     pp_delta_for_level_change,
 )
 from systems.offseason_manager import reset_team_season_stats, run_offseason_roster_turnover
+from systems.seven_on_seven import VALID_TOURNAMENT_TIERS, run_seven_on_seven_tournament
 from systems.team_ratings import calculate_player_overall
 from systems.save_system import league_history_path
 from systems.win_path_io import (
@@ -145,6 +146,7 @@ from systems.transfer_system import run_transfer_stage_1, run_transfer_stage_2
 from systems.coach_email_system import (
     delete_emails,
     ensure_coach_inbox,
+    generate_coach_game_touch_emails,
     generate_playoff_round_emails,
     generate_week_sim_emails,
     mark_emails_read,
@@ -157,6 +159,7 @@ from systems.game_stats import (
     season_stats_map_to_jsonable,
     player_game_stats_map_to_json_list,
 )
+from systems.gameplan_presets import list_defensive_preset_catalog, list_offensive_preset_catalog
 from systems.gameplan_v2 import (
     make_default_offense_plan as make_default_offense_gameplan_v2,
     make_default_defense_plan as make_default_defense_gameplan_v2,
@@ -194,16 +197,14 @@ def _hydrate_coach_inbox_persist_if_needed(user_id: str, save_id: str, state: Di
         save_state(user_id, save_id, state, save_dir)
 
 
-def patch_coach_inbox(
-    user_id: str,
-    save_id: str,
+def patch_coach_inbox_state(
+    state: Dict[str, Any],
     *,
     mark_read: Optional[List[str]] = None,
     choose: Optional[Dict[str, str]] = None,
     delete: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """Mark messages read, resolve a choice, and/or delete messages; persists state."""
-    state, save_dir = load_state(user_id, save_id)
+    """Stateless coach inbox patch for browser/local saves."""
     inbox = ensure_coach_inbox(state)
     if mark_read:
         mark_emails_read(inbox, [str(x) for x in mark_read if x])
@@ -214,6 +215,25 @@ def patch_coach_inbox(
             resolve_email_choice(inbox, str(eid), str(cid))
     if delete:
         delete_emails(inbox, [str(x) for x in delete if x])
+    return state
+
+
+def patch_coach_inbox(
+    user_id: str,
+    save_id: str,
+    *,
+    mark_read: Optional[List[str]] = None,
+    choose: Optional[Dict[str, str]] = None,
+    delete: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """Mark messages read, resolve a choice, and/or delete messages; persists state."""
+    state, save_dir = load_state(user_id, save_id)
+    patch_coach_inbox_state(
+        state,
+        mark_read=mark_read,
+        choose=choose,
+        delete=delete,
+    )
     save_state(user_id, save_id, state, save_dir)
     return {"state": state}
 
@@ -1066,11 +1086,16 @@ def get_team_stadium_path(user_id: str, team_name: str) -> Optional[str]:
 
 def _stem_variants_for_logo_match(stem: str) -> List[str]:
     """Try filename stems with common suffixes stripped (e.g. Martinsburg_logo → Martinsburg)."""
+    return _stem_variants_for_asset_match(stem, ())
+
+
+def _stem_variants_for_asset_match(stem: str, extra_suffixes: tuple = ()) -> List[str]:
     stem = str(stem or "").strip()
     if not stem:
         return []
     variants: List[str] = [stem]
-    for suffix in ("_logo", "-logo", "_LOGO", "-LOGO", " logo"):
+    suffixes = ("_logo", "-logo", "_LOGO", "-LOGO", " logo") + tuple(extra_suffixes)
+    for suffix in suffixes:
         if len(stem) > len(suffix) and stem.lower().endswith(suffix.lower()):
             variants.append(stem[: -len(suffix)].strip())
     out: List[str] = []
@@ -1082,18 +1107,30 @@ def _stem_variants_for_logo_match(stem: str) -> List[str]:
     return out
 
 
-def match_logo_filename_to_team(teams: List[str], filename_stem: str) -> Optional[str]:
+def _match_filename_stem_to_team(teams: List[str], filename_stem: str, extra_suffixes: tuple = ()) -> Optional[str]:
     by_norm: Dict[str, str] = {}
     for t in teams:
         name = str(t or "").strip()
         if not name:
             continue
         by_norm[_normalize_name(name)] = name
-    for stem in _stem_variants_for_logo_match(filename_stem):
+    for stem in _stem_variants_for_asset_match(filename_stem, extra_suffixes):
         stem_norm = _normalize_name(stem)
         if stem_norm and stem_norm in by_norm:
             return by_norm[stem_norm]
     return None
+
+
+def match_logo_filename_to_team(teams: List[str], filename_stem: str) -> Optional[str]:
+    return _match_filename_stem_to_team(teams, filename_stem, ())
+
+
+def match_stadium_filename_to_team(teams: List[str], filename_stem: str) -> Optional[str]:
+    return _match_filename_stem_to_team(
+        teams,
+        filename_stem,
+        ("_stadium", "-stadium", "_field", "-field", " stadium"),
+    )
 
 
 PRESEASON_STAGES: List[str] = [
@@ -1766,6 +1803,7 @@ def _finalize_offseason_to_preseason(state: Dict[str, Any], teams: Dict[str, Any
     state.pop("offseason_coach_dev_bank", None)
     state.pop("offseason_coach_dev_banks", None)
     state.pop("offseason_spring_ball_results", None)
+    state.pop("offseason_7on7_results", None)
     state.pop("offseason_winter_training_results", None)
     state.pop("offseason_winter_history", None)
     state.pop("offseason_spring_history", None)
@@ -2259,7 +2297,25 @@ def advance_offseason(
                 state["teams"] = [team_to_dict(t) for t in teams.values()]
                 save_state(user_id, save_id, state, save_dir)
                 return _attach_league_history_to_result(save_dir, {"state": state})
-    elif current in ("Transfers III", "7 on 7", "Graduation"):
+    elif current == "7 on 7":
+        seven_results = state.get("offseason_7on7_results")
+        ack = bool(body.get("seven_on_seven_ack_results"))
+        tier_raw = body.get("seven_on_seven_tournament")
+        if isinstance(seven_results, dict) and ack:
+            state.pop("offseason_7on7_results", None)
+        elif isinstance(seven_results, dict) and not ack:
+            raise ValueError("Review 7-on-7 tournament results, then press Continue again to advance.")
+        else:
+            tier = str(tier_raw or "").strip().lower()
+            if tier not in VALID_TOURNAMENT_TIERS:
+                raise ValueError("Choose a 7-on-7 tournament (Area, Regional, or State), then press Continue.")
+            payload = run_seven_on_seven_tournament(teams, str(user_team_name or ""), tier)
+            state["offseason_7on7_results"] = payload
+            state["offseason_stage_index"] = idx
+            state["teams"] = [team_to_dict(t) for t in teams.values()]
+            save_state(user_id, save_id, state, save_dir)
+            return _attach_league_history_to_result(save_dir, {"state": state})
+    elif current in ("Transfers III", "Graduation"):
         pass
 
     elif current == "Training Results":
@@ -2317,6 +2373,8 @@ def advance_offseason(
         _ensure_improvements_bank_equipment_pp(state, ut)
     if current == "Spring Ball":
         state.pop("offseason_spring_ball_results", None)
+    if current == "7 on 7":
+        state.pop("offseason_7on7_results", None)
     if current in ("Winter 1", "Winter 2"):
         state.pop("offseason_winter_training_results", None)
     state["teams"] = [team_to_dict(t) for t in teams.values()]
@@ -3677,6 +3735,33 @@ def _week_result_slot_played(slot: Any) -> bool:
     return _week_result_slot_finalized(slot)
 
 
+def _regular_week_fully_played(state: Dict[str, Any], wk_idx: int) -> bool:
+    weeks = state.get("weeks") or []
+    if wk_idx < 0 or wk_idx >= len(weeks):
+        return False
+    wk = weeks[wk_idx] or []
+    if not wk:
+        return False
+    week_results = state.get("week_results") or []
+    if wk_idx >= len(week_results):
+        return False
+    wk_res = week_results[wk_idx] or []
+    for gi in range(len(wk)):
+        if gi >= len(wk_res) or not _week_result_slot_played(wk_res[gi]):
+            return False
+    return True
+
+
+def _maybe_generate_week_sim_emails_if_complete(state: Dict[str, Any], *, completed_week: int) -> None:
+    """Append the weekly inbox batch once every slot in ``completed_week`` is final."""
+    if not _coach_sim_emails_enabled():
+        return
+    wk_idx = int(completed_week) - 1
+    if not _regular_week_fully_played(state, wk_idx):
+        return
+    generate_week_sim_emails(state, completed_week=int(completed_week))
+
+
 def _apply_game_result_to_standings(
     standings: Dict[str, Dict[str, Any]],
     home: str,
@@ -3771,6 +3856,142 @@ def _coach_gameplan_v2_matchup_key(state: Dict[str, Any]) -> Optional[str]:
     return f"week:{wk_idx + 1}:{gi}:{home} vs {away}"
 
 
+def _normalize_offense_gameplan_library(state: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """User-imported offensive plans stored on the dynasty save."""
+    raw = state.get("offense_gameplan_library")
+    if not isinstance(raw, list):
+        return []
+    out: List[Dict[str, Any]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        entry_id = str(item.get("id") or "").strip()
+        name = str(item.get("name") or "").strip()
+        plan = item.get("plan")
+        if not entry_id or not name or not isinstance(plan, dict):
+            continue
+        ok, _ = validate_gameplan_v2(plan, categories=GAMEPLAN_V2_OFF_CATEGORIES)
+        if not ok:
+            continue
+        try:
+            created_at = int(item.get("created_at") or 0)
+        except Exception:
+            created_at = 0
+        out.append({"id": entry_id, "name": name, "plan": plan, "created_at": created_at})
+    return out
+
+
+def _offense_gameplan_library_payload(state: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "presets": list_offensive_preset_catalog(),
+        "saved": _normalize_offense_gameplan_library(state),
+    }
+
+
+def add_offense_to_gameplan_library_in_state(
+    state: Dict[str, Any],
+    *,
+    name: str,
+    plan: Dict[str, Any],
+) -> Dict[str, Any]:
+    label = str(name or "").strip()
+    if not label:
+        raise ValueError("Saved game plan name is required.")
+    ok, errs = validate_gameplan_v2(plan, categories=GAMEPLAN_V2_OFF_CATEGORIES)
+    if not ok:
+        raise ValueError("Invalid OFF gameplan: " + "; ".join(errs[:10]))
+    library = _normalize_offense_gameplan_library(state)
+    entry = {
+        "id": f"saved-{uuid.uuid4().hex[:12]}",
+        "name": label,
+        "plan": plan,
+        "created_at": int(time.time()),
+    }
+    library.append(entry)
+    state["offense_gameplan_library"] = library
+    return entry
+
+
+def delete_offense_from_gameplan_library_in_state(state: Dict[str, Any], entry_id: str) -> bool:
+    target = str(entry_id or "").strip()
+    if not target:
+        raise ValueError("Saved game plan id is required.")
+    library = _normalize_offense_gameplan_library(state)
+    next_library = [e for e in library if e.get("id") != target]
+    if len(next_library) == len(library):
+        raise ValueError("Saved game plan not found.")
+    state["offense_gameplan_library"] = next_library
+    return True
+
+
+def _normalize_defense_gameplan_library(state: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """User-imported defensive plans stored on the dynasty save."""
+    raw = state.get("defense_gameplan_library")
+    if not isinstance(raw, list):
+        return []
+    out: List[Dict[str, Any]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        entry_id = str(item.get("id") or "").strip()
+        name = str(item.get("name") or "").strip()
+        plan = item.get("plan")
+        if not entry_id or not name or not isinstance(plan, dict):
+            continue
+        ok, _ = validate_gameplan_v2(plan, categories=GAMEPLAN_V2_DEF_CATEGORIES)
+        if not ok:
+            continue
+        try:
+            created_at = int(item.get("created_at") or 0)
+        except Exception:
+            created_at = 0
+        out.append({"id": entry_id, "name": name, "plan": plan, "created_at": created_at})
+    return out
+
+
+def _defense_gameplan_library_payload(state: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "presets": list_defensive_preset_catalog(),
+        "saved": _normalize_defense_gameplan_library(state),
+    }
+
+
+def add_defense_to_gameplan_library_in_state(
+    state: Dict[str, Any],
+    *,
+    name: str,
+    plan: Dict[str, Any],
+) -> Dict[str, Any]:
+    label = str(name or "").strip()
+    if not label:
+        raise ValueError("Saved game plan name is required.")
+    ok, errs = validate_gameplan_v2(plan, categories=GAMEPLAN_V2_DEF_CATEGORIES)
+    if not ok:
+        raise ValueError("Invalid DEF gameplan: " + "; ".join(errs[:10]))
+    library = _normalize_defense_gameplan_library(state)
+    entry = {
+        "id": f"saved-{uuid.uuid4().hex[:12]}",
+        "name": label,
+        "plan": plan,
+        "created_at": int(time.time()),
+    }
+    library.append(entry)
+    state["defense_gameplan_library"] = library
+    return entry
+
+
+def delete_defense_from_gameplan_library_in_state(state: Dict[str, Any], entry_id: str) -> bool:
+    target = str(entry_id or "").strip()
+    if not target:
+        raise ValueError("Saved game plan id is required.")
+    library = _normalize_defense_gameplan_library(state)
+    next_library = [e for e in library if e.get("id") != target]
+    if len(next_library) == len(library):
+        raise ValueError("Saved game plan not found.")
+    state["defense_gameplan_library"] = next_library
+    return True
+
+
 def attach_user_coach_gameplan_v2_from_save_state(
     state: Dict[str, Any],
     home_team: Any,
@@ -3855,6 +4076,8 @@ def get_coach_gameplan_v2_from_state(state: Dict[str, Any]) -> Dict[str, Any]:
         "offense": offense,
         "defense": defense,
         "fourth_down": fourth_down,
+        "offense_library": _offense_gameplan_library_payload(state),
+        "defense_library": _defense_gameplan_library_payload(state),
         "meta": {
             "season_phase": str(state.get("season_phase") or ""),
             "current_week": int(state.get("current_week", 1) or 1),
@@ -3874,44 +4097,79 @@ def save_coach_gameplan_v2_in_state(
     offense: Optional[Dict[str, Any]] = None,
     defense: Optional[Dict[str, Any]] = None,
     fourth_down: Optional[Dict[str, Any]] = None,
+    add_offense_library: Optional[Dict[str, Any]] = None,
+    delete_offense_library_id: Optional[str] = None,
+    add_defense_library: Optional[Dict[str, Any]] = None,
+    delete_defense_library_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Save the user's coach gameplan for the next game (mutates state in memory)."""
-    key = _coach_gameplan_v2_matchup_key(state)
-    if not key:
-        raise ValueError("No upcoming game found to attach a gameplan to.")
+    library_changed = False
+    if add_offense_library is not None:
+        if not isinstance(add_offense_library, dict):
+            raise ValueError("add_offense_library must be an object with name and plan.")
+        add_offense_to_gameplan_library_in_state(
+            state,
+            name=str(add_offense_library.get("name") or ""),
+            plan=add_offense_library.get("plan") if isinstance(add_offense_library.get("plan"), dict) else {},
+        )
+        library_changed = True
+    if delete_offense_library_id:
+        delete_offense_from_gameplan_library_in_state(state, delete_offense_library_id)
+        library_changed = True
+    if add_defense_library is not None:
+        if not isinstance(add_defense_library, dict):
+            raise ValueError("add_defense_library must be an object with name and plan.")
+        add_defense_to_gameplan_library_in_state(
+            state,
+            name=str(add_defense_library.get("name") or ""),
+            plan=add_defense_library.get("plan") if isinstance(add_defense_library.get("plan"), dict) else {},
+        )
+        library_changed = True
+    if delete_defense_library_id:
+        delete_defense_from_gameplan_library_in_state(state, delete_defense_library_id)
+        library_changed = True
 
-    store = state.get("coach_gameplans_v2")
-    if not isinstance(store, dict):
-        store = {}
+    matchup_changed = offense is not None or defense is not None or fourth_down is not None
+    if matchup_changed:
+        key = _coach_gameplan_v2_matchup_key(state)
+        if not key:
+            raise ValueError("No upcoming game found to attach a gameplan to.")
 
-    entry = store.get(key)
-    if not isinstance(entry, dict):
-        entry = {}
+        store = state.get("coach_gameplans_v2")
+        if not isinstance(store, dict):
+            store = {}
 
-    if offense is not None:
-        ok, errs = validate_gameplan_v2(offense, categories=GAMEPLAN_V2_OFF_CATEGORIES)
-        if not ok:
-            raise ValueError("Invalid OFF gameplan: " + "; ".join(errs[:10]))
-        entry["offense"] = offense
+        entry = store.get(key)
+        if not isinstance(entry, dict):
+            entry = {}
 
-    if defense is not None:
-        ok, errs = validate_gameplan_v2(defense, categories=GAMEPLAN_V2_DEF_CATEGORIES)
-        if not ok:
-            raise ValueError("Invalid DEF gameplan: " + "; ".join(errs[:10]))
-        entry["defense"] = defense
+        if offense is not None:
+            ok, errs = validate_gameplan_v2(offense, categories=GAMEPLAN_V2_OFF_CATEGORIES)
+            if not ok:
+                raise ValueError("Invalid OFF gameplan: " + "; ".join(errs[:10]))
+            entry["offense"] = offense
 
-    if fourth_down is not None:
-        if not isinstance(fourth_down, dict):
-            raise ValueError("Invalid 4th down settings: must be an object.")
-        try:
-            go_max = max(0, min(10, int(fourth_down.get("go_for_it_max_ytg", 2))))
-        except Exception:
-            raise ValueError("Invalid 4th down settings: go_for_it_max_ytg must be a number.")
-        entry["fourth_down"] = {"go_for_it_max_ytg": go_max}
+        if defense is not None:
+            ok, errs = validate_gameplan_v2(defense, categories=GAMEPLAN_V2_DEF_CATEGORIES)
+            if not ok:
+                raise ValueError("Invalid DEF gameplan: " + "; ".join(errs[:10]))
+            entry["defense"] = defense
 
-    entry["updated_at"] = int(time.time())
-    store[key] = entry
-    state["coach_gameplans_v2"] = store
+        if fourth_down is not None:
+            if not isinstance(fourth_down, dict):
+                raise ValueError("Invalid 4th down settings: must be an object.")
+            try:
+                go_max = max(0, min(10, int(fourth_down.get("go_for_it_max_ytg", 2))))
+            except Exception:
+                raise ValueError("Invalid 4th down settings: go_for_it_max_ytg must be a number.")
+            entry["fourth_down"] = {"go_for_it_max_ytg": go_max}
+
+        entry["updated_at"] = int(time.time())
+        store[key] = entry
+        state["coach_gameplans_v2"] = store
+    elif not library_changed:
+        raise ValueError("Nothing to save.")
+
     return get_coach_gameplan_v2_from_state(state)
 
 
@@ -3922,6 +4180,10 @@ def save_coach_gameplan_v2(
     offense: Optional[Dict[str, Any]] = None,
     defense: Optional[Dict[str, Any]] = None,
     fourth_down: Optional[Dict[str, Any]] = None,
+    add_offense_library: Optional[Dict[str, Any]] = None,
+    delete_offense_library_id: Optional[str] = None,
+    add_defense_library: Optional[Dict[str, Any]] = None,
+    delete_defense_library_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Save the user's coach gameplan for the next game."""
     state, save_dir = load_state(user_id, save_id)
@@ -3930,6 +4192,10 @@ def save_coach_gameplan_v2(
         offense=offense,
         defense=defense,
         fourth_down=fourth_down,
+        add_offense_library=add_offense_library,
+        delete_offense_library_id=delete_offense_library_id,
+        add_defense_library=add_defense_library,
+        delete_defense_library_id=delete_defense_library_id,
     )
     save_state(user_id, save_id, state, save_dir)
     return result
@@ -4601,6 +4867,8 @@ def sim_week_state(state: Dict[str, Any]) -> Dict[str, Any]:
         away_after = _team_stat_snapshot(season_stats, away)
         week_results[wk_idx][gi] = {
             "played": True,
+            "home": home,
+            "away": away,
             "home_score": hs,
             "away_score": as_,
             "ot": ot,
@@ -5160,7 +5428,24 @@ def advance_offseason_state(
                 state["offseason_stage_index"] = idx
                 state["teams"] = [team_to_dict(t) for t in teams.values()]
                 return state
-    elif current in ("Transfers III", "7 on 7", "Graduation", "Freshman Class", "Schedule Release"):
+    elif current == "7 on 7":
+        seven_results = state.get("offseason_7on7_results")
+        ack = bool(body.get("seven_on_seven_ack_results"))
+        tier_raw = body.get("seven_on_seven_tournament")
+        if isinstance(seven_results, dict) and ack:
+            state.pop("offseason_7on7_results", None)
+        elif isinstance(seven_results, dict) and not ack:
+            raise ValueError("Review 7-on-7 tournament results, then press Continue again to advance.")
+        else:
+            tier = str(tier_raw or "").strip().lower()
+            if tier not in VALID_TOURNAMENT_TIERS:
+                raise ValueError("Choose a 7-on-7 tournament (Area, Regional, or State), then press Continue.")
+            payload = run_seven_on_seven_tournament(teams, str(user_team_name or ""), tier)
+            state["offseason_7on7_results"] = payload
+            state["offseason_stage_index"] = idx
+            state["teams"] = [team_to_dict(t) for t in teams.values()]
+            return state
+    elif current in ("Transfers III", "Graduation", "Freshman Class", "Schedule Release"):
         pass
     elif current == "Training Results":
         before_rows: List[Dict[str, Any]] = []
@@ -5203,6 +5488,8 @@ def advance_offseason_state(
         _ensure_improvements_bank_equipment_pp(state, ut)
     if current == "Spring Ball":
         state.pop("offseason_spring_ball_results", None)
+    if current == "7 on 7":
+        state.pop("offseason_7on7_results", None)
     if current in ("Winter 1", "Winter 2"):
         state.pop("offseason_winter_training_results", None)
     state["teams"] = [team_to_dict(t) for t in teams.values()]
@@ -6102,6 +6389,8 @@ def finish_coach_week_state(state: Dict[str, Any], game: Any) -> Dict[str, Any]:
     recap_lines = box_lines
     week_results[wk_idx][game_idx] = {
         "played": True,
+        "home": home_name,
+        "away": away_name,
         "home_score": hs,
         "away_score": as_,
         "ot": ot,
@@ -6138,6 +6427,9 @@ def finish_coach_week_state(state: Dict[str, Any], game: Any) -> Dict[str, Any]:
 
     state["week_results"] = week_results
     ensure_coach_inbox(state)
+    if _coach_sim_emails_enabled():
+        generate_coach_game_touch_emails(state, home=home_name, away=away_name, hs=hs, as_=as_)
+        _maybe_generate_week_sim_emails_if_complete(state, completed_week=current_week)
     return state
 
 
@@ -6330,6 +6622,8 @@ def finish_coach_week(
     recap_lines = box_lines
     week_results[wk_idx][game_idx] = {
         "played": True,
+        "home": home_name,
+        "away": away_name,
         "home_score": hs,
         "away_score": as_,
         "ot": ot,
@@ -6367,6 +6661,9 @@ def finish_coach_week(
     state["week_results"] = week_results
 
     ensure_coach_inbox(state)
+    if _coach_sim_emails_enabled():
+        generate_coach_game_touch_emails(state, home=home_name, away=away_name, hs=hs, as_=as_)
+        _maybe_generate_week_sim_emails_if_complete(state, completed_week=current_week)
     save_state(user_id, save_id, state, save_dir)
     return {"state": state}
 
@@ -7445,6 +7742,11 @@ def _bulk_cpu_offseason_advance_body(state: Dict[str, Any]) -> Dict[str, Any]:
     elif current == "Spring Ball":
         if isinstance(state.get("offseason_spring_ball_results"), dict):
             body["spring_ball_ack_results"] = True
+    elif current == "7 on 7":
+        if isinstance(state.get("offseason_7on7_results"), dict):
+            body["seven_on_seven_ack_results"] = True
+        else:
+            body["seven_on_seven_tournament"] = "regional"
     elif current == "Improvements":
         teams_m = {
             str(t["name"]): team_from_dict(t)

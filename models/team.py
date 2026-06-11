@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 class Team:
     name: str
     nickname: Optional[str] = None
+    stadium_name: Optional[str] = None  # e.g. "Eagle Field · Eastview, WV"
     prestige: int = 5          # 1-15 (derived from team_points)
     team_points: Optional[float] = None  # Program reputation score; see prestige_system.py
     team_points_last_delta: float = 0.0  # Last offseason TP change (season + carousel coach pass)

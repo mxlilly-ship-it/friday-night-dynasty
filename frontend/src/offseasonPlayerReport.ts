@@ -116,7 +116,7 @@ function springPlayerChanges(result: any, playerName: string): AttributeChangeRo
       label: formatAttrLabel(String(n.attribute ?? '')),
       delta: Number(n.delta ?? 0),
     }))
-    .filter((r) => r.delta !== 0)
+    .filter((r: { delta: number }) => r.delta !== 0)
 }
 
 function trainingSection(saveState: any, playerName: string): OffseasonPhaseSection | null {

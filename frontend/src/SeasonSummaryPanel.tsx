@@ -1,10 +1,14 @@
 import type { ReactNode } from 'react'
 import TeamLogo from './TeamLogo'
-import { evaluateSeasonGoals, postseasonTierForTeam } from './seasonSummaryGoals'
+import {
+  evaluateSeasonGoals,
+  postseasonTierForTeam,
+  resolveSeasonSummaryPostseasonContext,
+} from './seasonSummaryGoals'
 import { userHomeThemeSummary } from './homeGameThemes'
 import { fmtProgramDollars } from './programDevelopmentUtils'
 import { formatTeamPoints, formatTeamPointsDelta } from './prestigeUtils'
-import { findSeasonEntryByCalendarYear } from './leagueHistoryView'
+import { findSeasonEntryByCalendarYear, standingsListToRecord } from './leagueHistoryView'
 
 export type SeasonSummaryStandingsRow = {
   rank: number
@@ -64,34 +68,18 @@ export default function SeasonSummaryPanel({
   const seasons = Array.isArray(leagueHistory?.seasons) ? leagueHistory.seasons : []
   const archived = findSeasonEntryByCalendarYear(seasons, seasonYear)
 
-  const st = ut ? (saveState?.standings?.[ut] as { wins?: number; losses?: number } | undefined) : null
-  const wins = st != null ? Number(st.wins ?? 0) : 0
-  const losses = st != null ? Number(st.losses ?? 0) : 0
+  const stLive = ut ? (saveState?.standings?.[ut] as { wins?: number; losses?: number } | undefined) : null
+  const stArchived = ut && archived ? standingsListToRecord(archived.standings)[ut] : undefined
+  const wins = Number(stLive?.wins ?? stArchived?.wins ?? 0)
+  const losses = Number(stLive?.losses ?? stArchived?.losses ?? 0)
 
   const champ =
     String(archived?.state_champion ?? saveState?.playoffs?.champion ?? playoffView.champion ?? '—') || '—'
   const runner = String(archived?.runner_up ?? saveState?.playoffs?.runner_up ?? '—') || '—'
 
-  const brFlat: Array<{ round?: string; home?: string; away?: string }> = []
-  const pbc = archived?.playoffs_by_class as Record<string, { bracket_results?: unknown[] }> | undefined
-  if (pbc && typeof pbc === 'object' && playoffView.viewClass) {
-    const inner = pbc[playoffView.viewClass]
-    if (inner && Array.isArray(inner.bracket_results)) {
-      brFlat.push(...(inner.bracket_results as Array<{ round?: string; home?: string; away?: string }>))
-    }
-  }
-  if (!brFlat.length) {
-    const legacy = (archived?.playoffs as { bracket_results?: unknown[] } | undefined)?.bracket_results
-    if (Array.isArray(legacy)) {
-      brFlat.push(...(legacy as Array<{ round?: string; home?: string; away?: string }>))
-    } else {
-      const flat = saveState?.playoffs?.bracket_results
-      if (Array.isArray(flat)) brFlat.push(...flat)
-    }
-  }
-
+  const postseasonCtx = resolveSeasonSummaryPostseasonContext(saveState, archived, ut)
   const goals = saveState?.season_goals as { win_goal?: number; stage_goal?: string } | undefined
-  const tier = postseasonTierForTeam(ut, brFlat, champ)
+  const tier = postseasonTierForTeam(ut, postseasonCtx.bracketResults, postseasonCtx.champion)
   const goalEval = evaluateSeasonGoals(wins, losses, goals, tier)
   const winPill = goalStatusPill(goalEval.winMet)
   const stagePill = goalStatusPill(goalEval.stageMet)

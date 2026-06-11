@@ -9,7 +9,7 @@ pass for the offseason they enter on; first offseason gains apply as sophomores 
 """
 
 import random
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from models.player import RATING_ATTR_MAX, RATING_ATTR_MIN
 
@@ -29,6 +29,60 @@ DEVELOPABLE_ATTRIBUTES = [
     "blitz", "pass_rush", "run_defense", "pursuit", "tackling", "block_shedding",
     "kick_power", "kick_accuracy",
 ]
+
+# --- Training Results / in-season: Option B tiered gains (position + two-way max-blend) ---
+PRIMARY_ATTR_WEIGHT = 1.0
+SECONDARY_ATTR_WEIGHT = 0.55
+UNIVERSAL_ATTR_WEIGHT = 0.40
+
+# Core skills that move OVR for each position (aligned with recruiting trim/boost levers).
+POSITION_PRIMARY_ATTRS: Dict[str, Tuple[str, ...]] = {
+    "QB": ("throw_power", "throw_accuracy", "decisions", "football_iq", "speed", "agility", "elusiveness"),
+    "RB": ("speed", "agility", "acceleration", "vision", "break_tackle", "ball_security", "catching", "strength"),
+    "WR": ("speed", "agility", "acceleration", "catching", "route_running", "ball_security", "vision"),
+    "OL": ("run_blocking", "pass_blocking", "strength", "agility", "balance"),
+    "TE": ("catching", "run_blocking", "strength", "speed", "route_running", "vision"),
+    "DE": ("pass_rush", "run_defense", "block_shedding", "strength", "speed", "tackling"),
+    "DT": ("strength", "run_defense", "block_shedding", "pass_rush", "tackling"),
+    "LB": ("tackling", "pursuit", "coverage", "run_defense", "speed", "strength"),
+    "CB": ("coverage", "speed", "agility", "acceleration", "tackling"),
+    "S": ("coverage", "tackling", "speed", "agility", "football_iq", "pursuit"),
+    "K": ("kick_power", "kick_accuracy"),
+    "P": ("kick_power", "kick_accuracy"),
+}
+
+# Useful but not core — partial gain when not already primary for that player.
+POSITION_SECONDARY_ATTRS: Dict[str, Tuple[str, ...]] = {
+    "QB": ("composure", "confidence", "balance", "toughness"),
+    "RB": ("elusiveness", "route_running", "pass_blocking", "strength"),
+    "WR": ("elusiveness", "jumping", "strength", "balance"),
+    "OL": ("football_iq", "toughness", "stamina", "effort"),
+    "TE": ("pass_blocking", "ball_security", "agility", "balance"),
+    "DE": ("blitz", "pursuit", "balance", "stamina"),
+    "DT": ("balance", "stamina", "pursuit", "pass_rush"),
+    "LB": ("blitz", "block_shedding", "football_iq", "acceleration"),
+    "CB": ("pursuit", "football_iq", "balance", "jumping", "ball_security"),
+    "S": ("blitz", "acceleration", "balance", "tackling"),
+    "K": ("composure", "confidence", "strength"),
+    "P": ("composure", "confidence", "strength"),
+}
+
+# Weight room / film room — everyone can improve these at a reduced rate.
+UNIVERSAL_DEVELOPMENT_ATTRS: Tuple[str, ...] = (
+    "speed",
+    "agility",
+    "acceleration",
+    "strength",
+    "stamina",
+    "injury",
+    "toughness",
+    "effort",
+    "football_iq",
+    "coachability",
+    "confidence",
+    "discipline",
+    "composure",
+)
 
 # Winter Phase: physical development (strength vs speed/quickness)
 WINTER_STRENGTH_ATTRS = ["strength"]
@@ -145,16 +199,57 @@ def _age_curve_multiplier(player: "Player") -> float:
     return max(0.3, min(1.0, mult))
 
 
+def _player_position_codes(player: "Player") -> List[str]:
+    out: List[str] = []
+    for raw in (getattr(player, "position", None), getattr(player, "secondary_position", None)):
+        pos = str(raw or "").strip().upper()
+        if pos and pos not in out:
+            out.append(pos)
+    return out
+
+
+def _weight_for_position_attr(position: str, attribute: str) -> float:
+    if attribute in POSITION_PRIMARY_ATTRS.get(position, ()):
+        return PRIMARY_ATTR_WEIGHT
+    if attribute in POSITION_SECONDARY_ATTRS.get(position, ()):
+        return SECONDARY_ATTR_WEIGHT
+    return 0.0
+
+
+def development_attr_weight(player: "Player", attribute: str) -> float:
+    """
+    Tiered training weight for Training Results / in-season development.
+    Two-way players use max-blend across primary + secondary positions; irrelevant skills stay at 0.
+    """
+    weight = UNIVERSAL_ATTR_WEIGHT if attribute in UNIVERSAL_DEVELOPMENT_ATTRS else 0.0
+    for pos in _player_position_codes(player):
+        weight = max(weight, _weight_for_position_attr(pos, attribute))
+    return weight
+
+
+def _development_spread_factor(player: "Player") -> float:
+    """Dampen slightly when many primary skills apply (common on two-way players)."""
+    primaries: set = set()
+    for pos in _player_position_codes(player):
+        primaries.update(POSITION_PRIMARY_ATTRS.get(pos, ()))
+    extra = max(0, len(primaries) - 8)
+    return max(0.82, 1.0 - extra * 0.015)
+
+
 def _development_gain(
     player: "Player",
     team: "Team",
     attribute: str,
     is_offseason: bool = True,
+    attr_weight: float = 1.0,
 ) -> int:
     """
     Compute how much to add to one attribute this period.
     Room = potential - current (capped); gain scaled by facilities, coach, growth_rate, age curve.
+    attr_weight: position/universal tier (0 skips the attribute).
     """
+    if attr_weight <= 0:
+        return 0
     current = getattr(player, attribute, 50)
     potential = player.potential
     room = max(0, potential - current)
@@ -179,8 +274,8 @@ def _development_gain(
     base_gain = room * growth_factor * facility_factor * coach_factor * age_factor * year_factor
     if is_offseason:
         base_gain *= 2.0  # off-season is main development period
-    # Random variance
-    gain = int(base_gain * random.uniform(0.5, 1.5))
+    # Random variance + position relevance tier
+    gain = int(base_gain * random.uniform(0.5, 1.5) * attr_weight)
     return max(0, min(room, gain))
 
 
@@ -189,17 +284,27 @@ def develop_player(
     team: "Team",
     is_offseason: bool = True,
     attributes: Optional[List[str]] = None,
+    *,
+    use_position_weights: bool = True,
 ) -> int:
     """
     Apply development to one player. Updates attributes in place.
     Returns total points added across all attributes.
     """
     attrs = attributes or DEVELOPABLE_ATTRIBUTES
+    spread = _development_spread_factor(player) if use_position_weights else 1.0
     total_gain = 0
     for attr in attrs:
         if not hasattr(player, attr):
             continue
-        gain = _development_gain(player, team, attr, is_offseason=is_offseason)
+        tier = development_attr_weight(player, attr) if use_position_weights else 1.0
+        gain = _development_gain(
+            player,
+            team,
+            attr,
+            is_offseason=is_offseason,
+            attr_weight=tier * spread,
+        )
         if gain > 0:
             current = getattr(player, attr, 50)
             new_val = max(RATING_ATTR_MIN, min(RATING_ATTR_MAX, current + gain))

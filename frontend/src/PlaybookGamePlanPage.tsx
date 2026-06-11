@@ -3,7 +3,6 @@ import { fetchPlaySelection } from './browserSave'
 import './PlaybookGamePlanPage.css'
 import TeamLogo from './TeamLogo'
 import {
-  cachePlaySelectionResponse,
   getPlaySelectionCache,
   hasPlaySelectionCache,
   setPlaySelectionCache,

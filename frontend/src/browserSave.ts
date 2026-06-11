@@ -190,11 +190,32 @@ export async function fetchPlayLearningSummary(
   return r.json()
 }
 
+export type GamePlanLibraryEntry = {
+  id: string
+  name: string
+  description?: string
+  builtin?: boolean
+  plan: Record<string, unknown>
+  created_at?: number
+}
+
+export type GamePlanLibrary = {
+  presets: GamePlanLibraryEntry[]
+  saved: GamePlanLibraryEntry[]
+}
+
+/** @deprecated use GamePlanLibrary */
+export type OffenseGamePlanLibraryEntry = GamePlanLibraryEntry
+/** @deprecated use GamePlanLibrary */
+export type OffenseGamePlanLibrary = GamePlanLibrary
+
 export type CoachGameplanResponse = {
   matchup_key: string | null
   offense: Record<string, unknown>
   defense: Record<string, unknown>
   fourth_down?: { go_for_it_max_ytg?: number }
+  offense_library?: GamePlanLibrary
+  defense_library?: GamePlanLibrary
   meta?: unknown
   state?: unknown
 }
@@ -229,6 +250,10 @@ export async function saveCoachGameplan(
     offense?: Record<string, unknown>
     defense?: Record<string, unknown>
     fourth_down?: { go_for_it_max_ytg?: number }
+    add_offense_library?: { name: string; plan: Record<string, unknown> }
+    delete_offense_library_id?: string
+    add_defense_library?: { name: string; plan: Record<string, unknown> }
+    delete_defense_library_id?: string
   },
 ): Promise<CoachGameplanResponse> {
   if (shouldUseSimApi(saveId, headers)) {

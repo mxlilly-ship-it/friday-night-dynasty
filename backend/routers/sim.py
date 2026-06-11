@@ -18,14 +18,17 @@ from backend.services.league_service import (
     get_coach_gameplan_v2_from_state,
     save_coach_gameplan_v2_in_state,
     update_depth_chart_in_state,
+    patch_coach_inbox_state,
     _ensure_playoffs_migrated,
     _init_playoffs_multiclass,
     _ensure_all_eligible_playoff_brackets,
     _playoffs_global_completed,
 )
+from backend.http_errors import exception_detail
 from backend.services.game_service import play_options, submit_play, sim_next_play, sim_to_half, sim_to_end
-from backend.services.game_state import deserialize_game, serialize_game
+from backend.services.game_state import deserialize_game, get_teams_for_coach_game, serialize_game
 from systems.save_system import team_from_dict
+from systems.coach_email_system import ensure_coach_inbox
 
 
 router = APIRouter()
@@ -48,6 +51,10 @@ class SimCoachGameplanRequest(BaseModel):
     offense: Optional[Dict[str, Any]] = None
     defense: Optional[Dict[str, Any]] = None
     fourth_down: Optional[Dict[str, Any]] = None
+    add_offense_library: Optional[Dict[str, Any]] = None
+    delete_offense_library_id: Optional[str] = None
+    add_defense_library: Optional[Dict[str, Any]] = None
+    delete_defense_library_id: Optional[str] = None
 
 
 class SimDepthChartRequest(BaseModel):
@@ -180,12 +187,20 @@ def sim_coach_gameplan_route(payload: SimCoachGameplanRequest = Body(...)):
             payload.offense is not None
             or payload.defense is not None
             or payload.fourth_down is not None
+            or payload.add_offense_library is not None
+            or payload.delete_offense_library_id is not None
+            or payload.add_defense_library is not None
+            or payload.delete_defense_library_id is not None
         ):
             result = save_coach_gameplan_v2_in_state(
                 payload.state,
                 offense=payload.offense,
                 defense=payload.defense,
                 fourth_down=payload.fourth_down,
+                add_offense_library=payload.add_offense_library,
+                delete_offense_library_id=payload.delete_offense_library_id,
+                add_defense_library=payload.add_defense_library,
+                delete_defense_library_id=payload.delete_defense_library_id,
             )
         else:
             result = get_coach_gameplan_v2_from_state(payload.state)
@@ -199,9 +214,7 @@ def sim_game_start_route(payload: SimGameStartRequest = Body(...)):
     try:
         out = start_coach_game_state(payload.state, payload.context, payload.scrimmage_index)
         game = deserialize_game(out["game"])
-        teams = {t["name"]: team_from_dict(t) for t in payload.state.get("teams", [])}
-        home_team = teams[out["home_team_name"]]
-        away_team = teams[out["away_team_name"]]
+        home_team, away_team = get_teams_for_coach_game(payload.state, game)
         options = play_options(game, home_team, away_team)
         return {
             "home_team_name": out["home_team_name"],
@@ -212,71 +225,61 @@ def sim_game_start_route(payload: SimGameStartRequest = Body(...)):
             "options": options,
         }
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=exception_detail(e, "Could not start coach game"))
 
 
 @router.post("/game/options", response_model=Dict[str, Any])
 def sim_game_options_route(payload: SimGameStepRequest = Body(...)):
     try:
         game = deserialize_game(payload.game)
-        teams = {t["name"]: team_from_dict(t) for t in payload.state.get("teams", [])}
-        home_team = teams[getattr(game, "home_team_name", None)]
-        away_team = teams[getattr(game, "away_team_name", None)]
-        return {"options": play_options(game, home_team, away_team)}
+        home_team, away_team = get_teams_for_coach_game(payload.state, game)
+        return {"options": play_options(game, home_team, away_team), "game": serialize_game(game)}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=exception_detail(e, "Could not load play options"))
 
 
 @router.post("/game/play", response_model=Dict[str, Any])
 def sim_game_play_route(payload: SimGamePlayRequest = Body(...)):
     try:
         game = deserialize_game(payload.game)
-        teams = {t["name"]: team_from_dict(t) for t in payload.state.get("teams", [])}
-        home_team = teams[getattr(game, "home_team_name", None)]
-        away_team = teams[getattr(game, "away_team_name", None)]
+        home_team, away_team = get_teams_for_coach_game(payload.state, game)
         out = submit_play(game, home_team, away_team, payload.offense_play_id, payload.defense_play_id)
         return {"game": serialize_game(game), **out}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=exception_detail(e, "Play failed"))
 
 
 @router.post("/game/sim-next", response_model=Dict[str, Any])
 def sim_game_sim_next_route(payload: SimGameStepRequest = Body(...)):
     try:
         game = deserialize_game(payload.game)
-        teams = {t["name"]: team_from_dict(t) for t in payload.state.get("teams", [])}
-        home_team = teams[getattr(game, "home_team_name", None)]
-        away_team = teams[getattr(game, "away_team_name", None)]
+        home_team, away_team = get_teams_for_coach_game(payload.state, game)
         out = sim_next_play(game, home_team, away_team)
         return {"game": serialize_game(game), **out}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=exception_detail(e, "Simulation failed"))
 
 
 @router.post("/game/sim-to-half", response_model=Dict[str, Any])
 def sim_game_sim_to_half_route(payload: SimGameStepRequest = Body(...)):
     try:
         game = deserialize_game(payload.game)
-        teams = {t["name"]: team_from_dict(t) for t in payload.state.get("teams", [])}
-        home_team = teams[getattr(game, "home_team_name", None)]
-        away_team = teams[getattr(game, "away_team_name", None)]
+        home_team, away_team = get_teams_for_coach_game(payload.state, game)
         out = sim_to_half(game, home_team, away_team)
         return {"game": serialize_game(game), **out}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=exception_detail(e, "Simulation failed"))
 
 
 @router.post("/game/sim-to-end", response_model=Dict[str, Any])
 def sim_game_sim_to_end_route(payload: SimGameStepRequest = Body(...)):
     try:
         game = deserialize_game(payload.game)
-        teams = {t["name"]: team_from_dict(t) for t in payload.state.get("teams", [])}
-        home_team = teams[getattr(game, "home_team_name", None)]
-        away_team = teams[getattr(game, "away_team_name", None)]
+        home_team, away_team = get_teams_for_coach_game(payload.state, game)
         out = sim_to_end(game, home_team, away_team)
         return {"game": serialize_game(game), **out}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=exception_detail(e, "Simulation failed"))
 
 
 @router.post("/game/finish-week", response_model=Dict[str, Any])
@@ -286,7 +289,7 @@ def sim_game_finish_week_route(payload: SimGameStepRequest = Body(...)):
         out = finish_coach_week_state(payload.state, game)
         return {"state": out}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=exception_detail(e, "Could not finish week"))
 
 
 @router.post("/game/finish-playoff", response_model=Dict[str, Any])
@@ -308,7 +311,7 @@ def sim_game_finish_playoff_route(payload: SimGameStepRequest = Body(...)):
             }
         return {"state": out_state}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=exception_detail(e, "Could not finish playoff game"))
 
 
 @router.post("/game/finish-scrimmage", response_model=Dict[str, Any])
@@ -318,5 +321,38 @@ def sim_game_finish_scrimmage_route(payload: SimGameStepRequest = Body(...), scr
         out = finish_coach_scrimmage_state(payload.state, game, scrimmage_stage)
         return {"state": out}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=exception_detail(e, "Could not finish scrimmage"))
+
+
+@router.post("/hydrate-inbox", response_model=Dict[str, Any])
+def sim_hydrate_inbox_route(payload: SimStateRequest = Body(...)):
+    """Ensure coach_inbox + starter mail exists for browser/local saves on load."""
+    try:
+        state = payload.state or {}
+        ensure_coach_inbox(state)
+        return {"state": state}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=exception_detail(e, "Could not hydrate inbox"))
+
+
+class SimCoachInboxPatchBody(BaseModel):
+    state: Dict[str, Any]
+    mark_read: Optional[list] = None
+    choose: Optional[Dict[str, str]] = None
+    delete: Optional[list] = None
+
+
+@router.patch("/coach-inbox", response_model=Dict[str, Any])
+def sim_patch_coach_inbox_route(body: SimCoachInboxPatchBody = Body(...)):
+    """Mark read / resolve choice / delete for browser/local saves."""
+    try:
+        out = patch_coach_inbox_state(
+            body.state or {},
+            mark_read=body.mark_read,
+            choose=body.choose,
+            delete=body.delete,
+        )
+        return {"state": out}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=exception_detail(e, "Inbox update failed"))
 

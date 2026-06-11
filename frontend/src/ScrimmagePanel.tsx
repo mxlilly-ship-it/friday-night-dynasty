@@ -36,7 +36,7 @@ function scrimmageStageName(s: ScrimmageResult): string {
 function scrimmageIsComplete(s: ScrimmageResult): boolean {
   if (s.completed === false) return false
   if (s.played === true) return true
-  return s.completed !== false
+  return s.completed === true
 }
 
 export default function ScrimmagePanel({ currentStage, scrimmages, opponents = [], onSimulate, onPlay }: Props) {

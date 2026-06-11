@@ -257,6 +257,7 @@ def team_to_dict(t: Team) -> Dict[str, Any]:
     raw = {
         "name": t.name,
         "nickname": getattr(t, "nickname", None),
+        "stadium_name": getattr(t, "stadium_name", None),
         "prestige": t.prestige,
         "team_points": round(float(getattr(t, "team_points", 0.0) or 0.0), 2),
         "team_points_last_delta": round(float(getattr(t, "team_points_last_delta", 0.0) or 0.0), 2),
@@ -298,6 +299,7 @@ def team_from_dict(d: Dict[str, Any]) -> Team:
     t = Team(
         name=d.get("name", ""),
         nickname=d.get("nickname", d.get("mascot")),
+        stadium_name=d.get("stadium_name"),
         prestige=int(d.get("prestige", 5)),
         community_type=community,
         enrollment=d.get("enrollment"),

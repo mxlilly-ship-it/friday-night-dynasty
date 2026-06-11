@@ -6,11 +6,21 @@ export function normalizeNameKey(s: string): string {
     .replace(/[^a-z0-9]/g, '')
 }
 
-function stemVariants(stem: string): string[] {
+const LOGO_STEM_SUFFIXES = ['_logo', '-logo', '_LOGO', '-LOGO', ' logo'] as const
+const STADIUM_STEM_SUFFIXES = [
+  '_stadium',
+  '-stadium',
+  '_field',
+  '-field',
+  ' stadium',
+  ...LOGO_STEM_SUFFIXES,
+] as const
+
+function stemVariants(stem: string, extraSuffixes: readonly string[] = LOGO_STEM_SUFFIXES): string[] {
   const stemTrim = stem.trim()
   if (!stemTrim) return []
   const variants = [stemTrim]
-  for (const suffix of ['_logo', '-logo', '_LOGO', '-LOGO', ' logo']) {
+  for (const suffix of extraSuffixes) {
     if (stemTrim.length > suffix.length && stemTrim.toLowerCase().endsWith(suffix.toLowerCase())) {
       variants.push(stemTrim.slice(0, -suffix.length).trim())
     }
@@ -26,8 +36,11 @@ function stemVariants(stem: string): string[] {
   return out
 }
 
-/** Guess which save team a logo file belongs to (filename without extension). */
-export function suggestTeamForLogoFilename(filename: string, teams: string[]): string {
+function suggestTeamForAssetFilename(
+  filename: string,
+  teams: string[],
+  suffixes: readonly string[],
+): string {
   const stem = filename.replace(/\.[^.]+$/i, '').trim()
   if (!stem || teams.length === 0) return ''
   const byNorm = new Map<string, string>()
@@ -35,9 +48,19 @@ export function suggestTeamForLogoFilename(filename: string, teams: string[]): s
     const n = normalizeNameKey(t)
     if (n) byNorm.set(n, t)
   }
-  for (const v of stemVariants(stem)) {
+  for (const v of stemVariants(stem, suffixes)) {
     const kn = normalizeNameKey(v)
     if (kn && byNorm.has(kn)) return byNorm.get(kn)!
   }
   return ''
+}
+
+/** Guess which save team a logo file belongs to (filename without extension). */
+export function suggestTeamForLogoFilename(filename: string, teams: string[]): string {
+  return suggestTeamForAssetFilename(filename, teams, LOGO_STEM_SUFFIXES)
+}
+
+/** Guess team from stadium/field photo filenames (e.g. Martinsburg_stadium.jpg). */
+export function suggestTeamForStadiumFilename(filename: string, teams: string[]): string {
+  return suggestTeamForAssetFilename(filename, teams, STADIUM_STEM_SUFFIXES)
 }

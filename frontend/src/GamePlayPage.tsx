@@ -54,6 +54,58 @@ const FIELD_YARD_MARKERS: { leftPct: number; label: string }[] = [
 /** Five-yard ticks on the playing field only (excludes end zones). */
 const FIELD_MINOR_YARD_PCTS = [15, 25, 35, 45, 55, 65, 75, 85]
 
+function PossessionFootball({ size = 'md' }: { size?: 'sm' | 'md' }) {
+  return (
+    <svg
+      className={`gameplay-possession-football gameplay-possession-football--${size}`}
+      viewBox="0 0 24 24"
+      role="img"
+      aria-label="Has the ball"
+    >
+      <g transform="rotate(-28 12 12)">
+        <ellipse cx="12" cy="12" rx="9.2" ry="5.2" fill="#a16207" stroke="#713f12" strokeWidth="0.9" />
+        <ellipse cx="12" cy="11.2" rx="7.5" ry="3.2" fill="#ca8a04" opacity="0.35" />
+        <rect x="10.15" y="9.4" width="3.7" height="5.2" rx="0.45" fill="#fef3c7" />
+        <line x1="12" y1="9.75" x2="12" y2="14.25" stroke="#92400e" strokeWidth="0.55" />
+        <line x1="11.1" y1="10.6" x2="12.9" y2="10.6" stroke="#92400e" strokeWidth="0.45" />
+        <line x1="11.1" y1="11.5" x2="12.9" y2="11.5" stroke="#92400e" strokeWidth="0.45" />
+        <line x1="11.1" y1="12.4" x2="12.9" y2="12.4" stroke="#92400e" strokeWidth="0.45" />
+        <line x1="11.1" y1="13.3" x2="12.9" y2="13.3" stroke="#92400e" strokeWidth="0.45" />
+      </g>
+    </svg>
+  )
+}
+
+function TeamNameWithPossession({
+  name,
+  hasPossession,
+  align = 'start',
+  truncateAt = 0,
+  className = '',
+}: {
+  name: string
+  hasPossession: boolean
+  align?: 'start' | 'end'
+  truncateAt?: number
+  className?: string
+}) {
+  const display =
+    truncateAt > 0 && name.length > truncateAt ? `${name.slice(0, truncateAt - 2)}…` : name
+  const football = hasPossession ? (
+    <span className="gameplay-possession-icon" title="Has the ball">
+      <PossessionFootball size={truncateAt > 0 ? 'sm' : 'md'} />
+    </span>
+  ) : null
+
+  return (
+    <span className={`gameplay-team-name-row gameplay-team-name-row--${align} ${className}`.trim()}>
+      {align === 'end' ? football : null}
+      <span className="gameplay-team-name-text">{display}</span>
+      {align === 'start' ? football : null}
+    </span>
+  )
+}
+
 /**
  * Engine stores ball_position as yards from the current offense's own goal (0–100 toward the opponent).
  * Map to absolute field percent for the graphic: 0 = home goal, 100 = away goal.
@@ -81,6 +133,76 @@ type PlayOptions = {
   defense_plays: PlayOption[]
 }
 
+type FetchOptionsOverride = {
+  game?: unknown
+  down?: number
+  is_overtime?: boolean
+  preservePlayId?: string | null
+}
+
+const FOURTH_DOWN_PLAY_CATEGORIES = new Set([
+  'FOURTH_DOWN_SPECIAL',
+  'SPECIAL_TEAMS_OFFENSE',
+  'SPECIAL_TEAMS_DEFENSE',
+])
+
+function supplementFourthDownPlays(opts: PlayOptions, down: number, isOvertime: boolean): PlayOptions {
+  if (down !== 4 || isOvertime) return opts
+  const off = Array.isArray(opts.offense_plays) ? [...opts.offense_plays] : []
+  const def = Array.isArray(opts.defense_plays) ? [...opts.defense_plays] : []
+  if (!off.some((p) => p.id === 'PUNT')) {
+    off.push({ id: 'PUNT', name: 'Punt', category: 'FOURTH_DOWN_SPECIAL', formation: '' })
+  }
+  if (!off.some((p) => p.id === 'FIELD_GOAL')) {
+    off.push({ id: 'FIELD_GOAL', name: 'Field goal', category: 'FOURTH_DOWN_SPECIAL', formation: '' })
+  }
+  if (!def.some((p) => p.id === 'DEF_PUNT_RETURN')) {
+    def.push({ id: 'DEF_PUNT_RETURN', name: 'Punt - return / safe', category: 'SPECIAL_TEAMS_DEFENSE', formation: '' })
+  }
+  if (!def.some((p) => p.id === 'DEF_PUNT_BLOCK')) {
+    def.push({ id: 'DEF_PUNT_BLOCK', name: 'Punt - block', category: 'SPECIAL_TEAMS_DEFENSE', formation: '' })
+  }
+  if (!def.some((p) => p.id === 'DEF_FG_BLOCK')) {
+    def.push({ id: 'DEF_FG_BLOCK', name: 'Field goal - block', category: 'SPECIAL_TEAMS_DEFENSE', formation: '' })
+  }
+  return { ...opts, offense_plays: off, defense_plays: def }
+}
+
+function userPlayPool(opts: PlayOptions, userTeam: string): PlayOption[] {
+  const userOnOffense = userTeam === opts.offense_team
+  return (userOnOffense ? opts.offense_plays : opts.defense_plays) as PlayOption[]
+}
+
+function pickDefaultUserPlay(
+  plays: PlayOption[],
+  userOnOffense: boolean,
+  down: number,
+  isOvertime: boolean,
+): PlayOption | null {
+  if (!plays.length) return null
+  if (userOnOffense && down === 4 && !isOvertime) {
+    const punt = plays.find((p) => p.id === 'PUNT' || p.id === 'PUNT_PRO')
+    if (punt) return punt
+    const special = plays.find((p) => FOURTH_DOWN_PLAY_CATEGORIES.has(p.category || ''))
+    if (special) return special
+  }
+  return plays[0] ?? null
+}
+
+function resolveUserPlay(
+  plays: PlayOption[],
+  preferredId: string | null | undefined,
+  userOnOffense: boolean,
+  down: number,
+  isOvertime: boolean,
+): PlayOption | null {
+  if (preferredId) {
+    const kept = plays.find((p) => p.id === preferredId)
+    if (kept) return kept
+  }
+  return pickDefaultUserPlay(plays, userOnOffense, down, isOvertime)
+}
+
 type Props = {
   apiBase: string
   headers: Record<string, string>
@@ -93,6 +215,7 @@ type Props = {
   /** Bumps logo URLs after upload (same as team home). */
   logoVersion?: number
   initialState: GameState
+  getLiveSaveState?: () => any
   /** When finishing a local-bundle game, pass `{ game }` (serialized engine game) so the client can call /sim/game/finish-*. */
   onContinue: (gameOver: boolean, finishPayload?: { game?: any }) => void | Promise<void>
   onError: (msg: string) => void
@@ -104,13 +227,16 @@ async function apiErrorMessage(r: Response, fallback: string): Promise<string> {
   try {
     const j = JSON.parse(txt) as { detail?: unknown }
     const d = j.detail
-    if (typeof d === 'string' && d.trim()) return d
+    if (typeof d === 'string') {
+      const trimmed = d.trim()
+      if (trimmed && trimmed.toLowerCase() !== 'none') return trimmed
+    }
     if (Array.isArray(d))
       return d.map((x: { msg?: string }) => x?.msg || JSON.stringify(x)).join('; ') || fallback
   } catch {
     /* not JSON */
   }
-  return txt.trim() || fallback
+  return txt.trim() && txt.trim().toLowerCase() !== 'none' ? txt.trim() : fallback
 }
 
 export default function GamePlayPage({
@@ -124,11 +250,16 @@ export default function GamePlayPage({
   userTeam,
   logoVersion = 0,
   initialState,
+  getLiveSaveState,
   onContinue,
   onError,
 }: Props) {
+  const liveState = useCallback(() => getLiveSaveState?.() ?? saveState ?? {}, [getLiveSaveState, saveState])
   const [state, setState] = useState<GameState>(initialState)
-  const [localGame, setLocalGame] = useState<any>(null)
+  const [localGame, setLocalGame] = useState<any>(() => {
+    const bundled = (initialState as { __game?: unknown })?.__game
+    return bundled ?? null
+  })
   const [options, setOptions] = useState<PlayOptions | null>(null)
   const [selectedPlay, setSelectedPlay] = useState<PlayOption | null>(null)
   /** Call sheet column key for "PLAY TYPE" display (matches game_interface playType). */
@@ -142,65 +273,63 @@ export default function GamePlayPage({
   const [simulating, setSimulating] = useState<string | null>(null)
   const [playFeed, setPlayFeed] = useState<string[]>([])
   const commentaryStripRef = useRef<HTMLDivElement>(null)
+  const selectedPlayRef = useRef<PlayOption | null>(null)
+  const localGameRef = useRef<any>(null)
+  const optionsRequestRef = useRef(0)
+
+  useEffect(() => {
+    selectedPlayRef.current = selectedPlay
+  }, [selectedPlay])
+
+  useEffect(() => {
+    localGameRef.current = localGame
+  }, [localGame])
 
   const sameTeam = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
   const isUserOnOffense = state.possession === 'home' ? sameTeam(userTeam, homeTeam) : sameTeam(userTeam, awayTeam)
+  const homeHasBall = state.possession === 'home'
+  const awayHasBall = state.possession === 'away'
   const gameOver = !!state.ot_winner || (state.quarter > 4 && !state.is_overtime)
   const isLocalBundle = saveId === '__local__' || saveId.startsWith('b_')
 
   const finishPayloadIfNeeded = (ended: boolean) =>
     isLocalBundle && ended ? { game: localGame } : undefined
 
-  const fetchOptions = useCallback(async () => {
+  const fetchOptions = useCallback(async (override?: FetchOptionsOverride) => {
+    const requestId = ++optionsRequestRef.current
+    const down = override?.down ?? state.down
+    const isOvertime = override?.is_overtime ?? !!state.is_overtime
+    const gamePayload = override?.game ?? localGameRef.current ?? localGame ?? {}
+    const preservePlayId = override?.preservePlayId ?? selectedPlayRef.current?.id ?? null
     try {
       const r = isLocalBundle
         ? await fetch(`${apiBase}/sim/game/options`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ state: saveState ?? {}, game: localGame ?? {} }),
+            body: JSON.stringify({ state: liveState(), game: gamePayload }),
           })
         : await fetch(`${apiBase}/games/${gameId}/options?save_id=${encodeURIComponent(saveId)}`, { headers })
       if (!r.ok) throw new Error(await apiErrorMessage(r, 'Failed to load play options'))
+      if (requestId !== optionsRequestRef.current) return
       const data = await r.json()
-      const opts = data.options as PlayOptions
-      if (opts && state.down === 4 && !state.is_overtime) {
-        const off = Array.isArray(opts.offense_plays) ? [...opts.offense_plays] : []
-        const def = Array.isArray(opts.defense_plays) ? [...opts.defense_plays] : []
-        if (!off.some((p) => p.id === 'PUNT')) {
-          off.push({ id: 'PUNT', name: 'Punt', category: 'FOURTH_DOWN_SPECIAL', formation: '' })
-        }
-        if (!off.some((p) => p.id === 'FIELD_GOAL')) {
-          off.push({ id: 'FIELD_GOAL', name: 'Field goal', category: 'FOURTH_DOWN_SPECIAL', formation: '' })
-        }
-        if (!def.some((p) => p.id === 'DEF_PUNT_RETURN')) {
-          def.push({ id: 'DEF_PUNT_RETURN', name: 'Punt - return / safe', category: 'SPECIAL_TEAMS_DEFENSE', formation: '' })
-        }
-        if (!def.some((p) => p.id === 'DEF_PUNT_BLOCK')) {
-          def.push({ id: 'DEF_PUNT_BLOCK', name: 'Punt - block', category: 'SPECIAL_TEAMS_DEFENSE', formation: '' })
-        }
-        if (!def.some((p) => p.id === 'DEF_FG_BLOCK')) {
-          def.push({ id: 'DEF_FG_BLOCK', name: 'Field goal - block', category: 'SPECIAL_TEAMS_DEFENSE', formation: '' })
-        }
-        opts.offense_plays = off
-        opts.defense_plays = def
-      }
+      if (isLocalBundle && data.game) setLocalGame(data.game)
+      let opts = data.options as PlayOptions
+      opts = supplementFourthDownPlays(opts, down, isOvertime)
+      if (requestId !== optionsRequestRef.current) return
       setOptions(opts)
-      if (opts) {
-        const userOff = userTeam === opts.offense_team
-        const plays = (userOff ? opts.offense_plays : opts.defense_plays) as PlayOption[]
-        const fourthCat = 'FOURTH_DOWN_SPECIAL'
-        const hasFourth = plays.some((p) => (p.category || '') === fourthCat)
-        const preferFourth = userOff && state.down === 4 && !state.is_overtime && hasFourth
-        const pick =
-          preferFourth ? plays.find((p) => (p.category || '') === fourthCat) : plays[0]
-        setSelectedPlay(pick || plays[0] || null)
+      const userOnOffense = userTeam === opts.offense_team
+      const plays = userPlayPool(opts, userTeam)
+      const nextPlay = resolveUserPlay(plays, preservePlayId, userOnOffense, down, isOvertime)
+      setSelectedPlay(nextPlay)
+      if (!preservePlayId || !nextPlay || nextPlay.id !== preservePlayId) {
         setCallsheetBucket('')
-        setCallsheetSide(userOff ? 'offense' : 'defense')
       }
+      setCallsheetSide(userOnOffense ? 'offense' : 'defense')
     } catch (e: unknown) {
+      if (requestId !== optionsRequestRef.current) return
       onError(e instanceof Error ? e.message : 'Failed to load options')
     }
-  }, [apiBase, gameId, saveId, headers, userTeam, isLocalBundle, localGame, saveState, state.down, state.is_overtime])
+  }, [apiBase, gameId, saveId, headers, userTeam, isLocalBundle, localGame, liveState, state.down, state.is_overtime, onError])
 
   useEffect(() => {
     if (!isLocalBundle) return
@@ -212,8 +341,8 @@ export default function GamePlayPage({
   }, [isLocalBundle, initialState, localGame])
 
   useEffect(() => {
-    if (!gameOver) fetchOptions()
-  }, [gameId, saveId, gameOver, state.possession, state.down, state.ball_position, state.pending_pat, fetchOptions])
+    if (!gameOver && (!isLocalBundle || localGame)) fetchOptions()
+  }, [gameId, saveId, gameOver, isLocalBundle, localGame, state.possession, state.down, state.ball_position, state.pending_pat, fetchOptions])
 
   useEffect(() => {
     setCallsheetSide(isUserOnOffense ? 'offense' : 'defense')
@@ -238,15 +367,15 @@ export default function GamePlayPage({
   const runPlay = async () => {
     if (!options || !selectedPlay || loading) return
     const userPlays = (isUserOnOffense ? options.offense_plays : options.defense_plays) as PlayOption[]
-    if (!userPlays.some((p) => p.id === selectedPlay.id)) {
-      onError('Play list updated — pick a play again.')
-      await fetchOptions()
-      return
-    }
+    let activePlay =
+      userPlays.find((p) => p.id === selectedPlay.id) ??
+      resolveUserPlay(userPlays, selectedPlay.id, isUserOnOffense, state.down, !!state.is_overtime)
+    if (!activePlay) return
+    if (activePlay.id !== selectedPlay.id) setSelectedPlay(activePlay)
     setLoading(true)
     try {
-      let offensePlayId = isUserOnOffense ? selectedPlay.id : options.ai.offense_play_id
-      let defensePlayId = isUserOnOffense ? options.ai.defense_play_id : selectedPlay.id
+      let offensePlayId = isUserOnOffense ? activePlay.id : options.ai.offense_play_id
+      let defensePlayId = isUserOnOffense ? options.ai.defense_play_id : activePlay.id
       // If user controls defense and picks a special-teams defense call, force matching offense call.
       // Otherwise backend treats DEF_PUNT_* / DEF_FG_BLOCK as invalid against normal offensive plays.
       if (!isUserOnOffense) {
@@ -274,8 +403,8 @@ export default function GamePlayPage({
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              state: saveState ?? {},
-              game: localGame ?? {},
+              state: liveState(),
+              game: localGameRef.current ?? localGame ?? {},
               offense_play_id: offensePlayId,
               defense_play_id: defensePlayId,
             }),
@@ -292,8 +421,8 @@ export default function GamePlayPage({
       const toAbs = absoluteFieldPct(data.state.possession, data.state.ball_position)
       if (isLocalBundle && data.game) setLocalGame(data.game)
       setState(data.state)
-      setPreviousPlay(isUserOnOffense ? selectedPlay.name : (options.offense_plays.find((p: PlayOption) => p.id === offensePlayId)?.name ?? '—'))
-      setPreviousOpponentPlay(isUserOnOffense ? (options.defense_plays.find((p: PlayOption) => p.id === defensePlayId)?.name ?? '—') : selectedPlay.name)
+      setPreviousPlay(isUserOnOffense ? activePlay.name : (options.offense_plays.find((p: PlayOption) => p.id === offensePlayId)?.name ?? '—'))
+      setPreviousOpponentPlay(isUserOnOffense ? (options.defense_plays.find((p: PlayOption) => p.id === defensePlayId)?.name ?? '—') : activePlay.name)
 
       const res = data.result
       let resultText = `${res?.yards ?? 0} yards`
@@ -329,7 +458,12 @@ export default function GamePlayPage({
       } else {
         setDriveArrows((prev) => [...prev, { from: fromAbs, to: toAbs }])
       }
-      await fetchOptions()
+      await fetchOptions({
+        game: isLocalBundle ? data.game ?? localGame : undefined,
+        down: data.state.down,
+        is_overtime: !!data.state.is_overtime,
+        preservePlayId: selectedPlayRef.current?.id,
+      })
     } catch (e: unknown) {
       onError(e instanceof Error ? e.message : 'Play failed')
     } finally {
@@ -344,7 +478,7 @@ export default function GamePlayPage({
         ? await fetch(`${apiBase}/sim/game/${action}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ state: saveState ?? {}, game: localGame ?? {} }),
+            body: JSON.stringify({ state: liveState(), game: localGame ?? {} }),
           })
         : await fetch(`${apiBase}/games/${gameId}/${action}?save_id=${encodeURIComponent(saveId)}`, {
             method: 'POST',
@@ -361,7 +495,13 @@ export default function GamePlayPage({
       } else if (typeof data.narrative === 'string' && data.narrative.trim()) {
         setPlayFeed((f) => [...f, data.narrative.trim()])
       }
-      if (!data.game_over) await fetchOptions()
+      if (!data.game_over) {
+        await fetchOptions({
+          game: isLocalBundle ? data.game ?? localGame : undefined,
+          down: data.state.down,
+          is_overtime: !!data.state.is_overtime,
+        })
+      }
     } catch (e: unknown) {
       onError(e instanceof Error ? e.message : 'Simulation failed')
     } finally {
@@ -485,13 +625,23 @@ export default function GamePlayPage({
       <header className="gameplay-header">
         <div className="gameplay-header-left gameplay-header-matchup">
           <div className={`gameplay-matchup-side ${userTeam === homeTeam ? 'gameplay-matchup-user' : ''}`}>
-            <div className="gameplay-team-name">{homeTeam}</div>
+            <TeamNameWithPossession
+              name={homeTeam}
+              hasPossession={homeHasBall}
+              align="start"
+              className="gameplay-team-name"
+            />
           </div>
           <span className="gameplay-matchup-vs" aria-hidden>
             vs
           </span>
           <div className={`gameplay-matchup-side ${userTeam === awayTeam ? 'gameplay-matchup-user' : ''}`}>
-            <div className="gameplay-team-name">{awayTeam}</div>
+            <TeamNameWithPossession
+              name={awayTeam}
+              hasPossession={awayHasBall}
+              align="end"
+              className="gameplay-team-name"
+            />
           </div>
         </div>
         <div className="gameplay-header-center">
@@ -513,7 +663,12 @@ export default function GamePlayPage({
           <div className="gameplay-team-block-inner">
             <div className="gameplay-team-score-stack">
               <div className="gameplay-team-label gameplay-team-label--board" title={homeTeam}>
-                {homeTeam.length > 18 ? `${homeTeam.slice(0, 16)}…` : homeTeam}
+                <TeamNameWithPossession
+                  name={homeTeam}
+                  hasPossession={homeHasBall}
+                  align="start"
+                  truncateAt={18}
+                />
               </div>
               <TeamLogo
                 apiBase={apiBase}
@@ -550,7 +705,12 @@ export default function GamePlayPage({
             {renderTeamStatGrid(as, state.score_away, 'away')}
             <div className="gameplay-team-score-stack">
               <div className="gameplay-team-label gameplay-team-label--board" title={awayTeam}>
-                {awayTeam.length > 18 ? `${awayTeam.slice(0, 16)}…` : awayTeam}
+                <TeamNameWithPossession
+                  name={awayTeam}
+                  hasPossession={awayHasBall}
+                  align="end"
+                  truncateAt={18}
+                />
               </div>
               <TeamLogo
                 apiBase={apiBase}

@@ -1,8 +1,9 @@
 import { createContext, useContext } from 'react'
-import type { SaveBundle } from './saveBundle'
+import type { SaveBundle, SaveBundleAssetMap } from './saveBundle'
 
 export type LocalAssets = {
-  getTeamLogo: (teamName: string) => { filename: string; data: Uint8Array; mime: string } | null
+  getTeamLogo: (teamName: string) => SaveBundleAssetMap[string] | null
+  getTeamStadium: (teamName: string) => SaveBundleAssetMap[string] | null
 }
 
 const Ctx = createContext<LocalAssets | null>(null)
@@ -18,8 +19,11 @@ export function LocalAssetsProvider({
     ? {
         getTeamLogo: (teamName: string) => {
           if (!teamName?.trim()) return null
-          const hit = bundle.logos?.[teamName]
-          return hit ?? null
+          return bundle.logos?.[teamName] ?? null
+        },
+        getTeamStadium: (teamName: string) => {
+          if (!teamName?.trim()) return null
+          return bundle.stadiums?.[teamName] ?? null
         },
       }
     : null
@@ -29,4 +33,3 @@ export function LocalAssetsProvider({
 export function useLocalAssets(): LocalAssets | null {
   return useContext(Ctx)
 }
-

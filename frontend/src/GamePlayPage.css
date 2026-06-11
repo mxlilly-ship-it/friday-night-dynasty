@@ -48,6 +48,56 @@
   max-width: 200px;
 }
 
+.gameplay-team-name-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.gameplay-team-name-row--end {
+  flex-direction: row;
+  justify-content: flex-end;
+}
+
+.gameplay-team-name-row.gameplay-team-name {
+  max-width: 220px;
+}
+
+.gameplay-team-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.gameplay-possession-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+}
+
+.gameplay-possession-football {
+  display: block;
+  filter: drop-shadow(0 0 3px rgba(251, 191, 36, 0.55));
+}
+
+.gameplay-possession-football--sm {
+  width: 13px;
+  height: 13px;
+}
+
+.gameplay-possession-football--md {
+  width: 15px;
+  height: 15px;
+}
+
+.gameplay-team-label--board .gameplay-team-name-row {
+  max-width: 140px;
+}
+
 .gameplay-matchup-user .gameplay-team-name {
   color: #93c5fd;
 }
@@ -409,16 +459,17 @@
   flex-direction: row;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 0 14px;
+  gap: 0 12px;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 8px 12px;
-  margin-bottom: 8px;
+  max-height: 2.4em;
+  padding: 5px 10px;
+  margin-bottom: 6px;
   background: rgba(20, 20, 24, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
-  font-size: 0.78rem;
-  line-height: 1.4;
+  font-size: 0.68rem;
+  line-height: 1.25;
   color: rgba(230, 230, 234, 0.9);
   scrollbar-width: thin;
 }
@@ -431,10 +482,9 @@
 
 .gameplay-commentary-strip-item {
   flex: 0 0 auto;
-  max-width: min(100%, 520px);
-  padding-right: 14px;
+  padding-right: 12px;
   border-right: 1px solid rgba(255, 255, 255, 0.12);
-  white-space: normal;
+  white-space: nowrap;
 }
 
 .gameplay-commentary-strip-item:last-child {
@@ -1066,7 +1116,9 @@
 
   .gameplay-commentary-strip {
     margin-bottom: 4px;
-    padding: 6px 10px;
+    padding: 4px 8px;
+    font-size: 0.65rem;
+    max-height: 2.2em;
   }
 }
 

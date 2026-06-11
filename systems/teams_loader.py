@@ -148,6 +148,7 @@ def build_teams_from_configs(
         team = Team(
             name=name,
             nickname=nickname,
+            stadium_name=str(cfg.get("stadium_name") or "").strip() or None,
             prestige=prestige_from_team_points(start_tp),
             team_points=start_tp,
             team_points_last_delta=0.0,
