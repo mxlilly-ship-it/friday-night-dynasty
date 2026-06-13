@@ -18,6 +18,7 @@ from systems.save_system import (
 from systems.teams_loader import (
     build_teams_from_json,
     build_teams_from_configs,
+    enrich_save_teams_from_league_json,
     load_league_config_from_json,
     playoff_system_id_from_config,
 )
@@ -1084,6 +1085,107 @@ def get_team_stadium_path(user_id: str, team_name: str) -> Optional[str]:
     return None
 
 
+def _get_user_helmet_dir(user_id: str) -> str:
+    safe_user = _safe_path_segment(user_id, default="user")
+    return os.path.join(_saves_base_dir(), safe_user, "_helmets")
+
+
+def save_team_helmet(user_id: str, team_name: str, data: bytes, extension: str) -> str:
+    """Write helmet image for ``team_name`` (same extensions as logos). Replaces any prior file for that team."""
+    ext = str(extension or "").lower().strip()
+    if ext not in _LOGO_EXTENSIONS:
+        raise ValueError("Unsupported helmet image type. Use PNG, JPG, JPEG, or WEBP.")
+    if not data:
+        raise ValueError("Helmet file is empty.")
+    safe_name = _safe_logo_name(team_name)
+    helmet_dir = _get_user_helmet_dir(user_id)
+    helmet_dir_abs = os.path.abspath(os.path.normpath(helmet_dir))
+    try:
+        makedirs_with_path_fallback(helmet_dir_abs)
+    except OSError:
+        os.makedirs(helmet_dir, exist_ok=True)
+    for old_ext in _LOGO_EXTENSIONS:
+        unlink_if_exists_any(os.path.abspath(os.path.join(helmet_dir, f"{safe_name}{old_ext}")))
+    out_plain = os.path.abspath(os.path.join(helmet_dir, f"{safe_name}{ext}"))
+    f = open_binary_with_path_fallback(out_plain, "wb")
+    try:
+        f.write(data)
+        return f.name
+    finally:
+        f.close()
+
+
+def get_team_helmet_path(user_id: str, team_name: str) -> Optional[str]:
+    safe_name = _safe_logo_name(team_name)
+    helmet_dir = _get_user_helmet_dir(user_id)
+    for ext in _LOGO_EXTENSIONS:
+        plain = os.path.abspath(os.path.join(helmet_dir, f"{safe_name}{ext}"))
+        for p in io_path_candidates(plain):
+            try:
+                if os.path.isfile(p):
+                    return p
+            except OSError:
+                continue
+    return None
+
+
+JERSEY_KINDS = ("home", "away", "alternate")
+
+
+def _normalize_jersey_kind(raw: Any) -> str:
+    s = str(raw or "").strip().lower()
+    if s in ("alt", "alternate", "alternates", "alt-jersey", "alt_jersey"):
+        return "alternate"
+    if s in ("away", "road", "visitor", "visitors"):
+        return "away"
+    return "home"
+
+
+def _get_user_jersey_dir(user_id: str) -> str:
+    safe_user = _safe_path_segment(user_id, default="user")
+    return os.path.join(_saves_base_dir(), safe_user, "_jerseys")
+
+
+def save_team_jersey(user_id: str, team_name: str, kind: str, data: bytes, extension: str) -> str:
+    """Write home/away/alternate jersey image for ``team_name``."""
+    ext = str(extension or "").lower().strip()
+    if ext not in _LOGO_EXTENSIONS:
+        raise ValueError("Unsupported jersey image type. Use PNG, JPG, JPEG, or WEBP.")
+    if not data:
+        raise ValueError("Jersey file is empty.")
+    jersey_kind = _normalize_jersey_kind(kind)
+    safe_name = _safe_logo_name(team_name)
+    team_dir = os.path.abspath(os.path.normpath(os.path.join(_get_user_jersey_dir(user_id), safe_name)))
+    try:
+        makedirs_with_path_fallback(team_dir)
+    except OSError:
+        os.makedirs(team_dir, exist_ok=True)
+    for old_ext in _LOGO_EXTENSIONS:
+        unlink_if_exists_any(os.path.abspath(os.path.join(team_dir, f"{jersey_kind}{old_ext}")))
+    out_plain = os.path.abspath(os.path.join(team_dir, f"{jersey_kind}{ext}"))
+    f = open_binary_with_path_fallback(out_plain, "wb")
+    try:
+        f.write(data)
+        return f.name
+    finally:
+        f.close()
+
+
+def get_team_jersey_path(user_id: str, team_name: str, kind: str) -> Optional[str]:
+    jersey_kind = _normalize_jersey_kind(kind)
+    safe_name = _safe_logo_name(team_name)
+    team_dir = os.path.abspath(os.path.normpath(os.path.join(_get_user_jersey_dir(user_id), safe_name)))
+    for ext in _LOGO_EXTENSIONS:
+        plain = os.path.abspath(os.path.join(team_dir, f"{jersey_kind}{ext}"))
+        for p in io_path_candidates(plain):
+            try:
+                if os.path.isfile(p):
+                    return p
+            except OSError:
+                continue
+    return None
+
+
 def _stem_variants_for_logo_match(stem: str) -> List[str]:
     """Try filename stems with common suffixes stripped (e.g. Martinsburg_logo → Martinsburg)."""
     return _stem_variants_for_asset_match(stem, ())
@@ -1131,6 +1233,49 @@ def match_stadium_filename_to_team(teams: List[str], filename_stem: str) -> Opti
         filename_stem,
         ("_stadium", "-stadium", "_field", "-field", " stadium"),
     )
+
+
+def match_helmet_filename_to_team(teams: List[str], filename_stem: str) -> Optional[str]:
+    return _match_filename_stem_to_team(
+        teams,
+        filename_stem,
+        ("_helmet", "-helmet", " helmet"),
+    )
+
+
+def match_jersey_filename_to_team(teams: List[str], filename_stem: str) -> Tuple[Optional[str], Optional[str]]:
+    """Return (team_name, jersey_kind) parsed from filename stem, or (None, None)."""
+    stem = str(filename_stem or "").strip()
+    if not stem:
+        return None, None
+    kind_suffixes = (
+        ("_alternate", "alternate"),
+        ("-alternate", "alternate"),
+        ("_alt", "alternate"),
+        ("-alt", "alternate"),
+        (" alternate", "alternate"),
+        ("_away", "away"),
+        ("-away", "away"),
+        (" away", "away"),
+        ("_road", "away"),
+        ("-road", "away"),
+        ("_home", "home"),
+        ("-home", "home"),
+        (" home", "home"),
+        ("_jersey", "home"),
+        ("-jersey", "home"),
+        (" jersey", "home"),
+    )
+    for suffix, kind in kind_suffixes:
+        if len(stem) > len(suffix) and stem.lower().endswith(suffix.lower()):
+            team_stem = stem[: -len(suffix)].strip()
+            team = _match_filename_stem_to_team(teams, team_stem, ())
+            if team:
+                return team, kind
+    team = match_logo_filename_to_team(teams, stem)
+    if team:
+        return team, "home"
+    return None, None
 
 
 PRESEASON_STAGES: List[str] = [
@@ -1776,18 +1921,14 @@ def _snapshot_player_overalls(team: Any) -> Dict[str, int]:
 
 
 def _finalize_offseason_to_preseason(state: Dict[str, Any], teams: Dict[str, Any]) -> None:
-    """After interactive offseason: play selection + results for user team, reset W/L, enter preseason."""
+    """After interactive offseason: enter preseason (play selection is configured in preseason UI)."""
+    if _repair_missing_cross_region_schedule_planning(state):
+        return
     user_team_name = state.get("user_team")
     ut = teams.get(user_team_name) if user_team_name else None
     if ut:
-        try:
-            run_play_selection_for_team(ut)
-        except Exception:
-            logger.exception("run_play_selection_for_team (offseason finalize)")
-        try:
-            run_play_selection_results_for_team(ut)
-        except Exception:
-            logger.exception("run_play_selection_results_for_team (offseason finalize)")
+        ut.season_offensive_play_selection = None
+        ut.season_defensive_play_selection = None
     for t in teams.values():
         reset_team_season_stats(t)
     state["season_phase"] = "preseason"
@@ -2701,8 +2842,13 @@ def create_save(
 
     team_names = sorted(teams.keys())
     ls = default_league_structure()
-    stub_state: Dict[str, Any] = {"league_structure": ls}
-    weeks, week_results = _regular_season_week_boards(teams, stub_state)
+    stub_state: Dict[str, Any] = {"league_structure": ls, "user_team": user_team}
+    planning_info = _schedule_planning_info_for_user(teams, user_team)
+    if planning_info:
+        weeks: List[List[Dict[str, str]]] = []
+        week_results: List[List[Dict[str, Any]]] = []
+    else:
+        weeks, week_results = _regular_season_week_boards(teams, stub_state)
     standings = {name: {"wins": 0, "losses": 0, "points_for": 0, "points_against": 0} for name in team_names}
 
     uc = teams[user_team].coach
@@ -2752,13 +2898,20 @@ def create_save(
             (save_id, user_id, save_name, save_dir, now, now),
         )
 
-    # New dynasties start in preseason before Week 1 regular season.
+    # New dynasties: schedule planning when cross-region picks required, else preseason.
     state, _save_dir = load_state(user_id, save_id)
-    state["season_phase"] = "preseason"
+    if planning_info:
+        state["season_phase"] = "schedule_planning"
+        state["schedule_planning_info"] = planning_info
+        state.pop("weeks", None)
+        state.pop("week_results", None)
+    else:
+        state["season_phase"] = "preseason"
     state["current_week"] = 1
     state["preseason_stages"] = list(PRESEASON_STAGES)
     state["preseason_stage_index"] = 0
     state["season_goals"] = state.get("season_goals") or []
+    _sync_user_cross_region_slot_count(state)
     # Stamp the chosen postseason structure on the save state so the rest of
     # the app can branch on it without re-reading the league JSON. Persists
     # for the life of this save (immutable across the dynasty for now).
@@ -3043,6 +3196,9 @@ def get_save(user_id: str, save_id: str) -> Dict[str, Any]:
 
     _hydrate_coach_inbox_persist_if_needed(user_id, save_id, state, save_dir)
 
+    if _finalize_cross_region_schedule_state(state):
+        save_state(user_id, save_id, state, save_dir)
+
     league_history_payload: Dict[str, Any] = {"seasons": []}
     try:
         league_history_payload = load_league_history(league_history_path(save_dir))
@@ -3250,7 +3406,7 @@ def _repair_playoffs_complete_to_season_summary(state: Dict[str, Any], save_dir:
     already_archived = any(isinstance(s, dict) and int(s.get("year") or 0) == cy for s in seasons)
 
     if already_archived:
-        state["season_phase"] = "season_summary"
+        _set_season_summary_phase(state)
         teams = {
             t["name"]: team_from_dict(t)
             for t in (state.get("teams") or [])
@@ -3312,7 +3468,7 @@ def _repair_playoffs_complete_to_season_summary(state: Dict[str, Any], save_dir:
         hist2 = load_league_history(league_history_path(save_dir))
         update_prestige(teams, hist2)
         state["prestige_applied_for_year"] = cy
-        state["season_phase"] = "season_summary"
+        _set_season_summary_phase(state)
         state["teams"] = [team_to_dict(t) for t in teams.values()]
         try:
             state["last_completed_standings"] = copy.deepcopy(standings)
@@ -3339,6 +3495,8 @@ def _sync_derived_save_fields(state: Dict[str, Any], save_dir: str) -> bool:
         apply_team_program_totals_from_history_to_state(save_dir, state)
         changed = True
     if _ensure_prestige_from_archived_season(state, save_dir):
+        changed = True
+    if enrich_save_teams_from_league_json(state):
         changed = True
     return changed
 
@@ -3370,7 +3528,9 @@ def load_state(user_id: str, save_id: str) -> Tuple[Dict[str, Any], str]:
     _migrate_save_dir_if_changed(user_id, save_id, save_dir, stored_dir)
     apply_team_program_totals_from_history_to_state(save_dir, state)
     _backfill_last_completed_standings(state, save_dir)
-    if _sync_derived_save_fields(state, save_dir):
+    if _finalize_cross_region_schedule_state(state):
+        save_state(user_id, save_id, state, save_dir)
+    elif _sync_derived_save_fields(state, save_dir):
         save_state(user_id, save_id, state, save_dir)
     try:
         hist = load_league_history(league_history_path(save_dir))
@@ -5153,14 +5313,15 @@ def advance_preseason_state(state: Dict[str, Any], playbook: Optional[Dict[str, 
                 ut.season_offensive_play_selection = off_stored
                 ut.season_defensive_play_selection = def_stored
             else:
-                if not getattr(ut, "season_offensive_play_selection", None):
-                    try:
-                        run_play_selection_for_team(ut)
-                    except Exception:
-                        pass
+                raise ValueError("Configure your game plan before continuing.")
 
     if current_stage == "Play Selection Results":
         for t in teams.values():
+            if not getattr(t, "season_offensive_play_selection", None):
+                try:
+                    run_play_selection_for_team(t)
+                except Exception:
+                    pass
             try:
                 run_play_selection_results_for_team(t)
             except Exception:
@@ -5219,15 +5380,6 @@ def advance_preseason_state(state: Dict[str, Any], playbook: Optional[Dict[str, 
 
     new_idx = state["preseason_stage_index"]
     _maybe_assign_preseason_scrimmage_opponents_on_advance(state, team_names, new_idx, stages)
-    if new_idx < len(stages) and stages[new_idx] == "Play Selection":
-        if user_team_name and user_team_name in teams:
-            ut = teams[user_team_name]
-            if not getattr(ut, "season_offensive_play_selection", None):
-                try:
-                    run_play_selection_for_team(ut)
-                    state["teams"] = [team_to_dict(t) for t in teams.values()]
-                except Exception:
-                    pass
 
     return {"state": state, "phase_completed": current_stage}
 
@@ -5241,6 +5393,11 @@ def advance_offseason_state(
     phase_s = str(state.get("season_phase") or "").strip().lower()
     if phase_s != "offseason":
         raise ValueError("save is not in offseason")
+    if _repair_missing_cross_region_schedule_planning(state):
+        teams = {t["name"]: team_from_dict(t) for t in state.get("teams", [])}
+        state["teams"] = [team_to_dict(t) for t in teams.values()]
+        _sync_cross_region_schedule_ui_fields(state)
+        return state
     body = body or {}
     teams = {t["name"]: team_from_dict(t) for t in state.get("teams", [])}
     stages: List[str] = list(state.get("offseason_stages") or OFFSEASON_UI_STAGES)
@@ -5508,6 +5665,7 @@ def finish_season_state(
     *,
     bulk_autopilot: bool = False,
     begin_offseason: bool = False,
+    cross_region_picks: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """Stateless finish_season: returns updated state + updated league_history/records + recap texts."""
     teams = {t["name"]: team_from_dict(t) for t in state.get("teams", [])}
@@ -5516,13 +5674,27 @@ def finish_season_state(
     output_lines: List[str] = []
     playoffs = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else None
     phase_s = str(state.get("season_phase") or "").strip().lower()
+
+    if phase_s == "schedule_planning":
+        _apply_schedule_planning_picks_and_enter_offseason(
+            state, teams, cross_region_picks, league_history=league_history
+        )
+        state["teams"] = [team_to_dict(t) for t in teams.values()]
+        _finalize_cross_region_schedule_state(state)
+        return {
+            "state": state,
+            "league_history": league_history,
+            "records": records,
+            "season_recaps": {},
+        }
+
     if phase_s == "season_summary":
         playoffs_ss = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else {}
         champion_ss = str(playoffs_ss.get("champion") or "")
         if begin_offseason or bulk_autopilot:
             br_flat_ss = _recap_merged_bracket_results(state, _flatten_playoff_bracket_results(playoffs_ss))
             year_num_ss = int(state.get("current_year", 1))
-            _finish_season_apply_offseason_transition(
+            _apply_season_summary_offseason_begin(
                 state,
                 teams,
                 team_names,
@@ -5531,7 +5703,12 @@ def finish_season_state(
                 br_flat_ss,
                 year_num_ss,
                 league_history,
+                bulk_autopilot=bulk_autopilot,
+                cross_region_picks=cross_region_picks,
             )
+        else:
+            _sync_cross_region_schedule_ui_fields(state)
+        _finalize_cross_region_schedule_state(state)
         return {
             "state": state,
             "champion": champion_ss,
@@ -5778,8 +5955,22 @@ def finish_season_state(
     state["home_theme_season_rewards"] = compute_league_home_theme_summaries(state, team_names)
 
     if not bulk_autopilot:
-        state["season_phase"] = "season_summary"
+        _set_season_summary_phase(state)
         state["teams"] = [team_to_dict(t) for t in teams.values()]
+        if begin_offseason:
+            _apply_season_summary_offseason_begin(
+                state,
+                teams,
+                team_names,
+                standings,
+                champion,
+                br_for_history,
+                year_num,
+                league_history,
+                bulk_autopilot=False,
+                cross_region_picks=cross_region_picks,
+            )
+        _finalize_cross_region_schedule_state(state)
         return {
             "state": state,
             "champion": champion,
@@ -5788,7 +5979,7 @@ def finish_season_state(
             "season_recaps": season_recaps,
         }
 
-    _finish_season_apply_offseason_transition(
+    _apply_season_summary_offseason_begin(
         state,
         teams,
         team_names,
@@ -5797,7 +5988,9 @@ def finish_season_state(
         br_for_history,
         year_num,
         league_history,
+        bulk_autopilot=True,
     )
+    _finalize_cross_region_schedule_state(state)
 
     return {"state": state, "champion": champion, "league_history": league_history, "records": records, "season_recaps": season_recaps}
 
@@ -5882,21 +6075,18 @@ def advance_preseason(user_id: str, save_id: str, playbook: Optional[Dict[str, A
                 ut.season_defensive_play_selection = def_stored
                 state["teams"] = [team_to_dict(t) for t in teams.values()]
             else:
-                # First time entering: run auto-selection if not yet populated.
-                if not getattr(ut, "season_offensive_play_selection", None):
-                    try:
-                        run_play_selection_for_team(ut)
-                        state["teams"] = [team_to_dict(t) for t in teams.values()]
-                    except Exception:
-                        pass
+                raise ValueError("Configure your game plan before continuing.")
 
     # Execute other preseason stage effects (skip Play Selection - handled above).
-    if current_stage == "Play Selection" and not game_plan:
-        pass  # Already handled above
-    elif current_stage == "Play Selection":
-        pass  # Game plan saved above
+    if current_stage == "Play Selection":
+        pass  # Game plan required above
     elif current_stage == "Play Selection Results":
         for t in teams.values():
+            if not getattr(t, "season_offensive_play_selection", None):
+                try:
+                    run_play_selection_for_team(t)
+                except Exception:
+                    pass
             try:
                 run_play_selection_results_for_team(t)
             except Exception:
@@ -5967,18 +6157,6 @@ def advance_preseason(user_id: str, save_id: str, playbook: Optional[Dict[str, A
 
     new_idx = state["preseason_stage_index"]
     _maybe_assign_preseason_scrimmage_opponents_on_advance(state, team_names, new_idx, stages)
-
-    # When entering Play Selection (e.g. from Playbook Select), run play selection for user's team.
-    if new_idx < len(stages) and stages[new_idx] == "Play Selection":
-        user_team_name = state.get("user_team")
-        if user_team_name and user_team_name in teams:
-            ut = teams[user_team_name]
-            if not getattr(ut, "season_offensive_play_selection", None):
-                try:
-                    run_play_selection_for_team(ut)
-                    state["teams"] = [team_to_dict(t) for t in teams.values()]
-                except Exception:
-                    pass
 
     # Keep schedule/reset structures ready for regular season kickoff.
     if not state.get("weeks"):
@@ -7010,6 +7188,26 @@ def _advance_playoff_one_round_state(state: Dict[str, Any]) -> Dict[str, Any]:
     return state
 
 
+def _stash_pending_offseason_transition(
+    state: Dict[str, Any],
+    standings: Dict[str, Any],
+    champion: str,
+    br_flat_fin: List[Dict[str, Any]],
+    year_num: int,
+) -> None:
+    """Hold season rollover until cross-region schedule planning is confirmed."""
+    try:
+        standings_snapshot = copy.deepcopy(standings)
+    except Exception:
+        standings_snapshot = {str(k): dict(v) if isinstance(v, dict) else v for k, v in dict(standings or {}).items()}
+    state["pending_offseason_transition"] = {
+        "standings": standings_snapshot,
+        "champion": str(champion or ""),
+        "br_flat_fin": list(br_flat_fin or []),
+        "year_num": int(year_num),
+    }
+
+
 def _finish_season_apply_offseason_transition(
     state: Dict[str, Any],
     teams: Dict[str, Any],
@@ -7019,8 +7217,23 @@ def _finish_season_apply_offseason_transition(
     br_flat_fin: List[Dict[str, Any]],
     year_num: int,
     league_history: Dict[str, Any],
+    *,
+    defer_schedule: bool = False,
 ) -> None:
     """Graduation, calendar advance to offseason, PP/coach-dev banks, schedule reset — after season summary."""
+    user_team_name = str(state.get("user_team") or "").strip()
+    if not defer_schedule and user_team_name:
+        if _redirect_to_schedule_planning_if_needed(
+            state,
+            teams,
+            standings=standings,
+            champion=champion,
+            br_flat_fin=br_flat_fin,
+            year_num=year_num,
+            force=True,
+        ):
+            return
+
     graduation_report: Dict[str, List[Dict[str, Any]]] = {}
     for t in teams.values():
         ro = run_offseason_roster_turnover(t, league_history=league_history)
@@ -7118,9 +7331,13 @@ def _finish_season_apply_offseason_transition(
     state.pop("home_game_themes_user_confirmed", None)
     state.pop("home_theme_season_rewards", None)
     ensure_league_structure_in_state(state)
-    wk, wr = _regular_season_week_boards(teams, state)
-    state["weeks"] = wk
-    state["week_results"] = wr
+    if not defer_schedule:
+        wk, wr = _regular_season_week_boards(teams, state)
+        state["weeks"] = wk
+        state["week_results"] = wr
+    else:
+        state.pop("weeks", None)
+        state.pop("week_results", None)
     try:
         state["offseason_transfer_snapshot_standings"] = copy.deepcopy(standings)
     except Exception:
@@ -7138,9 +7355,361 @@ def _finish_season_apply_offseason_transition(
     state["standings"] = {n: {"wins": 0, "losses": 0, "points_for": 0, "points_against": 0} for n in team_names}
     state["teams"] = [team_to_dict(t) for t in teams.values()]
     apply_team_program_totals_to_serialized_team_rows(league_history.get("seasons") or [], state=state)
-    _assign_scrimmage_opponents_for_state(state)
+    if not defer_schedule:
+        _assign_scrimmage_opponents_for_state(state)
     state.pop("playoffs", None)
     state.pop("playoff_season_player_stats", None)
+
+
+def _build_season_schedule_into_state(state: Dict[str, Any], teams: Dict[str, Any]) -> None:
+    """Build ``weeks`` / ``week_results`` from current ``cross_region_picks`` on state."""
+    wk, wr = _regular_season_week_boards(teams, state)
+    state["weeks"] = wk
+    state["week_results"] = wr
+
+
+def _user_cross_region_picks_complete(
+    state: Dict[str, Any],
+    teams: Dict[str, Any],
+    user_team: str,
+) -> bool:
+    """True when the user has no cross-region slots or every slot has a valid opponent."""
+    from systems.schedule_planning import cross_region_slots_for_team
+
+    slots = cross_region_slots_for_team(teams, user_team)
+    if not slots:
+        return True
+    picks_raw = state.get("cross_region_picks") or {}
+    user_picks = picks_raw.get(user_team) if isinstance(picks_raw, dict) else None
+    if not isinstance(user_picks, dict):
+        return False
+    by_slot = {s.slot_index: s for s in slots}
+    for si, slot in by_slot.items():
+        opp = user_picks.get(si)
+        if opp is None:
+            opp = user_picks.get(str(si))
+        opp = str(opp or "").strip()
+        if not opp or opp not in slot.eligible_teams:
+            return False
+    return True
+
+
+def _schedule_planning_info_for_user(teams: Dict[str, Any], user_team: str) -> Optional[Dict[str, Any]]:
+    from systems.schedule_planning import (
+        cross_region_slots_for_team,
+        cross_region_slots_to_json,
+        detect_class_template,
+    )
+    from systems.league_structure import classification_key
+
+    slots = cross_region_slots_for_team(teams, user_team)
+    if not slots:
+        return None
+    t = teams.get(user_team)
+    cls = classification_key(getattr(t, "classification", None) if t else None)
+    tmpl = detect_class_template(teams, cls)
+    in_region = tmpl.in_region_weeks if tmpl else 9
+    return {
+        "slot_count": len(slots),
+        "in_region_games": in_region,
+        "total_games": in_region + len(slots),
+        "slots": cross_region_slots_to_json(slots),
+    }
+
+
+def _redirect_to_schedule_planning_if_needed(
+    state: Dict[str, Any],
+    teams: Dict[str, Any],
+    *,
+    standings: Dict[str, Any],
+    champion: str,
+    br_flat_fin: List[Dict[str, Any]],
+    year_num: int,
+    force: bool = False,
+) -> bool:
+    """When cross-region picks are required but missing, enter schedule planning instead of offseason."""
+    user_team = str(state.get("user_team") or "").strip()
+    if not user_team:
+        return False
+    if _user_cross_region_picks_complete(state, teams, user_team):
+        return False
+    planning_info = _schedule_planning_info_for_user(teams, user_team)
+    if not planning_info:
+        return False
+    _stash_pending_offseason_transition(state, standings, champion, br_flat_fin, year_num)
+    state["season_phase"] = "schedule_planning"
+    state.pop("cross_region_picks", None)
+    state["schedule_planning_info"] = planning_info
+    state.pop("weeks", None)
+    state.pop("week_results", None)
+    _sync_user_cross_region_slot_count(state)
+    return True
+
+
+def _set_season_summary_phase(state: Dict[str, Any]) -> None:
+    """Enter season summary; clear prior-year out-of-region locks so the UI prompts fresh picks."""
+    state["season_phase"] = "season_summary"
+    state.pop("cross_region_picks", None)
+    _sync_cross_region_schedule_ui_fields(state)
+
+
+def _state_on_summary_or_planning_screen(state: Dict[str, Any]) -> bool:
+    """True when the client may show season summary or out-of-region pick UI."""
+    phase = str(state.get("season_phase") or "").strip().lower()
+    if phase in ("season_summary", "schedule_planning"):
+        return True
+    if phase == "playoffs":
+        playoffs = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else {}
+        return bool(playoffs.get("completed"))
+    return False
+
+
+def _sync_cross_region_schedule_ui_fields(state: Dict[str, Any]) -> None:
+    """Slot count for UI hints; attach planning info when summary/planning UI needs picks."""
+    ensure_league_structure_in_state(state)
+    teams = {
+        t["name"]: team_from_dict(t)
+        for t in (state.get("teams") or [])
+        if isinstance(t, dict) and t.get("name")
+    }
+    user_team = str(state.get("user_team") or "").strip()
+    info = _schedule_planning_info_for_user(teams, user_team) if user_team else None
+    state["user_cross_region_slot_count"] = int(info.get("slot_count") or 0) if info else 0
+    if not info or not user_team:
+        return
+    if _state_on_summary_or_planning_screen(state) and not _user_cross_region_picks_complete(
+        state, teams, user_team
+    ):
+        state["schedule_planning_info"] = info
+    elif str(state.get("season_phase") or "").strip().lower() == "schedule_planning":
+        if not state.get("schedule_planning_info"):
+            state["schedule_planning_info"] = info
+
+
+def _sync_user_cross_region_slot_count(state: Dict[str, Any]) -> None:
+    """Expose how many out-of-region picks the user's class requires (0 when pod-only)."""
+    _sync_cross_region_schedule_ui_fields(state)
+
+
+def _finalize_cross_region_schedule_state(state: Dict[str, Any]) -> bool:
+    """Repair skipped planning and refresh UI-facing cross-region fields."""
+    changed = _repair_missing_cross_region_schedule_planning(state)
+    _sync_cross_region_schedule_ui_fields(state)
+    return changed
+
+
+def _ensure_schedule_planning_info_on_state(state: Dict[str, Any], teams: Dict[str, Any]) -> bool:
+    """When phase is schedule_planning but info was dropped, rebuild it."""
+    phase = str(state.get("season_phase") or "").strip().lower()
+    if phase != "schedule_planning":
+        return False
+    user_team = str(state.get("user_team") or "").strip()
+    if not user_team:
+        return False
+    if state.get("schedule_planning_info"):
+        return False
+    planning_info = _schedule_planning_info_for_user(teams, user_team)
+    if not planning_info:
+        state["season_phase"] = "season_summary"
+        _sync_cross_region_schedule_ui_fields(state)
+        return True
+    state["schedule_planning_info"] = planning_info
+    return True
+
+
+def _repair_missing_cross_region_schedule_planning(state: Dict[str, Any]) -> bool:
+    """Send saves that skipped out-of-region picks back to schedule planning."""
+    phase = str(state.get("season_phase") or "").strip().lower()
+    teams = {
+        t["name"]: team_from_dict(t)
+        for t in (state.get("teams") or [])
+        if isinstance(t, dict) and t.get("name")
+    }
+    user_team = str(state.get("user_team") or "").strip()
+    if not user_team or user_team not in teams:
+        return False
+
+    if _ensure_schedule_planning_info_on_state(state, teams):
+        return True
+
+    if phase == "offseason":
+        if int(state.get("offseason_stage_index") or 0) != 0:
+            return False
+        if _user_cross_region_picks_complete(state, teams, user_team):
+            return False
+        planning_info = _schedule_planning_info_for_user(teams, user_team)
+        if not planning_info:
+            return False
+        if not state.get("pending_offseason_transition"):
+            playoffs_os = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else {}
+            br_flat_os = _recap_merged_bracket_results(
+                state, _flatten_playoff_bracket_results(playoffs_os)
+            )
+            _stash_pending_offseason_transition(
+                state,
+                state.get("standings") or {},
+                str(playoffs_os.get("champion") or ""),
+                br_flat_os,
+                int(state.get("current_year") or 1),
+            )
+        state["season_phase"] = "schedule_planning"
+        state["schedule_planning_info"] = planning_info
+        state.pop("weeks", None)
+        state.pop("week_results", None)
+        return True
+
+    # Season summary is the intended pick screen — only repair saves that skipped planning in preseason.
+    if phase != "preseason":
+        return False
+    if _user_cross_region_picks_complete(state, teams, user_team):
+        return False
+    if not _schedule_planning_info_for_user(teams, user_team):
+        return False
+    year_num = int(state.get("current_year") or 1)
+    standings = state.get("standings") or {}
+    playoffs_ps = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else {}
+    champion = str(playoffs_ps.get("champion") or "")
+    br_flat_ps = _recap_merged_bracket_results(state, _flatten_playoff_bracket_results(playoffs_ps))
+    return _redirect_to_schedule_planning_if_needed(
+        state,
+        teams,
+        standings=standings,
+        champion=champion,
+        br_flat_fin=br_flat_ps,
+        year_num=year_num,
+        force=True,
+    )
+
+
+def _apply_schedule_planning_picks_and_enter_offseason(
+    state: Dict[str, Any],
+    teams: Dict[str, Any],
+    cross_region_picks: Any,
+    *,
+    league_history: Optional[Dict[str, Any]] = None,
+) -> None:
+    from systems.schedule_planning import normalize_cross_region_picks, picks_dict_for_state
+
+    user_team = str(state.get("user_team") or "").strip()
+    if not user_team:
+        raise ValueError("No user team on save.")
+    picks = normalize_cross_region_picks(teams, user_team, cross_region_picks)
+    state["cross_region_picks"] = picks_dict_for_state(user_team, picks)
+    _build_season_schedule_into_state(state, teams)
+
+    already_in_offseason = isinstance(state.get("offseason_graduation_report"), dict)
+    pending = state.pop("pending_offseason_transition", None)
+    if isinstance(pending, dict):
+        team_names = list(teams.keys())
+        standings = pending.get("standings") or state.get("standings") or {}
+        _finish_season_apply_offseason_transition(
+            state,
+            teams,
+            team_names,
+            standings,
+            str(pending.get("champion") or ""),
+            list(pending.get("br_flat_fin") or []),
+            int(pending.get("year_num") or state.get("current_year") or 1),
+            league_history or {"seasons": []},
+            defer_schedule=False,
+        )
+        state["season_phase"] = "offseason"
+    elif already_in_offseason:
+        state["season_phase"] = "offseason"
+    else:
+        state["season_phase"] = "preseason"
+        state["preseason_stages"] = state.get("preseason_stages") or list(PRESEASON_STAGES)
+        state["preseason_stage_index"] = int(state.get("preseason_stage_index") or 0)
+    _assign_scrimmage_opponents_for_state(state)
+    state.pop("schedule_planning_info", None)
+    _sync_user_cross_region_slot_count(state)
+
+
+def _apply_season_summary_offseason_begin(
+    state: Dict[str, Any],
+    teams: Dict[str, Any],
+    team_names: List[str],
+    standings: Dict[str, Any],
+    champion: str,
+    br_flat_fin: List[Dict[str, Any]],
+    year_num: int,
+    league_history: Dict[str, Any],
+    *,
+    bulk_autopilot: bool = False,
+    cross_region_picks: Optional[Any] = None,
+) -> None:
+    """Leave season summary: schedule planning first, or graduation/offseason when no slots / autopilot."""
+    _begin_offseason_from_season_summary(
+        state,
+        teams,
+        team_names,
+        standings,
+        champion,
+        br_flat_fin,
+        year_num,
+        league_history,
+        bulk_autopilot=bulk_autopilot,
+    )
+    if (
+        not bulk_autopilot
+        and cross_region_picks
+        and str(state.get("season_phase") or "").strip().lower() == "schedule_planning"
+    ):
+        _apply_schedule_planning_picks_and_enter_offseason(
+            state, teams, cross_region_picks, league_history=league_history
+        )
+
+
+def _begin_offseason_from_season_summary(
+    state: Dict[str, Any],
+    teams: Dict[str, Any],
+    team_names: List[str],
+    standings: Dict[str, Any],
+    champion: str,
+    br_flat_fin: List[Dict[str, Any]],
+    year_num: int,
+    league_history: Dict[str, Any],
+    *,
+    bulk_autopilot: bool = False,
+) -> None:
+    """Graduation + year advance; schedule planning when the user's class has cross-region slots."""
+    from systems.schedule_planning import auto_random_picks, picks_dict_for_state
+
+    user_team = str(state.get("user_team") or "").strip()
+    planning_info = _schedule_planning_info_for_user(teams, user_team) if user_team else None
+
+    if not bulk_autopilot:
+        # Each new season requires fresh out-of-region picks — do not reuse last year's locks.
+        state.pop("cross_region_picks", None)
+        needs_planning = bool(planning_info)
+    else:
+        needs_planning = False
+
+    if needs_planning:
+        _redirect_to_schedule_planning_if_needed(
+            state,
+            teams,
+            standings=standings,
+            champion=champion,
+            br_flat_fin=br_flat_fin,
+            year_num=year_num,
+            force=True,
+        )
+        return
+
+    if planning_info and bulk_autopilot and user_team:
+        state["cross_region_picks"] = picks_dict_for_state(user_team, auto_random_picks(teams, user_team))
+    _finish_season_apply_offseason_transition(
+        state,
+        teams,
+        team_names,
+        standings,
+        champion,
+        br_flat_fin,
+        year_num,
+        league_history,
+        defer_schedule=False,
+    )
 
 
 def _attach_league_history_to_result(save_dir: str, result: Dict[str, Any]) -> Dict[str, Any]:
@@ -7158,6 +7727,7 @@ def finish_season(
     *,
     bulk_autopilot: bool = False,
     begin_offseason: bool = False,
+    cross_region_picks: Optional[Any] = None,
 ) -> Dict[str, Any]:
     state, save_dir = load_state(user_id, save_id)
     teams = {t["name"]: team_from_dict(t) for t in state.get("teams", [])}
@@ -7169,6 +7739,16 @@ def finish_season(
         save_state(user_id, save_id, state, save_dir)
         return _attach_league_history_to_result(save_dir, {"state": state})
 
+    if phase_s == "schedule_planning":
+        league_history_sp = load_league_history(league_history_path(save_dir))
+        _apply_schedule_planning_picks_and_enter_offseason(
+            state, teams, cross_region_picks, league_history=league_history_sp
+        )
+        state["teams"] = [team_to_dict(t) for t in teams.values()]
+        _sync_cross_region_schedule_ui_fields(state)
+        save_state(user_id, save_id, state, save_dir)
+        return _attach_league_history_to_result(save_dir, {"state": state})
+
     if phase_s == "season_summary":
         playoffs_ss = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else {}
         champion_ss = str(playoffs_ss.get("champion") or "")
@@ -7176,10 +7756,11 @@ def finish_season(
         if league_history_ss.get("seasons"):
             update_prestige(teams, league_history_ss)
             state["prestige_applied_for_year"] = int(state.get("current_year", 1) or 1)
+        _sync_cross_region_schedule_ui_fields(state)
         if begin_offseason or bulk_autopilot:
             br_flat_ss = _recap_merged_bracket_results(state, _flatten_playoff_bracket_results(playoffs_ss))
             year_num_ss = int(state.get("current_year", 1))
-            _finish_season_apply_offseason_transition(
+            _apply_season_summary_offseason_begin(
                 state,
                 teams,
                 team_names,
@@ -7188,8 +7769,10 @@ def finish_season(
                 br_flat_ss,
                 year_num_ss,
                 league_history_ss,
+                bulk_autopilot=bulk_autopilot,
+                cross_region_picks=cross_region_picks,
             )
-            save_state(user_id, save_id, state, save_dir)
+        save_state(user_id, save_id, state, save_dir)
         return _attach_league_history_to_result(save_dir, {"state": state, "champion": champion_ss})
 
     output_lines: List[str] = []
@@ -7441,12 +8024,28 @@ def finish_season(
         state["program_funding_awarded_year"] = int(year_num)
 
     if not bulk_autopilot:
-        state["season_phase"] = "season_summary"
+        _set_season_summary_phase(state)
         state["teams"] = [team_to_dict(t) for t in teams.values()]
         save_state(user_id, save_id, state, save_dir)
+        if begin_offseason:
+            league_history_chain = load_league_history(league_history_path(save_dir))
+            _apply_season_summary_offseason_begin(
+                state,
+                teams,
+                team_names,
+                standings,
+                champion,
+                br_for_history,
+                year_num,
+                league_history_chain,
+                bulk_autopilot=False,
+                cross_region_picks=cross_region_picks,
+            )
+            _sync_cross_region_schedule_ui_fields(state)
+            save_state(user_id, save_id, state, save_dir)
         return _attach_league_history_to_result(save_dir, {"state": state, "champion": champion})
 
-    _finish_season_apply_offseason_transition(
+    _apply_season_summary_offseason_begin(
         state,
         teams,
         team_names,
@@ -7455,6 +8054,7 @@ def finish_season(
         br_for_history,
         year_num,
         league_history,
+        bulk_autopilot=True,
     )
 
     save_state(user_id, save_id, state, save_dir)

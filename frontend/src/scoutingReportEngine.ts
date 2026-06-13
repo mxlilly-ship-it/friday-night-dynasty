@@ -49,7 +49,7 @@ function pickSeeded<T>(arr: T[], seedKey: string): T {
 }
 
 /** Aggregate per-game team_stats deltas for one team across regular season week_results. */
-function aggregateTeamGameStats(state: any, teamName: string) {
+export function aggregateTeamGameStats(state: any, teamName: string) {
   let games = 0
   let totalPlays = 0
   let rushYards = 0
@@ -119,7 +119,7 @@ function aggregateTeamGameStats(state: any, teamName: string) {
   }
 }
 
-function aggregatePlayerSeasonForTeam(state: any, teamName: string) {
+export function aggregatePlayerSeasonForTeam(state: any, teamName: string) {
   const rows = new Map<
     string,
     {

@@ -292,6 +292,25 @@
   cursor: not-allowed;
 }
 
+.isdash-preview-btn {
+  margin-left: auto;
+  border: 0.5px solid #1e2a3a;
+  border-radius: 99px;
+  background: #0b1018;
+  color: #5a6a8a;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.isdash-preview-btn:hover {
+  color: #dde0f0;
+  border-color: #2a3a55;
+}
+
 .isdash-btn-play {
   background: #ffd200;
   color: #000;
@@ -775,13 +794,12 @@
 }
 
 .isdash-recap-headline {
-  font-size: 11px;
-  color: #777;
-  font-style: italic;
-  margin-bottom: 10px;
-  border-left: 2px solid #ffd200;
-  padding-left: 8px;
-  line-height: 1.4;
+  font-size: 12px;
+  color: #aaa;
+  margin-bottom: 12px;
+  border-left: 3px solid #ffd200;
+  padding: 6px 0 6px 10px;
+  line-height: 1.45;
 }
 
 .isdash-recap-score {

@@ -13,6 +13,7 @@ from models.coach import Coach
 from models.community import CommunityType
 from models.coach import OffensiveStyle, DefensiveStyle
 from systems.playbook_system import normalize_coach_defensive_front, normalize_coach_offensive_playbook
+from systems.teams_loader import parse_rivals_from_json
 from systems.win_path_io import isfile_any, makedirs_with_path_fallback, open_text_with_path_fallback
 
 SAVES_DIR = "saves"
@@ -258,6 +259,7 @@ def team_to_dict(t: Team) -> Dict[str, Any]:
         "name": t.name,
         "nickname": getattr(t, "nickname", None),
         "stadium_name": getattr(t, "stadium_name", None),
+        "rivals": list(getattr(t, "rivals", []) or []),
         "prestige": t.prestige,
         "team_points": round(float(getattr(t, "team_points", 0.0) or 0.0), 2),
         "team_points_last_delta": round(float(getattr(t, "team_points_last_delta", 0.0) or 0.0), 2),
@@ -305,6 +307,7 @@ def team_from_dict(d: Dict[str, Any]) -> Team:
         enrollment=d.get("enrollment"),
         classification=d.get("classification"),
         region=d.get("region"),
+        rivals=parse_rivals_from_json(d.get("rivals")),
         wins=int(d.get("wins", 0)),
         losses=int(d.get("losses", 0)),
         regional_championships=int(d.get("regional_championships", 0)),

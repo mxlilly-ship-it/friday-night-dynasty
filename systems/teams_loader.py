@@ -32,6 +32,67 @@ _COMMUNITY_MAP = {
 }
 
 
+def parse_rivals_from_json(raw: Any) -> List[str]:
+    """Parse optional rivals from teams.json or save dict (list of exact team names)."""
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        return [str(x).strip() for x in raw if str(x).strip()]
+    if isinstance(raw, str):
+        return [p.strip() for p in raw.replace("·", ",").split(",") if p.strip()]
+    return []
+
+
+def league_team_static_lookup(path: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
+    """Team name -> static league JSON fields (stadium_name, rivals) for save backfill."""
+    out: Dict[str, Dict[str, Any]] = {}
+    for cfg in load_teams_from_json(path):
+        if not isinstance(cfg, dict):
+            continue
+        name = str(cfg.get("name") or "").strip()
+        if not name:
+            continue
+        entry: Dict[str, Any] = {}
+        stadium = str(cfg.get("stadium_name") or "").strip()
+        if stadium:
+            entry["stadium_name"] = stadium
+        rivals = parse_rivals_from_json(cfg.get("rivals"))
+        if rivals:
+            entry["rivals"] = rivals
+        if entry:
+            out[name] = entry
+    return out
+
+
+def enrich_save_teams_from_league_json(state: Dict[str, Any], path: Optional[str] = None) -> bool:
+    """
+    Backfill stadium_name and rivals from data/teams.json when missing on saved teams.
+    Returns True if any team row was updated.
+    """
+    teams = state.get("teams")
+    if not isinstance(teams, list):
+        return False
+    lookup = league_team_static_lookup(path)
+    if not lookup:
+        return False
+    changed = False
+    for t in teams:
+        if not isinstance(t, dict):
+            continue
+        name = str(t.get("name") or "").strip()
+        src = lookup.get(name)
+        if not src:
+            continue
+        if not str(t.get("stadium_name") or "").strip() and src.get("stadium_name"):
+            t["stadium_name"] = src["stadium_name"]
+            changed = True
+        rivals = t.get("rivals")
+        if (not rivals or rivals == []) and src.get("rivals"):
+            t["rivals"] = list(src["rivals"])
+            changed = True
+    return changed
+
+
 def _default_path() -> str:
     base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(base, TEAMS_JSON_PATH)
@@ -149,6 +210,7 @@ def build_teams_from_configs(
             name=name,
             nickname=nickname,
             stadium_name=str(cfg.get("stadium_name") or "").strip() or None,
+            rivals=parse_rivals_from_json(cfg.get("rivals")),
             prestige=prestige_from_team_points(start_tp),
             team_points=start_tp,
             team_points_last_delta=0.0,

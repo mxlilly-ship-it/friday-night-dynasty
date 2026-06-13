@@ -1,5 +1,11 @@
 import type { NewsArticle, NewsArticleType, TickerItemType, TickerPriority } from './newsTypes'
 import { clipTicker, getNewsCenter, nextId } from './newsStore'
+import {
+  ingestChampionship,
+  ingestGraduationAndFreshmen,
+  ingestRegionalTitles,
+  seedLeagueEventNews,
+} from './newsLeagueEvents'
 
 type PlayerGameLine = {
   player_name?: string
@@ -1266,9 +1272,6 @@ export function seedNewsFromSaveState(state: any, saveId: string, leagueHistory?
   if (!state || !saveId) return
   const center = getNewsCenter(saveId)
   const phase = String(state?.season_phase ?? '').toLowerCase()
-  const cw = Math.max(1, Number(state?.current_week ?? 1))
-  const low = Math.max(1, cw - 2)
-  const high = cw + 2
 
   ingestScrimmages({ preseason_scrimmages: [] }, state, center)
   ingestCarousel({ offseason_coach_carousel_last_events: [] }, state, center)
@@ -1277,6 +1280,7 @@ export function seedNewsFromSaveState(state: any, saveId: string, leagueHistory?
   ingestPlayoffGame({ playoffs: {} }, state, center)
   ingestPlayoffFieldNews({ season_phase: 'regular', playoffs: {} }, state, center)
   ingestPreseasonPredictions({ season_phase: '' }, state, center, leagueHistory)
+  seedLeagueEventNews(state, center)
 
   if (phase !== 'regular' && phase !== 'playoffs') return
 
@@ -1284,8 +1288,7 @@ export function seedNewsFromSaveState(state: any, saveId: string, leagueHistory?
   const nw = state?.week_results ?? []
   const streakSent = new Set<string>()
 
-  for (let wi = high - 1; wi >= low - 1; wi--) {
-    if (wi < 0 || wi >= nw.length) continue
+  for (let wi = 0; wi < nw.length; wi++) {
     const nr = nw[wi] ?? []
     for (let gi = 0; gi < nr.length; gi++) {
       appendRegularSeasonGameNews(center, state, wi, gi, ranks, streakSent)
@@ -1306,6 +1309,9 @@ export function ingestStateNews(prev: any, next: any, saveId: string, leagueHist
   ingestPreseasonPredictions(prev, next, center, leagueHistory)
   ingestPlayoffFieldNews(prev, next, center)
   ingestPlayoffGame(prev, next, center)
+  ingestRegionalTitles(prev, next, center)
+  ingestChampionship(prev, next, center)
+  ingestGraduationAndFreshmen(prev, next, center)
 
   if (phase !== 'regular' && phase !== 'playoffs') {
     return

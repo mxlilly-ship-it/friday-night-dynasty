@@ -5,7 +5,13 @@ function parsePhase(state: any): string {
   return String(state?.season_phase ?? '').toLowerCase()
 }
 
-/** True if this headline should appear for the current save snapshot (week-to-week regular season). */
+/** Firehose: show all regular-season headlines through the current week (plus a small forward buffer). */
+function regularSeasonWeekVisible(storyWeek: number, currentWeek: number): boolean {
+  const cw = Math.max(1, currentWeek)
+  return storyWeek >= 1 && storyWeek <= cw + 1
+}
+
+/** True if this headline should appear for the current save snapshot. */
 export function articleVisibleInFeed(article: NewsArticle, state: any): boolean {
   if (!state) return false
   const phase = parsePhase(state)
@@ -26,20 +32,17 @@ export function articleVisibleInFeed(article: NewsArticle, state: any): boolean 
   const cw = Math.max(1, Number(state?.current_week ?? 1))
   const isRegularWeekStory = (ap ?? 'regular') === 'regular'
 
-  // Non–regular-season tagged rows (shouldn't happen often)
   if (!isRegularWeekStory) {
-    if (phase !== 'regular') return false
-    return w >= cw - 1 && w <= cw
+    if (phase === 'regular') return false
+    return ap === phase || !ap
   }
 
-  // Regular-season scores: tight window while still in the regular season
   if (phase === 'regular') {
-    return w >= cw - 1 && w <= cw
+    return regularSeasonWeekVisible(w, cw)
   }
 
-  // Playoffs / preseason / offseason / done: keep regular-season lines so the wire
-  // doesn't go blank (current_week may sit past the last schedule week).
-  return w >= 1 && w <= cw + 2
+  // Playoffs / preseason / offseason: keep the full regular-season backlog visible.
+  return w >= 1 && w <= Math.max(cw + 2, 12)
 }
 
 export function tickerVisibleInFeed(item: TickerItem, state: any): boolean {
@@ -63,15 +66,15 @@ export function tickerVisibleInFeed(item: TickerItem, state: any): boolean {
   const isRegularWeekStory = (ip ?? 'regular') === 'regular'
 
   if (!isRegularWeekStory) {
-    if (phase !== 'regular') return false
-    return w >= cw - 1 && w <= cw
+    if (phase === 'regular') return false
+    return ip === phase || !ip
   }
 
   if (phase === 'regular') {
-    return w >= cw - 1 && w <= cw
+    return regularSeasonWeekVisible(w, cw)
   }
 
-  return w >= 1 && w <= cw + 2
+  return w >= 1 && w <= Math.max(cw + 2, 12)
 }
 
 export function dedupeTickerItemsByText(items: TickerItem[]): TickerItem[] {

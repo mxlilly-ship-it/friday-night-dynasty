@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ashton Atkins — Player Card Demo</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Barlow:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./player-card/playerCard.css" />
+    <style>
+      body {
+        font-family: 'Barlow', sans-serif;
+        background: #090b10;
+        color: #e8e8e8;
+        min-height: 100vh;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 32px 16px;
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="card-root"></div>
+    <script type="module">
+      import { renderPlayerCard, ashtonAtkins } from './player-card/playerCard.js'
+      renderPlayerCard(ashtonAtkins, 'card-root')
+    </script>
+  </body>
+</html>

@@ -31,11 +31,17 @@ from backend.services.league_service import (
     get_week_game_text,
     get_team_logo_path,
     get_team_stadium_path,
+    get_team_helmet_path,
+    get_team_jersey_path,
     load_state,
     match_logo_filename_to_team,
     match_stadium_filename_to_team,
+    match_helmet_filename_to_team,
+    match_jersey_filename_to_team,
     save_team_logo,
     save_team_stadium,
+    save_team_helmet,
+    save_team_jersey,
     get_coach_gameplan_v2,
     save_coach_gameplan_v2,
     get_team_history,
@@ -173,6 +179,7 @@ class StartCoachGameBody(BaseModel):
 class FinishSeasonBody(BaseModel):
     """begin_offseason=true only from Season Summary (Begin offseason). Playoff finish leaves this false."""
     begin_offseason: bool = False
+    cross_region_picks: Optional[List[Dict[str, Any]]] = None
 
 
 class SimulateSeasonsBody(BaseModel):
@@ -314,9 +321,6 @@ def get_team_logo_route(team_name: str, user=Depends(require_user)):
     return FileResponse(path, media_type=media_type)
 
 
-    return FileResponse(path, media_type=media_type)
-
-
 # `/stadiums/bulk` MUST be registered before `/stadiums/{team_name}` or "bulk" is captured as a team name.
 @router.post("/stadiums/bulk", response_model=Dict[str, Any])
 async def bulk_upload_team_stadiums_route(
@@ -386,6 +390,167 @@ def get_team_stadium_route(team_name: str, user=Depends(require_user)):
     path = get_team_stadium_path(user["user_id"], name)
     if not path:
         raise HTTPException(status_code=404, detail="Stadium image not found")
+    media_type = "image/png"
+    low = path.lower()
+    if low.endswith(".jpg") or low.endswith(".jpeg"):
+        media_type = "image/jpeg"
+    elif low.endswith(".webp"):
+        media_type = "image/webp"
+    return FileResponse(path, media_type=media_type)
+
+
+# `/helmets/bulk` MUST be registered before `/helmets/{team_name}`.
+@router.post("/helmets/bulk", response_model=Dict[str, Any])
+async def bulk_upload_team_helmets_route(
+    save_id: str = Query(..., description="Save ID used to resolve valid team names"),
+    helmets: List[UploadFile] = File(...),
+    user=Depends(require_user),
+):
+    try:
+        state, _save_dir = load_state(user["user_id"], save_id)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to load save: {e}")
+    valid_teams = [str(t.get("name", "")).strip() for t in (state.get("teams") or []) if isinstance(t, dict) and t.get("name")]
+    imported: List[Dict[str, str]] = []
+    skipped: List[Dict[str, str]] = []
+    for item in helmets or []:
+        raw_name = str(item.filename or "").strip()
+        if not raw_name:
+            skipped.append({"file": "(unnamed)", "reason": "Missing file name"})
+            continue
+        stem, ext = os.path.splitext(raw_name)
+        ext = ext.lower()
+        if ext not in (".png", ".jpg", ".jpeg", ".webp"):
+            skipped.append({"file": raw_name, "reason": "Unsupported file type"})
+            continue
+        team_name = match_helmet_filename_to_team(valid_teams, stem)
+        if not team_name:
+            skipped.append({"file": raw_name, "reason": "No matching team name found"})
+            continue
+        data = await item.read()
+        try:
+            save_team_helmet(user["user_id"], team_name, data, ext)
+            imported.append({"file": raw_name, "team_name": team_name})
+        except ValueError as e:
+            skipped.append({"file": raw_name, "reason": str(e)})
+    return {
+        "ok": True,
+        "total": len(helmets or []),
+        "imported_count": len(imported),
+        "skipped_count": len(skipped),
+        "imported": imported,
+        "skipped": skipped,
+    }
+
+
+@router.post("/helmets/{team_name}", response_model=Dict[str, Any])
+async def upload_team_helmet_route(team_name: str, helmet: UploadFile = File(...), user=Depends(require_user)):
+    name = (team_name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Missing team name")
+    filename = str(helmet.filename or "").lower()
+    ext = os.path.splitext(filename)[1]
+    if ext not in (".png", ".jpg", ".jpeg", ".webp"):
+        raise HTTPException(status_code=400, detail="Only PNG, JPG, JPEG, and WEBP are supported.")
+    data = await helmet.read()
+    try:
+        save_team_helmet(user["user_id"], name, data, ext)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=_save_route_exception_detail(e))
+    return {"ok": True, "team_name": name}
+
+
+@router.get("/helmets/{team_name}")
+def get_team_helmet_route(team_name: str, user=Depends(require_user)):
+    name = (team_name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Missing team name")
+    path = get_team_helmet_path(user["user_id"], name)
+    if not path:
+        raise HTTPException(status_code=404, detail="Helmet image not found")
+    media_type = "image/png"
+    low = path.lower()
+    if low.endswith(".jpg") or low.endswith(".jpeg"):
+        media_type = "image/jpeg"
+    elif low.endswith(".webp"):
+        media_type = "image/webp"
+    return FileResponse(path, media_type=media_type)
+
+
+# `/jerseys/bulk` MUST be registered before `/jerseys/{team_name}/{kind}`.
+@router.post("/jerseys/bulk", response_model=Dict[str, Any])
+async def bulk_upload_team_jerseys_route(
+    save_id: str = Query(..., description="Save ID used to resolve valid team names"),
+    jerseys: List[UploadFile] = File(...),
+    user=Depends(require_user),
+):
+    try:
+        state, _save_dir = load_state(user["user_id"], save_id)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to load save: {e}")
+    valid_teams = [str(t.get("name", "")).strip() for t in (state.get("teams") or []) if isinstance(t, dict) and t.get("name")]
+    imported: List[Dict[str, str]] = []
+    skipped: List[Dict[str, str]] = []
+    for item in jerseys or []:
+        raw_name = str(item.filename or "").strip()
+        if not raw_name:
+            skipped.append({"file": "(unnamed)", "reason": "Missing file name"})
+            continue
+        stem, ext = os.path.splitext(raw_name)
+        ext = ext.lower()
+        if ext not in (".png", ".jpg", ".jpeg", ".webp"):
+            skipped.append({"file": raw_name, "reason": "Unsupported file type"})
+            continue
+        team_name, kind = match_jersey_filename_to_team(valid_teams, stem)
+        if not team_name or not kind:
+            skipped.append({"file": raw_name, "reason": "No matching team name found"})
+            continue
+        data = await item.read()
+        try:
+            save_team_jersey(user["user_id"], team_name, kind, data, ext)
+            imported.append({"file": raw_name, "team_name": team_name, "kind": kind})
+        except ValueError as e:
+            skipped.append({"file": raw_name, "reason": str(e)})
+    return {
+        "ok": True,
+        "total": len(jerseys or []),
+        "imported_count": len(imported),
+        "skipped_count": len(skipped),
+        "imported": imported,
+        "skipped": skipped,
+    }
+
+
+@router.post("/jerseys/{team_name}/{kind}", response_model=Dict[str, Any])
+async def upload_team_jersey_route(
+    team_name: str,
+    kind: str,
+    jersey: UploadFile = File(...),
+    user=Depends(require_user),
+):
+    name = (team_name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Missing team name")
+    filename = str(jersey.filename or "").lower()
+    ext = os.path.splitext(filename)[1]
+    if ext not in (".png", ".jpg", ".jpeg", ".webp"):
+        raise HTTPException(status_code=400, detail="Only PNG, JPG, JPEG, and WEBP are supported.")
+    data = await jersey.read()
+    try:
+        save_team_jersey(user["user_id"], name, kind, data, ext)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=_save_route_exception_detail(e))
+    return {"ok": True, "team_name": name, "kind": kind}
+
+
+@router.get("/jerseys/{team_name}/{kind}")
+def get_team_jersey_route(team_name: str, kind: str, user=Depends(require_user)):
+    name = (team_name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Missing team name")
+    path = get_team_jersey_path(user["user_id"], name, kind)
+    if not path:
+        raise HTTPException(status_code=404, detail="Jersey image not found")
     media_type = "image/png"
     low = path.lower()
     if low.endswith(".jpg") or low.endswith(".jpeg"):
@@ -587,7 +752,13 @@ def finish_season_route(
 ):
     try:
         begin = bool(body.begin_offseason) if body else False
-        return finish_season(user["user_id"], save_id, begin_offseason=begin)
+        picks = body.cross_region_picks if body else None
+        return finish_season(
+            user["user_id"],
+            save_id,
+            begin_offseason=begin,
+            cross_region_picks=picks,
+        )
     except Exception as e:
         raise HTTPException(status_code=400, detail=_save_route_exception_detail(e))
 

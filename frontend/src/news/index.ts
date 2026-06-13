@@ -2,5 +2,6 @@ export type { NewsArticle, TickerItem, NewsArticleType, TickerItemType, TickerPr
 export { NewsProvider, NewsStateSync, useNews } from './NewsContext'
 export { getNewsCenter, resetNewsCenter, NewsCenter, clipTicker } from './newsStore'
 export { ingestStateNews, seedNewsFromSaveState, teamRankMap, computeWinStreak } from './newsEngine'
+export { ingestChampionship, ingestGraduationAndFreshmen, ingestRegionalTitles, seedLeagueEventNews } from './newsLeagueEvents'
 export { default as NewsTicker } from './NewsTicker'
 export { default as NewsFeedPanel } from './NewsFeedPanel'

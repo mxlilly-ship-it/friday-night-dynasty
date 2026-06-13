@@ -1,0 +1,951 @@
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Oswald:wght@300;400;500;600;700&family=Source+Sans+3:wght@400;600&display=swap');
+
+.ti-root {
+  --ti-bg: #1a1c22;
+  --ti-bg2: #22252e;
+  --ti-card: #2a2d38;
+  --ti-border: #35394a;
+  --ti-border2: #42475c;
+  --ti-accent: #a8b4c0;
+  --ti-accent2: #5b8dd9;
+  --ti-text: #c8cad4;
+  --ti-text-bold: #ffffff;
+  --ti-text2: #7e8499;
+  --ti-text3: #555a6e;
+  --ti-gold: #a8b4c0;
+  --ti-silver: #99aabb;
+  --ti-green: #3dba6e;
+  --ti-red: #e05555;
+  --ti-label: #7e8499;
+
+  background: var(--ti-bg);
+  color: var(--ti-text);
+  font-family: 'Source Sans 3', sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ti-chrome {
+  background: #14161d;
+  border-bottom: 2px solid var(--ti-border);
+  padding: 0 20px;
+  display: grid;
+  grid-template-columns: 56px 1fr auto auto auto;
+  align-items: center;
+  gap: 18px;
+  min-height: 70px;
+}
+
+.ti-chrome:has(.ti-chrome-buttons) {
+  grid-template-columns: 56px 1fr auto auto auto auto;
+}
+
+.ti-chrome-logo {
+  width: 48px;
+  height: 48px;
+  background: var(--ti-card);
+  border: 1.5px solid var(--ti-border2);
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.ti-chrome-logo-img {
+  width: 48px;
+  height: 48px;
+}
+
+.ti-chrome-team {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.ti-chrome-name {
+  font-family: Oswald, sans-serif;
+  font-size: 25px;
+  font-weight: 600;
+  color: var(--ti-text-bold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ti-chrome-nick {
+  font-family: Rajdhani, sans-serif;
+  font-size: 14px;
+  color: var(--ti-text2);
+}
+
+.ti-chrome-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 20px;
+  border-left: 1px solid var(--ti-border);
+}
+
+.ti-chrome-stat-label {
+  font-family: Rajdhani, sans-serif;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--ti-text3);
+}
+
+.ti-chrome-stat-val {
+  font-family: Oswald, sans-serif;
+  font-size: 23px;
+  font-weight: 600;
+  color: var(--ti-text-bold);
+}
+
+.ti-gold {
+  color: var(--ti-gold);
+}
+
+.ti-chrome-buttons {
+  display: flex;
+  gap: 8px;
+  padding-left: 20px;
+  border-left: 1px solid var(--ti-border);
+}
+
+.ti-btn {
+  font-family: Rajdhani, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 7px 16px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.ti-btn-primary {
+  background: #3a3d4a;
+  color: var(--ti-text-bold);
+  border: 1px solid var(--ti-border2);
+}
+
+.ti-btn-ghost {
+  background: transparent;
+  color: var(--ti-text2);
+  border: 1px solid var(--ti-border);
+}
+
+.ti-picker-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: #1e212a;
+  border-bottom: 1px solid var(--ti-border);
+}
+
+.ti-picker-label {
+  font-family: Rajdhani, sans-serif;
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--ti-text3);
+}
+
+.ti-picker-select {
+  background: var(--ti-card);
+  border: 1px solid var(--ti-border2);
+  color: var(--ti-text);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-family: Rajdhani, sans-serif;
+  font-size: 16px;
+  min-width: 200px;
+}
+
+.ti-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 410px;
+  grid-template-rows: auto auto;
+  gap: 1px;
+  background: #111318;
+  padding: 1px;
+}
+
+.ti-left-col {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ti-right-col {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ti-uniform-row {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+.ti-panel {
+  background: var(--ti-bg2);
+}
+
+.ti-panel--flex {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 180px;
+}
+
+.ti-sec-head {
+  background: #1e212a;
+  border-bottom: 1px solid var(--ti-border);
+  padding: 8px 14px;
+  font-family: Rajdhani, sans-serif;
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--ti-text3);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ti-sec-head::before {
+  content: '';
+  display: block;
+  width: 2px;
+  height: 10px;
+  background: var(--ti-accent);
+  border-radius: 1px;
+}
+
+.ti-identity {
+  padding: 14px;
+  display: grid;
+  grid-template-columns: 110px 1fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.ti-logo-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.ti-logo-img {
+  width: 100px;
+  height: 100px;
+  background: var(--ti-card);
+  border: 1.5px dashed var(--ti-border2);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.ti-logo-hint {
+  font-family: Rajdhani, sans-serif;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--ti-text3);
+  text-align: center;
+}
+
+.ti-id-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.ti-id-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ti-id-label {
+  font-family: Rajdhani, sans-serif;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--ti-label);
+}
+
+.ti-id-val {
+  font-family: Oswald, sans-serif;
+  font-size: 19px;
+  font-weight: 500;
+  color: var(--ti-text);
+}
+
+.ti-em {
+  color: var(--ti-text-bold);
+  font-weight: 600;
+}
+
+.ti-blue {
+  color: var(--ti-accent2);
+}
+
+.ti-sm {
+  font-size: 16px;
+}
+
+.ti-rivals {
+  color: var(--ti-red);
+}
+
+.ti-program-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid var(--ti-border);
+}
+
+.ti-ps-cell {
+  padding: 10px 14px;
+  border-right: 1px solid var(--ti-border);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ti-ps-cell:last-child {
+  border-right: none;
+}
+
+.ti-ps-label {
+  font-family: Rajdhani, sans-serif;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--ti-label);
+  line-height: 1.3;
+}
+
+.ti-ps-val {
+  font-family: Oswald, sans-serif;
+  font-size: 27px;
+  font-weight: 600;
+  color: var(--ti-text-bold);
+}
+
+.ti-ps-val.ti-none {
+  color: var(--ti-text2);
+  font-size: 20px;
+  padding-top: 4px;
+}
+
+.ti-prog-info {
+  padding: 10px 14px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid var(--ti-border);
+}
+
+.ti-pi-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-right: 16px;
+  border-right: 1px solid var(--ti-border);
+  margin-right: 16px;
+}
+
+.ti-pi-cell:last-child {
+  border-right: none;
+  margin-right: 0;
+  padding-right: 0;
+}
+
+.ti-pi-label {
+  font-family: Rajdhani, sans-serif;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--ti-label);
+}
+
+.ti-pi-val {
+  font-family: Oswald, sans-serif;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--ti-text);
+}
+
+.ti-pi-val strong {
+  color: var(--ti-text-bold);
+}
+
+.ti-grade-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: #111318;
+  border-top: 1px solid var(--ti-border);
+}
+
+.ti-grade-card {
+  background: var(--ti-bg2);
+  padding: 16px 12px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.ti-gc-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.ti-gc-label {
+  font-family: Rajdhani, sans-serif;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--ti-text3);
+  text-align: center;
+}
+
+.ti-gc-grade {
+  font-family: Oswald, sans-serif;
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--ti-text-bold);
+  line-height: 1;
+}
+
+.ti-gc-grade--a {
+  color: var(--ti-green);
+}
+
+.ti-gc-grade--b {
+  color: var(--ti-accent);
+}
+
+.ti-gc-grade--c {
+  color: var(--ti-red);
+}
+
+.ti-gc-bar {
+  width: 100%;
+  height: 3px;
+  background: var(--ti-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.ti-gc-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+}
+
+.ti-gc-bar-fill--a {
+  background: var(--ti-green);
+}
+
+.ti-gc-bar-fill--b {
+  background: var(--ti-accent);
+}
+
+.ti-gc-bar-fill--c {
+  background: var(--ti-red);
+}
+
+.ti-gc-num {
+  font-size: 13px;
+  color: var(--ti-text2);
+}
+
+.ti-stadium-img {
+  width: 100%;
+  height: 240px;
+  min-height: 240px;
+  background: linear-gradient(160deg, #0d1f3c 0%, #152d54 50%, #0a1520 100%);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ti-stadium-img svg {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+}
+
+.ti-stadium-photo {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  max-height: none;
+  min-height: 0;
+  border-radius: 0;
+}
+
+.ti-stadium-photo .teamstadium-img {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: cover;
+}
+
+.ti-stadium-overlay-text {
+  position: relative;
+  z-index: 2;
+  font-family: Rajdhani, sans-serif;
+  font-size: 13px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.13);
+  pointer-events: none;
+  user-select: none;
+}
+
+.ti-stadium-stats-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid var(--ti-border);
+}
+
+.ti-ssb-cell {
+  padding: 8px 12px;
+  border-right: 1px solid var(--ti-border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ti-ssb-cell:last-child {
+  border-right: none;
+}
+
+.ti-ssb-label {
+  font-family: Rajdhani, sans-serif;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--ti-text3);
+}
+
+.ti-ssb-val {
+  font-family: Oswald, sans-serif;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--ti-text);
+}
+
+.ti-ssb-val.ti-good {
+  color: var(--ti-green);
+}
+
+.ti-next-game {
+  padding: 10px 12px;
+}
+
+.ti-ng-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  gap: 8px;
+}
+
+.ti-ng-team {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.ti-ng-badge {
+  width: 32px;
+  height: 32px;
+  background: #30333f;
+  border: 1px solid var(--ti-border2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.ti-ng-name {
+  font-family: Rajdhani, sans-serif;
+  font-size: 12px;
+  color: var(--ti-text2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.ti-ng-vs {
+  font-family: Oswald, sans-serif;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--ti-border2);
+}
+
+.ti-ng-meta {
+  text-align: center;
+  margin-top: 5px;
+  font-family: Rajdhani, sans-serif;
+  font-size: 11px;
+  color: var(--ti-text3);
+  letter-spacing: 1px;
+}
+
+.ti-ng-meta em {
+  color: var(--ti-accent2);
+  font-style: normal;
+}
+
+.ti-ng-empty,
+.ti-trophy-empty,
+.ti-rank-empty {
+  padding: 12px 14px;
+  font-size: 14px;
+  color: var(--ti-text2);
+  line-height: 1.45;
+}
+
+.ti-kp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  border-top: 1px solid var(--ti-border);
+}
+
+.ti-kp-cell {
+  padding: 10px 8px;
+  border-right: 1px solid var(--ti-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.ti-kp-cell:last-child {
+  border-right: none;
+}
+
+.ti-kp-role {
+  font-family: Rajdhani, sans-serif;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--ti-accent);
+  font-weight: 700;
+}
+
+.ti-kp-avatar {
+  width: 36px;
+  height: 36px;
+  background: #30333f;
+  border: 1px solid var(--ti-border2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.ti-kp-name {
+  font-family: Oswald, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ti-text);
+  line-height: 1.1;
+}
+
+.ti-kp-pos {
+  font-family: Rajdhani, sans-serif;
+  font-size: 12px;
+  color: var(--ti-text3);
+}
+
+.ti-trophy-list {
+  flex: 1;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow-y: auto;
+  max-height: 220px;
+}
+
+.ti-trophy-list::-webkit-scrollbar {
+  width: 3px;
+}
+
+.ti-trophy-list::-webkit-scrollbar-thumb {
+  background: var(--ti-border2);
+  border-radius: 2px;
+}
+
+.ti-trophy-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--ti-card);
+  border: 1px solid var(--ti-border);
+  border-radius: 3px;
+  padding: 7px 10px;
+  position: relative;
+  overflow: hidden;
+}
+
+.ti-trophy-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+}
+
+.ti-trophy-row--champ::before {
+  background: var(--ti-gold);
+}
+
+.ti-trophy-row--conf::before {
+  background: var(--ti-accent2);
+}
+
+.ti-trophy-row--div::before {
+  background: var(--ti-silver);
+}
+
+.ti-trophy-row--playoff::before {
+  background: var(--ti-green);
+}
+
+.ti-tr-icon {
+  font-size: 21px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.ti-tr-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.ti-tr-title {
+  font-family: Oswald, sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--ti-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ti-tr-years {
+  font-family: Rajdhani, sans-serif;
+  font-size: 12px;
+  color: var(--ti-text3);
+}
+
+.ti-tr-count {
+  font-family: Oswald, sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ti-text2);
+  flex-shrink: 0;
+}
+
+.ti-trophy-row--champ .ti-tr-count {
+  color: var(--ti-gold);
+}
+
+.ti-trophy-total {
+  border-top: 1px solid var(--ti-border);
+  padding: 8px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ti-tt-label {
+  font-family: Rajdhani, sans-serif;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--ti-text3);
+}
+
+.ti-tt-val {
+  font-family: Oswald, sans-serif;
+  font-size: 23px;
+  font-weight: 700;
+  color: var(--ti-gold);
+}
+
+.ti-rank-section {
+  padding: 0 14px 12px;
+}
+
+.ti-rank-chart {
+  height: 68px;
+  margin-top: 8px;
+}
+
+.ti-rank-chart svg {
+  width: 100%;
+  height: 100%;
+}
+
+.ti-uniform-display {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 28px 60px 24px;
+  gap: 60px;
+  flex-wrap: wrap;
+}
+
+.ti-uni-box {
+  background: var(--ti-card);
+  border: 1.5px dashed var(--ti-border2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.ti-uni-box .teamuniformasset {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.ti-uni-box:has(.teamuniformasset-img) .ti-uni-placeholder-inner {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ti-uni-box--helmet {
+  width: 150px;
+  height: 150px;
+  border-radius: 8px;
+}
+
+.ti-uni-box--jersey {
+  width: 130px;
+  height: 158px;
+  border-radius: 6px;
+}
+
+.ti-uni-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.ti-uni-label {
+  font-family: Rajdhani, sans-serif;
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--ti-text3);
+  font-weight: 600;
+}
+
+.ti-uni-placeholder-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  user-select: none;
+}
+
+.ti-uni-placeholder-text {
+  font-family: Rajdhani, sans-serif;
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ti-text3);
+  text-align: center;
+  line-height: 1.3;
+}
+
+@media (max-width: 1100px) {
+  .ti-body {
+    grid-template-columns: 1fr;
+  }
+
+  .ti-left-col,
+  .ti-right-col,
+  .ti-uniform-row {
+    grid-column: 1;
+  }
+
+  .ti-right-col {
+    grid-row: 2;
+  }
+
+  .ti-uniform-row {
+    grid-row: 3;
+  }
+
+  .ti-chrome {
+    grid-template-columns: 48px 1fr;
+    grid-template-rows: auto auto;
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .ti-chrome-stat {
+    border-left: none;
+    border-top: 1px solid var(--ti-border);
+    padding-top: 8px;
+    align-items: flex-start;
+  }
+
+  .ti-identity {
+    grid-template-columns: 1fr;
+  }
+
+  .ti-program-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ti-prog-info {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .ti-pi-cell {
+    border-right: none;
+    margin-right: 0;
+    padding-right: 0;
+  }
+
+  .ti-stadium-stats-bar {
+    grid-template-columns: 1fr 1fr;
+  }
+}

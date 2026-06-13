@@ -4,6 +4,7 @@ import './TitleScreen.css'
 import { NewSaveFlow } from './NewSaveFlow'
 import TeamHomePage from './TeamHomePage'
 import type { HomeThemeSelection } from './homeGameThemes'
+import { deriveUiPhaseFromSave, shouldBeginOffseason } from './seasonPhase'
 import { importSaveZip, type SaveBundle } from './saveBundle'
 import { downloadBackupJson, downloadBackupZip } from './backupDownload'
 import {
@@ -17,6 +18,7 @@ import {
   writeLatestAutosave,
   type BrowserAutosaveRecord,
 } from './browserSave'
+import { enrichSaveStateFromLeagueJson } from './leagueTeamStatic'
 import { LocalAssetsProvider } from './LocalAssetsContext'
 import {
   firebaseLoginAndExchange,
@@ -25,7 +27,7 @@ import {
   firebaseSignUpAndExchange,
   tryRefreshAppSession,
 } from './authSession.js'
-import { getAuthInstance } from './auth.js'
+import { getAuthInstance, resetPassword } from './auth.js'
 import { getOrCreateDeviceId } from './deviceId.js'
 
 /** Stable reference so child effects do not re-run when logged out (browser saves). */
@@ -71,7 +73,7 @@ function saveHasActivePreseasonFlow(state: any): boolean {
   if (!Array.isArray(stages) || stages.length === 0) return false
   if (idx >= stages.length) return false
   const p = String(state?.season_phase ?? '').toLowerCase()
-  if (p === 'playoffs' || p === 'season_summary' || p === 'offseason' || p === 'done') return false
+  if (p === 'playoffs' || p === 'season_summary' || p === 'schedule_planning' || p === 'offseason' || p === 'done') return false
   return true
 }
 
@@ -98,6 +100,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [authBusy, setAuthBusy] = useState(false)
+  const [resetPasswordBusy, setResetPasswordBusy] = useState(false)
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login')
   const [deviceLimitDevices, setDeviceLimitDevices] = useState<
     Array<{ device_id: string; label?: string | null; last_seen_at?: number }>
@@ -187,6 +190,8 @@ export default function App({ devNoFirebase = false }: AppProps) {
       records: {},
       logos: {},
       stadiums: {},
+      helmets: {},
+      jerseys: {},
       seasonRecaps: {},
     }
   }, [localBundle, dynastyLeagueHistory])
@@ -271,6 +276,64 @@ export default function App({ devNoFirebase = false }: AppProps) {
           bundle: next,
         }).catch((e: unknown) =>
           setError(e instanceof Error ? e.message : 'Failed to save stadium photos to browser'),
+        )
+        return next
+      })
+    },
+    [saveId],
+  )
+
+  const importHelmetsToBundle = useCallback(
+    async (newHelmets: SaveBundle['helmets']) => {
+      const live = saveStateRef.current
+      setLocalBundle((prev) => {
+        if (!prev) return prev
+        const next: SaveBundle = {
+          ...prev,
+          helmets: { ...(prev.helmets ?? {}), ...newHelmets },
+          state: live ?? prev.state,
+        }
+        let id = saveId.startsWith('b_') ? saveId : createBrowserSaveId()
+        if (!saveId.startsWith('b_')) {
+          setSaveId(id)
+        }
+        const saveName = String((live ?? prev.state)?.save_name ?? 'Dynasty').trim() || 'Dynasty'
+        void putBrowserSave({
+          id,
+          saveName,
+          updatedAt: Date.now(),
+          bundle: next,
+        }).catch((e: unknown) =>
+          setError(e instanceof Error ? e.message : 'Failed to save helmets to browser'),
+        )
+        return next
+      })
+    },
+    [saveId],
+  )
+
+  const importJerseysToBundle = useCallback(
+    async (newJerseys: SaveBundle['jerseys']) => {
+      const live = saveStateRef.current
+      setLocalBundle((prev) => {
+        if (!prev) return prev
+        const next: SaveBundle = {
+          ...prev,
+          jerseys: { ...(prev.jerseys ?? {}), ...newJerseys },
+          state: live ?? prev.state,
+        }
+        let id = saveId.startsWith('b_') ? saveId : createBrowserSaveId()
+        if (!saveId.startsWith('b_')) {
+          setSaveId(id)
+        }
+        const saveName = String((live ?? prev.state)?.save_name ?? 'Dynasty').trim() || 'Dynasty'
+        void putBrowserSave({
+          id,
+          saveName,
+          updatedAt: Date.now(),
+          bundle: next,
+        }).catch((e: unknown) =>
+          setError(e instanceof Error ? e.message : 'Failed to save jerseys to browser'),
         )
         return next
       })
@@ -445,6 +508,38 @@ export default function App({ devNoFirebase = false }: AppProps) {
     return false
   }
 
+  async function handleForgotPassword() {
+    setError('')
+    setSuccessMessage('')
+    const em = email.trim()
+    if (!em) {
+      setError('Enter your email address, then tap Forgot Password.')
+      return
+    }
+    setResetPasswordBusy(true)
+    try {
+      await resetPassword(em)
+      setSuccessMessage(`Password reset email sent to ${em}. Check your inbox (and spam folder).`)
+      setTimeout(() => setSuccessMessage(''), 6000)
+    } catch (e: any) {
+      const code = String(e?.code ?? '')
+      if (code === 'auth/invalid-email') {
+        setError('Enter a valid email address.')
+      } else if (code === 'auth/missing-email') {
+        setError('Enter your email address first.')
+      } else if (code === 'auth/user-not-found') {
+        setError('No account found for that email.')
+      } else if (code === 'auth/too-many-requests') {
+        setError('Too many reset attempts. Wait a few minutes and try again.')
+      } else {
+        const msg = e?.message ? String(e.message) : 'Could not send reset email.'
+        setError(msg)
+      }
+    } finally {
+      setResetPasswordBusy(false)
+    }
+  }
+
   /** If response is 401, try Firebase re-login once; else expire session. Returns true = caller should stop. */
   async function consumeUnauthorized(r: Response): Promise<boolean> {
     if (r.status !== 401) return false
@@ -563,6 +658,8 @@ export default function App({ devNoFirebase = false }: AppProps) {
       records: (maybePayload as any).records ?? {},
       logos: (maybePayload as any).logos ?? {},
       stadiums: (maybePayload as any).stadiums ?? {},
+      helmets: (maybePayload as any).helmets ?? {},
+      jerseys: (maybePayload as any).jerseys ?? {},
       seasonRecaps: (maybePayload as any).seasonRecaps ?? {},
     }
   }
@@ -763,6 +860,24 @@ export default function App({ devNoFirebase = false }: AppProps) {
     } catch {
       /* API offline — load save as stored */
     }
+    try {
+      const r2 = await fetch(`${API_BASE}/sim/sync-state`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state }),
+      })
+      if (r2.ok) {
+        const data2 = await r2.json()
+        if (data2?.state) state = data2.state
+      }
+    } catch {
+      /* API offline — load save as stored */
+    }
+    try {
+      await enrichSaveStateFromLeagueJson(state, API_BASE)
+    } catch {
+      /* teams-data unavailable — stadium names stay as stored */
+    }
     setLocalBundle({ ...rec.bundle, state })
     setSaveId(id)
     setSaveState(state)
@@ -799,6 +914,8 @@ export default function App({ devNoFirebase = false }: AppProps) {
         records: data.records ?? {},
         logos: {},
         stadiums: {},
+        helmets: {},
+        jerseys: {},
         seasonRecaps: {},
       }
       const localId = createBrowserSaveId()
@@ -876,6 +993,8 @@ export default function App({ devNoFirebase = false }: AppProps) {
           records: data.records ?? {},
           logos: {},
           stadiums: {},
+          helmets: {},
+          jerseys: {},
           seasonRecaps: {},
         },
       })
@@ -897,6 +1016,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
     homeGameThemesAck?: boolean
     playoffsSim?: boolean
     seasonFinish?: boolean
+    crossRegionPicks?: { slot_index: number; opponent: string }[]
     /** Scrimmage Simulate — always hit preseason advance (avoids wrong URL if season_phase in React state is stale). */
     forcePreseasonAdvance?: boolean
     offseasonBody?: {
@@ -928,19 +1048,30 @@ export default function App({ devNoFirebase = false }: AppProps) {
     setError('')
     const live = saveStateRef.current
     const livePhase = String(live?.season_phase ?? '').toLowerCase()
+    const uiPhase = deriveUiPhaseFromSave(live, localBundle?.leagueHistory ?? dynastyLeagueHistory)
 
     if (localBundle) {
       // Stateless mode: send current bundle state to the API and receive updated state (and updated history/records/recaps).
       try {
         const payload: any = { state: live, league_history: localBundle.leagueHistory, records: localBundle.records }
-        if (opts?.seasonFinish) {
+        const seasonFinishFlow = Boolean(opts?.seasonFinish)
+        if (seasonFinishFlow) {
           payload.kind = 'season-finish'
-          payload.body = { begin_offseason: livePhase === 'season_summary' }
+          if (uiPhase === 'schedule_planning') {
+            payload.body = { cross_region_picks: opts?.crossRegionPicks ?? [] }
+          } else {
+            const beginOffseason = shouldBeginOffseason(live, uiPhase)
+            const body: Record<string, unknown> = { begin_offseason: beginOffseason }
+            if (beginOffseason && opts?.crossRegionPicks?.length) {
+              body.cross_region_picks = opts.crossRegionPicks
+            }
+            payload.body = body
+          }
         }
         // Full auto-playoff must win over generic "in playoffs → one round" (otherwise full sim never runs locally).
         else if (opts?.playoffsSim) payload.kind = 'playoffs-sim'
         else if (livePhase === 'playoffs') payload.kind = 'playoffs-sim-round'
-        if (livePhase === 'offseason') payload.kind = 'offseason-advance'
+        if (!seasonFinishFlow && livePhase === 'offseason') payload.kind = 'offseason-advance'
         if (!payload.kind) payload.kind = 'week-sim'
 
         if (payload.kind === 'offseason-advance') payload.body = opts?.offseasonBody ?? {}
@@ -954,7 +1085,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
         const inPreseason =
           !structDone &&
           (Boolean(opts?.forcePreseasonAdvance) || phaseLower === 'preseason' || saveHasActivePreseasonFlow(live))
-        if (inPreseason) {
+        if (inPreseason && !seasonFinishFlow) {
           payload.kind = 'preseason-advance'
           if (opts?.playbook) payload.body = opts.playbook
           else if (opts?.gamePlan) payload.body = { game_plan: opts.gamePlan }
@@ -989,11 +1120,17 @@ export default function App({ devNoFirebase = false }: AppProps) {
 
     if (opts?.seasonFinish) {
       try {
-        const beginOffseason = livePhase === 'season_summary'
+        const beginOffseason = shouldBeginOffseason(live, uiPhase)
+        const body =
+          uiPhase === 'schedule_planning'
+            ? { cross_region_picks: opts.crossRegionPicks ?? [] }
+            : beginOffseason && opts?.crossRegionPicks?.length
+              ? { begin_offseason: true, cross_region_picks: opts.crossRegionPicks }
+              : { begin_offseason: beginOffseason }
         const r = await fetch(`${API_BASE}/saves/${saveId}/season/finish`, {
           method: 'POST',
           headers: { ...headers, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ begin_offseason: beginOffseason }),
+          body: JSON.stringify(body),
         })
         if (!r.ok) {
           if (await consumeUnauthorized(r)) return false
@@ -1066,7 +1203,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
         return false
       }
     }
-    if (livePhase === 'season_summary') {
+    if (uiPhase === 'season_summary' || uiPhase === 'schedule_planning') {
       return simWeek({ ...opts, seasonFinish: true })
     }
     const phaseLower = String(live?.season_phase ?? '').toLowerCase()
@@ -1229,7 +1366,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
     const timer = window.setTimeout(() => {
       const payload: SaveBundle = localBundle
         ? { ...localBundle, state: live }
-        : { state: live, leagueHistory: { seasons: [] }, records: {}, logos: {}, stadiums: {}, seasonRecaps: {} }
+        : { state: live, leagueHistory: { seasons: [] }, records: {}, logos: {}, stadiums: {}, helmets: {}, jerseys: {}, seasonRecaps: {} }
       const rec: BrowserAutosaveRecord = {
         savedAt: Date.now(),
         saveId: saveId || '__unknown__',
@@ -1288,6 +1425,8 @@ export default function App({ devNoFirebase = false }: AppProps) {
               onMergeLocalSimulationResult={inLocalRuntime ? mergeLocalSimulationResult : undefined}
               onImportLogosToBundle={localBundle ? importLogosToBundle : undefined}
               onImportStadiumsToBundle={localBundle ? importStadiumsToBundle : undefined}
+              onImportHelmetsToBundle={localBundle ? importHelmetsToBundle : undefined}
+              onImportJerseysToBundle={localBundle ? importJerseysToBundle : undefined}
               onRefreshDynasty={inLocalRuntime ? undefined : refreshDynastyFromServer}
           />
         </LocalAssetsProvider>
@@ -1482,6 +1621,16 @@ export default function App({ devNoFirebase = false }: AppProps) {
                   <button type="button" disabled={authBusy} onClick={() => void onContinueLoad()}>
                     {authBusy ? 'Please wait…' : authMode === 'signup' ? 'Sign up' : 'Log in'}
                   </button>
+                  {authMode === 'login' ? (
+                    <button
+                      type="button"
+                      className="fnd-forgot-password"
+                      disabled={authBusy || resetPasswordBusy}
+                      onClick={() => void handleForgotPassword()}
+                    >
+                      {resetPasswordBusy ? 'Sending reset email…' : 'Forgot Password?'}
+                    </button>
+                  ) : null}
                 </div>
               </div>
             ) : (
@@ -1585,6 +1734,16 @@ export default function App({ devNoFirebase = false }: AppProps) {
                   <button type="button" disabled={authBusy} onClick={() => void onContinueNew()}>
                     {authBusy ? 'Please wait…' : authMode === 'signup' ? 'Create account & continue' : 'Log in & continue'}
                   </button>
+                  {authMode === 'login' ? (
+                    <button
+                      type="button"
+                      className="fnd-forgot-password"
+                      disabled={authBusy || resetPasswordBusy}
+                      onClick={() => void handleForgotPassword()}
+                    >
+                      {resetPasswordBusy ? 'Sending reset email…' : 'Forgot Password?'}
+                    </button>
+                  ) : null}
                 </div>
               </>
             )}
@@ -1637,6 +1796,8 @@ export default function App({ devNoFirebase = false }: AppProps) {
                     records: data.records ?? {},
                     logos: {},
                     stadiums: {},
+                    helmets: {},
+                    jerseys: {},
                     seasonRecaps: {},
                   },
                 })

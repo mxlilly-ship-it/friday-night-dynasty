@@ -1,9 +1,12 @@
 import { createContext, useContext } from 'react'
-import type { SaveBundle, SaveBundleAssetMap } from './saveBundle'
+import type { JerseyKind } from './logoUtils'
+import { jerseyBundleKey, type SaveBundle, type SaveBundleAssetMap } from './saveBundle'
 
 export type LocalAssets = {
   getTeamLogo: (teamName: string) => SaveBundleAssetMap[string] | null
   getTeamStadium: (teamName: string) => SaveBundleAssetMap[string] | null
+  getTeamHelmet: (teamName: string) => SaveBundleAssetMap[string] | null
+  getTeamJersey: (teamName: string, kind: JerseyKind) => SaveBundleAssetMap[string] | null
 }
 
 const Ctx = createContext<LocalAssets | null>(null)
@@ -24,6 +27,14 @@ export function LocalAssetsProvider({
         getTeamStadium: (teamName: string) => {
           if (!teamName?.trim()) return null
           return bundle.stadiums?.[teamName] ?? null
+        },
+        getTeamHelmet: (teamName: string) => {
+          if (!teamName?.trim()) return null
+          return bundle.helmets?.[teamName] ?? null
+        },
+        getTeamJersey: (teamName: string, kind: JerseyKind) => {
+          if (!teamName?.trim()) return null
+          return bundle.jerseys?.[jerseyBundleKey(teamName, kind)] ?? null
         },
       }
     : null

@@ -15,21 +15,6 @@
   padding-top: clamp(4rem, 12vh, 8rem);
   box-sizing: border-box;
   background-color: #1a1a1c;
-  background-image:
-    repeating-linear-gradient(
-      135deg,
-      transparent,
-      transparent 8px,
-      rgba(255, 255, 255, 0.02) 8px,
-      rgba(255, 255, 255, 0.02) 9px
-    ),
-    repeating-linear-gradient(
-      -135deg,
-      transparent,
-      transparent 12px,
-      rgba(0, 0, 0, 0.15) 12px,
-      rgba(0, 0, 0, 0.15) 13px
-    );
   overflow: auto;
 }
 
@@ -49,63 +34,6 @@
   height: 100%;
   border: 0;
   display: block;
-}
-
-.fnd-title-root::before,
-.fnd-title-root::after {
-  content: '';
-  position: fixed;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.fnd-title-root--landing::before,
-.fnd-title-root--landing::after {
-  display: none;
-}
-
-/* Top-left diagonal silver lines */
-.fnd-title-root::before {
-  top: 0;
-  left: 0;
-  width: min(45vw, 420px);
-  height: min(45vw, 420px);
-  background: linear-gradient(
-    135deg,
-    transparent 48%,
-    rgba(200, 210, 220, 0.35) 49%,
-    rgba(200, 210, 220, 0.35) 50.5%,
-    transparent 52%
-  ),
-  linear-gradient(
-    135deg,
-    transparent 52%,
-    rgba(180, 190, 200, 0.22) 53.2%,
-    rgba(180, 190, 200, 0.22) 54.5%,
-    transparent 56%
-  );
-}
-
-/* Bottom-right diagonal silver lines */
-.fnd-title-root::after {
-  bottom: 0;
-  right: 0;
-  width: min(45vw, 420px);
-  height: min(45vw, 420px);
-  background: linear-gradient(
-    -45deg,
-    transparent 48%,
-    rgba(200, 210, 220, 0.35) 49%,
-    rgba(200, 210, 220, 0.35) 50.5%,
-    transparent 52%
-  ),
-  linear-gradient(
-    -45deg,
-    transparent 52%,
-    rgba(180, 190, 200, 0.22) 53.2%,
-    rgba(180, 190, 200, 0.22) 54.5%,
-    transparent 56%
-  );
 }
 
 .fnd-title-inner {
@@ -393,6 +321,30 @@
   text-transform: uppercase;
   font-size: 0.75rem;
   cursor: pointer;
+}
+
+.fnd-forgot-password {
+  align-self: flex-start;
+  margin: 0.15rem 0 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #9ca3af;
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.fnd-forgot-password:hover:not(:disabled) {
+  color: #d0d4dc;
+}
+
+.fnd-forgot-password:disabled {
+  opacity: 0.55;
+  cursor: wait;
 }
 
 .fnd-error {

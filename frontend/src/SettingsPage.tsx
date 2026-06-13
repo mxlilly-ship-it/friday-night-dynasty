@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, type ChangeEvent } from 'react'
-import { suggestTeamForLogoFilename, suggestTeamForStadiumFilename } from './logoMatch'
-import { guessMime, type SaveBundle, type SaveBundleAssetMap } from './saveBundle'
+import { suggestTeamForHelmetFilename, suggestTeamForLogoFilename, suggestTeamForStadiumFilename, suggestTeamJerseyFilename, type JerseyKind } from './logoMatch'
+import { guessMime, jerseyBundleKey, type SaveBundle, type SaveBundleAssetMap } from './saveBundle'
 import './SettingsPage.css'
 
 const MAX_IMAGE_FILES = 200
@@ -31,6 +31,8 @@ type Props = {
   onError: (msg: string) => void
   onLogoVersionBump: () => void
   onStadiumVersionBump?: () => void
+  onHelmetVersionBump?: () => void
+  onJerseyVersionBump?: () => void
   backupReminderFrequency: 'none' | '3_weeks' | '6_weeks' | 'stage'
   onBackupReminderFrequencyChange?: (value: 'none' | '3_weeks' | '6_weeks' | 'stage') => void
   onBackupNow?: () => void
@@ -40,6 +42,8 @@ type Props = {
   onImportLogosToBundle?: (logos: SaveBundle['logos']) => Promise<void>
   /** Browser / zip saves: merge stadium photos into the local bundle and persist to IndexedDB. */
   onImportStadiumsToBundle?: (stadiums: SaveBundle['stadiums']) => Promise<void>
+  onImportHelmetsToBundle?: (helmets: SaveBundle['helmets']) => Promise<void>
+  onImportJerseysToBundle?: (jerseys: SaveBundle['jerseys']) => Promise<void>
 }
 
 export default function SettingsPage({
@@ -51,29 +55,45 @@ export default function SettingsPage({
   onError,
   onLogoVersionBump,
   onStadiumVersionBump,
+  onHelmetVersionBump,
+  onJerseyVersionBump,
   backupReminderFrequency,
   onBackupReminderFrequencyChange,
   onBackupNow,
   onApplySaveState,
   onImportLogosToBundle,
   onImportStadiumsToBundle,
+  onImportHelmetsToBundle,
+  onImportJerseysToBundle,
 }: Props) {
   const folderInputRef = useRef<HTMLInputElement | null>(null)
   const filesInputRef = useRef<HTMLInputElement | null>(null)
   const stadiumFolderInputRef = useRef<HTMLInputElement | null>(null)
   const stadiumFilesInputRef = useRef<HTMLInputElement | null>(null)
+  const helmetFolderInputRef = useRef<HTMLInputElement | null>(null)
+  const helmetFilesInputRef = useRef<HTMLInputElement | null>(null)
+  const jerseyFolderInputRef = useRef<HTMLInputElement | null>(null)
+  const jerseyFilesInputRef = useRef<HTMLInputElement | null>(null)
   const [busy, setBusy] = useState(false)
   const [stadiumBusy, setStadiumBusy] = useState(false)
+  const [helmetBusy, setHelmetBusy] = useState(false)
+  const [jerseyBusy, setJerseyBusy] = useState(false)
   const [progress, setProgress] = useState<string | null>(null)
   const [stadiumProgress, setStadiumProgress] = useState<string | null>(null)
+  const [helmetProgress, setHelmetProgress] = useState<string | null>(null)
+  const [jerseyProgress, setJerseyProgress] = useState<string | null>(null)
   const [lastResult, setLastResult] = useState<string | null>(null)
   const [stadiumLastResult, setStadiumLastResult] = useState<string | null>(null)
+  const [helmetLastResult, setHelmetLastResult] = useState<string | null>(null)
+  const [jerseyLastResult, setJerseyLastResult] = useState<string | null>(null)
   const [bulkSeasonCount, setBulkSeasonCount] = useState<1 | 5 | 10 | 20>(5)
   const [bulkBusy, setBulkBusy] = useState(false)
 
   /** Rows: one file + which team it maps to (empty string = skip). */
   const [rows, setRows] = useState<{ file: File; team: string }[]>([])
   const [stadiumRows, setStadiumRows] = useState<{ file: File; team: string }[]>([])
+  const [helmetRows, setHelmetRows] = useState<{ file: File; team: string }[]>([])
+  const [jerseyRows, setJerseyRows] = useState<{ file: File; team: string; kind: JerseyKind }[]>([])
 
   const setFolderInputEl = useCallback((el: HTMLInputElement | null) => {
     folderInputRef.current = el
@@ -89,6 +109,30 @@ export default function SettingsPage({
 
   const setStadiumFolderInputEl = useCallback((el: HTMLInputElement | null) => {
     stadiumFolderInputRef.current = el
+    if (!el) return
+    try {
+      el.setAttribute('webkitdirectory', '')
+      el.setAttribute('directory', '')
+      el.multiple = true
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  const setHelmetFolderInputEl = useCallback((el: HTMLInputElement | null) => {
+    helmetFolderInputRef.current = el
+    if (!el) return
+    try {
+      el.setAttribute('webkitdirectory', '')
+      el.setAttribute('directory', '')
+      el.multiple = true
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  const setJerseyFolderInputEl = useCallback((el: HTMLInputElement | null) => {
+    jerseyFolderInputRef.current = el
     if (!el) return
     try {
       el.setAttribute('webkitdirectory', '')
@@ -152,6 +196,54 @@ export default function SettingsPage({
     buildRowsFromFiles(snap, suggestTeamForStadiumFilename, setStadiumRows, setStadiumLastResult)
   }
 
+  const onHelmetFolderChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const snap = snapshotFiles(e.target.files)
+    e.target.value = ''
+    buildRowsFromFiles(snap, suggestTeamForHelmetFilename, setHelmetRows, setHelmetLastResult)
+  }
+
+  const onHelmetFilesChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const snap = snapshotFiles(e.target.files)
+    e.target.value = ''
+    buildRowsFromFiles(snap, suggestTeamForHelmetFilename, setHelmetRows, setHelmetLastResult)
+  }
+
+  const buildJerseyRowsFromFiles = (raw: File[]) => {
+    const imageFiles = filterImageFiles(raw)
+    if (imageFiles.length === 0) {
+      onError(
+        raw.length > 0
+          ? `Found ${raw.length} file(s), but none were PNG, JPG, or WEBP.`
+          : 'No files were selected.',
+      )
+      return
+    }
+    const capped = imageFiles.length > MAX_IMAGE_FILES ? imageFiles.slice(0, MAX_IMAGE_FILES) : imageFiles
+    const next = capped.map((file) => {
+      const parsed = suggestTeamJerseyFilename(file.name, teamNames)
+      return { file, team: parsed.team, kind: parsed.kind }
+    })
+    setJerseyRows(next)
+    setJerseyLastResult(
+      imageFiles.length > MAX_IMAGE_FILES
+        ? `Showing first ${MAX_IMAGE_FILES} of ${imageFiles.length} images. Import in batches if needed.`
+        : null,
+    )
+    onError('')
+  }
+
+  const onJerseyFolderChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const snap = snapshotFiles(e.target.files)
+    e.target.value = ''
+    buildJerseyRowsFromFiles(snap)
+  }
+
+  const onJerseyFilesChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const snap = snapshotFiles(e.target.files)
+    e.target.value = ''
+    buildJerseyRowsFromFiles(snap)
+  }
+
   const setTeamAt = (index: number, team: string) => {
     setRows((prev) => {
       const copy = [...prev]
@@ -180,6 +272,42 @@ export default function SettingsPage({
     setStadiumLastResult(null)
   }
 
+  const clearHelmetRows = () => {
+    setHelmetRows([])
+    setHelmetProgress(null)
+    setHelmetLastResult(null)
+  }
+
+  const clearJerseyRows = () => {
+    setJerseyRows([])
+    setJerseyProgress(null)
+    setJerseyLastResult(null)
+  }
+
+  const setHelmetTeamAt = (index: number, team: string) => {
+    setHelmetRows((prev) => {
+      const copy = [...prev]
+      if (copy[index]) copy[index] = { ...copy[index], team }
+      return copy
+    })
+  }
+
+  const setJerseyTeamAt = (index: number, team: string) => {
+    setJerseyRows((prev) => {
+      const copy = [...prev]
+      if (copy[index]) copy[index] = { ...copy[index], team }
+      return copy
+    })
+  }
+
+  const setJerseyKindAt = (index: number, kind: JerseyKind) => {
+    setJerseyRows((prev) => {
+      const copy = [...prev]
+      if (copy[index]) copy[index] = { ...copy[index], kind }
+      return copy
+    })
+  }
+
   const importAssetsToBundle = async (
     toUpload: { file: File; team: string }[],
     maxBytes: number,
@@ -204,24 +332,52 @@ export default function SettingsPage({
     return toUpload.length
   }
 
-  const uploadAssetsToApi = async (
-    toUpload: { file: File; team: string }[],
+  const importJerseysToBundle = async (
+    toUpload: { file: File; team: string; kind: JerseyKind }[],
     maxBytes: number,
-    fieldName: 'logo' | 'stadium',
-    pathSegment: 'logos' | 'stadiums',
+    merge: (assets: SaveBundle['jerseys']) => Promise<void>,
+  ) => {
+    const assets: SaveBundle['jerseys'] = {}
+    for (let i = 0; i < toUpload.length; i++) {
+      const { file, team, kind } = toUpload[i]
+      if (file.size > maxBytes) {
+        throw new Error(`${file.name} is too large (max ${Math.round(maxBytes / (1024 * 1024))} MB).`)
+      }
+      const buf = new Uint8Array(await file.arrayBuffer())
+      assets[jerseyBundleKey(team, kind)] = {
+        filename: file.name,
+        data: buf,
+        mime: file.type?.startsWith('image/') ? file.type : guessMime(file.name),
+      }
+    }
+    if (Object.keys(assets).length > 0) {
+      await merge(assets)
+    }
+    return toUpload.length
+  }
+
+  const uploadAssetsToApi = async (
+    toUpload: { file: File; team: string; kind?: JerseyKind }[],
+    maxBytes: number,
+    fieldName: 'logo' | 'stadium' | 'helmet' | 'jersey',
+    pathSegment: 'logos' | 'stadiums' | 'helmets' | 'jerseys',
     setProgressText: (msg: string | null) => void,
   ) => {
     const uploadHeaders: Record<string, string> = {}
     if (headers.Authorization) uploadHeaders.Authorization = headers.Authorization
     for (let i = 0; i < toUpload.length; i++) {
-      const { file, team } = toUpload[i]
-      setProgressText(`Uploading ${i + 1} / ${toUpload.length}: ${team}…`)
+      const { file, team, kind } = toUpload[i]
+      setProgressText(`Uploading ${i + 1} / ${toUpload.length}: ${team}${kind ? ` (${kind})` : ''}…`)
       if (file.size > maxBytes) {
         throw new Error(`${file.name} is too large (max ${Math.round(maxBytes / (1024 * 1024))} MB).`)
       }
       const fd = new FormData()
       fd.append(fieldName, file)
-      const r = await fetch(`${apiBase}/saves/${pathSegment}/${encodeURIComponent(team)}`, {
+      const url =
+        pathSegment === 'jerseys' && kind
+          ? `${apiBase}/saves/jerseys/${encodeURIComponent(team)}/${encodeURIComponent(kind)}`
+          : `${apiBase}/saves/${pathSegment}/${encodeURIComponent(team)}`
+      const r = await fetch(url, {
         method: 'POST',
         headers: uploadHeaders,
         body: fd,
@@ -315,6 +471,96 @@ export default function SettingsPage({
     } finally {
       setStadiumProgress(null)
       setStadiumBusy(false)
+    }
+  }
+
+  const runHelmetImport = async () => {
+    const toUpload = helmetRows.filter((r) => r.team.trim())
+    if (toUpload.length === 0) {
+      onError('Pick a team for at least one helmet image, or use Skip on all rows.')
+      return
+    }
+    if (!saveId) return
+
+    const isLocal = saveId === '__local__' || saveId.startsWith('b_')
+    if (isLocal) {
+      if (!onImportHelmetsToBundle) {
+        onError('Helmet import is not available for this save.')
+        return
+      }
+    } else if (!headers.Authorization) {
+      onError('Sign in to upload helmets to a cloud save, or use a browser dynasty save.')
+      return
+    }
+
+    setHelmetBusy(true)
+    setHelmetProgress(null)
+    onError('')
+
+    try {
+      let ok = 0
+      if (isLocal) {
+        ok = await importAssetsToBundle(toUpload, MAX_LOGO_BYTES, onImportHelmetsToBundle!)
+      } else {
+        ok = await uploadAssetsToApi(toUpload, MAX_LOGO_BYTES, 'helmet', 'helmets', setHelmetProgress)
+      }
+      onHelmetVersionBump?.()
+      setHelmetLastResult(`Imported ${ok} helmet(s).`)
+      onError('')
+      clearHelmetRows()
+    } catch (e: unknown) {
+      onError(e instanceof Error ? e.message : 'Import stopped due to an error.')
+    } finally {
+      setHelmetProgress(null)
+      setHelmetBusy(false)
+    }
+  }
+
+  const runJerseyImport = async () => {
+    const toUpload = jerseyRows.filter((r) => r.team.trim())
+    if (toUpload.length === 0) {
+      onError('Pick a team for at least one jersey image, or use Skip on all rows.')
+      return
+    }
+    if (!saveId) return
+
+    const isLocal = saveId === '__local__' || saveId.startsWith('b_')
+    if (isLocal) {
+      if (!onImportJerseysToBundle) {
+        onError('Jersey import is not available for this save.')
+        return
+      }
+    } else if (!headers.Authorization) {
+      onError('Sign in to upload jerseys to a cloud save, or use a browser dynasty save.')
+      return
+    }
+
+    setJerseyBusy(true)
+    setJerseyProgress(null)
+    onError('')
+
+    try {
+      let ok = 0
+      if (isLocal) {
+        ok = await importJerseysToBundle(toUpload, MAX_STADIUM_BYTES, onImportJerseysToBundle!)
+      } else {
+        ok = await uploadAssetsToApi(
+          toUpload.map((r) => ({ file: r.file, team: r.team, kind: r.kind })),
+          MAX_STADIUM_BYTES,
+          'jersey',
+          'jerseys',
+          setJerseyProgress,
+        )
+      }
+      onJerseyVersionBump?.()
+      setJerseyLastResult(`Imported ${ok} jersey image(s).`)
+      onError('')
+      clearJerseyRows()
+    } catch (e: unknown) {
+      onError(e instanceof Error ? e.message : 'Import stopped due to an error.')
+    } finally {
+      setJerseyProgress(null)
+      setJerseyBusy(false)
     }
   }
 
@@ -571,6 +817,203 @@ export default function SettingsPage({
             </div>
           ) : null}
           {stadiumLastResult ? <p className="settings-result">{stadiumLastResult}</p> : null}
+        </section>
+
+        <section className="settings-section">
+          <h2 className="settings-section-title">Helmet photos</h2>
+          <p className="settings-copy">
+            Import helmet images the same way as logos — choose a <strong>folder</strong> or <strong>image files</strong>, assign each to a
+            school, then import. Filenames like <code>Martinsburg_helmet.png</code> are matched automatically.
+            {isLocalSave ? <> Browser saves store helmets on this device (included in backup .zip).</> : null}
+          </p>
+          <input ref={setHelmetFolderInputEl} type="file" className="settings-file-input" onChange={onHelmetFolderChange} />
+          <input
+            ref={helmetFilesInputRef}
+            type="file"
+            multiple
+            accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+            className="settings-file-input"
+            onChange={onHelmetFilesChange}
+          />
+          <div className="settings-actions settings-actions-row">
+            <button
+              type="button"
+              className="settings-primary"
+              disabled={helmetBusy || busy || stadiumBusy || !saveId}
+              onClick={() => helmetFolderInputRef.current?.click()}
+            >
+              Choose folder…
+            </button>
+            <button
+              type="button"
+              className="settings-secondary"
+              disabled={helmetBusy || busy || stadiumBusy || !saveId}
+              onClick={() => helmetFilesInputRef.current?.click()}
+            >
+              Choose image files…
+            </button>
+          </div>
+          {helmetRows.length > 0 ? (
+            <div className="settings-review">
+              <div className="settings-review-head">
+                <span>{helmetRows.length} image(s)</span>
+                <button type="button" className="settings-linkbtn" onClick={clearHelmetRows} disabled={helmetBusy}>
+                  Clear list
+                </button>
+              </div>
+              <div className="settings-review-table-wrap">
+                <table className="settings-review-table">
+                  <thead>
+                    <tr>
+                      <th>File</th>
+                      <th>Team</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {helmetRows.map((row, i) => (
+                      <tr key={`helmet-${row.file.name}-${i}-${row.file.size}`}>
+                        <td className="settings-filecell" title={row.file.name}>
+                          {row.file.name}
+                        </td>
+                        <td>
+                          <select
+                            className="settings-team-select"
+                            value={row.team}
+                            onChange={(e) => setHelmetTeamAt(i, e.target.value)}
+                            disabled={helmetBusy}
+                          >
+                            <option value="">— Skip —</option>
+                            {sortedTeams.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="settings-import-row">
+                <button
+                  type="button"
+                  className="settings-import-btn"
+                  disabled={helmetBusy || busy || !saveId}
+                  onClick={() => void runHelmetImport()}
+                >
+                  {helmetBusy ? 'Working…' : 'Import helmets'}
+                </button>
+                {helmetProgress ? <span className="settings-progress">{helmetProgress}</span> : null}
+              </div>
+            </div>
+          ) : null}
+          {helmetLastResult ? <p className="settings-result">{helmetLastResult}</p> : null}
+        </section>
+
+        <section className="settings-section">
+          <h2 className="settings-section-title">Jersey photos</h2>
+          <p className="settings-copy">
+            Import home, away, and alternate jerseys — choose a <strong>folder</strong> or <strong>image files</strong>, assign team and jersey
+            type, then import. Filenames like <code>Martinsburg_away.png</code> or <code>Beckley_home.jpg</code> are matched automatically.
+            {isLocalSave ? <> Browser saves store jerseys on this device (included in backup .zip).</> : null}
+          </p>
+          <input ref={setJerseyFolderInputEl} type="file" className="settings-file-input" onChange={onJerseyFolderChange} />
+          <input
+            ref={jerseyFilesInputRef}
+            type="file"
+            multiple
+            accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+            className="settings-file-input"
+            onChange={onJerseyFilesChange}
+          />
+          <div className="settings-actions settings-actions-row">
+            <button
+              type="button"
+              className="settings-primary"
+              disabled={jerseyBusy || helmetBusy || busy || !saveId}
+              onClick={() => jerseyFolderInputRef.current?.click()}
+            >
+              Choose folder…
+            </button>
+            <button
+              type="button"
+              className="settings-secondary"
+              disabled={jerseyBusy || helmetBusy || busy || !saveId}
+              onClick={() => jerseyFilesInputRef.current?.click()}
+            >
+              Choose image files…
+            </button>
+          </div>
+          {jerseyRows.length > 0 ? (
+            <div className="settings-review">
+              <div className="settings-review-head">
+                <span>{jerseyRows.length} image(s)</span>
+                <button type="button" className="settings-linkbtn" onClick={clearJerseyRows} disabled={jerseyBusy}>
+                  Clear list
+                </button>
+              </div>
+              <div className="settings-review-table-wrap">
+                <table className="settings-review-table">
+                  <thead>
+                    <tr>
+                      <th>File</th>
+                      <th>Team</th>
+                      <th>Jersey</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {jerseyRows.map((row, i) => (
+                      <tr key={`jersey-${row.file.name}-${i}-${row.file.size}`}>
+                        <td className="settings-filecell" title={row.file.name}>
+                          {row.file.name}
+                        </td>
+                        <td>
+                          <select
+                            className="settings-team-select"
+                            value={row.team}
+                            onChange={(e) => setJerseyTeamAt(i, e.target.value)}
+                            disabled={jerseyBusy}
+                          >
+                            <option value="">— Skip —</option>
+                            {sortedTeams.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td>
+                          <select
+                            className="settings-team-select"
+                            value={row.kind}
+                            onChange={(e) => setJerseyKindAt(i, e.target.value as JerseyKind)}
+                            disabled={jerseyBusy}
+                          >
+                            <option value="home">Home</option>
+                            <option value="away">Away</option>
+                            <option value="alternate">Alternate</option>
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="settings-import-row">
+                <button
+                  type="button"
+                  className="settings-import-btn"
+                  disabled={jerseyBusy || busy || !saveId}
+                  onClick={() => void runJerseyImport()}
+                >
+                  {jerseyBusy ? 'Working…' : 'Import jerseys'}
+                </button>
+                {jerseyProgress ? <span className="settings-progress">{jerseyProgress}</span> : null}
+              </div>
+            </div>
+          ) : null}
+          {jerseyLastResult ? <p className="settings-result">{jerseyLastResult}</p> : null}
         </section>
 
         <section className="settings-section">

@@ -6,7 +6,7 @@
 
 .fnd-news-feed--compact {
   gap: 8px;
-  max-height: 220px;
+  max-height: min(520px, 55vh);
   overflow: auto;
 }
 

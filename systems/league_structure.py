@@ -229,7 +229,11 @@ def build_regular_season_weeks(
                 random.shuffle(out[cls][reg])
         return out
 
-    def _pair_two_regions_week(a: List[str], b: List[str], offset: int) -> List[Tuple[str, str]]:
+    def _pair_two_regions_week(a: List[str], b: List[str], offset: int, locks: Optional[List[Tuple[str, str]]] = None) -> List[Tuple[str, str]]:
+        from systems.schedule_planning import pair_two_regions_with_locks
+
+        if locks:
+            return pair_two_regions_with_locks(a, b, offset, locks)
         n = min(len(a), len(b))
         games: List[Tuple[str, str]] = []
         for i in range(n):
@@ -239,6 +243,11 @@ def build_regular_season_weeks(
                 home, away = away, home
             games.append((home, away))
         return games
+
+    def _cross_locks(cls: str, reg_a: str, reg_b: str, slot_index: int) -> List[Tuple[str, str]]:
+        from systems.schedule_planning import locks_for_cross_week
+
+        return locks_for_cross_week(teams, state, cls, reg_a, reg_b, slot_index)
 
     def _merge_class_blocks(blocks: List[List[List[Tuple[str, str]]]]) -> List[List[Tuple[str, str]]]:
         if not blocks:
@@ -277,7 +286,14 @@ def build_regular_season_weeks(
                 if wi < len(rr2):
                     week_games.extend(rr2[wi])
                 block.append(week_games)
-            block.append(_pair_two_regions_week(r1_teams, r2_teams, offset=random.randrange(10)))
+            block.append(
+                _pair_two_regions_week(
+                    r1_teams,
+                    r2_teams,
+                    offset=random.randrange(10),
+                    locks=_cross_locks(cls, r1, r2, 0),
+                )
+            )
             class_blocks.append(block)
             continue
 
@@ -303,7 +319,14 @@ def build_regular_season_weeks(
             for wk_idx, pairs in enumerate(pair_weeks):
                 cross_games: List[Tuple[str, str]] = []
                 for a, b in pairs:
-                    cross_games.extend(_pair_two_regions_week(regs_list[a], regs_list[b], offset=(wk_idx + a + b) % 8))
+                    cross_games.extend(
+                        _pair_two_regions_week(
+                            regs_list[a],
+                            regs_list[b],
+                            offset=(wk_idx + a + b) % 8,
+                            locks=_cross_locks(cls, region_names[a], region_names[b], wk_idx),
+                        )
+                    )
                 block.append(cross_games)
             class_blocks.append(block)
             continue
@@ -322,10 +345,20 @@ def build_regular_season_weeks(
                 block.append(week_games)
             cross_games: List[Tuple[str, str]] = []
             cross_games.extend(
-                _pair_two_regions_week(regs_list[0], regs_list[1], offset=random.randrange(10))
+                _pair_two_regions_week(
+                    regs_list[0],
+                    regs_list[1],
+                    offset=random.randrange(10),
+                    locks=_cross_locks(cls, region_names[0], region_names[1], 0),
+                )
             )
             cross_games.extend(
-                _pair_two_regions_week(regs_list[2], regs_list[3], offset=random.randrange(10))
+                _pair_two_regions_week(
+                    regs_list[2],
+                    regs_list[3],
+                    offset=random.randrange(10),
+                    locks=_cross_locks(cls, region_names[2], region_names[3], 0),
+                )
             )
             block.append(cross_games)
             class_blocks.append(block)
@@ -354,7 +387,12 @@ def build_regular_season_weeks(
                 cross_games: List[Tuple[str, str]] = []
                 for a, b in pairs:
                     cross_games.extend(
-                        _pair_two_regions_week(regs_list[a], regs_list[b], offset=(wk_idx + a + b) % 7)
+                        _pair_two_regions_week(
+                            regs_list[a],
+                            regs_list[b],
+                            offset=(wk_idx + a + b) % 7,
+                            locks=_cross_locks(cls, region_names[a], region_names[b], wk_idx),
+                        )
                     )
                 block.append(cross_games)
             class_blocks.append(block)

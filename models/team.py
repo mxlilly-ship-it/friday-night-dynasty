@@ -28,6 +28,8 @@ class Team:
     classification: Optional[str] = None  # "1A", "2A", "3A", "4A", "5A", "6A"
     # Geographic / administrative region (e.g. "North", "Region I"). Same as classification for scheduling pods.
     region: Optional[str] = None
+    # Named rival schools (exact team names from data/teams.json); shown on Team Info.
+    rivals: List[str] = field(default_factory=list)
 
     # Records
     wins: int = 0

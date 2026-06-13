@@ -19,6 +19,8 @@ from backend.services.league_service import (
     save_coach_gameplan_v2_in_state,
     update_depth_chart_in_state,
     patch_coach_inbox_state,
+    _sync_user_cross_region_slot_count,
+    _finalize_cross_region_schedule_state,
     _ensure_playoffs_migrated,
     _init_playoffs_multiclass,
     _ensure_all_eligible_playoff_brackets,
@@ -29,6 +31,12 @@ from backend.services.game_service import play_options, submit_play, sim_next_pl
 from backend.services.game_state import deserialize_game, get_teams_for_coach_game, serialize_game
 from systems.save_system import team_from_dict
 from systems.coach_email_system import ensure_coach_inbox
+
+
+def _sim_finalize_state(state: Any) -> Any:
+    if isinstance(state, dict):
+        _finalize_cross_region_schedule_state(state)
+    return state
 
 
 router = APIRouter()
@@ -101,20 +109,22 @@ def sim_route(payload: SimRequest = Body(...)):
                 _ensure_all_eligible_playoff_brackets(state, teams, st)
         if kind == "week-sim":
             out = sim_week_state(state)
-            return {"state": out}
+            return {"state": _sim_finalize_state(out)}
         if kind == "preseason-advance":
             out = advance_preseason_state(state, body)
-            return {"state": out.get("state"), "phase_completed": out.get("phase_completed")}
+            st = out.get("state") if isinstance(out, dict) else None
+            return {"state": _sim_finalize_state(st), "phase_completed": out.get("phase_completed")}
         if kind == "offseason-advance":
             out = advance_offseason_state(state, body, league_history=payload.league_history)
-            return {"state": out}
+            st = out if isinstance(out, dict) else None
+            return {"state": _sim_finalize_state(st)}
         if kind == "playoffs-sim":
             out = sim_playoffs_state(state)
-            return {"state": out}
+            return {"state": _sim_finalize_state(out)}
         if kind == "playoffs-sim-round":
             try:
                 out = sim_playoff_round_state(state)
-                return {"state": out}
+                return {"state": _sim_finalize_state(out)}
             except ValueError as err:
                 # Stateless/local: bracket already complete (e.g. user coach-played the final) but phase
                 # still "playoffs" — mirror persisted sim_playoff_round and finalize into season_summary.
@@ -123,6 +133,9 @@ def sim_route(payload: SimRequest = Body(...)):
                 hist = payload.league_history or {"seasons": []}
                 records = payload.records or {}
                 out = finish_season_state(state, hist, records, bulk_autopilot=False)
+                st = out.get("state")
+                if isinstance(st, dict):
+                    _sim_finalize_state(st)
                 return {
                     "state": out.get("state"),
                     "league_history": out.get("league_history"),
@@ -135,9 +148,18 @@ def sim_route(payload: SimRequest = Body(...)):
             records = payload.records or {}
             bulk_ap = bool((body or {}).get("bulk_autopilot"))
             begin_os = bool((body or {}).get("begin_offseason"))
+            cross_picks = (body or {}).get("cross_region_picks")
             out = finish_season_state(
-                state, hist, records, bulk_autopilot=bulk_ap, begin_offseason=begin_os
+                state,
+                hist,
+                records,
+                bulk_autopilot=bulk_ap,
+                begin_offseason=begin_os,
+                cross_region_picks=cross_picks,
             )
+            st = out.get("state")
+            if isinstance(st, dict):
+                _sim_finalize_state(st)
             return {
                 "state": out.get("state"),
                 "league_history": out.get("league_history"),
@@ -330,9 +352,21 @@ def sim_hydrate_inbox_route(payload: SimStateRequest = Body(...)):
     try:
         state = payload.state or {}
         ensure_coach_inbox(state)
+        _sim_finalize_state(state)
         return {"state": state}
     except Exception as e:
         raise HTTPException(status_code=400, detail=exception_detail(e, "Could not hydrate inbox"))
+
+
+@router.post("/sync-state", response_model=Dict[str, Any])
+def sim_sync_state_route(payload: SimStateRequest = Body(...)):
+    """Repair/sync cross-region schedule planning fields on browser/local saves."""
+    try:
+        state = payload.state or {}
+        _sim_finalize_state(state)
+        return {"state": state}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=exception_detail(e, "Could not sync save state"))
 
 
 class SimCoachInboxPatchBody(BaseModel):

@@ -131,7 +131,7 @@ export default function SeasonSummaryPanel({
 
       <p className="teamhome-small season-summary-lead">
         Standings and brackets are saved to league history. When you&apos;re ready, use{' '}
-        <strong>Begin offseason</strong> (top right) for Graduation and the rest of the offseason hub.
+        <strong>Continue</strong> (top right) for schedule planning (if your class picks out-of-region opponents), then Graduation and the rest of the offseason hub, then preseason Play Selection.
       </p>
 
       <div className="season-summary-stats-grid">

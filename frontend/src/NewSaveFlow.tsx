@@ -343,7 +343,9 @@ export function NewSaveFlow({
 
       {step === 0 && (
         <>
-          <h2 className="newsave-h3">Dynasty save slot</h2>
+          <h2 className="newsave-h3">
+            Dynasty save slot<span className="newsave-footnote-mark">*</span>
+          </h2>
           <p className="newsave-sub">Name this save file. You can run multiple dynasties under the same coach login.</p>
           <input
             className="newsave-input"
@@ -352,6 +354,10 @@ export function NewSaveFlow({
             placeholder="e.g. Year 1 — Martinsburg"
             autoFocus
           />
+          <p className="newsave-footnote">
+            <span className="newsave-footnote-mark newsave-footnote-mark--lead">*</span>
+            Import logos, stadiums, helmets, and jerseys in Settings after your dynasty starts.
+          </p>
           <div className="newsave-row2" style={{ marginTop: 12 }}>
             <div />
             <div>
@@ -610,22 +616,6 @@ export function NewSaveFlow({
               </option>
             ))}
           </select>
-          <label className="newsave-sub" style={{ display: 'block', marginTop: '0.75rem' }}>
-            Winter strength focus (% strength vs speed)
-          </label>
-          <div className="newsave-slider-block">
-            <label>
-              <span>Strength</span>
-              <span>{skills.winter_strength_pct}%</span>
-            </label>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={skills.winter_strength_pct}
-              onChange={(e) => setSkills((s) => ({ ...s, winter_strength_pct: Number(e.target.value) }))}
-            />
-          </div>
         </>
       )}
 

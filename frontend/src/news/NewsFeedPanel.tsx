@@ -11,7 +11,7 @@ type Props = {
   syncSelection?: boolean
 }
 
-export default function NewsFeedPanel({ limit = 8, compact = false, syncSelection = true }: Props) {
+export default function NewsFeedPanel({ limit = 24, compact = false, syncSelection = true }: Props) {
   const { center, saveState, selectedArticleId, openArticle, closeArticle } = useNews()
   const [localOpen, setLocalOpen] = useState<string | null>(null)
 

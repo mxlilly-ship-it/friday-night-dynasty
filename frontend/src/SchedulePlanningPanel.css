@@ -1,0 +1,146 @@
+.schedplan {
+  max-width: 640px;
+  margin: 0 auto;
+  background: #0d1117;
+  border: 0.5px solid #1e2a3a;
+  border-radius: 16px;
+  overflow: hidden;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.schedplan-header {
+  padding: 22px 24px 16px;
+  background: linear-gradient(180deg, #0f1a2e 0%, #0d1117 100%);
+  border-bottom: 0.5px solid #1e2a3a;
+}
+
+.schedplan-eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: #4a5a7a;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.schedplan-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #e8a020;
+}
+
+.schedplan-title {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #dde0f0;
+}
+
+.schedplan-sub {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #7a8aa8;
+}
+
+.schedplan-slots {
+  padding: 16px 24px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.schedplan-slot {
+  background: #0b1018;
+  border: 0.5px solid #1e2a3a;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.schedplan-slot-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.schedplan-slot-num {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #e8a020;
+  background: #1a1500;
+  border: 0.5px solid #3a2e00;
+  border-radius: 99px;
+  padding: 2px 8px;
+}
+
+.schedplan-slot-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #5a6a8a;
+}
+
+.schedplan-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.schedplan-select-wrap {
+  flex: 1;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.schedplan-select-label {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #2e3f60;
+}
+
+.schedplan-select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 0.5px solid #1e2a3a;
+  background: #080d14;
+  color: #dde0f0;
+  font-size: 13px;
+}
+
+.schedplan-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.schedplan-preview-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #7a8aa0;
+}
+
+.schedplan-filter {
+  padding: 0 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.schedplan-filter-input {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 0.5px solid #1e2a3a;
+  background: #080d14;
+  color: #dde0f0;
+  font-size: 13px;
+}

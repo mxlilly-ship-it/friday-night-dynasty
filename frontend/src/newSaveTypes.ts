@@ -12,6 +12,9 @@ export type TeamJsonRow = {
   community?: string
   enrollment?: number
   facilities_grade?: number
+  stadium_name?: string
+  /** Exact team names from this league; shown on Team Info */
+  rivals?: string[]
 }
 
 export type TeamsDataResponse = {

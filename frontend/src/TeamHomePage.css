@@ -617,6 +617,14 @@
   min-width: 0;
 }
 
+.teamhome-roster-shell:has(.ti-root) {
+  border: none;
+  background: transparent;
+  min-height: 0;
+  display: block;
+  padding: 0;
+}
+
 .teamhome-roster-shell {
   border: 2px solid rgba(220, 224, 234, 0.55);
   background: #25262d;
@@ -707,6 +715,37 @@
 
 .teamhome-standings-row:hover {
   background: rgba(255, 255, 255, 0.04);
+}
+
+.teamhome-regional-standings-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.teamhome-regional-standings-intro {
+  margin: 0 0 1rem;
+  opacity: 0.85;
+  max-width: 720px;
+}
+
+.teamhome-regional-standings-group {
+  margin-bottom: 1.75rem;
+}
+
+.teamhome-regional-standings-group:last-child {
+  margin-bottom: 0;
+}
+
+.teamhome-regional-standings-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #c8ccd4;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .teamhome-rankings-row {
@@ -1630,9 +1669,7 @@ td .teamhome-roster-name--profile {
   opacity: 0.92;
 }
 
-.teamhome-preseason-main .teamhome-preseason-panelA,
-.teamhome-preseason-main .teamhome-playbook-select,
-.teamhome-preseason-main .teamhome-scrimmage-panel {
+.teamhome-preseason-main .teamhome-preseason-panelA {
   width: 100%;
   min-height: min(520px, calc(72vh - 200px));
   place-content: start;
@@ -1641,21 +1678,90 @@ td .teamhome-roster-name--profile {
   box-sizing: border-box;
 }
 
-.teamhome-preseason-main .teamhome-playbook-select {
+.teamhome-preseason-main .teamhome-preseason-panelA.teamhome-scrimmage-panel {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-start;
+  align-items: center;
+  justify-content: center;
+  place-content: center;
+  text-align: center;
+  padding: 28px 32px;
+  gap: 14px;
+}
+
+.teamhome-preseason-main .teamhome-scrimmage-panel .teamhome-preseason-sub,
+.teamhome-preseason-main .teamhome-scrimmage-panel .teamhome-scrimmage-sub {
+  max-width: min(760px, 100%);
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+
+.teamhome-preseason-main .teamhome-scrimmage-panel .teamhome-scrimmage-opponent {
+  text-align: center;
+}
+
+.teamhome-preseason-main .teamhome-scrimmage-panel .teamhome-scrimmage-result {
+  width: 100%;
+  max-width: min(560px, 100%);
+  text-align: center;
+}
+
+.teamhome-preseason-main .teamhome-scrimmage-panel .teamhome-scrimmage-score {
+  text-align: center;
+}
+
+.teamhome-preseason-main .teamhome-scrimmage-panel .teamhome-scrimmage-stats {
+  text-align: center;
+}
+
+.teamhome-preseason-main .teamhome-scrimmage-panel .teamhome-scrimmage-team-stats {
+  text-align: center;
+}
+
+.teamhome-preseason-main .teamhome-scrimmage-panel .teamhome-scrimmage-options {
+  align-items: center;
+  text-align: center;
+  width: 100%;
+  max-width: min(560px, 100%);
+}
+
+.teamhome-preseason-main .teamhome-scrimmage-panel .teamhome-scrimmage-buttons {
+  justify-content: center;
+}
+
+.teamhome-preseason-main .teamhome-scrimmage-panel .teamhome-scrimmage-coming-soon {
+  text-align: center;
+}
+
+.teamhome-preseason-main .teamhome-scrimmage-panel .teamhome-preseason-stage {
+  text-align: center;
+}
+
+.teamhome-preseason-main .teamhome-playbook-select {
+  width: 100%;
+  min-height: min(520px, calc(72vh - 200px));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   padding: 28px 32px;
   gap: 22px;
 }
 
+.teamhome-preseason-main .teamhome-playbook-title {
+  text-align: center;
+}
+
 .teamhome-preseason-main .teamhome-playbook-lock {
-  margin: 0;
+  margin: 0 auto;
   max-width: min(760px, 100%);
   opacity: 0.92;
   line-height: 1.45;
   font-size: 0.92rem;
+  text-align: center;
 }
 
 .teamhome-preseason-main .teamhome-playbook-row {
@@ -1663,11 +1769,14 @@ td .teamhome-roster-name--profile {
   width: 100%;
   max-width: min(760px, 100%);
   gap: 24px 40px;
+  justify-content: center;
 }
 
 .teamhome-preseason-main .teamhome-playbook-field {
   flex: 1 1 240px;
   min-width: min(240px, 100%);
+  align-items: center;
+  text-align: center;
 }
 
 .teamhome-preseason-main .teamhome-playbook-select-input {
@@ -1678,7 +1787,7 @@ td .teamhome-roster-name--profile {
 
 .teamhome-preseason-main .teamhome-preseason-panelA--play-selection,
 .teamhome-preseason-main .teamhome-preseason-panelA--play-results,
-.teamhome-preseason-main .teamhome-goals-panel,
+.teamhome-preseason-main .teamhome-goals-panel.teamhome-themes-panel,
 .teamhome-preseason-main .teamhome-preseason-panelA--depth-chart,
 .teamhome-preseason-main .teamhome-position-changes,
 .teamhome-preseason-main .teamhome-preseason-panelA--themes {
@@ -1689,10 +1798,87 @@ td .teamhome-roster-name--profile {
   gap: 14px;
 }
 
-.teamhome-preseason-main .teamhome-preseason-panelA--compact,
-.teamhome-preseason-main .teamhome-goals-panel.teamhome-preseason-panelA--compact {
+.teamhome-preseason-main .teamhome-preseason-panelA--play-selection {
+  align-items: center;
+  text-align: center;
+}
+
+.teamhome-preseason-main .teamhome-preseason-panelA--play-selection .teamhome-preseason-playbook-chips {
+  justify-content: center;
+}
+
+.teamhome-preseason-main .teamhome-preseason-panelA--play-selection .teamhome-preseason-stage-copy {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.teamhome-preseason-main .teamhome-preseason-panelA--play-results {
+  align-items: center;
+  text-align: center;
+}
+
+.teamhome-preseason-main .teamhome-preseason-panelA--play-results .teamhome-preseason-stage-copy {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.teamhome-preseason-main .teamhome-preseason-panelA--play-results .teamhome-play-results {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.teamhome-preseason-main .teamhome-preseason-panelA--play-results .teamhome-play-results-columns {
+  text-align: center;
+}
+
+.teamhome-preseason-main .teamhome-preseason-panelA--play-results .teamhome-play-results-col {
+  align-items: center;
+  text-align: center;
+}
+
+.teamhome-preseason-main .teamhome-preseason-panelA--compact:not(.teamhome-goals-panel) {
   min-height: auto;
   place-content: start;
+}
+
+.teamhome-preseason-main .teamhome-goals-panel.teamhome-preseason-panelA--compact:not(.teamhome-themes-panel) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  place-content: center;
+  text-align: center;
+  min-height: min(520px, calc(72vh - 200px));
+  width: 100%;
+  padding: 28px 32px;
+  gap: 14px;
+}
+
+.teamhome-preseason-main .teamhome-goals-panel.teamhome-preseason-panelA--compact:not(.teamhome-themes-panel) .teamhome-preseason-stage-copy {
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+
+.teamhome-preseason-main .teamhome-goals-panel.teamhome-preseason-panelA--compact:not(.teamhome-themes-panel) .teamhome-goals-row {
+  max-width: min(640px, 100%);
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  justify-items: center;
+}
+
+.teamhome-preseason-main .teamhome-goals-panel.teamhome-preseason-panelA--compact:not(.teamhome-themes-panel) .teamhome-goals-col {
+  align-items: center;
+  text-align: center;
+}
+
+.teamhome-preseason-main .teamhome-goals-panel.teamhome-preseason-panelA--compact:not(.teamhome-themes-panel) .teamhome-goals-hint {
+  text-align: center;
+  max-width: min(640px, 100%);
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .teamhome-preseason-main .teamhome-preseason-panelA--themes {
@@ -1719,16 +1905,16 @@ td .teamhome-roster-name--profile {
   margin-top: 8px;
 }
 
-.teamhome-preseason-main .teamhome-goals-panel {
+.teamhome-preseason-main .teamhome-goals-panel.teamhome-themes-panel {
   align-items: flex-start;
 }
 
-.teamhome-preseason-main .teamhome-goals-row {
+.teamhome-preseason-main .teamhome-goals-panel.teamhome-themes-panel .teamhome-goals-row {
   max-width: min(640px, 100%);
   width: 100%;
 }
 
-.teamhome-preseason-main .teamhome-goals-col {
+.teamhome-preseason-main .teamhome-goals-panel.teamhome-themes-panel .teamhome-goals-col {
   align-items: flex-start;
 }
 
@@ -1754,10 +1940,6 @@ td .teamhome-roster-name--profile {
   text-align: left;
 }
 
-.teamhome-preseason-main .teamhome-scrimmage-panel {
-  padding: 28px 32px;
-}
-
 .teamhome-preseason-main .teamhome-position-changes-table-wrap {
   width: 100%;
   max-width: min(960px, 100%);
@@ -1770,9 +1952,32 @@ td .teamhome-roster-name--profile {
   width: 100%;
 }
 
+.teamhome-preseason-top--offseason-single .teamhome-preseason-panelA.teamhome-scrimmage-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  place-content: center;
+  text-align: center;
+  min-height: min(480px, 72vh);
+  width: 100%;
+}
+
+.teamhome-preseason-top--offseason-single .teamhome-goals-panel.teamhome-preseason-panelA--compact:not(.teamhome-themes-panel) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  place-content: center;
+  text-align: center;
+  min-height: min(480px, 72vh);
+  width: 100%;
+}
+
 .teamhome-preseason-top--offseason-single .teamhome-playbook-select {
-  align-items: flex-start;
-  justify-content: flex-start;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   min-height: min(480px, 72vh);
   width: 100%;
 }
@@ -2540,6 +2745,55 @@ td .teamhome-roster-name--profile {
   text-transform: uppercase;
 }
 
+.teamhome-schedule-gotw-star {
+  color: #f0c040;
+  font-weight: 900;
+  font-size: 0.95rem;
+  line-height: 1;
+  margin-right: 6px;
+  text-shadow: 0 0 10px rgba(240, 192, 64, 0.45);
+  cursor: help;
+}
+
+.teamhome-schedule-gotw-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(240, 192, 64, 0.35);
+  background: rgba(240, 192, 64, 0.08);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 236, 180, 0.95);
+}
+
+.teamhome-schedule-gotw-chip .teamhome-schedule-gotw-star {
+  margin-right: 4px;
+  font-size: 0.85rem;
+}
+
+.teamhome-schedule-row--gotw {
+  background: linear-gradient(90deg, rgba(240, 192, 64, 0.1) 0%, rgba(240, 192, 64, 0.02) 42%, transparent 100%);
+  border-left: 3px solid rgba(240, 192, 64, 0.55);
+  padding-left: 9px;
+}
+
+.teamhome-schedule-gotw-legend {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0.85;
+}
+
+.teamhome-schedule-gotw-legend .teamhome-schedule-gotw-star {
+  margin-right: 2px;
+}
+
 .teamhome-schedule-head {
   margin-top: 8px;
 }
@@ -2558,7 +2812,7 @@ td .teamhome-roster-name--profile {
   grid-template-columns: minmax(100px, 1.1fr) minmax(100px, 1.1fr) minmax(150px, 1fr) minmax(108px, 0.85fr);
 }
 
-/* State → Team schedule: week | H/A | opp | score | W/L | box | log */
+/* State → Team schedule: week | H/A | opp | score | W/L | preview | box | log */
 .teamhome-schedule-row--team {
   grid-template-columns:
     minmax(44px, 0.55fr)
@@ -2566,6 +2820,7 @@ td .teamhome-roster-name--profile {
     minmax(140px, 1.25fr)
     minmax(88px, 0.75fr)
     minmax(40px, 0.45fr)
+    minmax(72px, auto)
     minmax(96px, auto)
     minmax(96px, auto);
 }
@@ -2631,6 +2886,29 @@ td .teamhome-roster-name--profile {
 .teamhome-schedule-link:hover:not(:disabled) {
   background: rgba(59, 130, 246, 0.22);
   border-color: rgba(96, 165, 250, 0.7);
+}
+
+.teamhome-schedule-preview {
+  border: 0.5px solid rgba(90, 106, 138, 0.45);
+  border-radius: 99px;
+  background: rgba(11, 16, 24, 0.85);
+  color: #8a9ab8;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.teamhome-schedule-preview:hover:not(:disabled) {
+  color: #dde0f0;
+  border-color: rgba(120, 140, 170, 0.65);
+}
+
+.teamhome-schedule-preview:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .teamhome-schedule-link:disabled {
@@ -3333,6 +3611,33 @@ td .teamhome-roster-name--profile {
 }
 .teamhome-season-summary-row:last-child {
   border-bottom: none;
+}
+
+.teamhome-season-end-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.season-summary-schedule-note {
+  margin: 0.35rem 0 1rem;
+  padding: 0.65rem 1rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.72);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.season-summary-schedule-note-mark {
+  margin-right: 0.35rem;
+  color: #f5c842;
+  font-weight: 700;
+}
+
+.teamhome-schedplan-fallback {
+  margin-top: 1rem;
 }
 .teamhome-league-history-hint {
   opacity: 0.82;

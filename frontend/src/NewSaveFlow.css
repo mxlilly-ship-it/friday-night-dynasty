@@ -49,6 +49,26 @@
   line-height: 1.45;
 }
 
+.newsave-footnote-mark {
+  color: #9aa3b0;
+  font-weight: 600;
+}
+
+.newsave-h3 .newsave-footnote-mark {
+  margin-left: 0.2em;
+}
+
+.newsave-footnote-mark--lead {
+  margin-right: 0.25em;
+}
+
+.newsave-footnote {
+  margin: 0.65rem 0 0;
+  font-size: 0.78rem;
+  color: #7a808a;
+  line-height: 1.45;
+}
+
 .newsave-input {
   width: 100%;
   box-sizing: border-box;

@@ -1,222 +1,222 @@
 {
-  "_schema": "name, nickname, prestige (1-15), classification (1A-6A), region, culture_grade (1-10), booster_support (1-10), community (rural|urban|suburban|affluent|blue-collar|football factory), enrollment, facilities_grade; optional abbreviation, stadium_name (omit when unknown - UI shows blank)",
+  "_schema": "name, nickname, prestige (1-15), classification (1A-6A), region, culture_grade (1-10), booster_support (1-10), community (rural|urban|suburban|affluent|blue-collar|football factory), enrollment, facilities_grade; optional abbreviation, stadium_name (omit when unknown - UI shows blank), rivals (array of exact team names - shown on Team Info; omit to auto-list same class/region peers)",
   "_playoff_system_schema": "Top-level 'playoff_system' selects the postseason structure. Registered ids live in systems/playoff_systems.py (PLAYOFF_SYSTEMS). Currently supported: 'wv' (one 8-team bracket per classification, 1v8/2v7/3v6/4v5, QF -> SF -> Championship). Add new ids here when adding new state systems.",
   "playoff_system": "wv",
   "teams": [
-    {"name": "Martinsburg", "nickname": "Bulldogs", "abbreviation": "MAR", "prestige": 15, "classification": "4A", "region": "North", "culture_grade": 10, "booster_support": 10, "community": "football factory", "enrollment": 1400, "facilities_grade": 10, "stadium_name": "Cobourn Field at David M. Walker Stadium · Martinsburg, WV"},
+    {"name": "Martinsburg", "nickname": "Bulldogs", "abbreviation": "MAR", "prestige": 15, "classification": "4A", "region": "North", "culture_grade": 10, "booster_support": 10, "community": "football factory", "enrollment": 1400, "facilities_grade": 10, "stadium_name": "Cobourn Field at Dave Walker Stadium"},
 
-    {"name": "Morgantown", "nickname": "Mohigans", "abbreviation": "MOR", "prestige": 12, "classification": "4A", "region": "North", "culture_grade": 9, "booster_support": 10, "community": "affluent", "enrollment": 1400, "facilities_grade": 10, "stadium_name": "Pony Lewis Field · Morgantown, WV"},
+    {"name": "Morgantown", "nickname": "Mohigans", "abbreviation": "MOR", "prestige": 12, "classification": "4A", "region": "North", "culture_grade": 9, "booster_support": 10, "community": "affluent", "enrollment": 1400, "facilities_grade": 10, "stadium_name": "Pony Lewis Field"},
 
-    {"name": "Huntington", "nickname": "Highlanders", "abbreviation": "HUN", "prestige": 14, "classification": "4A", "region": "South", "culture_grade": 10, "booster_support": 10, "community": "football factory", "enrollment": 1400, "facilities_grade": 10, "stadium_name": "Mitch Vingle Field · Huntington, WV"},
+    {"name": "Huntington", "nickname": "Highlanders", "abbreviation": "HUN", "prestige": 14, "classification": "4A", "region": "South", "culture_grade": 10, "booster_support": 10, "community": "football factory", "enrollment": 1400, "facilities_grade": 10, "stadium_name": "Bob Sang Stadium"},
 
-    {"name": "Jefferson", "nickname": "Cougars", "abbreviation": "JEF", "prestige": 11, "classification": "4A", "region": "North", "culture_grade": 6, "booster_support": 4, "community": "suburban", "enrollment": 1400, "facilities_grade": 6, "stadium_name": "James C. Price Stadium · Charles Town, WV"},
+    {"name": "Jefferson", "nickname": "Cougars", "abbreviation": "JEF", "prestige": 11, "classification": "4A", "region": "North", "culture_grade": 6, "booster_support": 4, "community": "suburban", "enrollment": 1400, "facilities_grade": 6, "stadium_name": "Jefferson Memorial Stadium"},
 
-    {"name": "George Washington", "nickname": "Patriots", "abbreviation": "GW", "prestige": 11, "classification": "4A", "region": "South", "culture_grade": 7, "booster_support": 10, "community": "affluent", "enrollment": 1000, "facilities_grade": 6, "stadium_name": "Tomlinson Stadium · Charleston, WV"},
+    {"name": "George Washington", "nickname": "Patriots", "abbreviation": "GW", "prestige": 11, "classification": "4A", "region": "South", "culture_grade": 7, "booster_support": 10, "community": "affluent", "enrollment": 1000, "facilities_grade": 6, "stadium_name": "Steve Edwards Sr. Field"},
 
-    {"name": "Wheeling Park", "nickname": "Patriots", "abbreviation": "WP", "prestige": 11, "classification": "4A", "region": "North", "culture_grade": 7, "booster_support": 7, "community": "urban", "enrollment": 1100, "facilities_grade": 7, "stadium_name": "Wheeling Park Stadium · Wheeling, WV"},
+    {"name": "Wheeling Park", "nickname": "Patriots", "abbreviation": "WP", "prestige": 11, "classification": "4A", "region": "North", "culture_grade": 7, "booster_support": 7, "community": "urban", "enrollment": 1100, "facilities_grade": 7, "stadium_name": "Wheeling Island Stadium"},
 
-    {"name": "University", "nickname": "Hawks", "abbreviation": "UNI", "prestige": 12, "classification": "4A", "region": "North", "culture_grade": 7, "booster_support": 7, "community": "affluent", "enrollment": 1100, "facilities_grade": 10, "stadium_name": "University High School Stadium · Morgantown, WV"},
+    {"name": "University", "nickname": "Hawks", "abbreviation": "UNI", "prestige": 12, "classification": "4A", "region": "North", "culture_grade": 7, "booster_support": 7, "community": "affluent", "enrollment": 1100, "facilities_grade": 10, "stadium_name": "Mylan Pharmaceuticals Complex"},
 
-    {"name": "Spring Mills", "nickname": "Cardinals", "abbreviation": "SM", "prestige": 11, "classification": "4A", "region": "North", "culture_grade": 8, "booster_support": 7, "community": "urban", "enrollment": 1400, "facilities_grade": 10, "stadium_name": "Cardinal Stadium · Falling Waters, WV"},
+    {"name": "Spring Mills", "nickname": "Cardinals", "abbreviation": "SM", "prestige": 11, "classification": "4A", "region": "North", "culture_grade": 8, "booster_support": 7, "community": "urban", "enrollment": 1400, "facilities_grade": 10, "stadium_name": "Cardinal Field"},
 
-    {"name": "Musselman", "nickname": "Appleman", "abbreviation": "MUS", "prestige": 9, "classification": "4A", "region": "North", "culture_grade": 6, "booster_support": 5, "community": "blue-collar", "enrollment": 1400, "facilities_grade": 6, "stadium_name": "Appleman Field · Inwood, WV"},
+    {"name": "Musselman", "nickname": "Appleman", "abbreviation": "MUS", "prestige": 9, "classification": "4A", "region": "North", "culture_grade": 6, "booster_support": 5, "community": "blue-collar", "enrollment": 1400, "facilities_grade": 6, "stadium_name": "Waldeck Field"},
 
-    {"name": "Parkersburg", "nickname": "Big Reds", "abbreviation": "PAR", "prestige": 8, "classification": "4A", "region": "South", "culture_grade": 6, "booster_support": 5, "community": "suburban", "enrollment": 1200, "facilities_grade": 7, "stadium_name": "Stadium Field · Parkersburg, WV"},
+    {"name": "Parkersburg", "nickname": "Big Reds", "abbreviation": "PAR", "prestige": 8, "classification": "4A", "region": "South", "culture_grade": 6, "booster_support": 5, "community": "suburban", "enrollment": 1200, "facilities_grade": 7, "stadium_name": "Stadium Field"},
 
-    {"name": "Beckley", "nickname": "Flying Eagles", "abbreviation": "BEC", "prestige": 6, "classification": "4A", "region": "South", "culture_grade": 3, "booster_support": 6, "community": "urban", "enrollment": 1300, "facilities_grade": 8, "stadium_name": "Pete Culicerto Field at Van Meter Stadium · Beckley, WV"},
+    {"name": "Beckley", "nickname": "Flying Eagles", "abbreviation": "BEC", "prestige": 6, "classification": "4A", "region": "South", "culture_grade": 3, "booster_support": 6, "community": "urban", "enrollment": 1300, "facilities_grade": 8, "stadium_name": "Van Meter Field"},
 
-    {"name": "Oak Hill", "nickname": "Red Devils", "abbreviation": "OH", "prestige": 6, "classification": "4A", "region": "South", "culture_grade": 3, "booster_support": 6, "community": "urban", "enrollment": 1100, "facilities_grade": 4},
+    {"name": "Oak Hill", "nickname": "Red Devils", "abbreviation": "OH", "prestige": 6, "classification": "4A", "region": "South", "culture_grade": 3, "booster_support": 6, "community": "urban", "enrollment": 1100, "facilities_grade": 4, "stadium_name": "John P. Duda Stadium"},
 
-    {"name": "Washington", "nickname": "Patriots", "abbreviation": "WAS", "prestige": 4, "classification": "4A", "region": "North", "culture_grade": 1, "booster_support": 4, "community": "suburban", "enrollment": 1100, "facilities_grade": 4},
+    {"name": "Washington", "nickname": "Patriots", "abbreviation": "WAS", "prestige": 4, "classification": "4A", "region": "North", "culture_grade": 1, "booster_support": 4, "community": "suburban", "enrollment": 1100, "facilities_grade": 4, "stadium_name": "Terry Marcus Stadium"},
 
-    {"name": "Parkersburg South", "nickname": "Patriots", "abbreviation": "PSOU", "prestige": 8, "classification": "4A", "region": "South", "culture_grade": 6, "booster_support": 5, "community": "suburban", "enrollment": 1100, "facilities_grade": 8, "stadium_name": "Erickson All-Sports Stadium · Parkersburg, WV"},
+    {"name": "Parkersburg South", "nickname": "Patriots", "abbreviation": "PSOU", "prestige": 8, "classification": "4A", "region": "South", "culture_grade": 6, "booster_support": 5, "community": "suburban", "enrollment": 1100, "facilities_grade": 8, "stadium_name": "Erickson Complex"},
 
-    {"name": "Hedgesville", "nickname": "Eagles", "abbreviation": "HED", "prestige": 4, "classification": "4A", "region": "North", "culture_grade": 1, "booster_support": 2, "community": "rural", "enrollment": 1400, "facilities_grade": 4},
+    {"name": "Hedgesville", "nickname": "Eagles", "abbreviation": "HED", "prestige": 4, "classification": "4A", "region": "North", "culture_grade": 1, "booster_support": 2, "community": "rural", "enrollment": 1400, "facilities_grade": 4, "stadium_name": "Mumaw Stadium"},
 
-    {"name": "Buckhannon-Upshur", "nickname": "Buccs", "abbreviation": "BU", "prestige": 4, "classification": "4A", "region": "South", "culture_grade": 1, "booster_support": 2, "community": "rural", "enrollment": 1000, "facilities_grade": 2},
+    {"name": "Buckhannon-Upshur", "nickname": "Buccs", "abbreviation": "BU", "prestige": 4, "classification": "4A", "region": "South", "culture_grade": 1, "booster_support": 2, "community": "rural", "enrollment": 1000, "facilities_grade": 2, "stadium_name": "Red Crites Memorial Stadium"},
 
-    {"name": "Riverside", "nickname": "Warriors", "abbreviation": "RIV", "prestige": 4, "classification": "4A", "region": "South", "culture_grade": 1, "booster_support": 2, "community": "rural", "enrollment": 1000, "facilities_grade": 2},
+    {"name": "Riverside", "nickname": "Warriors", "abbreviation": "RIV", "prestige": 4, "classification": "4A", "region": "South", "culture_grade": 1, "booster_support": 2, "community": "rural", "enrollment": 1000, "facilities_grade": 2, "stadium_name": "Warrior Stadium"},
 
-    {"name": "Preston", "nickname": "Knights", "abbreviation": "PRE", "prestige": 4, "classification": "4A", "region": "North", "culture_grade": 1, "booster_support": 2, "community": "rural", "enrollment": 1000, "facilities_grade": 2, "stadium_name": "T.R. Whiteman Memorial Stadium · Kingwood, WV"},
+    {"name": "Preston", "nickname": "Knights", "abbreviation": "PRE", "prestige": 4, "classification": "4A", "region": "North", "culture_grade": 1, "booster_support": 2, "community": "rural", "enrollment": 1000, "facilities_grade": 2, "stadium_name": "Knights Stadium"},
 
-    {"name": "Cabell Midland", "nickname": "Knights", "abbreviation": "CM", "prestige": 12, "classification": "4A", "region": "South", "culture_grade": 8, "booster_support": 10, "community": "football factory", "enrollment": 1400, "facilities_grade": 10, "stadium_name": "Tom Harmon Field · Ona, WV"},
+    {"name": "Cabell Midland", "nickname": "Knights", "abbreviation": "CM", "prestige": 12, "classification": "4A", "region": "South", "culture_grade": 8, "booster_support": 10, "community": "football factory", "enrollment": 1400, "facilities_grade": 10, "stadium_name": "Knights Stadium"},
 
-    {"name": "Hurricane", "nickname": "Redskins", "abbreviation": "HUR", "prestige": 9, "classification": "4A", "region": "South", "culture_grade": 6, "booster_support": 8, "community": "affluent", "enrollment": 1000, "facilities_grade": 6, "stadium_name": "Hoops Family Fields · Hurricane, WV"},
+    {"name": "Hurricane", "nickname": "Redskins", "abbreviation": "HUR", "prestige": 9, "classification": "4A", "region": "South", "culture_grade": 6, "booster_support": 8, "community": "affluent", "enrollment": 1000, "facilities_grade": 6, "stadium_name": "Redskins Stadium"},
 
-    {"name": "John Marshall", "nickname": "Monarchs", "abbreviation": "JM", "prestige": 4, "classification": "3A", "region": "North", "culture_grade": 2, "booster_support": 2, "community": "rural", "enrollment": 800, "facilities_grade": 4, "stadium_name": "Monarch Stadium · Glen Dale, WV"},
+    {"name": "John Marshall", "nickname": "Monarchs", "abbreviation": "JM", "prestige": 4, "classification": "3A", "region": "North", "culture_grade": 2, "booster_support": 2, "community": "rural", "enrollment": 800, "facilities_grade": 4, "stadium_name": "Monarch Stadium"},
 
-    {"name": "Capital", "nickname": "Cougars", "abbreviation": "CAP", "prestige": 6, "classification": "3A", "region": "South", "culture_grade": 3, "booster_support": 2, "community": "football factory", "enrollment": 800, "facilities_grade": 3, "stadium_name": "Capital High School Stadium · Charleston, WV"},
+    {"name": "Capital", "nickname": "Cougars", "abbreviation": "CAP", "prestige": 6, "classification": "3A", "region": "South", "culture_grade": 3, "booster_support": 2, "community": "football factory", "enrollment": 800, "facilities_grade": 3, "stadium_name": "Laidley Field"},
 
-    {"name": "Greenbrier East", "nickname": "Spartans", "abbreviation": "GE", "prestige": 5, "classification": "3A", "region": "South", "culture_grade": 3, "booster_support": 5, "community": "rural", "enrollment": 800, "facilities_grade": 6, "stadium_name": "Spartan Stadium · Lewisburg, WV"},
+    {"name": "Greenbrier East", "nickname": "Spartans", "abbreviation": "GE", "prestige": 5, "classification": "3A", "region": "South", "culture_grade": 3, "booster_support": 5, "community": "rural", "enrollment": 800, "facilities_grade": 6, "stadium_name": "Spartan Stadium"},
 
-    {"name": "Spring Valley", "nickname": "Timberwolves", "abbreviation": "SV", "prestige": 9, "classification": "3A", "region": "South", "culture_grade": 7, "booster_support": 6, "community": "blue-collar", "enrollment": 800, "facilities_grade": 6, "stadium_name": "Timberwolf Stadium · Huntington, WV"},
+    {"name": "Spring Valley", "nickname": "Timberwolves", "abbreviation": "SV", "prestige": 9, "classification": "3A", "region": "South", "culture_grade": 7, "booster_support": 6, "community": "blue-collar", "enrollment": 800, "facilities_grade": 6, "stadium_name": "The Wolves Den"},
 
-    {"name": "Princeton", "nickname": "Tigers", "abbreviation": "PRI", "prestige": 10, "classification": "3A", "region": "South", "culture_grade": 6, "booster_support": 9, "community": "affluent", "enrollment": 800, "facilities_grade": 9},
+    {"name": "Princeton", "nickname": "Tigers", "abbreviation": "PRI", "prestige": 10, "classification": "3A", "region": "South", "culture_grade": 6, "booster_support": 9, "community": "affluent", "enrollment": 800, "facilities_grade": 9, "stadium_name": "Hunnicutt Stadium"},
 
-    {"name": "Brooke", "nickname": "Bruins", "abbreviation": "BRO", "prestige": 6, "classification": "3A", "region": "North", "culture_grade": 4, "booster_support": 9, "community": "blue-collar", "enrollment": 750, "facilities_grade": 9},
+    {"name": "Brooke", "nickname": "Bruins", "abbreviation": "BRO", "prestige": 6, "classification": "3A", "region": "North", "culture_grade": 4, "booster_support": 9, "community": "blue-collar", "enrollment": 750, "facilities_grade": 9, "stadium_name": "Brooke Memorial Stadium"},
 
-    {"name": "South Charleston", "nickname": "Black Eagles", "abbreviation": "SC", "prestige": 6, "classification": "3A", "region": "South", "culture_grade": 5, "booster_support": 7, "community": "urban", "enrollment": 750, "facilities_grade": 3, "stadium_name": "Black Eagle Stadium · South Charleston, WV"},
+    {"name": "South Charleston", "nickname": "Black Eagles", "abbreviation": "SC", "prestige": 6, "classification": "3A", "region": "South", "culture_grade": 5, "booster_support": 7, "community": "urban", "enrollment": 750, "facilities_grade": 3, "stadium_name": "Eagle Stadium"},
 
-    {"name": "St. Albans", "nickname": "Red Dragons", "abbreviation": "STA", "prestige": 3, "classification": "3A", "region": "South", "culture_grade": 2, "booster_support": 1, "community": "urban", "enrollment": 750, "facilities_grade": 1, "stadium_name": "Dick Reynolds Field · St. Albans, WV"},
+    {"name": "St. Albans", "nickname": "Red Dragons", "abbreviation": "STA", "prestige": 3, "classification": "3A", "region": "South", "culture_grade": 2, "booster_support": 1, "community": "urban", "enrollment": 750, "facilities_grade": 1, "stadium_name": "Crawford Field"},
 
-    {"name": "Lincoln County", "nickname": "Panthers", "abbreviation": "LINC", "prestige": 2, "classification": "3A", "region": "South", "culture_grade": 2, "booster_support": 1, "community": "rural", "enrollment": 700, "facilities_grade": 1},
+    {"name": "Lincoln County", "nickname": "Panthers", "abbreviation": "LINC", "prestige": 2, "classification": "3A", "region": "South", "culture_grade": 2, "booster_support": 1, "community": "rural", "enrollment": 700, "facilities_grade": 1, "stadium_name": "Lincoln County Stadium"},
 
-    {"name": "Hampshire", "nickname": "Trojans", "abbreviation": "HAM", "prestige": 4, "classification": "3A", "region": "North", "culture_grade": 2, "booster_support": 2, "community": "rural", "enrollment": 700, "facilities_grade": 4},
+    {"name": "Hampshire", "nickname": "Trojans", "abbreviation": "HAM", "prestige": 4, "classification": "3A", "region": "North", "culture_grade": 2, "booster_support": 2, "community": "rural", "enrollment": 700, "facilities_grade": 4, "stadium_name": "Rannells Field"},
 
-    {"name": "Bridgeport", "nickname": "Indians", "abbreviation": "BRI", "prestige": 12, "classification": "3A", "region": "North", "culture_grade": 10, "booster_support": 10, "community": "football factory", "enrollment": 700, "facilities_grade": 10, "stadium_name": "Wayne Jamison Field · Bridgeport, WV"},
+    {"name": "Bridgeport", "nickname": "Indians", "abbreviation": "BRI", "prestige": 12, "classification": "3A", "region": "North", "culture_grade": 10, "booster_support": 10, "community": "football factory", "enrollment": 700, "facilities_grade": 10, "stadium_name": "Wayne Jamison Field"},
 
-    {"name": "Nitro", "nickname": "Wildcats", "abbreviation": "NIT", "prestige": 6, "classification": "3A", "region": "South", "culture_grade": 3, "booster_support": 3, "community": "blue-collar", "enrollment": 700, "facilities_grade": 4, "stadium_name": "Larry Friend Field · Nitro, WV"},
+    {"name": "Nitro", "nickname": "Wildcats", "abbreviation": "NIT", "prestige": 6, "classification": "3A", "region": "South", "culture_grade": 3, "booster_support": 3, "community": "blue-collar", "enrollment": 700, "facilities_grade": 4, "stadium_name": "Underwood Field"},
 
-    {"name": "Winfield", "nickname": "Generals", "abbreviation": "WIN", "prestige": 8, "classification": "3A", "region": "South", "culture_grade": 7, "booster_support": 6, "community": "blue-collar", "enrollment": 700, "facilities_grade": 6, "stadium_name": "Wayne P. Holder Stadium · Winfield, WV"},
+    {"name": "Winfield", "nickname": "Generals", "abbreviation": "WIN", "prestige": 8, "classification": "3A", "region": "South", "culture_grade": 7, "booster_support": 6, "community": "blue-collar", "enrollment": 700, "facilities_grade": 6, "stadium_name": "Generals Stadium"},
 
-    {"name": "Shady Spring", "nickname": "Tigers", "abbreviation": "SS", "prestige": 4, "classification": "3A", "region": "South", "culture_grade": 1, "booster_support": 3, "community": "affluent", "enrollment": 700, "facilities_grade": 3},
+    {"name": "Shady Spring", "nickname": "Tigers", "abbreviation": "SS", "prestige": 4, "classification": "3A", "region": "South", "culture_grade": 1, "booster_support": 3, "community": "affluent", "enrollment": 700, "facilities_grade": 3, "stadium_name": "Thomas Field"},
 
-    {"name": "Ripley", "nickname": "Vikings", "abbreviation": "RIP", "prestige": 4, "classification": "3A", "region": "North", "culture_grade": 2, "booster_support": 2, "community": "rural", "enrollment": 700, "facilities_grade": 3},
+    {"name": "Ripley", "nickname": "Vikings", "abbreviation": "RIP", "prestige": 4, "classification": "3A", "region": "North", "culture_grade": 2, "booster_support": 2, "community": "rural", "enrollment": 700, "facilities_grade": 3, "stadium_name": "Memorial Stadium"},
 
-    {"name": "Herbert Hoover", "nickname": "Huskies", "abbreviation": "HH", "prestige": 11, "classification": "3A", "region": "South", "culture_grade": 9, "booster_support": 10, "community": "affluent", "enrollment": 700, "facilities_grade": 10, "stadium_name": "Husky Stadium · Elkview, WV"},
+    {"name": "Herbert Hoover", "nickname": "Huskies", "abbreviation": "HH", "prestige": 11, "classification": "3A", "region": "South", "culture_grade": 9, "booster_support": 10, "community": "affluent", "enrollment": 700, "facilities_grade": 10, "stadium_name": "Husky Stadium"},
 
-    {"name": "Fairmont Senior", "nickname": "Polar Bears", "abbreviation": "FS", "prestige": 11, "classification": "3A", "region": "North", "culture_grade": 9, "booster_support": 10, "community": "football factory", "enrollment": 700, "facilities_grade": 9, "stadium_name": "East-West Stadium · Fairmont, WV"},
+    {"name": "Fairmont Senior", "nickname": "Polar Bears", "abbreviation": "FS", "prestige": 11, "classification": "3A", "region": "North", "culture_grade": 9, "booster_support": 10, "community": "football factory", "enrollment": 700, "facilities_grade": 9, "stadium_name": "East-West Stadium"},
 
-    {"name": "Elkins", "nickname": "Tigers", "abbreviation": "ELK", "prestige": 4, "classification": "3A", "region": "North", "culture_grade": 5, "booster_support": 4, "community": "rural", "enrollment": 700, "facilities_grade": 4},
+    {"name": "Elkins", "nickname": "Tigers", "abbreviation": "ELK", "prestige": 4, "classification": "3A", "region": "North", "culture_grade": 5, "booster_support": 4, "community": "rural", "enrollment": 700, "facilities_grade": 4, "stadium_name": "Wilmer Field"},
 
-    {"name": "Lewis County", "nickname": "Minutemen", "abbreviation": "LWC", "prestige": 4, "classification": "3A", "region": "North", "culture_grade": 3, "booster_support": 2, "community": "rural", "enrollment": 650, "facilities_grade": 2},
+    {"name": "Lewis County", "nickname": "Minutemen", "abbreviation": "LWC", "prestige": 4, "classification": "3A", "region": "North", "culture_grade": 3, "booster_support": 2, "community": "rural", "enrollment": 650, "facilities_grade": 2, "stadium_name": "Lewis County Athletic Field"},
 
-    {"name": "North Marion", "nickname": "Huskies", "abbreviation": "NM", "prestige": 8, "classification": "3A", "region": "North", "culture_grade": 7, "booster_support": 6, "community": "blue-collar", "enrollment": 650, "facilities_grade": 7, "stadium_name": "Husky Field · Farmington, WV"},
+    {"name": "North Marion", "nickname": "Huskies", "abbreviation": "NM", "prestige": 8, "classification": "3A", "region": "North", "culture_grade": 7, "booster_support": 6, "community": "blue-collar", "enrollment": 650, "facilities_grade": 7, "stadium_name": "Roy Michael Field"},
 
-    {"name": "East Fairmont", "nickname": "Bees", "abbreviation": "EAF", "prestige": 4, "classification": "3A", "region": "North", "culture_grade": 2, "booster_support": 4, "community": "rural", "enrollment": 650, "facilities_grade": 6, "stadium_name": "East-West Stadium · Fairmont, WV"},
+    {"name": "East Fairmont", "nickname": "Bees", "abbreviation": "EAF", "prestige": 4, "classification": "3A", "region": "North", "culture_grade": 2, "booster_support": 4, "community": "rural", "enrollment": 650, "facilities_grade": 6, "stadium_name": "East-West Stadium"},
 
-    {"name": "Nicholas County", "nickname": "Grizzlies", "abbreviation": "NC", "prestige": 5, "classification": "3A", "region": "South", "culture_grade": 3, "booster_support": 4, "community": "blue-collar", "enrollment": 650, "facilities_grade": 5},
+    {"name": "Nicholas County", "nickname": "Grizzlies", "abbreviation": "NC", "prestige": 5, "classification": "3A", "region": "South", "culture_grade": 3, "booster_support": 4, "community": "blue-collar", "enrollment": 650, "facilities_grade": 5, "stadium_name": "Memorial Stadium"},
 
-    {"name": "Robert C. Byrd", "nickname": "Flying Eagles", "abbreviation": "RCB", "prestige": 4, "classification": "3A", "region": "North", "culture_grade": 3, "booster_support": 3, "community": "urban", "enrollment": 650, "facilities_grade": 5},
+    {"name": "Robert C. Byrd", "nickname": "Flying Eagles", "abbreviation": "RCB", "prestige": 4, "classification": "3A", "region": "North", "culture_grade": 3, "booster_support": 3, "community": "urban", "enrollment": 650, "facilities_grade": 5, "stadium_name": "Robert C Byrd Stadium"},
 
-    {"name": "Point Pleasant", "nickname": "Big Blacks", "abbreviation": "PP", "prestige": 4, "classification": "3A", "region": "North", "culture_grade": 3, "booster_support": 3, "community": "rural", "enrollment": 650, "facilities_grade": 4},
+    {"name": "Point Pleasant", "nickname": "Big Blacks", "abbreviation": "PP", "prestige": 4, "classification": "3A", "region": "North", "culture_grade": 3, "booster_support": 3, "community": "rural", "enrollment": 650, "facilities_grade": 4, "stadium_name": "Sanders Memorial Stadium"},
 
-    {"name": "Grafton", "nickname": "Bearcats", "abbreviation": "GRA", "prestige": 3, "classification": "2A", "region": "North", "culture_grade": 2, "booster_support": 2, "community": "rural", "enrollment": 650, "facilities_grade": 4},
+    {"name": "Grafton", "nickname": "Bearcats", "abbreviation": "GRA", "prestige": 3, "classification": "2A", "region": "North", "culture_grade": 2, "booster_support": 2, "community": "rural", "enrollment": 650, "facilities_grade": 4, "stadium_name": "McKinney Field"},
 
-    {"name": "Keyser", "nickname": "Tornado", "abbreviation": "KEY", "prestige": 4, "classification": "2A", "region": "East", "culture_grade": 3, "booster_support": 3, "community": "rural", "enrollment": 600, "facilities_grade": 3, "stadium_name": "Alumni Field · Keyser, WV"},
+    {"name": "Keyser", "nickname": "Tornado", "abbreviation": "KEY", "prestige": 4, "classification": "2A", "region": "East", "culture_grade": 3, "booster_support": 3, "community": "rural", "enrollment": 600, "facilities_grade": 3, "stadium_name": "Stayman Field"},
 
-    {"name": "Berkeley Springs", "nickname": "Indians", "abbreviation": "BS", "prestige": 1, "classification": "2A", "region": "East", "culture_grade": 2, "booster_support": 1, "community": "suburban", "enrollment": 580, "facilities_grade": 1},
+    {"name": "Berkeley Springs", "nickname": "Indians", "abbreviation": "BS", "prestige": 1, "classification": "2A", "region": "East", "culture_grade": 2, "booster_support": 1, "community": "suburban", "enrollment": 580, "facilities_grade": 1, "stadium_name": "Morgan Field"},
 
-    {"name": "Frankfort", "nickname": "Falcons", "abbreviation": "FRA", "prestige": 8, "classification": "2A", "region": "East", "culture_grade": 9, "booster_support": 8, "community": "blue-collar", "enrollment": 500, "facilities_grade": 8, "stadium_name": "Falcon Stadium · Ridgeley, WV"},
+    {"name": "Frankfort", "nickname": "Falcons", "abbreviation": "FRA", "prestige": 8, "classification": "2A", "region": "East", "culture_grade": 9, "booster_support": 8, "community": "blue-collar", "enrollment": 500, "facilities_grade": 8, "stadium_name": "Frankfort Stadium"},
 
-    {"name": "Braxton County", "nickname": "Eagles", "abbreviation": "BC", "prestige": 1, "classification": "2A", "region": "East", "culture_grade": 1, "booster_support": 2, "community": "rural", "enrollment": 500, "facilities_grade": 2},
+    {"name": "Braxton County", "nickname": "Eagles", "abbreviation": "BC", "prestige": 1, "classification": "2A", "region": "East", "culture_grade": 1, "booster_support": 2, "community": "rural", "enrollment": 500, "facilities_grade": 2, "stadium_name": "Braxton County Stadium"},
 
-    {"name": "Moorefield", "nickname": "Eagles", "abbreviation": "MRF", "prestige": 3, "classification": "2A", "region": "East", "culture_grade": 1, "booster_support": 2, "community": "suburban", "enrollment": 475, "facilities_grade": 2},
+    {"name": "Moorefield", "nickname": "Eagles", "abbreviation": "MRF", "prestige": 3, "classification": "2A", "region": "East", "culture_grade": 1, "booster_support": 2, "community": "suburban", "enrollment": 475, "facilities_grade": 2, "stadium_name": "Yellowjacket Field"},
 
-    {"name": "Petersburg", "nickname": "Vikings", "abbreviation": "PET", "prestige": 4, "classification": "2A", "region": "East", "culture_grade": 2, "booster_support": 3, "community": "rural", "enrollment": 425, "facilities_grade": 3},
+    {"name": "Petersburg", "nickname": "Vikings", "abbreviation": "PET", "prestige": 4, "classification": "2A", "region": "East", "culture_grade": 2, "booster_support": 3, "community": "rural", "enrollment": 425, "facilities_grade": 3, "stadium_name": "Viking Memorial Stadium"},
 
-    {"name": "Midland Trail", "nickname": "Patriots", "abbreviation": "MT", "prestige": 4, "classification": "2A", "region": "East", "culture_grade": 6, "booster_support": 4, "community": "rural", "enrollment": 425, "facilities_grade": 3},
+    {"name": "Midland Trail", "nickname": "Patriots", "abbreviation": "MT", "prestige": 4, "classification": "2A", "region": "East", "culture_grade": 6, "booster_support": 4, "community": "rural", "enrollment": 425, "facilities_grade": 3, "stadium_name": "Patriot Stadium"},
 
-    {"name": "Weir", "nickname": "Red Riders", "abbreviation": "WEIR", "prestige": 5, "classification": "2A", "region": "North", "culture_grade": 3, "booster_support": 4, "community": "urban", "enrollment": 580, "facilities_grade": 5, "stadium_name": "Red Rider Stadium · Weirton, WV"},
+    {"name": "Weir", "nickname": "Red Riders", "abbreviation": "WEIR", "prestige": 5, "classification": "2A", "region": "North", "culture_grade": 3, "booster_support": 4, "community": "urban", "enrollment": 580, "facilities_grade": 5, "stadium_name": "Jimmy Carey Stadium"},
 
-    {"name": "Sissonville", "nickname": "Indians", "abbreviation": "SIS", "prestige": 3, "classification": "2A", "region": "North", "culture_grade": 3, "booster_support": 3, "community": "rural", "enrollment": 580, "facilities_grade": 3},
+    {"name": "Sissonville", "nickname": "Indians", "abbreviation": "SIS", "prestige": 3, "classification": "2A", "region": "North", "culture_grade": 3, "booster_support": 3, "community": "rural", "enrollment": 580, "facilities_grade": 3, "stadium_name": "Joe Sawyers Field"},
 
-    {"name": "Lincoln", "nickname": "Cougars", "abbreviation": "LINC", "prestige": 4, "classification": "2A", "region": "North", "culture_grade": 4, "booster_support": 4, "community": "suburban", "enrollment": 560, "facilities_grade": 5},
+    {"name": "Lincoln", "nickname": "Cougars", "abbreviation": "LINC", "prestige": 4, "classification": "2A", "region": "North", "culture_grade": 4, "booster_support": 4, "community": "suburban", "enrollment": 560, "facilities_grade": 5, "stadium_name": "Stydahar Field"},
 
-    {"name": "Philip Barbour", "nickname": "Colts", "abbreviation": "PB", "prestige": 5, "classification": "2A", "region": "East", "culture_grade": 6, "booster_support": 5, "community": "blue-collar", "enrollment": 560, "facilities_grade": 4},
+    {"name": "Philip Barbour", "nickname": "Colts", "abbreviation": "PB", "prestige": 5, "classification": "2A", "region": "East", "culture_grade": 6, "booster_support": 5, "community": "blue-collar", "enrollment": 560, "facilities_grade": 4, "stadium_name": "George Byrer Field"},
 
-    {"name": "Clay County", "nickname": "Panthers", "abbreviation": "CCP", "prestige": 4, "classification": "2A", "region": "North", "culture_grade": 4, "booster_support": 3, "community": "rural", "enrollment": 500, "facilities_grade": 3},
+    {"name": "Clay County", "nickname": "Panthers", "abbreviation": "CCP", "prestige": 4, "classification": "2A", "region": "North", "culture_grade": 4, "booster_support": 3, "community": "rural", "enrollment": 500, "facilities_grade": 3, "stadium_name": "Bradley Field"},
 
-    {"name": "Roane County", "nickname": "Raiders", "abbreviation": "RC", "prestige": 6, "classification": "2A", "region": "North", "culture_grade": 7, "booster_support": 7, "community": "blue-collar", "enrollment": 500, "facilities_grade": 8},
+    {"name": "Roane County", "nickname": "Raiders", "abbreviation": "RC", "prestige": 6, "classification": "2A", "region": "North", "culture_grade": 7, "booster_support": 7, "community": "blue-collar", "enrollment": 500, "facilities_grade": 8, "stadium_name": "County Stadium"},
 
-    {"name": "Oak Glen", "nickname": "Golden Bears", "abbreviation": "OKG", "prestige": 3, "classification": "2A", "region": "North", "culture_grade": 2, "booster_support": 2, "community": "rural", "enrollment": 475, "facilities_grade": 2},
+    {"name": "Oak Glen", "nickname": "Golden Bears", "abbreviation": "OKG", "prestige": 3, "classification": "2A", "region": "North", "culture_grade": 2, "booster_support": 2, "community": "rural", "enrollment": 475, "facilities_grade": 2, "stadium_name": "Memorial Field"},
 
-    {"name": "Wheeling Central", "nickname": "Maroon Knights", "abbreviation": "WCC", "prestige": 7, "classification": "2A", "region": "North", "culture_grade": 8, "booster_support": 10, "community": "affluent", "enrollment": 450, "facilities_grade": 8, "stadium_name": "Wheeling Island Stadium · Wheeling, WV"},
+    {"name": "Wheeling Central", "nickname": "Maroon Knights", "abbreviation": "WCC", "prestige": 7, "classification": "2A", "region": "North", "culture_grade": 8, "booster_support": 10, "community": "affluent", "enrollment": 450, "facilities_grade": 8, "stadium_name": "Bishop Schmitt Field"},
 
-    {"name": "Pikeview", "nickname": "Panthers", "abbreviation": "PV", "prestige": 2, "classification": "2A", "region": "South", "culture_grade": 2, "booster_support": 2, "community": "rural", "enrollment": 580, "facilities_grade": 1},
+    {"name": "Pikeview", "nickname": "Panthers", "abbreviation": "PV", "prestige": 2, "classification": "2A", "region": "South", "culture_grade": 2, "booster_support": 2, "community": "rural", "enrollment": 580, "facilities_grade": 1, "stadium_name": "Ben Disibbio Field"},
 
-    {"name": "Bluefield", "nickname": "Beavers", "abbreviation": "BLU", "prestige": 8, "classification": "2A", "region": "South", "culture_grade": 7, "booster_support": 8, "community": "urban", "enrollment": 580, "facilities_grade": 8, "stadium_name": "Mitchell Stadium · Bluefield, WV"},
+    {"name": "Bluefield", "nickname": "Beavers", "abbreviation": "BLU", "prestige": 8, "classification": "2A", "region": "South", "culture_grade": 7, "booster_support": 8, "community": "urban", "enrollment": 580, "facilities_grade": 8, "stadium_name": "Mitchell Stadium"},
 
-    {"name": "Independence", "nickname": "Patriots", "abbreviation": "INDY", "prestige": 8, "classification": "2A", "region": "South", "culture_grade": 9, "booster_support": 6, "community": "blue-collar", "enrollment": 580, "facilities_grade": 6, "stadium_name": "Brushfork Stadium · Coal City, WV"},
+    {"name": "Independence", "nickname": "Patriots", "abbreviation": "INDY", "prestige": 8, "classification": "2A", "region": "South", "culture_grade": 9, "booster_support": 6, "community": "blue-collar", "enrollment": 580, "facilities_grade": 6, "stadium_name": "George Covey Field"},
 
-    {"name": "Westside", "nickname": "Renegades", "abbreviation": "WES", "prestige": 4, "classification": "2A", "region": "South", "culture_grade": 3, "booster_support": 3, "community": "rural", "enrollment": 500, "facilities_grade": 4},
+    {"name": "Westside", "nickname": "Renegades", "abbreviation": "WES", "prestige": 4, "classification": "2A", "region": "South", "culture_grade": 3, "booster_support": 3, "community": "rural", "enrollment": 500, "facilities_grade": 4, "stadium_name": "The Burial Ground"},
 
-    {"name": "James Monroe", "nickname": "Mavericks", "abbreviation": "JM", "prestige": 5, "classification": "2A", "region": "South", "culture_grade": 5, "booster_support": 5, "community": "rural", "enrollment": 475, "facilities_grade": 3},
+    {"name": "James Monroe", "nickname": "Mavericks", "abbreviation": "JM", "prestige": 5, "classification": "2A", "region": "South", "culture_grade": 5, "booster_support": 5, "community": "rural", "enrollment": 475, "facilities_grade": 3, "stadium_name": "Comer Sports Complex"},
 
-    {"name": "Wyoming East", "nickname": "Warriors", "abbreviation": "WE", "prestige": 2, "classification": "2A", "region": "South", "culture_grade": 1, "booster_support": 3, "community": "rural", "enrollment": 450, "facilities_grade": 4},
+    {"name": "Wyoming East", "nickname": "Warriors", "abbreviation": "WE", "prestige": 2, "classification": "2A", "region": "South", "culture_grade": 1, "booster_support": 3, "community": "rural", "enrollment": 450, "facilities_grade": 4, "stadium_name": "The War Zone"},
 
-    {"name": "River View", "nickname": "Raiders", "abbreviation": "RV", "prestige": 2, "classification": "2A", "region": "South", "culture_grade": 2, "booster_support": 3, "community": "rural", "enrollment": 450, "facilities_grade": 4},
+    {"name": "River View", "nickname": "Raiders", "abbreviation": "RV", "prestige": 2, "classification": "2A", "region": "South", "culture_grade": 2, "booster_support": 3, "community": "rural", "enrollment": 450, "facilities_grade": 4, "stadium_name": "Mitchell Estep Field"},
 
-    {"name": "Poca", "nickname": "Dots", "abbreviation": "POCA", "prestige": 4, "classification": "2A", "region": "South", "culture_grade": 2, "booster_support": 3, "community": "rural", "enrollment": 450, "facilities_grade": 4},
+    {"name": "Poca", "nickname": "Dots", "abbreviation": "POCA", "prestige": 4, "classification": "2A", "region": "South", "culture_grade": 2, "booster_support": 3, "community": "rural", "enrollment": 450, "facilities_grade": 4, "stadium_name": "OO White Field"},
 
-    {"name": "Chapmanville", "nickname": "Tigers", "abbreviation": "CHA", "prestige": 5, "classification": "2A", "region": "West", "culture_grade": 4, "booster_support": 4, "community": "rural", "enrollment": 580, "facilities_grade": 4, "stadium_name": "Larry Farley Field · Chapmanville, WV"},
+    {"name": "Chapmanville", "nickname": "Tigers", "abbreviation": "CHA", "prestige": 5, "classification": "2A", "region": "West", "culture_grade": 4, "booster_support": 4, "community": "rural", "enrollment": 580, "facilities_grade": 4, "stadium_name": "Barker Stadium"},
 
-    {"name": "Mingo Central", "nickname": "Miners", "abbreviation": "MC", "prestige": 5, "classification": "2A", "region": "West", "culture_grade": 5, "booster_support": 6, "community": "rural", "enrollment": 580, "facilities_grade": 7},
+    {"name": "Mingo Central", "nickname": "Miners", "abbreviation": "MC", "prestige": 5, "classification": "2A", "region": "West", "culture_grade": 5, "booster_support": 6, "community": "rural", "enrollment": 580, "facilities_grade": 7, "stadium_name": "Buck Harless Stadium"},
 
-    {"name": "Scott", "nickname": "Skyhawks", "abbreviation": "SCO", "prestige": 5, "classification": "2A", "region": "West", "culture_grade": 5, "booster_support": 4, "community": "blue-collar", "enrollment": 580, "facilities_grade": 4},
+    {"name": "Scott", "nickname": "Skyhawks", "abbreviation": "SCO", "prestige": 5, "classification": "2A", "region": "West", "culture_grade": 5, "booster_support": 4, "community": "blue-collar", "enrollment": 580, "facilities_grade": 4, "stadium_name": "Scott Field"},
 
-    {"name": "Logan", "nickname": "Wildcats", "abbreviation": "LOG", "prestige": 4, "classification": "2A", "region": "West", "culture_grade": 2, "booster_support": 1, "community": "rural", "enrollment": 560, "facilities_grade": 4},
+    {"name": "Logan", "nickname": "Wildcats", "abbreviation": "LOG", "prestige": 4, "classification": "2A", "region": "West", "culture_grade": 2, "booster_support": 1, "community": "rural", "enrollment": 560, "facilities_grade": 4, "stadium_name": "Logan Stadium"},
 
-    {"name": "Wayne", "nickname": "Pioneers", "abbreviation": "WAY", "prestige": 4, "classification": "2A", "region": "West", "culture_grade": 5, "booster_support": 2, "community": "blue-collar", "enrollment": 560, "facilities_grade": 3},
+    {"name": "Wayne", "nickname": "Pioneers", "abbreviation": "WAY", "prestige": 4, "classification": "2A", "region": "West", "culture_grade": 5, "booster_support": 2, "community": "blue-collar", "enrollment": 560, "facilities_grade": 3, "stadium_name": "Pioneer Field"},
 
-    {"name": "Ravenswood", "nickname": "Red Devils", "abbreviation": "RAV", "prestige": 1, "classification": "2A", "region": "West", "culture_grade": 1, "booster_support": 1, "community": "rural", "enrollment": 425, "facilities_grade": 2},
+    {"name": "Ravenswood", "nickname": "Red Devils", "abbreviation": "RAV", "prestige": 1, "classification": "2A", "region": "West", "culture_grade": 1, "booster_support": 1, "community": "rural", "enrollment": 425, "facilities_grade": 2, "stadium_name": "Flinn Field"},
 
-    {"name": "Buffalo", "nickname": "Bison", "abbreviation": "BUF", "prestige": 1, "classification": "2A", "region": "West", "culture_grade": 2, "booster_support": 2, "community": "suburban", "enrollment": 425, "facilities_grade": 3},
+    {"name": "Buffalo", "nickname": "Bison", "abbreviation": "BUF", "prestige": 1, "classification": "2A", "region": "West", "culture_grade": 2, "booster_support": 2, "community": "suburban", "enrollment": 425, "facilities_grade": 3, "stadium_name": "Bison Field"},
 
-    {"name": "Tyler Consolidated", "nickname": "Silver Knights", "abbreviation": "TCC", "prestige": 1, "classification": "2A", "region": "West", "culture_grade": 2, "booster_support": 3, "community": "rural", "enrollment": 425, "facilities_grade": 3, "stadium_name": "Tyler Consolidated High School Stadium · Sistersville, WV"},
+    {"name": "Tyler Consolidated", "nickname": "Silver Knights", "abbreviation": "TCC", "prestige": 1, "classification": "2A", "region": "West", "culture_grade": 2, "booster_support": 3, "community": "rural", "enrollment": 425, "facilities_grade": 3, "stadium_name": "Tyler Field"},
 
-    {"name": "South Harrison", "nickname": "Eagles", "abbreviation": "SH", "prestige": 2, "classification": "1A", "region": "East", "culture_grade": 2, "booster_support": 2, "community": "rural", "enrollment": 375, "facilities_grade": 2},
+    {"name": "South Harrison", "nickname": "Eagles", "abbreviation": "SH", "prestige": 2, "classification": "1A", "region": "East", "culture_grade": 2, "booster_support": 2, "community": "rural", "enrollment": 375, "facilities_grade": 2, "stadium_name": "Gary Barnette Field"},
 
-    {"name": "Webster Co", "nickname": "Highlands", "abbreviation": "WCH", "prestige": 2, "classification": "1A", "region": "East", "culture_grade": 2, "booster_support": 2, "community": "rural", "enrollment": 350, "facilities_grade": 2},
+    {"name": "Webster Co", "nickname": "Highlands", "abbreviation": "WCH", "prestige": 2, "classification": "1A", "region": "East", "culture_grade": 2, "booster_support": 2, "community": "rural", "enrollment": 350, "facilities_grade": 2, "stadium_name": "Highlander Field"},
 
-    {"name": "Richwood", "nickname": "Lumberjacks", "abbreviation": "RICH", "prestige": 1, "classification": "1A", "region": "East", "culture_grade": 1, "booster_support": 1, "community": "rural", "enrollment": 325, "facilities_grade": 1},
+    {"name": "Richwood", "nickname": "Lumberjacks", "abbreviation": "RICH", "prestige": 1, "classification": "1A", "region": "East", "culture_grade": 1, "booster_support": 1, "community": "rural", "enrollment": 325, "facilities_grade": 1, "stadium_name": "Dean Memorial Field"},
 
-    {"name": "East Hardy", "nickname": "Cougars", "abbreviation": "EH", "prestige": 3, "classification": "1A", "region": "East", "culture_grade": 3, "booster_support": 3, "community": "rural", "enrollment": 325, "facilities_grade": 2},
+    {"name": "East Hardy", "nickname": "Cougars", "abbreviation": "EH", "prestige": 3, "classification": "1A", "region": "East", "culture_grade": 3, "booster_support": 3, "community": "rural", "enrollment": 325, "facilities_grade": 2, "stadium_name": "Cougar Stadium"},
 
-    {"name": "Tucker Co", "nickname": "Mountain Lions", "abbreviation": "TCM", "prestige": 3, "classification": "1A", "region": "East", "culture_grade": 6, "booster_support": 5, "community": "rural", "enrollment": 325, "facilities_grade": 2},
+    {"name": "Tucker Co", "nickname": "Mountain Lions", "abbreviation": "TCM", "prestige": 3, "classification": "1A", "region": "East", "culture_grade": 6, "booster_support": 5, "community": "rural", "enrollment": 325, "facilities_grade": 2, "stadium_name": "RH Armstrong Memorial Field"},
 
-    {"name": "Pocahontas Co", "nickname": "Warriors", "abbreviation": "PCC", "prestige": 1, "classification": "1A", "region": "East", "culture_grade": 1, "booster_support": 2, "community": "rural", "enrollment": 275, "facilities_grade": 2},
+    {"name": "Pocahontas Co", "nickname": "Warriors", "abbreviation": "PCC", "prestige": 1, "classification": "1A", "region": "East", "culture_grade": 1, "booster_support": 2, "community": "rural", "enrollment": 275, "facilities_grade": 2, "stadium_name": "Memorial Field"},
 
-    {"name": "Pendleton Co", "nickname": "Wildcats", "abbreviation": "PEN", "prestige": 3, "classification": "1A", "region": "East", "culture_grade": 4, "booster_support": 4, "community": "rural", "enrollment": 225, "facilities_grade": 4},
+    {"name": "Pendleton Co", "nickname": "Wildcats", "abbreviation": "PEN", "prestige": 3, "classification": "1A", "region": "East", "culture_grade": 4, "booster_support": 4, "community": "rural", "enrollment": 225, "facilities_grade": 4, "stadium_name": "Slusher Field"},
 
-    {"name": "Tygarts Valley", "nickname": "Bulldogs", "abbreviation": "TYG", "prestige": 1, "classification": "1A", "region": "East", "culture_grade": 3, "booster_support": 2, "community": "rural", "enrollment": 200, "facilities_grade": 2},
+    {"name": "Tygarts Valley", "nickname": "Bulldogs", "abbreviation": "TYG", "prestige": 1, "classification": "1A", "region": "East", "culture_grade": 3, "booster_support": 2, "community": "rural", "enrollment": 200, "facilities_grade": 2, "stadium_name": "Bulldog Field"},
 
-    {"name": "Doddridge Co", "nickname": "Bulldogs", "abbreviation": "DC", "prestige": 5, "classification": "1A", "region": "North", "culture_grade": 8, "booster_support": 8, "community": "blue-collar", "enrollment": 375, "facilities_grade": 9, "stadium_name": "Doddridge County Complex · West Union, WV"},
+    {"name": "Doddridge Co", "nickname": "Bulldogs", "abbreviation": "DC", "prestige": 5, "classification": "1A", "region": "North", "culture_grade": 8, "booster_support": 8, "community": "blue-collar", "enrollment": 375, "facilities_grade": 9, "stadium_name": "Cline Stansberry Stadium"},
 
-    {"name": "Williamstown", "nickname": "Yellowjackets", "abbreviation": "WILL", "prestige": 5, "classification": "1A", "region": "North", "culture_grade": 8, "booster_support": 9, "community": "blue-collar", "enrollment": 375, "facilities_grade": 6, "stadium_name": "Yellowjacket Stadium · Williamstown, WV"},
+    {"name": "Williamstown", "nickname": "Yellowjackets", "abbreviation": "WILL", "prestige": 5, "classification": "1A", "region": "North", "culture_grade": 8, "booster_support": 9, "community": "blue-collar", "enrollment": 375, "facilities_grade": 6, "stadium_name": "Yellowjacket Field"},
 
-    {"name": "Clay Battelle", "nickname": "Cee Bees", "abbreviation": "CBB", "prestige": 3, "classification": "1A", "region": "North", "culture_grade": 2, "booster_support": 2, "community": "suburban", "enrollment": 350, "facilities_grade": 3},
+    {"name": "Clay Battelle", "nickname": "Cee Bees", "abbreviation": "CBB", "prestige": 3, "classification": "1A", "region": "North", "culture_grade": 2, "booster_support": 2, "community": "suburban", "enrollment": 350, "facilities_grade": 3, "stadium_name": "Clay Battelle Stadium"},
 
-    {"name": "Magnolia", "nickname": "Blue Eagles", "abbreviation": "MAG", "prestige": 2, "classification": "1A", "region": "North", "culture_grade": 1, "booster_support": 2, "community": "rural", "enrollment": 275, "facilities_grade": 2},
+    {"name": "Magnolia", "nickname": "Blue Eagles", "abbreviation": "MAG", "prestige": 2, "classification": "1A", "region": "North", "culture_grade": 1, "booster_support": 2, "community": "rural", "enrollment": 275, "facilities_grade": 2, "stadium_name": "Alumni Field"},
 
-    {"name": "Wirt Co", "nickname": "Tigers", "abbreviation": "WIRT", "prestige": 2, "classification": "1A", "region": "North", "culture_grade": 2, "booster_support": 3, "community": "rural", "enrollment": 275, "facilities_grade": 2},
+    {"name": "Wirt Co", "nickname": "Tigers", "abbreviation": "WIRT", "prestige": 2, "classification": "1A", "region": "North", "culture_grade": 2, "booster_support": 3, "community": "rural", "enrollment": 275, "facilities_grade": 2, "stadium_name": "Wilson-Eismon Field"},
 
-    {"name": "Cameron", "nickname": "Dragons", "abbreviation": "CAM", "prestige": 3, "classification": "1A", "region": "North", "culture_grade": 5, "booster_support": 5, "community": "rural", "enrollment": 150, "facilities_grade": 4},
+    {"name": "Cameron", "nickname": "Dragons", "abbreviation": "CAM", "prestige": 3, "classification": "1A", "region": "North", "culture_grade": 5, "booster_support": 5, "community": "rural", "enrollment": 150, "facilities_grade": 4, "stadium_name": "Dragon Field"},
 
-    {"name": "Valley", "nickname": "Lumberjacks", "abbreviation": "VAL", "prestige": 2, "classification": "1A", "region": "North", "culture_grade": 1, "booster_support": 1, "community": "rural", "enrollment": 200, "facilities_grade": 4},
+    {"name": "Valley", "nickname": "Lumberjacks", "abbreviation": "VAL", "prestige": 2, "classification": "1A", "region": "North", "culture_grade": 1, "booster_support": 1, "community": "rural", "enrollment": 200, "facilities_grade": 4, "stadium_name": "Thomas West Field"},
 
-    {"name": "Madonna", "nickname": "Dons", "abbreviation": "MAD", "prestige": 1, "classification": "1A", "region": "North", "culture_grade": 1, "booster_support": 2, "community": "urban", "enrollment": 150, "facilities_grade": 2},
+    {"name": "Madonna", "nickname": "Dons", "abbreviation": "MAD", "prestige": 1, "classification": "1A", "region": "North", "culture_grade": 1, "booster_support": 2, "community": "urban", "enrollment": 150, "facilities_grade": 2, "stadium_name": "Jimmy Carey Stadium"},
 
-    {"name": "Summers County", "nickname": "Bobcats", "abbreviation": "SC", "prestige": 1, "classification": "1A", "region": "South", "culture_grade": 1, "booster_support": 1, "community": "rural", "enrollment": 375, "facilities_grade": 1},
+    {"name": "Summers County", "nickname": "Bobcats", "abbreviation": "SC", "prestige": 1, "classification": "1A", "region": "South", "culture_grade": 1, "booster_support": 1, "community": "rural", "enrollment": 375, "facilities_grade": 1, "stadium_name": "Garten Stadium"},
 
-    {"name": "Greenbrier West", "nickname": "Cavaliers", "abbreviation": "GWC", "prestige": 3, "classification": "1A", "region": "South", "culture_grade": 5, "booster_support": 5, "community": "blue-collar", "enrollment": 375, "facilities_grade": 5, "stadium_name": "Warrior Stadium · Charmco, WV"},
+    {"name": "Greenbrier West", "nickname": "Cavaliers", "abbreviation": "GWC", "prestige": 3, "classification": "1A", "region": "South", "culture_grade": 5, "booster_support": 5, "community": "blue-collar", "enrollment": 375, "facilities_grade": 5, "stadium_name": "Cavalier Field"},
 
-    {"name": "Liberty", "nickname": "Raiders", "abbreviation": "LR", "prestige": 1, "classification": "1A", "region": "South", "culture_grade": 2, "booster_support": 3, "community": "rural", "enrollment": 375, "facilities_grade": 5},
+    {"name": "Liberty", "nickname": "Raiders", "abbreviation": "LR", "prestige": 1, "classification": "1A", "region": "South", "culture_grade": 2, "booster_support": 3, "community": "rural", "enrollment": 375, "facilities_grade": 5, "stadium_name": "Liberty HS Stadium"},
 
-    {"name": "Mount View", "nickname": "Golden Knights", "abbreviation": "MV", "prestige": 1, "classification": "1A", "region": "South", "culture_grade": 1, "booster_support": 1, "community": "urban", "enrollment": 350, "facilities_grade": 4},
+    {"name": "Mount View", "nickname": "Golden Knights", "abbreviation": "MV", "prestige": 1, "classification": "1A", "region": "South", "culture_grade": 1, "booster_support": 1, "community": "urban", "enrollment": 350, "facilities_grade": 4, "stadium_name": "Vic Nystrom Stadium"},
 
-    {"name": "Man", "nickname": "Hillbillies", "abbreviation": "MAN", "prestige": 3, "classification": "1A", "region": "South", "culture_grade": 5, "booster_support": 4, "community": "rural", "enrollment": 350, "facilities_grade": 3},
+    {"name": "Man", "nickname": "Hillbillies", "abbreviation": "MAN", "prestige": 3, "classification": "1A", "region": "South", "culture_grade": 5, "booster_support": 4, "community": "rural", "enrollment": 350, "facilities_grade": 3, "stadium_name": "George Queen Memorial Field"},
 
-    {"name": "Sherman", "nickname": "Tide", "abbreviation": "SHE", "prestige": 3, "classification": "1A", "region": "South", "culture_grade": 4, "booster_support": 4, "community": "rural", "enrollment": 350, "facilities_grade": 3},
+    {"name": "Sherman", "nickname": "Tide", "abbreviation": "SHE", "prestige": 3, "classification": "1A", "region": "South", "culture_grade": 4, "booster_support": 4, "community": "rural", "enrollment": 350, "facilities_grade": 3, "stadium_name": "Zontini Field"},
 
-    {"name": "Meadow Bridge", "nickname": "Wildcats", "abbreviation": "MB", "prestige": 2, "classification": "1A", "region": "South", "culture_grade": 2, "booster_support": 2, "community": "rural", "enrollment": 150, "facilities_grade": 1},
+    {"name": "Meadow Bridge", "nickname": "Wildcats", "abbreviation": "MB", "prestige": 2, "classification": "1A", "region": "South", "culture_grade": 2, "booster_support": 2, "community": "rural", "enrollment": 150, "facilities_grade": 1, "stadium_name": "Frank Arritt Stadium"},
 
-    {"name": "Van", "nickname": "Bulldogs", "abbreviation": "VAN", "prestige": 2, "classification": "1A", "region": "South", "culture_grade": 2, "booster_support": 2, "community": "rural", "enrollment": 100, "facilities_grade": 3},
+    {"name": "Van", "nickname": "Bulldogs", "abbreviation": "VAN", "prestige": 2, "classification": "1A", "region": "South", "culture_grade": 2, "booster_support": 2, "community": "rural", "enrollment": 100, "facilities_grade": 3, "stadium_name": "Herschel Jerrell Field"},
 
-    {"name": "Ritchie County", "nickname": "Rebels", "abbreviation": "RCC", "prestige": 2, "classification": "1A", "region": "West", "culture_grade": 2, "booster_support": 2, "community": "rural", "enrollment": 350, "facilities_grade": 2},
+    {"name": "Ritchie County", "nickname": "Rebels", "abbreviation": "RCC", "prestige": 2, "classification": "1A", "region": "West", "culture_grade": 2, "booster_support": 2, "community": "rural", "enrollment": 350, "facilities_grade": 2, "stadium_name": "Chuck Schofield Memorial Stadium"},
 
-    {"name": "St. Marys", "nickname": "Blue Devils", "abbreviation": "STM", "prestige": 3, "classification": "1A", "region": "West", "culture_grade": 5, "booster_support": 5, "community": "suburban", "enrollment": 325, "facilities_grade": 3},
+    {"name": "St. Marys", "nickname": "Blue Devils", "abbreviation": "STM", "prestige": 3, "classification": "1A", "region": "West", "culture_grade": 5, "booster_support": 5, "community": "suburban", "enrollment": 325, "facilities_grade": 3, "stadium_name": "Imlay Field"},
 
-    {"name": "Tolsia", "nickname": "Rebels", "abbreviation": "TOL", "prestige": 1, "classification": "1A", "region": "West", "culture_grade": 2, "booster_support": 2, "community": "rural", "enrollment": 375, "facilities_grade": 2},
+    {"name": "Tolsia", "nickname": "Rebels", "abbreviation": "TOL", "prestige": 1, "classification": "1A", "region": "West", "culture_grade": 2, "booster_support": 2, "community": "rural", "enrollment": 375, "facilities_grade": 2, "stadium_name": "Wilts Salmons Athletic Field"},
 
-    {"name": "Tug Valley", "nickname": "Panthers", "abbreviation": "TUG", "prestige": 3, "classification": "1A", "region": "West", "culture_grade": 3, "booster_support": 4, "community": "rural", "enrollment": 325, "facilities_grade": 2},
+    {"name": "Tug Valley", "nickname": "Panthers", "abbreviation": "TUG", "prestige": 3, "classification": "1A", "region": "West", "culture_grade": 3, "booster_support": 4, "community": "rural", "enrollment": 325, "facilities_grade": 2, "stadium_name": "Bob Brewer Stadium"},
 
-    {"name": "Montcalm", "nickname": "Generals", "abbreviation": "MONT", "prestige": 1, "classification": "1A", "region": "West", "culture_grade": 2, "booster_support": 2, "community": "rural", "enrollment": 225, "facilities_grade": 1},
+    {"name": "Montcalm", "nickname": "Generals", "abbreviation": "MONT", "prestige": 1, "classification": "1A", "region": "West", "culture_grade": 2, "booster_support": 2, "community": "rural", "enrollment": 225, "facilities_grade": 1, "stadium_name": "Prudich Stadium"},
 
-    {"name": "Calhoun Co", "nickname": "Red Devils", "abbreviation": "CAL", "prestige": 1, "classification": "1A", "region": "West", "culture_grade": 1, "booster_support": 1, "community": "rural", "enrollment": 225, "facilities_grade": 1},
+    {"name": "Calhoun Co", "nickname": "Red Devils", "abbreviation": "CAL", "prestige": 1, "classification": "1A", "region": "West", "culture_grade": 1, "booster_support": 1, "community": "rural", "enrollment": 225, "facilities_grade": 1, "stadium_name": "Underwood Field"},
 
-    {"name": "Wahama", "nickname": "White Falcons", "abbreviation": "WAH", "prestige": 5, "classification": "1A", "region": "West", "culture_grade": 5, "booster_support": 5, "community": "rural", "enrollment": 225, "facilities_grade": 5},
+    {"name": "Wahama", "nickname": "White Falcons", "abbreviation": "WAH", "prestige": 5, "classification": "1A", "region": "West", "culture_grade": 5, "booster_support": 5, "community": "rural", "enrollment": 225, "facilities_grade": 5, "stadium_name": "Bachtel Stadium"},
 
-    {"name": "Gilmer Co", "nickname": "Titans", "abbreviation": "GIL", "prestige": 1, "classification": "1A", "region": "West", "culture_grade": 2, "booster_support": 3, "community": "rural", "enrollment": 200, "facilities_grade": 8}
+    {"name": "Gilmer Co", "nickname": "Titans", "abbreviation": "GIL", "prestige": 1, "classification": "1A", "region": "West", "culture_grade": 2, "booster_support": 3, "community": "rural", "enrollment": 200, "facilities_grade": 8, "stadium_name": "IL Morris Stadium"}
   ]
 }

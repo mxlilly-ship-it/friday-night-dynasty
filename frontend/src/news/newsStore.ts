@@ -1,8 +1,8 @@
 import type { NewsArticle, TickerItem } from './newsTypes'
 import { articleVisibleInFeed, tickerVisibleInFeed } from './newsVisibility'
 
-const MAX_ARTICLES = 100
-const MAX_TICKER = 180
+const MAX_ARTICLES = 320
+const MAX_TICKER = 420
 
 type Listener = () => void
 

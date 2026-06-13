@@ -80,6 +80,62 @@ export function teamRecordLine(state: any, teamName: string): string {
   return `${Number(s.wins ?? 0)}-${Number(s.losses ?? 0)}`
 }
 
+function teamDisplayName(team: any, fallback: string): string {
+  const nick = String(team?.nickname ?? '').trim()
+  return nick || fallback
+}
+
+function sumPlayerStatForTeam(playerStats: unknown[], teamName: string, field: string): number {
+  let sum = 0
+  for (const raw of playerStats ?? []) {
+    const ps = raw as Record<string, unknown> | null
+    if (!ps || String(ps.team_name ?? '') !== teamName) continue
+    sum += Number(ps[field] ?? 0)
+  }
+  return sum
+}
+
+/** Team TDs in one game — never sum rec_td (already counted on QB pass_td). */
+function teamTouchdownsInGame(
+  teamStats: Record<string, number>,
+  playerStats: unknown[],
+  teamName: string,
+  pointsScored: number,
+): number {
+  const fromTeam = Number(teamStats?.touchdowns)
+  if (Number.isFinite(fromTeam) && fromTeam > 0) return fromTeam
+
+  const passTd = sumPlayerStatForTeam(playerStats, teamName, 'pass_td')
+  const rushTd = sumPlayerStatForTeam(playerStats, teamName, 'rush_td')
+  const fromPlayers = passTd + rushTd
+  if (fromPlayers > 0) return fromPlayers
+
+  return Math.max(0, Math.floor(pointsScored / 6))
+}
+
+function buildRecapHeadline(args: {
+  userDisplay: string
+  oppDisplay: string
+  userScore: number
+  oppScore: number
+  won: boolean
+  ot: boolean
+}): string {
+  const { userDisplay, oppDisplay, userScore, oppScore, won, ot } = args
+  const margin = Math.abs(userScore - oppScore)
+  const otNote = ot ? ' in overtime' : ''
+
+  if (won) {
+    if (margin >= 28) return `${userDisplay} rolls past ${oppDisplay}, ${userScore}–${oppScore}${otNote}.`
+    if (margin >= 14) return `${userDisplay} pulls away from ${oppDisplay}, ${userScore}–${oppScore}${otNote}.`
+    if (margin <= 7) return `${userDisplay} holds off ${oppDisplay}, ${userScore}–${oppScore}${otNote}.`
+    return `${userDisplay} beats ${oppDisplay}, ${userScore}–${oppScore}${otNote}.`
+  }
+  if (margin >= 28) return `${userDisplay} routed by ${oppDisplay}, ${userScore}–${oppScore}${otNote}.`
+  if (margin <= 7) return `${userDisplay} falls short against ${oppDisplay}, ${userScore}–${oppScore}${otNote}.`
+  return `${userDisplay} loses to ${oppDisplay}, ${userScore}–${oppScore}${otNote}.`
+}
+
 export function rankForTeam(rows: StandingsRow[], teamName: string): number | null {
   const r = rows.find((x) => x.teamName === teamName)
   return r?.rank ?? null
@@ -108,23 +164,29 @@ export function buildLastGameRecap(state: any): LastGameRecap | null {
       const opponent = userHome ? String(g.away) : String(g.home)
       const won = userScore >= oppScore
       const ts = (r.team_stats?.[userTeam] ?? {}) as Record<string, number>
+      const playerStats = (r.player_stats ?? []) as unknown[]
       let comp = 0
       let att = 0
-      let tds = 0
-      for (const ps of r.player_stats ?? []) {
-        if (!ps || ps.team_name !== userTeam) continue
+      for (const raw of playerStats) {
+        const ps = raw as Record<string, unknown> | null
+        if (!ps || String(ps.team_name ?? '') !== userTeam) continue
         comp += Number(ps.comp ?? 0)
         att += Number(ps.att ?? 0)
-        tds += Number(ps.pass_td ?? 0) + Number(ps.rush_td ?? 0) + Number(ps.rec_td ?? 0)
       }
-      const recap = String(r.recap ?? '').trim()
-      const headline = recap
-        ? recap.length > 120
-          ? `${recap.slice(0, 117)}…`
-          : recap
-        : won
-          ? `"${userTeam} takes the win ${userScore}–${oppScore} over ${opponent}."`
-          : `"${userTeam} falls ${userScore}–${oppScore} to ${opponent}."`
+      const userRow = findTeam(state, userTeam)
+      const oppRow = findTeam(state, opponent)
+      const headline = buildRecapHeadline({
+        userDisplay: teamDisplayName(userRow, userTeam),
+        oppDisplay: teamDisplayName(oppRow, opponent),
+        userScore,
+        oppScore,
+        won,
+        ot: Boolean(r.ot),
+      })
+      const tds = teamTouchdownsInGame(ts, playerStats, userTeam, userScore)
+      const interceptions =
+        Number(ts.interceptions ?? 0) || sumPlayerStatForTeam(playerStats, userTeam, 'int_thrown')
+      const sacks = Number(ts.sacks ?? 0) || sumPlayerStatForTeam(playerStats, userTeam, 'sacks')
       return {
         week: wi + 1,
         opponent,
@@ -137,8 +199,8 @@ export function buildLastGameRecap(state: any): LastGameRecap | null {
         passYds: Number(ts.pass_yards ?? 0),
         rushYds: Number(ts.rush_yards ?? 0),
         tds,
-        interceptions: Number(ts.interceptions ?? 0),
-        sacks: Number(ts.sacks ?? 0),
+        interceptions,
+        sacks,
         compPct: att > 0 ? Math.round((comp / att) * 100) : null,
       }
     }

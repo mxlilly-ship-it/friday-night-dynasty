@@ -50,6 +50,7 @@ type Props = {
   onOpenDefGameplan: () => void
   onOpenScouting: () => void
   onOpenInbox: () => void
+  onOpenGamePreview?: () => void
 }
 
 function findTeam(state: any, teamName: string) {
@@ -90,6 +91,7 @@ export default function InSeasonDashboard({
   onOpenDefGameplan,
   onOpenScouting,
   onOpenInbox,
+  onOpenGamePreview,
 }: Props) {
   const [simChip, setSimChip] = useState(3)
   const { center } = useNews()
@@ -130,7 +132,7 @@ export default function InSeasonDashboard({
   )
   const newsRows = useMemo(() => {
     const articles = center.articles.filter((a) => articleVisibleInFeed(a, saveState))
-    return mapNewsArticles(articles, 5)
+    return mapNewsArticles(articles, 18)
   }, [center.articles, saveState])
 
   const userRank = rankForTeam(classStandings, userTeam)
@@ -183,6 +185,11 @@ export default function InSeasonDashboard({
                 <div className="isdash-badge-row">
                   <span className="isdash-game-badge">This Friday · 7:00 PM</span>
                   {currentGame?.isRegionGame ? <span className="isdash-region-badge">★ Region Game</span> : null}
+                  {opponent && hasUnplayedGameThisWeek && onOpenGamePreview ? (
+                    <button type="button" className="isdash-preview-btn" onClick={onOpenGamePreview}>
+                      Preview
+                    </button>
+                  ) : null}
                 </div>
                 {opponent ? (
                   <div className="isdash-matchup">
@@ -417,7 +424,7 @@ export default function InSeasonDashboard({
           {lastRecap ? (
             <div className="isdash-card-sm">
               <div className="isdash-section-label">Last Game · Week {lastRecap.week}</div>
-              <div className="isdash-recap-headline">&ldquo;{lastRecap.headline}&rdquo;</div>
+              <div className="isdash-recap-headline">{lastRecap.headline}</div>
               <div className="isdash-recap-score">
                 <div className="isdash-recap-team">
                   {logoSlot(userTeam, 32, 'isdash-recap-logo')}

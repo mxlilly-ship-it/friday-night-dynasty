@@ -1,7 +1,27 @@
 import JSZip from 'jszip'
-import { suggestTeamForLogoFilename, suggestTeamForStadiumFilename } from './logoMatch'
+import {
+  suggestTeamForHelmetFilename,
+  suggestTeamForLogoFilename,
+  suggestTeamForStadiumFilename,
+  suggestTeamJerseyFilename,
+  type JerseyKind,
+} from './logoMatch'
 
 export type SaveBundleAssetMap = Record<string, { filename: string; data: Uint8Array; mime: string }>
+
+export function jerseyBundleKey(teamName: string, kind: JerseyKind): string {
+  return `${teamName}::${kind}`
+}
+
+export function parseJerseyBundleKey(key: string): { team: string; kind: JerseyKind } | null {
+  const idx = key.indexOf('::')
+  if (idx <= 0) return null
+  const team = key.slice(0, idx).trim()
+  const kind = key.slice(idx + 2).trim() as JerseyKind
+  if (!team) return null
+  if (kind !== 'home' && kind !== 'away' && kind !== 'alternate') return null
+  return { team, kind }
+}
 
 export type SaveBundle = {
   state: any
@@ -14,6 +34,10 @@ export type SaveBundle = {
   logos: SaveBundleAssetMap
   /** Optional home stadium / field photos keyed by team name. */
   stadiums: SaveBundleAssetMap
+  /** Optional helmet photos keyed by team name. */
+  helmets: SaveBundleAssetMap
+  /** Optional jersey photos keyed by ``teamName::home|away|alternate``. */
+  jerseys: SaveBundleAssetMap
   /** Optional recap text files (path -> text) */
   seasonRecaps: Record<string, string>
 }
@@ -55,6 +79,8 @@ export async function importSaveZip(file: File): Promise<SaveBundle> {
 
   const logos: SaveBundle['logos'] = {}
   const stadiums: SaveBundle['stadiums'] = {}
+  const helmets: SaveBundle['helmets'] = {}
+  const jerseys: SaveBundle['jerseys'] = {}
   const seasonRecaps: SaveBundle['seasonRecaps'] = {}
   const teamNames = Array.isArray(state?.teams) ? state.teams.map((t: any) => String(t?.name ?? '')).filter(Boolean) : []
 
@@ -75,12 +101,24 @@ export async function importSaveZip(file: File): Promise<SaveBundle> {
       const guess = teamNames.length ? suggestTeamForStadiumFilename(filename, teamNames) : ''
       const key = guess || filename.replace(/\.[^.]+$/, '')
       stadiums[key] = { filename, data, mime: guessMime(filename) }
+    } else if (norm.toLowerCase().startsWith('helmets/')) {
+      const filename = norm.split('/').pop() || norm
+      const data = await entry.async('uint8array')
+      const guess = teamNames.length ? suggestTeamForHelmetFilename(filename, teamNames) : ''
+      const key = guess || filename.replace(/\.[^.]+$/, '')
+      helmets[key] = { filename, data, mime: guessMime(filename) }
+    } else if (norm.toLowerCase().startsWith('jerseys/')) {
+      const filename = norm.split('/').pop() || norm
+      const data = await entry.async('uint8array')
+      const parsed = teamNames.length ? suggestTeamJerseyFilename(filename, teamNames) : { team: '', kind: 'home' as JerseyKind }
+      const key = parsed.team ? jerseyBundleKey(parsed.team, parsed.kind) : filename.replace(/\.[^.]+$/, '')
+      jerseys[key] = { filename, data, mime: guessMime(filename) }
     } else if (norm.toLowerCase().startsWith('season_recaps/') && norm.toLowerCase().endsWith('.txt')) {
       seasonRecaps[norm] = await entry.async('text')
     }
   }
 
-  return { state, leagueHistory, records, logos, stadiums, seasonRecaps }
+  return { state, leagueHistory, records, logos, stadiums, helmets, jerseys, seasonRecaps }
 }
 
 export async function exportSaveZip(bundle: SaveBundle): Promise<Blob> {
@@ -97,6 +135,17 @@ export async function exportSaveZip(bundle: SaveBundle): Promise<Blob> {
   for (const [team, stadium] of Object.entries(bundle.stadiums ?? {})) {
     const fn = stadium.filename || `${team}.jpg`
     zip.file(`stadiums/${fn}`, stadium.data)
+  }
+
+  for (const [team, helmet] of Object.entries(bundle.helmets ?? {})) {
+    const fn = helmet.filename || `${team}.png`
+    zip.file(`helmets/${fn}`, helmet.data)
+  }
+
+  for (const [key, jersey] of Object.entries(bundle.jerseys ?? {})) {
+    const parsed = parseJerseyBundleKey(key)
+    const fn = jersey.filename || (parsed ? `${parsed.team}_${parsed.kind}.png` : `${key}.png`)
+    zip.file(`jerseys/${fn}`, jersey.data)
   }
 
   for (const [path, text] of Object.entries(bundle.seasonRecaps ?? {})) {
