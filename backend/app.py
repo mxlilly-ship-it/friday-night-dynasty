@@ -274,7 +274,21 @@ def create_app() -> FastAPI:
         def spa_favicon():
             p = dist / "favicon.svg"
             if p.is_file():
-                return FileResponse(p)
+                return FileResponse(p, media_type="image/svg+xml")
+            raise HTTPException(status_code=404)
+
+        @app.get("/favicon.png")
+        def spa_favicon_png():
+            p = dist / "favicon.png"
+            if p.is_file():
+                return FileResponse(p, media_type="image/png")
+            raise HTTPException(status_code=404)
+
+        @app.get("/apple-touch-icon.png")
+        def spa_apple_touch_icon():
+            p = dist / "apple-touch-icon.png"
+            if p.is_file():
+                return FileResponse(p, media_type="image/png")
             raise HTTPException(status_code=404)
 
         @app.get("/icons.svg")
