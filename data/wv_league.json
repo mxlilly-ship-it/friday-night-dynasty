@@ -28,7 +28,8 @@
       "booster_support": 10,
       "community": "football factory",
       "enrollment": 1400,
-      "facilities_grade": 10
+      "facilities_grade": 10,
+      "stadium_name": "Cobourn Field at Dave Walker Stadium"
     },
     {
       "name": "Morgantown",
@@ -41,7 +42,8 @@
       "booster_support": 10,
       "community": "affluent",
       "enrollment": 1400,
-      "facilities_grade": 10
+      "facilities_grade": 10,
+      "stadium_name": "Pony Lewis Field"
     },
     {
       "name": "Huntington",
@@ -54,7 +56,8 @@
       "booster_support": 10,
       "community": "football factory",
       "enrollment": 1400,
-      "facilities_grade": 10
+      "facilities_grade": 10,
+      "stadium_name": "Bob Sang Stadium"
     },
     {
       "name": "Jefferson",
@@ -67,7 +70,8 @@
       "booster_support": 4,
       "community": "suburban",
       "enrollment": 1400,
-      "facilities_grade": 6
+      "facilities_grade": 6,
+      "stadium_name": "Jefferson Memorial Stadium"
     },
     {
       "name": "George Washington",
@@ -80,7 +84,8 @@
       "booster_support": 10,
       "community": "affluent",
       "enrollment": 1000,
-      "facilities_grade": 6
+      "facilities_grade": 6,
+      "stadium_name": "Steve Edwards Sr. Field"
     },
     {
       "name": "Wheeling Park",
@@ -93,7 +98,8 @@
       "booster_support": 7,
       "community": "urban",
       "enrollment": 1100,
-      "facilities_grade": 7
+      "facilities_grade": 7,
+      "stadium_name": "Wheeling Island Stadium"
     },
     {
       "name": "University",
@@ -106,7 +112,8 @@
       "booster_support": 7,
       "community": "affluent",
       "enrollment": 1100,
-      "facilities_grade": 10
+      "facilities_grade": 10,
+      "stadium_name": "Mylan Pharmaceuticals Complex"
     },
     {
       "name": "Spring Mills",
@@ -119,7 +126,8 @@
       "booster_support": 7,
       "community": "urban",
       "enrollment": 1400,
-      "facilities_grade": 10
+      "facilities_grade": 10,
+      "stadium_name": "Cardinal Field"
     },
     {
       "name": "Musselman",
@@ -132,7 +140,8 @@
       "booster_support": 5,
       "community": "blue-collar",
       "enrollment": 1400,
-      "facilities_grade": 6
+      "facilities_grade": 6,
+      "stadium_name": "Waldeck Field"
     },
     {
       "name": "Parkersburg",
@@ -145,7 +154,8 @@
       "booster_support": 5,
       "community": "suburban",
       "enrollment": 1200,
-      "facilities_grade": 7
+      "facilities_grade": 7,
+      "stadium_name": "Stadium Field"
     },
     {
       "name": "Beckley",
@@ -158,7 +168,8 @@
       "booster_support": 6,
       "community": "urban",
       "enrollment": 1300,
-      "facilities_grade": 8
+      "facilities_grade": 8,
+      "stadium_name": "Van Meter Field"
     },
     {
       "name": "Oak Hill",
@@ -171,7 +182,8 @@
       "booster_support": 6,
       "community": "urban",
       "enrollment": 1100,
-      "facilities_grade": 4
+      "facilities_grade": 4,
+      "stadium_name": "John P. Duda Stadium"
     },
     {
       "name": "Washington",
@@ -184,7 +196,8 @@
       "booster_support": 4,
       "community": "suburban",
       "enrollment": 1100,
-      "facilities_grade": 4
+      "facilities_grade": 4,
+      "stadium_name": "Terry Marcus Stadium"
     },
     {
       "name": "Parkersburg South",
@@ -197,7 +210,8 @@
       "booster_support": 5,
       "community": "suburban",
       "enrollment": 1100,
-      "facilities_grade": 8
+      "facilities_grade": 8,
+      "stadium_name": "Erickson Complex"
     },
     {
       "name": "Hedgesville",
@@ -210,7 +224,8 @@
       "booster_support": 2,
       "community": "rural",
       "enrollment": 1400,
-      "facilities_grade": 4
+      "facilities_grade": 4,
+      "stadium_name": "Mumaw Stadium"
     },
     {
       "name": "Buckhannon-Upshur",
@@ -223,7 +238,8 @@
       "booster_support": 2,
       "community": "rural",
       "enrollment": 1000,
-      "facilities_grade": 2
+      "facilities_grade": 2,
+      "stadium_name": "Red Crites Memorial Stadium"
     },
     {
       "name": "Riverside",
@@ -236,7 +252,8 @@
       "booster_support": 2,
       "community": "rural",
       "enrollment": 1000,
-      "facilities_grade": 2
+      "facilities_grade": 2,
+      "stadium_name": "Warrior Stadium"
     },
     {
       "name": "Preston",
@@ -249,7 +266,8 @@
       "booster_support": 2,
       "community": "rural",
       "enrollment": 1000,
-      "facilities_grade": 2
+      "facilities_grade": 2,
+      "stadium_name": "Knights Stadium"
     },
     {
       "name": "Cabell Midland",
@@ -262,7 +280,8 @@
       "booster_support": 10,
       "community": "football factory",
       "enrollment": 1400,
-      "facilities_grade": 10
+      "facilities_grade": 10,
+      "stadium_name": "Knights Stadium"
     },
     {
       "name": "Hurricane",
@@ -275,7 +294,8 @@
       "booster_support": 8,
       "community": "affluent",
       "enrollment": 1000,
-      "facilities_grade": 6
+      "facilities_grade": 6,
+      "stadium_name": "Redskins Stadium"
     },
     {
       "name": "John Marshall",
@@ -288,7 +308,8 @@
       "booster_support": 2,
       "community": "rural",
       "enrollment": 800,
-      "facilities_grade": 4
+      "facilities_grade": 4,
+      "stadium_name": "Monarch Stadium"
     },
     {
       "name": "Capital",
@@ -301,7 +322,8 @@
       "booster_support": 2,
       "community": "football factory",
       "enrollment": 800,
-      "facilities_grade": 3
+      "facilities_grade": 3,
+      "stadium_name": "Laidley Field"
     },
     {
       "name": "Greenbrier East",
@@ -314,7 +336,8 @@
       "booster_support": 5,
       "community": "rural",
       "enrollment": 800,
-      "facilities_grade": 6
+      "facilities_grade": 6,
+      "stadium_name": "Spartan Stadium"
     },
     {
       "name": "Spring Valley",
@@ -327,7 +350,8 @@
       "booster_support": 6,
       "community": "blue-collar",
       "enrollment": 800,
-      "facilities_grade": 6
+      "facilities_grade": 6,
+      "stadium_name": "The Wolves Den"
     },
     {
       "name": "Princeton",
@@ -340,7 +364,8 @@
       "booster_support": 9,
       "community": "affluent",
       "enrollment": 800,
-      "facilities_grade": 9
+      "facilities_grade": 9,
+      "stadium_name": "Hunnicutt Stadium"
     },
     {
       "name": "Brooke",
@@ -353,7 +378,8 @@
       "booster_support": 9,
       "community": "blue-collar",
       "enrollment": 750,
-      "facilities_grade": 9
+      "facilities_grade": 9,
+      "stadium_name": "Brooke Memorial Stadium"
     },
     {
       "name": "South Charleston",
@@ -366,7 +392,8 @@
       "booster_support": 7,
       "community": "urban",
       "enrollment": 750,
-      "facilities_grade": 3
+      "facilities_grade": 3,
+      "stadium_name": "Eagle Stadium"
     },
     {
       "name": "St. Albans",
@@ -379,7 +406,8 @@
       "booster_support": 1,
       "community": "urban",
       "enrollment": 750,
-      "facilities_grade": 1
+      "facilities_grade": 1,
+      "stadium_name": "Crawford Field"
     },
     {
       "name": "Lincoln County",
@@ -392,7 +420,8 @@
       "booster_support": 1,
       "community": "rural",
       "enrollment": 700,
-      "facilities_grade": 1
+      "facilities_grade": 1,
+      "stadium_name": "Lincoln County Stadium"
     },
     {
       "name": "Hampshire",
@@ -405,7 +434,8 @@
       "booster_support": 2,
       "community": "rural",
       "enrollment": 700,
-      "facilities_grade": 4
+      "facilities_grade": 4,
+      "stadium_name": "Rannells Field"
     },
     {
       "name": "Bridgeport",
@@ -418,7 +448,8 @@
       "booster_support": 10,
       "community": "football factory",
       "enrollment": 700,
-      "facilities_grade": 10
+      "facilities_grade": 10,
+      "stadium_name": "Wayne Jamison Field"
     },
     {
       "name": "Nitro",
@@ -431,7 +462,8 @@
       "booster_support": 3,
       "community": "blue-collar",
       "enrollment": 700,
-      "facilities_grade": 4
+      "facilities_grade": 4,
+      "stadium_name": "Underwood Field"
     },
     {
       "name": "Winfield",
@@ -444,7 +476,8 @@
       "booster_support": 6,
       "community": "blue-collar",
       "enrollment": 700,
-      "facilities_grade": 6
+      "facilities_grade": 6,
+      "stadium_name": "Generals Stadium"
     },
     {
       "name": "Shady Spring",
@@ -457,7 +490,8 @@
       "booster_support": 3,
       "community": "affluent",
       "enrollment": 700,
-      "facilities_grade": 3
+      "facilities_grade": 3,
+      "stadium_name": "Thomas Field"
     },
     {
       "name": "Ripley",
@@ -470,7 +504,8 @@
       "booster_support": 2,
       "community": "rural",
       "enrollment": 700,
-      "facilities_grade": 3
+      "facilities_grade": 3,
+      "stadium_name": "Memorial Stadium"
     },
     {
       "name": "Herbert Hoover",
@@ -483,7 +518,8 @@
       "booster_support": 10,
       "community": "affluent",
       "enrollment": 700,
-      "facilities_grade": 10
+      "facilities_grade": 10,
+      "stadium_name": "Husky Stadium"
     },
     {
       "name": "Fairmont Senior",
@@ -496,7 +532,8 @@
       "booster_support": 10,
       "community": "football factory",
       "enrollment": 700,
-      "facilities_grade": 9
+      "facilities_grade": 9,
+      "stadium_name": "East-West Stadium"
     },
     {
       "name": "Elkins",
@@ -509,7 +546,8 @@
       "booster_support": 4,
       "community": "rural",
       "enrollment": 700,
-      "facilities_grade": 4
+      "facilities_grade": 4,
+      "stadium_name": "Wilmer Field"
     },
     {
       "name": "Lewis County",
@@ -522,7 +560,8 @@
       "booster_support": 2,
       "community": "rural",
       "enrollment": 650,
-      "facilities_grade": 2
+      "facilities_grade": 2,
+      "stadium_name": "Lewis County Athletic Field"
     },
     {
       "name": "North Marion",
@@ -535,7 +574,8 @@
       "booster_support": 6,
       "community": "blue-collar",
       "enrollment": 650,
-      "facilities_grade": 7
+      "facilities_grade": 7,
+      "stadium_name": "Roy Michael Field"
     },
     {
       "name": "East Fairmont",
@@ -548,7 +588,8 @@
       "booster_support": 4,
       "community": "rural",
       "enrollment": 650,
-      "facilities_grade": 6
+      "facilities_grade": 6,
+      "stadium_name": "East-West Stadium"
     },
     {
       "name": "Nicholas County",
@@ -561,7 +602,8 @@
       "booster_support": 4,
       "community": "blue-collar",
       "enrollment": 650,
-      "facilities_grade": 5
+      "facilities_grade": 5,
+      "stadium_name": "Memorial Stadium"
     },
     {
       "name": "Robert C. Byrd",
@@ -574,7 +616,8 @@
       "booster_support": 3,
       "community": "urban",
       "enrollment": 650,
-      "facilities_grade": 5
+      "facilities_grade": 5,
+      "stadium_name": "Robert C Byrd Stadium"
     },
     {
       "name": "Point Pleasant",
@@ -587,7 +630,8 @@
       "booster_support": 3,
       "community": "rural",
       "enrollment": 650,
-      "facilities_grade": 4
+      "facilities_grade": 4,
+      "stadium_name": "Sanders Memorial Stadium"
     },
     {
       "name": "Grafton",
@@ -600,7 +644,8 @@
       "booster_support": 2,
       "community": "rural",
       "enrollment": 650,
-      "facilities_grade": 4
+      "facilities_grade": 4,
+      "stadium_name": "McKinney Field"
     },
     {
       "name": "Keyser",
@@ -613,7 +658,8 @@
       "booster_support": 3,
       "community": "rural",
       "enrollment": 600,
-      "facilities_grade": 3
+      "facilities_grade": 3,
+      "stadium_name": "Stayman Field"
     },
     {
       "name": "Berkeley Springs",
@@ -626,7 +672,8 @@
       "booster_support": 1,
       "community": "suburban",
       "enrollment": 580,
-      "facilities_grade": 1
+      "facilities_grade": 1,
+      "stadium_name": "Morgan Field"
     },
     {
       "name": "Frankfort",
@@ -639,7 +686,8 @@
       "booster_support": 8,
       "community": "blue-collar",
       "enrollment": 500,
-      "facilities_grade": 8
+      "facilities_grade": 8,
+      "stadium_name": "Frankfort Stadium"
     },
     {
       "name": "Braxton County",
@@ -652,7 +700,8 @@
       "booster_support": 2,
       "community": "rural",
       "enrollment": 500,
-      "facilities_grade": 2
+      "facilities_grade": 2,
+      "stadium_name": "Braxton County Stadium"
     },
     {
       "name": "Moorefield",
@@ -665,7 +714,8 @@
       "booster_support": 2,
       "community": "suburban",
       "enrollment": 475,
-      "facilities_grade": 2
+      "facilities_grade": 2,
+      "stadium_name": "Yellowjacket Field"
     },
     {
       "name": "Petersburg",
@@ -678,7 +728,8 @@
       "booster_support": 3,
       "community": "rural",
       "enrollment": 425,
-      "facilities_grade": 3
+      "facilities_grade": 3,
+      "stadium_name": "Viking Memorial Stadium"
     },
     {
       "name": "Midland Trail",
@@ -691,7 +742,8 @@
       "booster_support": 4,
       "community": "rural",
       "enrollment": 425,
-      "facilities_grade": 3
+      "facilities_grade": 3,
+      "stadium_name": "Patriot Stadium"
     },
     {
       "name": "Weir",
@@ -704,7 +756,8 @@
       "booster_support": 4,
       "community": "urban",
       "enrollment": 580,
-      "facilities_grade": 5
+      "facilities_grade": 5,
+      "stadium_name": "Jimmy Carey Stadium"
     },
     {
       "name": "Sissonville",
@@ -717,7 +770,8 @@
       "booster_support": 3,
       "community": "rural",
       "enrollment": 580,
-      "facilities_grade": 3
+      "facilities_grade": 3,
+      "stadium_name": "Joe Sawyers Field"
     },
     {
       "name": "Lincoln",
@@ -730,7 +784,8 @@
       "booster_support": 4,
       "community": "suburban",
       "enrollment": 560,
-      "facilities_grade": 5
+      "facilities_grade": 5,
+      "stadium_name": "Stydahar Field"
     },
     {
       "name": "Philip Barbour",
@@ -743,7 +798,8 @@
       "booster_support": 5,
       "community": "blue-collar",
       "enrollment": 560,
-      "facilities_grade": 4
+      "facilities_grade": 4,
+      "stadium_name": "George Byrer Field"
     },
     {
       "name": "Clay County",
@@ -756,7 +812,8 @@
       "booster_support": 3,
       "community": "rural",
       "enrollment": 500,
-      "facilities_grade": 3
+      "facilities_grade": 3,
+      "stadium_name": "Bradley Field"
     },
     {
       "name": "Roane County",
@@ -769,7 +826,8 @@
       "booster_support": 7,
       "community": "blue-collar",
       "enrollment": 500,
-      "facilities_grade": 8
+      "facilities_grade": 8,
+      "stadium_name": "County Stadium"
     },
     {
       "name": "Oak Glen",
@@ -782,7 +840,8 @@
       "booster_support": 2,
       "community": "rural",
       "enrollment": 475,
-      "facilities_grade": 2
+      "facilities_grade": 2,
+      "stadium_name": "Memorial Field"
     },
     {
       "name": "Wheeling Central",
@@ -795,7 +854,8 @@
       "booster_support": 10,
       "community": "affluent",
       "enrollment": 450,
-      "facilities_grade": 8
+      "facilities_grade": 8,
+      "stadium_name": "Bishop Schmitt Field"
     },
     {
       "name": "Pikeview",
@@ -808,7 +868,8 @@
       "booster_support": 2,
       "community": "rural",
       "enrollment": 580,
-      "facilities_grade": 1
+      "facilities_grade": 1,
+      "stadium_name": "Ben Disibbio Field"
     },
     {
       "name": "Bluefield",
@@ -821,7 +882,8 @@
       "booster_support": 8,
       "community": "urban",
       "enrollment": 580,
-      "facilities_grade": 8
+      "facilities_grade": 8,
+      "stadium_name": "Mitchell Stadium"
     },
     {
       "name": "Independence",
@@ -834,7 +896,8 @@
       "booster_support": 6,
       "community": "blue-collar",
       "enrollment": 580,
-      "facilities_grade": 6
+      "facilities_grade": 6,
+      "stadium_name": "George Covey Field"
     },
     {
       "name": "Westside",
@@ -847,7 +910,8 @@
       "booster_support": 3,
       "community": "rural",
       "enrollment": 500,
-      "facilities_grade": 4
+      "facilities_grade": 4,
+      "stadium_name": "The Burial Ground"
     },
     {
       "name": "James Monroe",
@@ -860,7 +924,8 @@
       "booster_support": 5,
       "community": "rural",
       "enrollment": 475,
-      "facilities_grade": 3
+      "facilities_grade": 3,
+      "stadium_name": "Comer Sports Complex"
     },
     {
       "name": "Wyoming East",
@@ -873,7 +938,8 @@
       "booster_support": 3,
       "community": "rural",
       "enrollment": 450,
-      "facilities_grade": 4
+      "facilities_grade": 4,
+      "stadium_name": "The War Zone"
     },
     {
       "name": "River View",
@@ -886,7 +952,8 @@
       "booster_support": 3,
       "community": "rural",
       "enrollment": 450,
-      "facilities_grade": 4
+      "facilities_grade": 4,
+      "stadium_name": "Mitchell Estep Field"
     },
     {
       "name": "Poca",
@@ -899,7 +966,8 @@
       "booster_support": 3,
       "community": "rural",
       "enrollment": 450,
-      "facilities_grade": 4
+      "facilities_grade": 4,
+      "stadium_name": "OO White Field"
     },
     {
       "name": "Chapmanville",
@@ -912,7 +980,8 @@
       "booster_support": 4,
       "community": "rural",
       "enrollment": 580,
-      "facilities_grade": 4
+      "facilities_grade": 4,
+      "stadium_name": "Barker Stadium"
     },
     {
       "name": "Mingo Central",
@@ -925,7 +994,8 @@
       "booster_support": 6,
       "community": "rural",
       "enrollment": 580,
-      "facilities_grade": 7
+      "facilities_grade": 7,
+      "stadium_name": "Buck Harless Stadium"
     },
     {
       "name": "Scott",
@@ -938,7 +1008,8 @@
       "booster_support": 4,
       "community": "blue-collar",
       "enrollment": 580,
-      "facilities_grade": 4
+      "facilities_grade": 4,
+      "stadium_name": "Scott Field"
     },
     {
       "name": "Logan",
@@ -951,7 +1022,8 @@
       "booster_support": 1,
       "community": "rural",
       "enrollment": 560,
-      "facilities_grade": 4
+      "facilities_grade": 4,
+      "stadium_name": "Logan Stadium"
     },
     {
       "name": "Wayne",
@@ -964,7 +1036,8 @@
       "booster_support": 2,
       "community": "blue-collar",
       "enrollment": 560,
-      "facilities_grade": 3
+      "facilities_grade": 3,
+      "stadium_name": "Pioneer Field"
     },
     {
       "name": "Ravenswood",
@@ -977,7 +1050,8 @@
       "booster_support": 1,
       "community": "rural",
       "enrollment": 425,
-      "facilities_grade": 2
+      "facilities_grade": 2,
+      "stadium_name": "Flinn Field"
     },
     {
       "name": "Buffalo",
@@ -990,7 +1064,8 @@
       "booster_support": 2,
       "community": "suburban",
       "enrollment": 425,
-      "facilities_grade": 3
+      "facilities_grade": 3,
+      "stadium_name": "Bison Field"
     },
     {
       "name": "Tyler Consolidated",
@@ -1003,7 +1078,8 @@
       "booster_support": 3,
       "community": "rural",
       "enrollment": 425,
-      "facilities_grade": 3
+      "facilities_grade": 3,
+      "stadium_name": "Tyler Field"
     },
     {
       "name": "South Harrison",
@@ -1016,7 +1092,8 @@
       "booster_support": 2,
       "community": "rural",
       "enrollment": 375,
-      "facilities_grade": 2
+      "facilities_grade": 2,
+      "stadium_name": "Gary Barnette Field"
     },
     {
       "name": "Webster Co",
@@ -1029,7 +1106,8 @@
       "booster_support": 2,
       "community": "rural",
       "enrollment": 350,
-      "facilities_grade": 2
+      "facilities_grade": 2,
+      "stadium_name": "Highlander Field"
     },
     {
       "name": "Richwood",
@@ -1042,7 +1120,8 @@
       "booster_support": 1,
       "community": "rural",
       "enrollment": 325,
-      "facilities_grade": 1
+      "facilities_grade": 1,
+      "stadium_name": "Dean Memorial Field"
     },
     {
       "name": "East Hardy",
@@ -1055,7 +1134,8 @@
       "booster_support": 3,
       "community": "rural",
       "enrollment": 325,
-      "facilities_grade": 2
+      "facilities_grade": 2,
+      "stadium_name": "Cougar Stadium"
     },
     {
       "name": "Tucker Co",
@@ -1068,7 +1148,8 @@
       "booster_support": 5,
       "community": "rural",
       "enrollment": 325,
-      "facilities_grade": 2
+      "facilities_grade": 2,
+      "stadium_name": "RH Armstrong Memorial Field"
     },
     {
       "name": "Pocahontas Co",
@@ -1081,7 +1162,8 @@
       "booster_support": 2,
       "community": "rural",
       "enrollment": 275,
-      "facilities_grade": 2
+      "facilities_grade": 2,
+      "stadium_name": "Memorial Field"
     },
     {
       "name": "Pendleton Co",
@@ -1094,7 +1176,8 @@
       "booster_support": 4,
       "community": "rural",
       "enrollment": 225,
-      "facilities_grade": 4
+      "facilities_grade": 4,
+      "stadium_name": "Slusher Field"
     },
     {
       "name": "Tygarts Valley",
@@ -1107,7 +1190,8 @@
       "booster_support": 2,
       "community": "rural",
       "enrollment": 200,
-      "facilities_grade": 2
+      "facilities_grade": 2,
+      "stadium_name": "Bulldog Field"
     },
     {
       "name": "Doddridge Co",
@@ -1120,7 +1204,8 @@
       "booster_support": 8,
       "community": "blue-collar",
       "enrollment": 375,
-      "facilities_grade": 9
+      "facilities_grade": 9,
+      "stadium_name": "Cline Stansberry Stadium"
     },
     {
       "name": "Williamstown",
@@ -1133,7 +1218,8 @@
       "booster_support": 9,
       "community": "blue-collar",
       "enrollment": 375,
-      "facilities_grade": 6
+      "facilities_grade": 6,
+      "stadium_name": "Yellowjacket Field"
     },
     {
       "name": "Clay Battelle",
@@ -1146,7 +1232,8 @@
       "booster_support": 2,
       "community": "suburban",
       "enrollment": 350,
-      "facilities_grade": 3
+      "facilities_grade": 3,
+      "stadium_name": "Clay Battelle Stadium"
     },
     {
       "name": "Magnolia",
@@ -1159,7 +1246,8 @@
       "booster_support": 2,
       "community": "rural",
       "enrollment": 275,
-      "facilities_grade": 2
+      "facilities_grade": 2,
+      "stadium_name": "Alumni Field"
     },
     {
       "name": "Wirt Co",
@@ -1172,7 +1260,8 @@
       "booster_support": 3,
       "community": "rural",
       "enrollment": 275,
-      "facilities_grade": 2
+      "facilities_grade": 2,
+      "stadium_name": "Wilson-Eismon Field"
     },
     {
       "name": "Cameron",
@@ -1185,7 +1274,8 @@
       "booster_support": 5,
       "community": "rural",
       "enrollment": 150,
-      "facilities_grade": 4
+      "facilities_grade": 4,
+      "stadium_name": "Dragon Field"
     },
     {
       "name": "Valley",
@@ -1198,7 +1288,8 @@
       "booster_support": 1,
       "community": "rural",
       "enrollment": 200,
-      "facilities_grade": 4
+      "facilities_grade": 4,
+      "stadium_name": "Thomas West Field"
     },
     {
       "name": "Madonna",
@@ -1211,7 +1302,8 @@
       "booster_support": 2,
       "community": "urban",
       "enrollment": 150,
-      "facilities_grade": 2
+      "facilities_grade": 2,
+      "stadium_name": "Jimmy Carey Stadium"
     },
     {
       "name": "Summers County",
@@ -1224,7 +1316,8 @@
       "booster_support": 1,
       "community": "rural",
       "enrollment": 375,
-      "facilities_grade": 1
+      "facilities_grade": 1,
+      "stadium_name": "Garten Stadium"
     },
     {
       "name": "Greenbrier West",
@@ -1237,7 +1330,8 @@
       "booster_support": 5,
       "community": "blue-collar",
       "enrollment": 375,
-      "facilities_grade": 5
+      "facilities_grade": 5,
+      "stadium_name": "Cavalier Field"
     },
     {
       "name": "Liberty",
@@ -1250,7 +1344,8 @@
       "booster_support": 3,
       "community": "rural",
       "enrollment": 375,
-      "facilities_grade": 5
+      "facilities_grade": 5,
+      "stadium_name": "Liberty HS Stadium"
     },
     {
       "name": "Mount View",
@@ -1263,7 +1358,8 @@
       "booster_support": 1,
       "community": "urban",
       "enrollment": 350,
-      "facilities_grade": 4
+      "facilities_grade": 4,
+      "stadium_name": "Vic Nystrom Stadium"
     },
     {
       "name": "Man",
@@ -1276,7 +1372,8 @@
       "booster_support": 4,
       "community": "rural",
       "enrollment": 350,
-      "facilities_grade": 3
+      "facilities_grade": 3,
+      "stadium_name": "George Queen Memorial Field"
     },
     {
       "name": "Sherman",
@@ -1289,7 +1386,8 @@
       "booster_support": 4,
       "community": "rural",
       "enrollment": 350,
-      "facilities_grade": 3
+      "facilities_grade": 3,
+      "stadium_name": "Zontini Field"
     },
     {
       "name": "Meadow Bridge",
@@ -1302,7 +1400,8 @@
       "booster_support": 2,
       "community": "rural",
       "enrollment": 150,
-      "facilities_grade": 1
+      "facilities_grade": 1,
+      "stadium_name": "Frank Arritt Stadium"
     },
     {
       "name": "Van",
@@ -1315,7 +1414,8 @@
       "booster_support": 2,
       "community": "rural",
       "enrollment": 100,
-      "facilities_grade": 3
+      "facilities_grade": 3,
+      "stadium_name": "Herschel Jerrell Field"
     },
     {
       "name": "Ritchie County",
@@ -1328,7 +1428,8 @@
       "booster_support": 2,
       "community": "rural",
       "enrollment": 350,
-      "facilities_grade": 2
+      "facilities_grade": 2,
+      "stadium_name": "Chuck Schofield Memorial Stadium"
     },
     {
       "name": "St. Marys",
@@ -1341,7 +1442,8 @@
       "booster_support": 5,
       "community": "suburban",
       "enrollment": 325,
-      "facilities_grade": 3
+      "facilities_grade": 3,
+      "stadium_name": "Imlay Field"
     },
     {
       "name": "Tolsia",
@@ -1354,7 +1456,8 @@
       "booster_support": 2,
       "community": "rural",
       "enrollment": 375,
-      "facilities_grade": 2
+      "facilities_grade": 2,
+      "stadium_name": "Wilts Salmons Athletic Field"
     },
     {
       "name": "Tug Valley",
@@ -1367,7 +1470,8 @@
       "booster_support": 4,
       "community": "rural",
       "enrollment": 325,
-      "facilities_grade": 2
+      "facilities_grade": 2,
+      "stadium_name": "Bob Brewer Stadium"
     },
     {
       "name": "Montcalm",
@@ -1380,7 +1484,8 @@
       "booster_support": 2,
       "community": "rural",
       "enrollment": 225,
-      "facilities_grade": 1
+      "facilities_grade": 1,
+      "stadium_name": "Prudich Stadium"
     },
     {
       "name": "Calhoun Co",
@@ -1393,7 +1498,8 @@
       "booster_support": 1,
       "community": "rural",
       "enrollment": 225,
-      "facilities_grade": 1
+      "facilities_grade": 1,
+      "stadium_name": "Underwood Field"
     },
     {
       "name": "Wahama",
@@ -1406,7 +1512,8 @@
       "booster_support": 5,
       "community": "rural",
       "enrollment": 225,
-      "facilities_grade": 5
+      "facilities_grade": 5,
+      "stadium_name": "Bachtel Stadium"
     },
     {
       "name": "Gilmer Co",
@@ -1419,7 +1526,8 @@
       "booster_support": 3,
       "community": "rural",
       "enrollment": 200,
-      "facilities_grade": 8
+      "facilities_grade": 8,
+      "stadium_name": "IL Morris Stadium"
     }
   ]
 }

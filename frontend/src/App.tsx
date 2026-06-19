@@ -28,6 +28,7 @@ import {
   tryRefreshAppSession,
 } from './authSession.js'
 import { getAuthInstance, resetPassword } from './auth.js'
+import SignupTermsConsent from './SignupTermsConsent'
 import { getOrCreateDeviceId } from './deviceId.js'
 
 /** Stable reference so child effects do not re-run when logged out (browser saves). */
@@ -102,6 +103,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
   const [authBusy, setAuthBusy] = useState(false)
   const [resetPasswordBusy, setResetPasswordBusy] = useState(false)
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login')
+  const [termsAccepted, setTermsAccepted] = useState(false)
   const [deviceLimitDevices, setDeviceLimitDevices] = useState<
     Array<{ device_id: string; label?: string | null; last_seen_at?: number }>
   >([])
@@ -474,6 +476,10 @@ export default function App({ devNoFirebase = false }: AppProps) {
     const em = email.trim()
     if (!em || !password) {
       setError('Enter email and password.')
+      return false
+    }
+    if (mode === 'signup' && !termsAccepted) {
+      setError('You must agree to the Terms of Service and Privacy Policy.')
       return false
     }
     setAuthBusy(true)
@@ -1016,7 +1022,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
     homeGameThemesAck?: boolean
     playoffsSim?: boolean
     seasonFinish?: boolean
-    crossRegionPicks?: { slot_index: number; opponent: string }[]
+    crossRegionPicks?: { slot_index: number; opponent: string; user_home: boolean }[]
     /** Scrimmage Simulate — always hit preseason advance (avoids wrong URL if season_phase in React state is stale). */
     forcePreseasonAdvance?: boolean
     offseasonBody?: {
@@ -1307,6 +1313,10 @@ export default function App({ devNoFirebase = false }: AppProps) {
   }
 
   useEffect(() => {
+    if (authMode === 'login') setTermsAccepted(false)
+  }, [authMode])
+
+  useEffect(() => {
     if (!token) return
     void validateSession(token).then((ok) => {
       if (!ok) clearStaleSession()
@@ -1496,7 +1506,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
         <iframe
           className="fnd-title-iframe"
           title="Friday Night Dynasty"
-          src={`${import.meta.env.BASE_URL}fnd_homepage.html?v=20260607`}
+          src={`${import.meta.env.BASE_URL}fnd_homepage.html?v=20260618b`}
         />
       ) : (
         <div className="fnd-title-inner">
@@ -1618,7 +1628,14 @@ export default function App({ devNoFirebase = false }: AppProps) {
                     placeholder="Password"
                     onKeyDown={(e) => e.key === 'Enter' && void onContinueLoad()}
                   />
-                  <button type="button" disabled={authBusy} onClick={() => void onContinueLoad()}>
+                  {authMode === 'signup' ? (
+                    <SignupTermsConsent checked={termsAccepted} onChange={setTermsAccepted} />
+                  ) : null}
+                  <button
+                    type="button"
+                    disabled={authBusy || (authMode === 'signup' && !termsAccepted)}
+                    onClick={() => void onContinueLoad()}
+                  >
                     {authBusy ? 'Please wait…' : authMode === 'signup' ? 'Sign up' : 'Log in'}
                   </button>
                   {authMode === 'login' ? (
@@ -1731,7 +1748,14 @@ export default function App({ devNoFirebase = false }: AppProps) {
                     placeholder="Password"
                     onKeyDown={(e) => e.key === 'Enter' && void onContinueNew()}
                   />
-                  <button type="button" disabled={authBusy} onClick={() => void onContinueNew()}>
+                  {authMode === 'signup' ? (
+                    <SignupTermsConsent checked={termsAccepted} onChange={setTermsAccepted} />
+                  ) : null}
+                  <button
+                    type="button"
+                    disabled={authBusy || (authMode === 'signup' && !termsAccepted)}
+                    onClick={() => void onContinueNew()}
+                  >
                     {authBusy ? 'Please wait…' : authMode === 'signup' ? 'Create account & continue' : 'Log in & continue'}
                   </button>
                   {authMode === 'login' ? (
@@ -1775,7 +1799,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
             onError={setError}
             onSessionExpired={() => expireSession()}
             defaultCoachName={username}
-            onCreated={async (cloudId) => {
+            onCreated={async (cloudId, logos) => {
               try {
                 const auth = await getAuthHeaders()
                 const r = await fetch(`${API_BASE}/saves/${cloudId}`, { headers: auth })
@@ -1794,7 +1818,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
                     state: data.state,
                     leagueHistory: data.league_history ?? { seasons: [] },
                     records: data.records ?? {},
-                    logos: {},
+                    logos: logos ?? {},
                     stadiums: {},
                     helmets: {},
                     jerseys: {},

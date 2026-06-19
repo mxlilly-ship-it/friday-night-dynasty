@@ -1,5 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import './NewSaveFlow.css'
+import { buildTeamAssetLookup, suggestTeamForLogoFilename } from './logoMatch'
+import { guessMime, type SaveBundle } from './saveBundle'
+import TeamLogo from './TeamLogo'
+import CustomLeagueInstructionsModal from './CustomLeagueInstructionsModal'
 import {
   COACH_PRESETS,
   DEFAULT_SKILLS,
@@ -15,12 +19,31 @@ import {
 
 const STEPS = ['Save slot', 'Coach', 'Attributes', 'Your school'] as const
 
+const MAX_IMAGE_FILES = 200
+const MAX_LOGO_BYTES = 5 * 1024 * 1024
+
+function filterImageFiles(files: readonly File[]): File[] {
+  return files.filter((f) => {
+    const n = f.name
+    if (!n || n.startsWith('.')) return false
+    if (/^\.ds_store$/i.test(n) || /^thumbs\.db$/i.test(n)) return false
+    return /\.(png|jpe?g|webp)$/i.test(n)
+  })
+}
+
+function snapshotFiles(list: FileList | null): File[] {
+  if (!list?.length) return []
+  return Array.from(list)
+}
+
+type LogoRow = { file: File; team: string }
+
 type Props = {
   apiBase: string
   headers: Record<string, string>
   getAuthHeaders?: () => Promise<Record<string, string>>
   onBack: () => void
-  onCreated: (saveId: string) => void
+  onCreated: (saveId: string, logos?: SaveBundle['logos']) => void
   onError: (msg: string) => void
   onSessionExpired?: () => void
   defaultCoachName?: string
@@ -66,6 +89,117 @@ export function NewSaveFlow({
   const [disableTransfers, setDisableTransfers] = useState(false)
   const [teamSource, setTeamSource] = useState<'default' | 'upload'>('default')
   const [uploadedFileName, setUploadedFileName] = useState('')
+  const [logoRows, setLogoRows] = useState<LogoRow[]>([])
+  const logoFolderInputRef = useRef<HTMLInputElement | null>(null)
+  const logoFilesInputRef = useRef<HTMLInputElement | null>(null)
+  const [defaultLogoVersion, setDefaultLogoVersion] = useState<number | undefined>(undefined)
+  const [showCustomLeagueHelp, setShowCustomLeagueHelp] = useState(false)
+
+  const setLogoFolderInputEl = useCallback((el: HTMLInputElement | null) => {
+    logoFolderInputRef.current = el
+    if (!el) return
+    try {
+      el.setAttribute('webkitdirectory', '')
+      el.setAttribute('directory', '')
+      el.multiple = true
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  const uploadedTeamNames = useMemo(() => {
+    if (!teamsData?.teams) return []
+    return teamsData.teams.map((t) => t.name).filter(Boolean) as string[]
+  }, [teamsData])
+
+  const sortedUploadedTeams = useMemo(
+    () => [...uploadedTeamNames].sort((a, b) => a.localeCompare(b)),
+    [uploadedTeamNames],
+  )
+
+  const logoAssetLookup = useMemo(() => buildTeamAssetLookup(teamsData?.teams ?? []), [teamsData])
+
+  const suggestLogoTeam = useCallback(
+    (filename: string, teams: string[]) => suggestTeamForLogoFilename(filename, teams, logoAssetLookup),
+    [logoAssetLookup],
+  )
+
+  const buildLogoRowsFromFiles = (raw: File[]) => {
+    const imageFiles = filterImageFiles(raw)
+    if (imageFiles.length === 0) {
+      onError(
+        raw.length > 0
+          ? `Found ${raw.length} file(s), but none were PNG, JPG, or WEBP.`
+          : 'No image files were selected.',
+      )
+      return
+    }
+    if (!uploadedTeamNames.length) {
+      onError('Upload your teams .json first so logos can be matched to schools.')
+      return
+    }
+    const capped = imageFiles.length > MAX_IMAGE_FILES ? imageFiles.slice(0, MAX_IMAGE_FILES) : imageFiles
+    setLogoRows(
+      capped.map((file) => ({
+        file,
+        team: suggestLogoTeam(file.name, uploadedTeamNames),
+      })),
+    )
+    if (imageFiles.length > MAX_IMAGE_FILES) {
+      onError(`Showing first ${MAX_IMAGE_FILES} of ${imageFiles.length} images. Add more in Settings if needed.`)
+    } else {
+      onError('')
+    }
+  }
+
+  const onLogoFolderChange = (e: ChangeEvent<HTMLInputElement>) => {
+    buildLogoRowsFromFiles(snapshotFiles(e.target.files))
+    e.target.value = ''
+  }
+
+  const onLogoFilesChange = (e: ChangeEvent<HTMLInputElement>) => {
+    buildLogoRowsFromFiles(snapshotFiles(e.target.files))
+    e.target.value = ''
+  }
+
+  const setLogoTeamAt = (index: number, team: string) => {
+    setLogoRows((prev) => {
+      const copy = [...prev]
+      if (copy[index]) copy[index] = { ...copy[index], team }
+      return copy
+    })
+  }
+
+  const [pendingLogoUrls, setPendingLogoUrls] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    const urls: Record<string, string> = {}
+    const objectUrls: string[] = []
+    for (const row of logoRows) {
+      const team = row.team.trim()
+      if (!team) continue
+      const url = URL.createObjectURL(row.file)
+      objectUrls.push(url)
+      urls[team] = url
+    }
+    setPendingLogoUrls(urls)
+    return () => {
+      for (const u of objectUrls) URL.revokeObjectURL(u)
+    }
+  }, [logoRows])
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(`${apiBase}/default-logos/version`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { version?: number } | null) => {
+        if (!cancelled && j && typeof j.version === 'number') setDefaultLogoVersion(j.version)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [apiBase])
 
   const loadTeamsData = useCallback(async () => {
     setLoadingTeams(true)
@@ -77,7 +211,7 @@ export function NewSaveFlow({
         const body = await r.text()
         onError(
           `Teams request failed (${r.status}). ${body || r.statusText}. ` +
-            'Make sure the API is running: python -m uvicorn backend.app:app --host 127.0.0.1 --port 8001',
+            'Make sure the API is running: python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000',
         )
         return
       }
@@ -97,7 +231,7 @@ export function NewSaveFlow({
       const msg = e instanceof Error ? e.message : 'Network error'
       onError(
         `Could not load teams (${msg}). ` +
-          'Is the API running? Start it from the project folder: python -m uvicorn backend.app:app --host 127.0.0.1 --port 8001',
+          'Is the API running? Start it from the project folder: python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000',
       )
     } finally {
       setLoadingTeams(false)
@@ -298,8 +432,52 @@ export function NewSaveFlow({
         return
       }
       const created = await r.json()
-      if (created?.save_id) onCreated(created.save_id)
-      else onError('Save created but no id returned.')
+      if (created?.save_id) {
+        const toUpload = logoRows.filter((r) => r.team.trim())
+        if (toUpload.length > 0) {
+          const uploadHeaders: Record<string, string> = {}
+          if (auth.Authorization) uploadHeaders.Authorization = auth.Authorization
+          for (const { file, team } of toUpload) {
+            if (file.size > MAX_LOGO_BYTES) {
+              onError(`${file.name} is too large (max 5 MB).`)
+              return
+            }
+            const fd = new FormData()
+            fd.append('logo', file)
+            const ur = await fetch(`${apiBase}/saves/logos/${encodeURIComponent(team)}`, {
+              method: 'POST',
+              headers: uploadHeaders,
+              body: fd,
+            })
+            if (!ur.ok) {
+              if (ur.status === 401) {
+                onSessionExpired?.()
+                return
+              }
+              try {
+                const maybe = await ur.json()
+                onError(typeof maybe?.detail === 'string' ? maybe.detail : `Failed to upload logo for ${team}`)
+              } catch {
+                onError(`Failed to upload logo for ${team}`)
+              }
+              return
+            }
+          }
+        }
+        let logosBundle: SaveBundle['logos'] | undefined
+        if (toUpload.length > 0) {
+          logosBundle = {}
+          for (const { file, team } of toUpload) {
+            const buf = new Uint8Array(await file.arrayBuffer())
+            logosBundle[team] = {
+              filename: file.name,
+              data: buf,
+              mime: file.type?.startsWith('image/') ? file.type : guessMime(file.name),
+            }
+          }
+        }
+        onCreated(created.save_id, logosBundle)
+      } else onError('Save created but no id returned.')
     } finally {
       setCreating(false)
     }
@@ -354,9 +532,21 @@ export function NewSaveFlow({
             placeholder="e.g. Year 1 — Martinsburg"
             autoFocus
           />
+          <div className="newsave-help-row">
+            <button
+              type="button"
+              className="newsave-help-btn"
+              onClick={() => setShowCustomLeagueHelp(true)}
+            >
+              How to upload a custom league
+            </button>
+            <span className="newsave-help-suffix">— Your States League</span>
+          </div>
           <p className="newsave-footnote">
             <span className="newsave-footnote-mark newsave-footnote-mark--lead">*</span>
-            Import logos, stadiums, helmets, and jerseys in Settings after your dynasty starts.
+            {teamSource === 'upload'
+              ? 'Custom leagues can add logos below. Import stadiums, helmets, and jerseys in Settings after your dynasty starts.'
+              : 'Import logos, stadiums, helmets, and jerseys in Settings after your dynasty starts.'}
           </p>
           <div className="newsave-row2" style={{ marginTop: 12 }}>
             <div />
@@ -422,11 +612,12 @@ export function NewSaveFlow({
                   setUploadedFileName('')
                   setTeamsData(null)
                   setUserTeam('')
+                  setLogoRows([])
                   loadTeamsData()
                 }}
               >
                 <strong>Default teams file</strong>
-                <small>Use built-in data/teams.json</small>
+                <small>Use built-in league file (112 schools)</small>
               </button>
               <button
                 type="button"
@@ -435,6 +626,7 @@ export function NewSaveFlow({
                   setTeamSource('upload')
                   setTeamsData(null)
                   setUserTeam('')
+                  setLogoRows([])
                 }}
               >
                 <strong>Upload .json</strong>
@@ -450,6 +642,7 @@ export function NewSaveFlow({
                     const f = e.target.files?.[0]
                     if (!f) return
                     setUploadedFileName(f.name)
+                    setLogoRows([])
                     onError('')
                     try {
                       const txt = await f.text()
@@ -474,6 +667,107 @@ export function NewSaveFlow({
                 <div className="newsave-sub" style={{ marginTop: 6 }}>
                   {uploadedFileName ? `Selected: ${uploadedFileName}` : 'No file selected'}
                 </div>
+              </div>
+            ) : null}
+            {teamSource === 'upload' ? (
+              <div className="newsave-logo-section">
+                <div className="newsave-sub" style={{ marginBottom: 8 }}>
+                  League logos <span className="newsave-footnote-mark">(optional)</span>
+                </div>
+                {!teamsData ? (
+                  <p className="newsave-footnote">Upload your teams .json first so filenames can be matched to schools.</p>
+                ) : (
+                  <>
+                    <p className="newsave-footnote newsave-logo-hint">
+                      Choose a <strong>folder</strong> or <strong>image files</strong>. We guess the school from each
+                      filename (e.g. <code>Martinsburg.png</code> or an abbreviation). Change any row before you finish
+                      setup — logos upload when you create the save.
+                    </p>
+                    <input
+                      ref={setLogoFolderInputEl}
+                      type="file"
+                      className="newsave-file-input"
+                      onChange={onLogoFolderChange}
+                    />
+                    <input
+                      ref={logoFilesInputRef}
+                      type="file"
+                      multiple
+                      accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+                      className="newsave-file-input"
+                      onChange={onLogoFilesChange}
+                    />
+                    <div className="newsave-logo-actions">
+                      <button
+                        type="button"
+                        className="fnd-title-btn newsave-logo-btn"
+                        disabled={creating}
+                        onClick={() => logoFolderInputRef.current?.click()}
+                      >
+                        Choose folder…
+                      </button>
+                      <button
+                        type="button"
+                        className="fnd-title-btn newsave-logo-btn newsave-logo-btn--secondary"
+                        disabled={creating}
+                        onClick={() => logoFilesInputRef.current?.click()}
+                      >
+                        Choose image files…
+                      </button>
+                    </div>
+                    {logoRows.length > 0 ? (
+                      <div className="newsave-logo-review">
+                        <div className="newsave-logo-review-head">
+                          <span>
+                            {logoRows.filter((r) => r.team).length} of {logoRows.length} assigned
+                          </span>
+                          <button
+                            type="button"
+                            className="newsave-linkbtn"
+                            disabled={creating}
+                            onClick={() => setLogoRows([])}
+                          >
+                            Clear list
+                          </button>
+                        </div>
+                        <div className="newsave-logo-table-wrap">
+                          <table className="newsave-logo-table">
+                            <thead>
+                              <tr>
+                                <th>File</th>
+                                <th>Team</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {logoRows.map((row, i) => (
+                                <tr key={`${row.file.name}-${i}-${row.file.size}`}>
+                                  <td className="newsave-logo-filecell" title={row.file.name}>
+                                    {row.file.name}
+                                  </td>
+                                  <td>
+                                    <select
+                                      className="newsave-select newsave-logo-team-select"
+                                      value={row.team}
+                                      onChange={(e) => setLogoTeamAt(i, e.target.value)}
+                                      disabled={creating}
+                                    >
+                                      <option value="">— Skip —</option>
+                                      {sortedUploadedTeams.map((t) => (
+                                        <option key={t} value={t}>
+                                          {t}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
+                )}
               </div>
             ) : null}
           </div>
@@ -664,7 +958,19 @@ export function NewSaveFlow({
                   className={`newsave-team-card ${userTeam === t.name ? 'selected' : ''}`}
                   onClick={() => setUserTeam(t.name)}
                 >
-                  <div className="tn">{t.name}</div>
+                  <div className="tn">
+                    <TeamLogo
+                      apiBase={apiBase}
+                      teamName={t.name}
+                      headers={headers}
+                      overrideSrc={pendingLogoUrls[t.name]}
+                      preferDefaultLogos={teamSource === 'default' && !pendingLogoUrls[t.name]}
+                      logoVersion={defaultLogoVersion}
+                      hideWhenMissing
+                      size={28}
+                    />
+                    <span>{t.name}</span>
+                  </div>
                   <div className="tm">
                     <span>
                       {t.classification ?? '—'} · Prestige {t.prestige ?? '—'}
@@ -716,6 +1022,10 @@ export function NewSaveFlow({
           </button>
         )}
       </div>
+
+      {showCustomLeagueHelp ? (
+        <CustomLeagueInstructionsModal onClose={() => setShowCustomLeagueHelp(false)} />
+      ) : null}
     </div>
   )
 }

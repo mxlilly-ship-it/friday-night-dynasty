@@ -106,8 +106,8 @@
 }
 
 .isdash-stadium-photo.teamstadium {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  inset: auto;
   z-index: 1;
   min-height: 0;
   max-height: none;

@@ -48,6 +48,7 @@ function suggestTeamForAssetFilename(
   filename: string,
   teams: string[],
   suffixes: readonly string[],
+  assetLookup?: Map<string, string>,
 ): string {
   const stem = filename.replace(/\.[^.]+$/i, '').trim()
   if (!stem || teams.length === 0) return ''
@@ -59,13 +60,41 @@ function suggestTeamForAssetFilename(
   for (const v of stemVariants(stem, suffixes)) {
     const kn = normalizeNameKey(v)
     if (kn && byNorm.has(kn)) return byNorm.get(kn)!
+    if (kn && assetLookup?.has(kn)) {
+      const canonical = assetLookup.get(kn)!
+      const cn = normalizeNameKey(canonical)
+      if (cn && byNorm.has(cn)) return byNorm.get(cn)!
+    }
   }
   return ''
 }
 
+/** Normalized name or abbreviation → canonical school name (from league JSON rows). */
+export function buildTeamAssetLookup(
+  teams: Array<{ name?: string; abbreviation?: string }>,
+): Map<string, string> {
+  const map = new Map<string, string>()
+  for (const t of teams) {
+    const name = String(t.name ?? '').trim()
+    if (!name) continue
+    const nk = normalizeNameKey(name)
+    if (nk) map.set(nk, name)
+    const abbr = String(t.abbreviation ?? '').trim()
+    if (abbr) {
+      const ak = normalizeNameKey(abbr)
+      if (ak) map.set(ak, name)
+    }
+  }
+  return map
+}
+
 /** Guess which save team a logo file belongs to (filename without extension). */
-export function suggestTeamForLogoFilename(filename: string, teams: string[]): string {
-  return suggestTeamForAssetFilename(filename, teams, LOGO_STEM_SUFFIXES)
+export function suggestTeamForLogoFilename(
+  filename: string,
+  teams: string[],
+  assetLookup?: Map<string, string>,
+): string {
+  return suggestTeamForAssetFilename(filename, teams, LOGO_STEM_SUFFIXES, assetLookup)
 }
 
 /** Guess team from stadium/field photo filenames (e.g. Martinsburg_stadium.jpg). */

@@ -17,6 +17,12 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 LEAGUE_PRESETS: List[Dict[str, str]] = [
     {
+        "id": "wv",
+        "label": "West Virginia (archived)",
+        "description": "Original 108-school WV league — 8-team playoff per class.",
+        "filename": "wv_league.json",
+    },
+    {
         "id": "wv_3class",
         "label": "West Virginia 3-Class",
         "description": "1A / 2A / 3A — 16-team playoff per class (1-16 seeding, no regional brackets).",

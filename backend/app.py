@@ -55,6 +55,7 @@ def create_app() -> FastAPI:
         "CORS_ORIGINS",
         "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173,"
         "http://localhost:3000,http://127.0.0.1:3000,"
+        "http://127.0.0.1:8000,http://localhost:8000,"
         "http://127.0.0.1:8001,http://localhost:8001",
     ).split(",")
     app.add_middleware(
@@ -106,6 +107,65 @@ def create_app() -> FastAPI:
                 return json.load(f)
         except Exception as e:
             return {"_schema": str(e), "teams": [], "_debug": {"cwd": os.getcwd()}}
+
+    @app.get("/default-logos/version")
+    def default_logos_version_route():
+        """Cache-bust token for built-in crests (changes when data/logos/ files change)."""
+        from backend.services.league_service import default_logos_cache_version
+
+        return {"version": default_logos_cache_version()}
+
+    @app.get("/default-logos/{team_name}")
+    def get_default_team_logo_route(team_name: str):
+        """Built-in team crest from data/logos/ (new-save school picker; no user overrides)."""
+        from backend.services.league_service import get_default_team_logo_path
+
+        name = (team_name or "").strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Missing team name")
+        path = get_default_team_logo_path(name)
+        if not path:
+            raise HTTPException(status_code=404, detail="Logo not found")
+        media_type = "image/png"
+        low = path.lower()
+        if low.endswith(".jpg") or low.endswith(".jpeg"):
+            media_type = "image/jpeg"
+        elif low.endswith(".webp"):
+            media_type = "image/webp"
+        return FileResponse(
+            path,
+            media_type=media_type,
+            headers={"Cache-Control": "no-store, max-age=0", "Pragma": "no-cache"},
+        )
+
+    def _default_stadium_path() -> str:
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+        candidates = [
+            os.path.abspath(os.path.join(app_dir, "..", "data", "default_stadium.png")),
+            os.path.join(os.getcwd(), "data", "default_stadium.png"),
+        ]
+        for p in candidates:
+            if p and os.path.isfile(p):
+                return p
+        return candidates[0] if candidates else "data/default_stadium.png"
+
+    @app.get("/default-stadium/version")
+    def default_stadium_version_route():
+        path = _default_stadium_path()
+        version = int(os.path.getmtime(path)) if os.path.isfile(path) else 0
+        return {"version": version}
+
+    @app.get("/default-stadium")
+    def get_default_stadium_route():
+        """Built-in stadium photo shown when a team has no custom upload."""
+        path = _default_stadium_path()
+        if not os.path.isfile(path):
+            raise HTTPException(status_code=404, detail="Default stadium image not found")
+        return FileResponse(
+            path,
+            media_type="image/png",
+            headers={"Cache-Control": "no-store, max-age=0", "Pragma": "no-cache"},
+        )
 
     @app.get("/league-presets")
     def list_league_presets_route():
@@ -173,8 +233,8 @@ def create_app() -> FastAPI:
             "pid": os.getpid(),
             "boot_unix": _API_BOOT_UNIX,
             "build_label": label or None,
-            "vite_proxy_default": "http://127.0.0.1:8001",
-            "hint": "Restart uvicorn after code changes. Dev/preview UI proxies /api to VITE_API_PROXY_TARGET (default 8001).",
+            "vite_proxy_default": "http://127.0.0.1:8000",
+            "hint": "Dev UI (npm run dev) proxies /api to port 8000. Run: python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000 --reload. Single-server mode: python run_game.py (port 8001).",
             "coach_week_sim_emails_enabled": _coach_sim_emails_enabled(),
             "fnd_disable_week_sim_emails": disable_val,
             "data_root": data_dir,

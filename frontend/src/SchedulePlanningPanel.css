@@ -144,3 +144,41 @@
   color: #dde0f0;
   font-size: 13px;
 }
+
+.schedplan-ha-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.schedplan-ha-toggle {
+  display: inline-flex;
+  border-radius: 8px;
+  border: 0.5px solid #1e2a3a;
+  overflow: hidden;
+  background: #080d14;
+}
+
+.schedplan-ha-btn {
+  padding: 8px 14px;
+  border: none;
+  background: transparent;
+  color: #5a6a8a;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.schedplan-ha-btn + .schedplan-ha-btn {
+  border-left: 0.5px solid #1e2a3a;
+}
+
+.schedplan-ha-btn--active {
+  background: #1a1500;
+  color: #e8a020;
+}
+
+.schedplan-ha-btn:hover:not(.schedplan-ha-btn--active) {
+  color: #9aa8c0;
+}

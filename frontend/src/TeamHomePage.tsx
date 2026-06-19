@@ -9,9 +9,18 @@ import { cachePlaySelectionResponse, hasPlaySelectionCache } from './playSelecti
 import DepthChartPage from './DepthChartPage'
 import ScrimmagePanel from './ScrimmagePanel'
 import PreseasonHubHeader from './PreseasonHubHeader'
-import { formatPositionRecommendation, recommendBalancedPositionsForRoster, recommendPlayerPositions } from './positionRecommendations'
+import {
+  ALL_POSITIONS_ORDERED,
+  countPrimaryPositions,
+  formatPositionRecommendation,
+  primaryPositionTargets,
+  recommendBalancedPositionsForRoster,
+  recommendPlayerPositions,
+} from './positionRecommendations'
 import GamePlayPage from './GamePlayPage'
 import TeamLogo from './TeamLogo'
+import { LogoPrefsProvider } from './LogoPrefsContext'
+import { saveUsesDefaultLeagueLogos } from './logoPrefs'
 import SettingsPage from './SettingsPage'
 import TeamInfoPage from './TeamInfoPage'
 import { buildTeamInfoData } from './teamInfoData'
@@ -59,8 +68,10 @@ import {
   allSlotsFilled,
   buildCrossRegionPicksPayload,
   crossRegionSlotCountFromSave,
+  emptySlotSelection,
   schedulePlanningInfoFromState,
   userClassExpectsCrossRegionPicks,
+  type CrossRegionSelections,
 } from './schedulePlanningData'
 import { deriveUiPhaseFromSave } from './seasonPhase'
 import { buildPregamePreviewData } from './pregamePreviewData'
@@ -259,7 +270,7 @@ type Props = {
     homeGameThemesAck?: boolean
     playoffsSim?: boolean
     seasonFinish?: boolean
-    crossRegionPicks?: { slot_index: number; opponent: string }[]
+    crossRegionPicks?: { slot_index: number; opponent: string; user_home: boolean }[]
     forcePreseasonAdvance?: boolean
     offseasonBody?: {
       winter_strength_pct?: number
@@ -1744,7 +1755,7 @@ function TeamHomePageBody({
   const crossRegionSlotCount = useMemo(() => crossRegionSlotCountFromSave(saveState), [saveState?.user_cross_region_slot_count, saveState?.schedule_planning_info])
   const expectsCrossRegionPicks = useMemo(() => userClassExpectsCrossRegionPicks(saveState), [saveState?.user_team, saveState?.teams])
   const effectiveCrossRegionSlots = crossRegionSlotCount > 0 ? crossRegionSlotCount : expectsCrossRegionPicks ? Math.max(schedulePlanningInfo?.slot_count ?? 0, 1) : 0
-  const [crossRegionSelections, setCrossRegionSelections] = useState<Record<number, string>>({})
+  const [crossRegionSelections, setCrossRegionSelections] = useState<CrossRegionSelections>({})
   const crossRegionReady = useMemo(
     () => (schedulePlanningInfo ? allSlotsFilled(schedulePlanningInfo, crossRegionSelections) : false),
     [schedulePlanningInfo, crossRegionSelections],
@@ -1825,7 +1836,7 @@ function TeamHomePageBody({
       let changed = false
       for (const slot of schedulePlanningInfo.slots) {
         if (next[slot.slot_index] === undefined) {
-          next[slot.slot_index] = ''
+          next[slot.slot_index] = emptySlotSelection(slot.slot_index)
           changed = true
         }
       }
@@ -2684,8 +2695,12 @@ function TeamHomePageBody({
     roundKey: string,
     exportEnabled: boolean,
     rowKey: string,
+    projected = false,
   ) => (
-    <div key={rowKey} className="teamhome-playoffs-row teamhome-playoffs-row--stacked">
+    <div
+      key={rowKey}
+      className={`teamhome-playoffs-row teamhome-playoffs-row--stacked${projected ? ' teamhome-playoffs-row--projected' : ''}`}
+    >
       <div className="teamhome-playoffs-matchup">
         {renderPlayoffBracketLine(home, homeScore, {
           playoffSeed: playoffDisplaySeedForTeam(playoffView.seeds, home, playoffSeedDisplayMode),
@@ -2695,6 +2710,9 @@ function TeamHomePageBody({
         })}
       </div>
       <div className="teamhome-playoffs-footer">
+        {projected ? (
+          <div className="teamhome-small teamhome-playoffs-projected-label">Projected — sim this round with Continue</div>
+        ) : null}
         <div className="teamhome-playoffs-actions">
           <button
             type="button"
@@ -2757,8 +2775,9 @@ function TeamHomePageBody({
                 g.home_score,
                 g.away_score,
                 col.roundKey,
-                g.home_score != null,
+                g.home_score != null && !g.projected,
                 `${col.roundKey}-row-${i}-${g.home}-${g.away}`,
+                Boolean(g.projected),
               ),
             )}
       </div>
@@ -2780,10 +2799,10 @@ function TeamHomePageBody({
                 <div key={`${col.roundKey}-${m.home}-${m.away}`} className="teamhome-playoffs-row teamhome-playoffs-row--stacked">
                   <div className="teamhome-playoffs-matchup">
                     {renderPlayoffBracketLine(m.home, playedHomeScore, {
-                      playoffSeed: playoffSeedForTeam(playoffView.seeds, m.home),
+                      playoffSeed: playoffDisplaySeedForTeam(playoffView.seeds, m.home, playoffSeedDisplayMode),
                     })}
                     {renderPlayoffBracketLine(m.away, playedAwayScore, {
-                      playoffSeed: playoffSeedForTeam(playoffView.seeds, m.away),
+                      playoffSeed: playoffDisplaySeedForTeam(playoffView.seeds, m.away, playoffSeedDisplayMode),
                     })}
                   </div>
                 </div>
@@ -4083,6 +4102,12 @@ function TeamHomePageBody({
     const roster = (findTeam(saveState, userTeam)?.roster ?? []) as Record<string, unknown>[]
     return recommendBalancedPositionsForRoster(roster)
   }, [isPositionChangesStage, saveState, userTeam])
+  const positionDraftCounts = useMemo(() => countPrimaryPositions(positionDraft), [positionDraft])
+  const positionTargetCounts = useMemo(() => {
+    if (!isPositionChangesStage || !userTeam) return {} as Record<string, number>
+    const rosterSize = findTeam(saveState, userTeam)?.roster?.length ?? 0
+    return primaryPositionTargets(rosterSize)
+  }, [isPositionChangesStage, saveState, userTeam])
   useEffect(() => {
     if (phase !== 'offseason' || !coach) return
     const st = offseasonCurrentStage
@@ -5128,7 +5153,7 @@ function TeamHomePageBody({
                 : phase === 'playoffs' && playoffsComplete
                 ? 'Playoffs complete — Continue to open season summary'
                 : phase === 'playoffs'
-                  ? 'Simulate the next playoff round (quarterfinals → semifinals → championship)'
+                  ? `Simulate the next playoff round (${playoffRoundDisplay === '—' ? 'see bracket' : playoffRoundDisplay})`
                   : phase === 'offseason' &&
                       offseasonCurrentStage === 'Improvements' &&
                       improvementsBudget.invalid
@@ -5488,6 +5513,23 @@ function TeamHomePageBody({
                     >
                       Apply all coach recommendations
                     </button>
+                  </div>
+                  <div className="teamhome-position-changes-summary" aria-label="Primary position counts vs recommended">
+                    {ALL_POSITIONS_ORDERED.map((pos) => {
+                      const current = positionDraftCounts[pos] ?? 0
+                      const target = positionTargetCounts[pos] ?? 0
+                      const status =
+                        current === target ? 'match' : current > target ? 'over' : 'under'
+                      return (
+                        <span
+                          key={pos}
+                          className={`teamhome-position-changes-summary-chip teamhome-position-changes-summary-chip--${status}`}
+                          title={`${pos}: ${current} assigned, ${target} recommended`}
+                        >
+                          {pos}: {current}/{target}
+                        </span>
+                      )
+                    })}
                   </div>
                   <div className="teamhome-position-changes-table-wrap">
                     <div className="teamhome-roster-row teamhome-roster-row-attrs teamhome-position-changes-head">
@@ -7932,6 +7974,32 @@ export default function TeamHomePage(props: Props) {
   const [helmetVersion, setHelmetVersion] = useState(0)
   const [jerseyVersion, setJerseyVersion] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
+  const [defaultLogoVersion, setDefaultLogoVersion] = useState<number | undefined>(undefined)
+  const preferDefaultLogos = useMemo(() => saveUsesDefaultLeagueLogos(props.saveState), [props.saveState])
+
+  useEffect(() => {
+    if (!preferDefaultLogos) return
+    let cancelled = false
+    fetch(`${props.apiBase}/default-logos/version`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { version?: number } | null) => {
+        if (!cancelled && j && typeof j.version === 'number') setDefaultLogoVersion(j.version)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [props.apiBase, preferDefaultLogos])
+
+  const effectiveLogoVersion = preferDefaultLogos ? (defaultLogoVersion ?? logoVersion) : logoVersion
+  const logoPrefs = useMemo(
+    () => ({
+      preferDefaultLogos,
+      logoVersion: effectiveLogoVersion,
+      saveId: props.saveId,
+    }),
+    [preferDefaultLogos, effectiveLogoVersion, props.saveId],
+  )
   const allTeamNames = useMemo(() => {
     const teams = props.saveState?.teams ?? []
     const names = teams.map((t: any) => t?.name).filter(Boolean) as string[]
@@ -7940,7 +8008,8 @@ export default function TeamHomePage(props: Props) {
 
   if (showSettings) {
     return (
-      <SettingsPage
+      <LogoPrefsProvider value={logoPrefs}>
+        <SettingsPage
         apiBase={props.apiBase}
         headers={props.headers}
         saveId={props.saveId}
@@ -7960,31 +8029,33 @@ export default function TeamHomePage(props: Props) {
         onImportHelmetsToBundle={props.onImportHelmetsToBundle}
         onImportJerseysToBundle={props.onImportJerseysToBundle}
       />
+      </LogoPrefsProvider>
     )
   }
 
   return (
+    <LogoPrefsProvider value={logoPrefs}>
     <NewsProvider saveId={props.saveId} saveState={props.saveState}>
       <NewsStateSync saveId={props.saveId} saveState={props.saveState} leagueHistory={props.leagueHistory} />
       <PlayerProfileProvider
         saveState={props.saveState}
         apiBase={props.apiBase}
         headers={props.headers}
-        logoVersion={logoVersion}
+        logoVersion={effectiveLogoVersion}
       >
         <CoachProfileProvider
           saveState={props.saveState}
           apiBase={props.apiBase}
           headers={props.headers}
           saveId={props.saveId}
-          logoVersion={logoVersion}
+          logoVersion={effectiveLogoVersion}
           leagueHistory={props.leagueHistory}
           seasonRecaps={props.seasonRecaps}
           onError={props.onError}
         >
           <TeamHomePageBody
             {...props}
-            logoVersion={logoVersion}
+            logoVersion={effectiveLogoVersion}
             setLogoVersion={setLogoVersion}
             stadiumVersion={stadiumVersion}
             setStadiumVersion={setStadiumVersion}
@@ -7998,6 +8069,7 @@ export default function TeamHomePage(props: Props) {
       </PlayerProfileProvider>
       <NewsTicker />
     </NewsProvider>
+    </LogoPrefsProvider>
   )
 }
 

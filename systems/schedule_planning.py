@@ -34,6 +34,28 @@ class CrossRegionSlot:
     eligible_teams: List[str]
 
 
+@dataclass
+class CrossRegionPick:
+    opponent: str
+    user_home: Optional[bool] = None
+
+
+def parse_stored_pick(raw: Any) -> CrossRegionPick:
+    """Read a cross-region pick from save state (legacy str or {opponent, user_home})."""
+    if isinstance(raw, dict):
+        opp = str(raw.get("opponent") or "").strip()
+        if "user_home" in raw:
+            uh = raw.get("user_home")
+            return CrossRegionPick(opp, None if uh is None else bool(uh))
+        return CrossRegionPick(opp, None)
+    return CrossRegionPick(str(raw or "").strip(), None)
+
+
+def default_user_home_for_slot(slot_index: int) -> bool:
+    """Default home/away when the user has not chosen (even slots home)."""
+    return int(slot_index) % 2 == 0
+
+
 def _team_class_region(teams: Dict[str, "Team"], team_name: str) -> Tuple[str, str]:
     t = teams.get(team_name)
     if not t:
@@ -74,6 +96,11 @@ def detect_class_template(teams: Dict[str, "Team"], classification: str) -> Opti
 
     if len(region_names) == 4 and total == 28 and all(s == 7 for s in sizes):
         return ClassTemplate("4x7x4", classification, region_names, sizes, 4, 7)
+
+    if len(region_names) == 4 and total >= 16:
+        sizes_set = set(sizes)
+        if not (total == 32 and sizes_set == {8}) and not (total == 40 and sizes_set == {10}):
+            return ClassTemplate("4xNx2", classification, region_names, sizes, 2, 8)
 
     return None
 
@@ -120,6 +147,21 @@ def _opponent_region_for_slot(template: ClassTemplate, user_region: str, slot_in
             ((0, 2), (1, 3)),
             ((0, 3), (1, 2)),
             ((0, 1), (2, 3)),
+        ]
+        if slot_index < 0 or slot_index >= len(pair_weeks):
+            return None
+        pairs = pair_weeks[slot_index]
+        for a, b in pairs:
+            if ri == a:
+                return template.region_names[b]
+            if ri == b:
+                return template.region_names[a]
+        return None
+
+    if template.template_id == "4xNx2":
+        pair_weeks = [
+            ((0, 1), (2, 3)),
+            ((0, 2), (1, 3)),
         ]
         if slot_index < 0 or slot_index >= len(pair_weeks):
             return None
@@ -179,8 +221,8 @@ def normalize_cross_region_picks(
     teams: Dict[str, "Team"],
     user_team: str,
     raw_picks: Any,
-) -> Dict[int, str]:
-    """Validate and return {slot_index: opponent_name}."""
+) -> Dict[int, CrossRegionPick]:
+    """Validate and return {slot_index: CrossRegionPick}."""
     slots = cross_region_slots_for_team(teams, user_team)
     if not slots:
         return {}
@@ -190,7 +232,7 @@ def normalize_cross_region_picks(
     if not isinstance(raw_picks, list):
         raise ValueError("Choose an opponent for each out-of-region game.")
 
-    out: Dict[int, str] = {}
+    out: Dict[int, CrossRegionPick] = {}
     for row in raw_picks:
         if not isinstance(row, dict):
             continue
@@ -204,7 +246,12 @@ def normalize_cross_region_picks(
             raise ValueError(f"{opp} is not an eligible opponent for {by_slot[si].label}.")
         if opp == user_team:
             raise ValueError("You cannot schedule yourself.")
-        out[si] = opp
+        uh_raw = row.get("user_home")
+        if uh_raw is None:
+            user_home: Optional[bool] = default_user_home_for_slot(si)
+        else:
+            user_home = bool(uh_raw)
+        out[si] = CrossRegionPick(opp, user_home)
 
     missing = required - set(out.keys())
     if missing:
@@ -218,11 +265,14 @@ def pair_two_regions_with_locks(
     region_b: List[str],
     offset: int,
     locks: List[Tuple[str, str]],
+    ha_counts: Optional[Dict[str, Dict[str, int]]] = None,
 ) -> List[Tuple[str, str]]:
     """
     1:1 pairings between two regions. ``locks`` are oriented (home, away) edges that must appear.
-    Remaining teams paired with the same home/away alternation as ``_pair_two_regions_week``.
+    Remaining teams paired with home/away balanced when ``ha_counts`` is provided.
     """
+    from systems.schedule_system import pick_home_away, record_home_away
+
     a_rem = list(region_a)
     b_rem = list(region_b)
     games: List[Tuple[str, str]] = []
@@ -238,25 +288,53 @@ def pair_two_regions_with_locks(
             b_rem.remove(home)
         else:
             raise ValueError("Cross-region pick conflicts with another school's schedule.")
+        if ha_counts is not None:
+            record_home_away(games[-1][0], games[-1][1], ha_counts)
 
     n = min(len(a_rem), len(b_rem))
     if len(a_rem) != len(b_rem):
         raise ValueError("Cross-region pairing could not balance remaining teams.")
     for i in range(n):
-        home = a_rem[i]
-        away = b_rem[(i + offset) % n] if n else b_rem[0]
-        if i % 2 == 1:
-            home, away = away, home
-        games.append((home, away))
+        t1 = a_rem[i]
+        t2 = b_rem[(i + offset) % n] if n else b_rem[0]
+        if ha_counts is not None:
+            games.append(pick_home_away(t1, t2, ha_counts))
+        else:
+            home, away = t1, t2
+            if i % 2 == 1:
+                home, away = away, home
+            games.append((home, away))
     return games
+
+
+def _orient_user_pick(
+    user_team: str,
+    opponent: str,
+    pick: CrossRegionPick,
+    *,
+    user_list: List[str],
+    ha_counts: Optional[Dict[str, Dict[str, int]]] = None,
+) -> Tuple[str, str]:
+    from systems.schedule_system import pick_home_away
+
+    if pick.user_home is True:
+        return user_team, opponent
+    if pick.user_home is False:
+        return opponent, user_team
+    if ha_counts is not None:
+        return pick_home_away(user_team, opponent, ha_counts)
+    if user_list.index(user_team) % 2 == 0:
+        return user_team, opponent
+    return opponent, user_team
 
 
 def locks_for_user_picks(
     teams: Dict[str, "Team"],
     user_team: str,
-    picks: Dict[int, str],
+    picks: Dict[int, CrossRegionPick],
+    ha_counts: Optional[Dict[str, Dict[str, int]]] = None,
 ) -> List[Tuple[str, str]]:
-    """Convert user slot picks to (home, away) locks using standard pairing orientation."""
+    """Convert user slot picks to (home, away) locks."""
     cls, user_region = _team_class_region(teams, user_team)
     template = detect_class_template(teams, cls)
     if not template:
@@ -265,26 +343,35 @@ def locks_for_user_picks(
     user_list = regs.get(user_region, [])
     if user_team not in user_list:
         return []
-    user_idx = user_list.index(user_team)
 
     locks: List[Tuple[str, str]] = []
-    for si, opponent in sorted(picks.items()):
+    for si, pick in sorted(picks.items()):
+        opponent = pick.opponent
         opp_reg = _opponent_region_for_slot(template, user_region, si)
         if not opp_reg:
             continue
         opp_list = regs.get(opp_reg, [])
         if opponent not in opp_list:
             continue
-        # Match _pair_two_regions_week: even index in region_a list is home when r%2==0
-        if user_idx % 2 == 0:
-            locks.append((user_team, opponent))
-        else:
-            locks.append((opponent, user_team))
+        locks.append(
+            _orient_user_pick(
+                user_team,
+                opponent,
+                pick,
+                user_list=user_list,
+                ha_counts=ha_counts,
+            )
+        )
     return locks
 
 
-def picks_dict_for_state(user_team: str, picks: Dict[int, str]) -> Dict[str, Dict[int, str]]:
-    return {user_team: dict(picks)}
+def picks_dict_for_state(user_team: str, picks: Dict[int, CrossRegionPick]) -> Dict[str, Dict[int, Any]]:
+    return {
+        user_team: {
+            si: {"opponent": p.opponent, "user_home": p.user_home}
+            for si, p in picks.items()
+        }
+    }
 
 
 def lock_for_pick(
@@ -292,9 +379,13 @@ def lock_for_pick(
     user_team: str,
     slot_index: int,
     opponent: str,
+    ha_counts: Optional[Dict[str, Dict[str, int]]] = None,
+    *,
+    user_home: Optional[bool] = None,
 ) -> Tuple[str, str]:
     """Orient (home, away) for one user cross-region pick."""
-    all_locks = locks_for_user_picks(teams, user_team, {slot_index: opponent})
+    pick = CrossRegionPick(opponent, user_home)
+    all_locks = locks_for_user_picks(teams, user_team, {slot_index: pick}, ha_counts)
     if not all_locks:
         raise ValueError("Invalid cross-region pick.")
     return all_locks[0]
@@ -318,23 +409,28 @@ def locks_for_cross_week(
     user_picks = picks_raw.get(user) if isinstance(picks_raw, dict) else None
     if not isinstance(user_picks, dict):
         return []
-    opp = user_picks.get(slot_index) or user_picks.get(str(slot_index))
-    if not opp:
+    raw = user_picks.get(slot_index) or user_picks.get(str(slot_index))
+    if not raw:
         return []
-    opp = str(opp).strip()
+    pick = parse_stored_pick(raw)
+    if not pick.opponent:
+        return []
     cls_u, user_reg = _team_class_region(teams, user)
-    cls_o, opp_reg = _team_class_region(teams, opp)
+    cls_o, opp_reg = _team_class_region(teams, pick.opponent)
     if cls_u != classification or cls_o != classification:
         return []
     if {user_reg, opp_reg} != {region_a, region_b}:
         return []
-    return [lock_for_pick(teams, user, int(slot_index), opp)]
+    return [lock_for_pick(teams, user, int(slot_index), pick.opponent, user_home=pick.user_home)]
 
 
-def auto_random_picks(teams: Dict[str, "Team"], user_team: str) -> Dict[int, str]:
-    """Bulk autopilot: random eligible opponent per slot."""
-    out: Dict[int, str] = {}
+def auto_random_picks(teams: Dict[str, "Team"], user_team: str) -> Dict[int, CrossRegionPick]:
+    """Bulk autopilot: random eligible opponent per slot with alternating home/away."""
+    out: Dict[int, CrossRegionPick] = {}
     for slot in cross_region_slots_for_team(teams, user_team):
         if slot.eligible_teams:
-            out[slot.slot_index] = random.choice(slot.eligible_teams)
+            out[slot.slot_index] = CrossRegionPick(
+                random.choice(slot.eligible_teams),
+                default_user_home_for_slot(slot.slot_index),
+            )
     return out

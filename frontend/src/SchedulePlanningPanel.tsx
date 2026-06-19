@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import TeamLogo from './TeamLogo'
-import type { SchedulePlanningInfo } from './schedulePlanningData'
+import type { CrossRegionSelections, SchedulePlanningInfo } from './schedulePlanningData'
+import { defaultUserHomeForSlot, emptySlotSelection } from './schedulePlanningData'
 import './SchedulePlanningPanel.css'
 
 type Props = {
@@ -10,8 +11,8 @@ type Props = {
   userTeam: string
   seasonYear: number
   info: SchedulePlanningInfo
-  selections: Record<number, string>
-  onSelectionsChange: (next: Record<number, string>) => void
+  selections: CrossRegionSelections
+  onSelectionsChange: (next: CrossRegionSelections) => void
 }
 
 export default function SchedulePlanningPanel({
@@ -33,6 +34,25 @@ export default function SchedulePlanningPanel({
     return parts.join(' · ')
   }, [info])
 
+  const setOpponent = (slotIndex: number, opponent: string) => {
+    const prev = selections[slotIndex] ?? emptySlotSelection(slotIndex)
+    onSelectionsChange({
+      ...selections,
+      [slotIndex]: {
+        opponent,
+        userHome: prev.userHome ?? defaultUserHomeForSlot(slotIndex),
+      },
+    })
+  }
+
+  const setUserHome = (slotIndex: number, userHome: boolean) => {
+    const prev = selections[slotIndex] ?? emptySlotSelection(slotIndex)
+    onSelectionsChange({
+      ...selections,
+      [slotIndex]: { ...prev, userHome },
+    })
+  }
+
   return (
     <div className="schedplan" role="region" aria-label="Schedule planning">
       <div className="schedplan-header">
@@ -43,13 +63,16 @@ export default function SchedulePlanningPanel({
         <h2 className="schedplan-title">Non-region selection — pick your opponents</h2>
         <p className="schedplan-sub">
           {userTeam} · {summaryLine}. Region matchups are set automatically; choose who you face from
-          other regions in your class ({info.total_games} games total).
+          other regions in your class ({info.total_games} games total). For each out-of-region game, pick
+          the opponent and whether you host or travel.
         </p>
       </div>
 
       <div className="schedplan-slots">
         {info.slots.map((slot) => {
-          const selected = selections[slot.slot_index] ?? ''
+          const sel = selections[slot.slot_index] ?? emptySlotSelection(slot.slot_index)
+          const selected = sel.opponent
+          const userHome = sel.userHome
           const q = filter.trim().toLowerCase()
           const eligible = slot.eligible_teams.filter((name) => !q || name.toLowerCase().includes(q))
           return (
@@ -64,9 +87,7 @@ export default function SchedulePlanningPanel({
                   <select
                     className="schedplan-select"
                     value={selected}
-                    onChange={(e) =>
-                      onSelectionsChange({ ...selections, [slot.slot_index]: e.target.value })
-                    }
+                    onChange={(e) => setOpponent(slot.slot_index, e.target.value)}
                   >
                     <option value="">— Select school —</option>
                     {eligible.map((name) => (
@@ -77,6 +98,29 @@ export default function SchedulePlanningPanel({
                   </select>
                 </label>
                 {selected ? (
+                  <div className="schedplan-ha-wrap">
+                    <span className="schedplan-select-label">Site</span>
+                    <div className="schedplan-ha-toggle" role="group" aria-label="Home or away">
+                      <button
+                        type="button"
+                        className={`schedplan-ha-btn${userHome ? ' schedplan-ha-btn--active' : ''}`}
+                        aria-pressed={userHome}
+                        onClick={() => setUserHome(slot.slot_index, true)}
+                      >
+                        Home
+                      </button>
+                      <button
+                        type="button"
+                        className={`schedplan-ha-btn${!userHome ? ' schedplan-ha-btn--active' : ''}`}
+                        aria-pressed={!userHome}
+                        onClick={() => setUserHome(slot.slot_index, false)}
+                      >
+                        Away
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+                {selected ? (
                   <div className="schedplan-preview">
                     <TeamLogo
                       apiBase={apiBase}
@@ -85,7 +129,9 @@ export default function SchedulePlanningPanel({
                       logoVersion={logoVersion}
                       size={36}
                     />
-                    <span className="schedplan-preview-name">{selected}</span>
+                    <span className="schedplan-preview-name">
+                      {userHome ? `vs ${selected}` : `@ ${selected}`}
+                    </span>
                   </div>
                 ) : null}
               </div>

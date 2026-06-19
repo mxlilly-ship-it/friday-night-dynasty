@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocalAssets } from './LocalAssetsContext'
-import { teamStadiumUrl } from './logoUtils'
+import { defaultStadiumUrl, teamStadiumUrl } from './logoUtils'
 import './TeamStadium.css'
 
 type Props = {
@@ -13,8 +13,21 @@ type Props = {
   hidePlaceholder?: boolean
 }
 
+async function loadImageBlob(url: string, headers?: Record<string, string>): Promise<Blob | null> {
+  try {
+    const r = await fetch(url, {
+      headers: headers ?? undefined,
+      cache: 'no-store',
+    })
+    if (!r.ok) return null
+    return await r.blob()
+  } catch {
+    return null
+  }
+}
+
 /**
- * Loads `/saves/stadiums/{team}` with fetch + Bearer (same auth pattern as {@link TeamLogo}).
+ * Loads custom `/saves/stadiums/{team}` when present, otherwise the built-in default stadium photo.
  */
 export default function TeamStadium({
   apiBase,
@@ -38,6 +51,14 @@ export default function TeamStadium({
       }
     }
 
+    const setFromBlob = (blob: Blob) => {
+      revokeCurrent()
+      const objUrl = URL.createObjectURL(blob)
+      blobRef.current = objUrl
+      setBlobSrc(objUrl)
+      setMissing(false)
+    }
+
     if (!teamName?.trim()) {
       revokeCurrent()
       setBlobSrc(null)
@@ -53,47 +74,36 @@ export default function TeamStadium({
           ? localStadium.data
           : new Uint8Array(localStadium.data as ArrayLike<number>)
       const blob = new Blob([bytes as BlobPart], { type: localStadium.mime || 'application/octet-stream' })
-      const objUrl = URL.createObjectURL(blob)
-      blobRef.current = objUrl
-      setBlobSrc(objUrl)
-      setMissing(false)
+      setFromBlob(blob)
       return () => {
         revokeCurrent()
       }
     }
 
-    if (!headers || !authSig) {
-      revokeCurrent()
-      setBlobSrc(null)
-      setMissing(true)
-      return
-    }
-
     let cancelled = false
-    const url = teamStadiumUrl(apiBase, teamName, stadiumVersion)
-
     revokeCurrent()
     setBlobSrc(null)
     setMissing(false)
 
     ;(async () => {
-      try {
-        const r = await fetch(url, { headers, cache: 'no-store' })
-        if (!r.ok) {
-          if (!cancelled) setMissing(true)
-          return
-        }
-        const blob = await r.blob()
-        const objUrl = URL.createObjectURL(blob)
-        blobRef.current = objUrl
-        if (!cancelled) {
-          setBlobSrc(objUrl)
-          setMissing(false)
-        } else {
-          URL.revokeObjectURL(objUrl)
-        }
-      } catch {
-        if (!cancelled) setMissing(true)
+      let blob: Blob | null = null
+
+      if (headers && authSig) {
+        blob = await loadImageBlob(teamStadiumUrl(apiBase, teamName, stadiumVersion), headers)
+      }
+
+      if (!blob) {
+        blob = await loadImageBlob(defaultStadiumUrl(apiBase, stadiumVersion))
+      }
+
+      if (cancelled) return
+
+      if (blob) {
+        setFromBlob(blob)
+      } else {
+        revokeCurrent()
+        setBlobSrc(null)
+        setMissing(true)
       }
     })()
 
@@ -101,7 +111,7 @@ export default function TeamStadium({
       cancelled = true
       revokeCurrent()
     }
-  }, [apiBase, teamName, stadiumVersion, authSig, localAssets])
+  }, [apiBase, teamName, stadiumVersion, authSig, localAssets, headers])
 
   if (!teamName?.trim()) {
     return <div className={`teamstadium teamstadium-empty ${className}`} aria-hidden />

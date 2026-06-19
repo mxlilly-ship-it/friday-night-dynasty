@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { teamLogoUrl } from './logoUtils'
+import { teamDefaultLogoUrl, teamLogoUrl } from './logoUtils'
 import { useLocalAssets } from './LocalAssetsContext'
+import { useLogoPrefs } from './LogoPrefsContext'
 import { renderPlayerCard } from './playerCard/playerCard.js'
 import { buildPlayerCardData } from './playerCard/playerCardData'
 import './playerCard/playerCard.css'
@@ -52,6 +53,7 @@ export default function PlayerProfilePage({
   usePlayerCardFonts()
   const cardRootRef = useRef<HTMLDivElement>(null)
   const localAssets = useLocalAssets()
+  const logoPrefs = useLogoPrefs()
   const [teamLogoSrc, setTeamLogoSrc] = useState<string | undefined>()
 
   useEffect(() => {
@@ -70,9 +72,16 @@ export default function PlayerProfilePage({
       }
     }
 
-    const url = teamLogoUrl(apiBase, teamName, logoVersion)
+    const useDefault = logoPrefs?.preferDefaultLogos ?? false
+    const version = logoVersion ?? logoPrefs?.logoVersion
+    const url = useDefault
+      ? teamDefaultLogoUrl(apiBase, teamName, version)
+      : teamLogoUrl(apiBase, teamName, version, logoPrefs?.saveId)
     const auth = headers?.Authorization
-    fetch(url, auth ? { headers: { Authorization: auth } } : undefined)
+    fetch(url, {
+      headers: useDefault ? undefined : auth ? { Authorization: auth } : undefined,
+      cache: 'no-store',
+    })
       .then((r) => (r.ok ? r.blob() : null))
       .then((blob) => {
         if (cancelled || !blob) return
@@ -87,7 +96,7 @@ export default function PlayerProfilePage({
       cancelled = true
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [apiBase, teamName, headers, logoVersion, localAssets])
+  }, [apiBase, teamName, headers, logoVersion, localAssets, logoPrefs])
 
   const cardData = useMemo(
     () => buildPlayerCardData(player, teamName, saveState, { teamLogoSrc }),

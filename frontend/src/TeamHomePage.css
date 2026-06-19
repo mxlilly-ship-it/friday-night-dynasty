@@ -1535,6 +1535,15 @@ td .teamhome-roster-name--profile {
   align-items: stretch;
   gap: 12px;
 }
+.teamhome-playoffs-row--projected {
+  opacity: 0.72;
+  border-style: dashed;
+}
+.teamhome-playoffs-projected-label {
+  margin: 0 0 4px;
+  opacity: 0.75;
+  font-style: italic;
+}
 .teamhome-playoffs-matchup {
   display: flex;
   flex-direction: column;
@@ -2187,6 +2196,37 @@ td .teamhome-roster-name--profile {
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 4px;
+}
+
+.teamhome-position-changes-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.teamhome-position-changes-summary-chip {
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: rgba(226, 232, 240, 0.88);
+  white-space: nowrap;
+}
+
+.teamhome-position-changes-summary-chip--match {
+  color: rgba(134, 239, 172, 0.95);
+}
+
+.teamhome-position-changes-summary-chip--under {
+  color: rgba(253, 224, 71, 0.95);
+}
+
+.teamhome-position-changes-summary-chip--over {
+  color: rgba(252, 165, 165, 0.98);
 }
 
 .teamhome-position-changes-apply-all {

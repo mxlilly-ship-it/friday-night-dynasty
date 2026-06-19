@@ -18,16 +18,18 @@ from typing import Any, Dict, Optional
 from systems.playoff_systems import DEFAULT_PLAYOFF_SYSTEM_ID, ensure_playoff_system_in_state
 from systems.teams_loader import playoff_system_id_from_config
 
-DEFAULT_LEAGUE_ID = DEFAULT_PLAYOFF_SYSTEM_ID
-DEFAULT_STATE_NAME = "West Virginia"
-DEFAULT_EMAIL_PACK = DEFAULT_PLAYOFF_SYSTEM_ID
+DEFAULT_LEAGUE_ID = "fnd"
+DEFAULT_STATE_NAME = "Friday Night Dynasty"
+DEFAULT_EMAIL_PACK = "fnd"
 
 # playoff_system id -> (league_id, state display name, email_pack) when JSON omits fields
 _PLAYOFF_DEFAULTS: Dict[str, tuple[str, str, str]] = {
+    "fnd": ("fnd", "Friday Night Dynasty", "fnd"),
     "wv": ("wv", "West Virginia", "wv"),
     "wv16": ("wv_3class", "West Virginia (3-Class)", "wv"),
     "oh": ("oh_d5", "Ohio", "oh"),
     "oh_d5": ("oh_d5", "Ohio", "oh"),
+    "regional_8x4": ("va_div12", "Virginia (Div 1 & 2)", "oh"),
 }
 
 

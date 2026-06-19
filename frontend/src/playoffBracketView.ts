@@ -128,7 +128,11 @@ export function buildOverallPlayoffColumns(
 
     if (isLast) {
       const prevRoundName = roundNames[ri - 1]
-      const prevRows = buildTwoGameRoundRows(priorRoundGames, priorPairs, results.filter((g) => String(g.round || '') === prevRoundName))
+      const prevRows = buildBracketRoundRows(
+        priorRoundGames,
+        priorPairs,
+        results.filter((g) => String(g.round || '') === prevRoundName),
+      )
       const row = buildChampionshipRow(prevRows, games)
       columns.push({
         title: roundName,
@@ -140,7 +144,7 @@ export function buildOverallPlayoffColumns(
       continue
     }
 
-    const rows = buildTwoGameRoundRows(priorRoundGames, priorPairs, games)
+    const rows = buildBracketRoundRows(priorRoundGames, priorPairs, games)
     columns.push({
       title: roundName,
       roundKey: roundName,
@@ -170,7 +174,17 @@ export function regionalInRegionRoundNames(teamsPerRegion: number): string[] {
   return out
 }
 
-/** First-round pairings for slot-ordered teams (standard 1v8, 4v5, 2v7, 3v6 for 8). */
+/** First-round pairings when teams are in engine bracket-slot order (adjacent pairs).
+ *  Matches systems/playoff_system.py run_next_playoff_round_regional + _standard_in_region_seed_layout. */
+export function firstRoundPairsFromBracketSlots(names: string[]): PlayoffMatchup[] {
+  const pairs: PlayoffMatchup[] = []
+  for (let i = 0; i < names.length; i += 2) {
+    if (i + 1 < names.length) pairs.push({ home: names[i], away: names[i + 1] })
+  }
+  return pairs
+}
+
+/** First-round pairings for linear seed order 1..N (1vN, 2vN-1, …) — overall state brackets only. */
 export function firstRoundPairsFromOrderedTeams(names: string[]): PlayoffMatchup[] {
   const n = names.length
   if (n < 2) return []
@@ -217,67 +231,100 @@ function winnerByIndex(games: PlayoffGameRow[], pairs: PlayoffMatchup[], i: numb
   const p = pairs[i]
   if (!p) return null
   const g = findPlayoffGame(games, p)
+  if (g?.winner != null && String(g.winner).trim() !== '') return String(g.winner)
+  if (g?.home_score != null && g?.away_score != null) {
+    return g.home_score >= g.away_score ? String(g.home) : String(g.away)
+  }
   const w = g?.winner
   return w != null && String(w).trim() !== '' ? String(w) : null
 }
 
-/** Projected + played rows for a two-game semifinal round after a prior round. */
+/** Standard fixed-bracket pairings: slot i vs slot numSlots - 1 - i. */
+export function roundPairingsForSize(numSlots: number): Array<[number, number]> {
+  const n = Math.max(2, Math.floor(numSlots))
+  const pairs: Array<[number, number]> = []
+  for (let i = 0; i < n / 2; i++) pairs.push([i, n - 1 - i])
+  return pairs
+}
+
+/** Projected + played rows for any bracket round after the prior round (2, 4, 8, … games). */
+export function buildBracketRoundRows(
+  priorGames: PlayoffGameRow[],
+  priorPairs: PlayoffMatchup[],
+  roundGames: PlayoffGameRow[],
+): PlayoffGameRow[] {
+  const numTeams = priorPairs.length
+  if (numTeams < 2) return []
+
+  const gamesNeeded = numTeams / 2
+  if (roundGames.length >= gamesNeeded) {
+    return roundGames.map((g) => ({ ...g, projected: false }))
+  }
+
+  const rows: PlayoffGameRow[] = []
+  for (const [a, b] of roundPairingsForSize(numTeams)) {
+    const homeW = winnerByIndex(priorGames, priorPairs, a)
+    const awayW = winnerByIndex(priorGames, priorPairs, b)
+    const home = homeW ?? 'TBD'
+    const away = awayW ?? 'TBD'
+    const played =
+      home !== 'TBD' && away !== 'TBD'
+        ? roundGames.find(
+            (g) =>
+              (g.home === home && g.away === away) || (g.home === away && g.away === home),
+          )
+        : undefined
+    if (played) {
+      rows.push({ ...played, projected: false })
+    } else {
+      rows.push({ home, away, home_score: null, away_score: null, projected: true })
+    }
+  }
+  return rows
+}
+
+/** @deprecated Prefer buildBracketRoundRows — kept for callers that only need two-game rounds. */
 export function buildTwoGameRoundRows(
   priorGames: PlayoffGameRow[],
   priorPairs: PlayoffMatchup[],
   roundGames: PlayoffGameRow[],
 ): PlayoffGameRow[] {
-  const w = (i: number) => winnerByIndex(priorGames, priorPairs, i)
-  const proj = (which: 1 | 2): PlayoffGameRow => {
-    if (which === 1) {
-      return { home: w(0) ?? 'TBD', away: w(3) ?? 'TBD', home_score: null, away_score: null, projected: true }
-    }
-    return { home: w(1) ?? 'TBD', away: w(2) ?? 'TBD', home_score: null, away_score: null, projected: true }
-  }
-  const matches1 = (g: PlayoffGameRow) => {
-    const a = w(0),
-      b = w(3)
-    if (!a || !b) return false
-    return (g.home === a && g.away === b) || (g.home === b && g.away === a)
-  }
-  const matches2 = (g: PlayoffGameRow) => {
-    const a = w(1),
-      b = w(2)
-    if (!a || !b) return false
-    return (g.home === a && g.away === b) || (g.home === b && g.away === a)
-  }
-  if (roundGames.length >= 2) return roundGames.map((g) => ({ ...g, projected: false }))
-  if (roundGames.length === 1) {
-    const g = roundGames[0]
-    if (matches1(g)) return [g, proj(2)]
-    if (matches2(g)) return [proj(1), g]
-    return [g, proj(2)]
-  }
-  return [proj(1), proj(2)]
+  return buildBracketRoundRows(priorGames, priorPairs, roundGames)
 }
 
 export function buildChampionshipRow(sfRows: PlayoffGameRow[], chGames: PlayoffGameRow[]): PlayoffGameRow | null {
   if (chGames.length) return { ...chGames[0], projected: false }
-  if (sfRows.length === 2) {
-    const w1 = sfRows[0]?.winner
-    const w2 = sfRows[1]?.winner
+  const rowWinner = (g: PlayoffGameRow | undefined): string | null => {
+    if (!g) return null
+    if (g.winner != null && String(g.winner).trim() !== '') return String(g.winner)
+    if (g.home_score != null && g.away_score != null) {
+      return g.home_score >= g.away_score ? String(g.home) : String(g.away)
+    }
+    return null
+  }
+  if (sfRows.length >= 2) {
+    const w1 = rowWinner(sfRows[0])
+    const w2 = rowWinner(sfRows[1])
     if (w1 && w2) {
       return {
-        home: String(w1),
-        away: String(w2),
+        home: w1,
+        away: w2,
         home_score: null,
         away_score: null,
         projected: true,
       }
     }
   }
-  if (sfRows.length === 1 && sfRows[0]?.winner) {
-    return {
-      home: String(sfRows[0].winner),
-      away: 'TBD',
-      home_score: null,
-      away_score: null,
-      projected: true,
+  if (sfRows.length === 1) {
+    const w1 = rowWinner(sfRows[0])
+    if (w1) {
+      return {
+        home: w1,
+        away: 'TBD',
+        home_score: null,
+        away_score: null,
+        projected: true,
+      }
     }
   }
   return { home: 'TBD', away: 'TBD', home_score: null, away_score: null, projected: true }
@@ -309,8 +356,10 @@ export function buildRegionalPlayoffSlice(
   const regionSeeds = seeds
     .filter((s) => String(s.region) === region)
     .sort((a, b) => Number(a.seed) - Number(b.seed))
+  const teamsPerRegion =
+    regionSeeds.reduce((max, s) => Math.max(max, Number(s.region_seed) || 0), 0) || regionSeeds.length
   const regionTeams = new Set(regionSeeds.map((s) => String(s.team)))
-  const inRoundNames = regionalInRegionRoundNames(regionSeeds.length)
+  const inRoundNames = regionalInRegionRoundNames(teamsPerRegion)
 
   const gamesInRegion = (roundName: string) =>
     results.filter(
@@ -323,7 +372,7 @@ export function buildRegionalPlayoffSlice(
   const shortTitle = (name: string) => name.replace(/^Regional /, 'Reg. ')
 
   const inRegionColumns: PlayoffRoundColumn[] = []
-  let priorPairs = firstRoundPairsFromOrderedTeams(regionSeeds.map((s) => String(s.team)))
+  let priorPairs = firstRoundPairsFromBracketSlots(regionSeeds.map((s) => String(s.team)))
   let priorRoundGames: PlayoffGameRow[] = []
 
   for (let ri = 0; ri < inRoundNames.length; ri++) {
@@ -346,7 +395,7 @@ export function buildRegionalPlayoffSlice(
 
     if (isLast) {
       const prevRoundName = inRoundNames[ri - 1]
-      const prevRows = buildTwoGameRoundRows(priorRoundGames, priorPairs, gamesInRegion(prevRoundName))
+      const prevRows = buildBracketRoundRows(priorRoundGames, priorPairs, gamesInRegion(prevRoundName))
       const row = buildChampionshipRow(prevRows, games)
       inRegionColumns.push({
         title: shortTitle(roundName),
@@ -358,7 +407,7 @@ export function buildRegionalPlayoffSlice(
       continue
     }
 
-    const rows = buildTwoGameRoundRows(priorRoundGames, priorPairs, games)
+    const rows = buildBracketRoundRows(priorRoundGames, priorPairs, games)
     inRegionColumns.push({
       title: shortTitle(roundName),
       roundKey: roundName,

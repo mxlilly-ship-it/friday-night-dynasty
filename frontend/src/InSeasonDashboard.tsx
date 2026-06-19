@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import './InSeasonDashboard.css'
 import TeamLogo from './TeamLogo'
 import TeamStadium from './TeamStadium'
-import StadiumNightSvg from './StadiumNightSvg'
 import { useNews } from './news/NewsContext'
 import { articleVisibleInFeed } from './news/newsVisibility'
 import {
@@ -105,7 +104,6 @@ export default function InSeasonDashboard({
   const opponentTeam = opponent ? findTeam(saveState, opponent) : null
 
   const homeTeam = currentGame?.userHome ? userTeam : opponent ?? userTeam
-  const awayTeam = currentGame?.userHome ? opponent ?? 'TBD' : userTeam
   const venueTeam = currentGame?.userHome ? userRow : opponentTeam ?? userRow
   /** Stadium photo for the field where this week's game is played (home team). */
   const stadiumPhotoTeam = opponent && currentGame ? homeTeam : null
@@ -162,13 +160,7 @@ export default function InSeasonDashboard({
           <section>
             <div className="isdash-section-label">Next Game</div>
             <div className="isdash-card isdash-card-flush">
-              <div className="isdash-stadium-visual isdash-stadium-visual--layered">
-                <StadiumNightSvg
-                  className="isdash-stadium-svg isdash-stadium-svg--bg"
-                  homeLabel={teamSchoolName(findTeam(saveState, homeTeam), homeTeam)}
-                  awayLabel={teamSchoolName(findTeam(saveState, awayTeam), awayTeam)}
-                  stadiumLine={stadiumLine}
-                />
+              <div className="isdash-stadium-visual">
                 {stadiumPhotoTeam ? (
                   <TeamStadium
                     key={`${stadiumPhotoTeam}-${stadiumVersion}`}

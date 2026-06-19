@@ -12,10 +12,10 @@ from typing import Any, Dict, List, Optional, Tuple
 from systems.coach_development import _goal_evaluation, _postseason_tier as _cd_postseason_tier
 
 # Max portal candidates per team before the league-wide cap (not lifetime player cap).
-TRANSFER_PORTAL_MAX_PER_TEAM = 5
+TRANSFER_PORTAL_MAX_PER_TEAM = 2
 # Max outgoing / incoming moves per team when resolving destinations.
-TRANSFER_MOVES_MAX_OUT_PER_TEAM = 5
-TRANSFER_MOVES_MAX_IN_PER_TEAM = 5
+TRANSFER_MOVES_MAX_OUT_PER_TEAM = 2
+TRANSFER_MOVES_MAX_IN_PER_TEAM = 2
 # League-wide portal size: ~50 entrants per 100 teams (typical total moves ~30–70 after resolution).
 TRANSFER_PORTAL_LEAGUE_SHARE = 0.50
 

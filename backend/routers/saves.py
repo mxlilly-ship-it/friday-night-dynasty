@@ -305,11 +305,22 @@ async def upload_team_logo_route(team_name: str, logo: UploadFile = File(...), u
 
 
 @router.get("/logos/{team_name}")
-def get_team_logo_route(team_name: str, user=Depends(require_user)):
+def get_team_logo_route(
+    team_name: str,
+    save_id: Optional[str] = Query(None, description="Save ID — custom JSON leagues skip built-in default crests"),
+    user=Depends(require_user),
+):
     name = (team_name or "").strip()
     if not name:
         raise HTTPException(status_code=400, detail="Missing team name")
-    path = get_team_logo_path(user["user_id"], name)
+    custom_league = False
+    if save_id:
+        try:
+            state, _dir = load_state(user["user_id"], save_id)
+            custom_league = bool(state.get("custom_league_json"))
+        except Exception:
+            custom_league = False
+    path = get_team_logo_path(user["user_id"], name, custom_league=custom_league)
     if not path:
         raise HTTPException(status_code=404, detail="Logo not found")
     media_type = "image/png"
@@ -318,7 +329,11 @@ def get_team_logo_route(team_name: str, user=Depends(require_user)):
         media_type = "image/jpeg"
     elif low.endswith(".webp"):
         media_type = "image/webp"
-    return FileResponse(path, media_type=media_type)
+    return FileResponse(
+        path,
+        media_type=media_type,
+        headers={"Cache-Control": "no-store, max-age=0", "Pragma": "no-cache"},
+    )
 
 
 # `/stadiums/bulk` MUST be registered before `/stadiums/{team_name}` or "bulk" is captured as a team name.

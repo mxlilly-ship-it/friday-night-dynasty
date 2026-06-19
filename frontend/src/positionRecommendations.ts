@@ -240,3 +240,27 @@ export function formatPositionRecommendation(rec: PositionRecommendation): strin
   if (rec.secondary) return `${rec.position} · ${rec.secondary}`
   return rec.position
 }
+
+/** Recommended primary counts per position for a roster size (mirrors CPU assignment targets). */
+export function primaryPositionTargets(rosterSize: number): Record<string, number> {
+  return scalePositionCounts(rosterSize)
+}
+
+export const ALL_POSITIONS_ORDERED = [
+  ...OFFENSE_POSITIONS,
+  ...DEFENSE_POSITIONS,
+  ...SPECIALIST_POSITIONS,
+] as const
+
+/** Count primary positions from a name → { position } draft map. */
+export function countPrimaryPositions(
+  draft: Record<string, { position: string }>,
+): Record<string, number> {
+  const counts: Record<string, number> = {}
+  for (const pos of ALL_POSITIONS_ORDERED) counts[pos] = 0
+  for (const entry of Object.values(draft)) {
+    const pos = String(entry.position ?? '').trim()
+    if (pos) counts[pos] = (counts[pos] ?? 0) + 1
+  }
+  return counts
+}

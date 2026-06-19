@@ -4,7 +4,6 @@ import TeamHelmet from './TeamHelmet'
 import TeamJersey from './TeamJersey'
 import type { JerseyKind } from './logoUtils'
 import TeamInfoRankingChart from './TeamInfoRankingChart'
-import TeamInfoStadiumSvg from './TeamInfoStadiumSvg'
 import { CoachProfileName } from './CoachProfileContext'
 import {
   DEFAULT_UNIFORM_SLOTS,
@@ -326,8 +325,6 @@ export default function TeamInfoPage({
                 className="ti-stadium-photo"
                 hidePlaceholder
               />
-              <TeamInfoStadiumSvg />
-              <div className="ti-stadium-overlay-text">Insert Stadium Photo</div>
             </div>
             <div className="ti-stadium-stats-bar">
               <div className="ti-ssb-cell">

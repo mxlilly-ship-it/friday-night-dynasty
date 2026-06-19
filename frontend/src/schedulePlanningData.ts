@@ -12,6 +12,21 @@ export type SchedulePlanningInfo = {
   slots: SchedulePlanningSlot[]
 }
 
+export type CrossRegionSlotSelection = {
+  opponent: string
+  userHome: boolean
+}
+
+export type CrossRegionSelections = Record<number, CrossRegionSlotSelection>
+
+export function defaultUserHomeForSlot(slotIndex: number): boolean {
+  return slotIndex % 2 === 0
+}
+
+export function emptySlotSelection(slotIndex: number): CrossRegionSlotSelection {
+  return { opponent: '', userHome: defaultUserHomeForSlot(slotIndex) }
+}
+
 export function schedulePlanningInfoFromState(saveState: any): SchedulePlanningInfo | null {
   const raw = saveState?.schedule_planning_info
   if (!raw || typeof raw !== 'object') return null
@@ -32,12 +47,16 @@ export function schedulePlanningInfoFromState(saveState: any): SchedulePlanningI
 
 export function buildCrossRegionPicksPayload(
   info: SchedulePlanningInfo,
-  selections: Record<number, string>,
-): { slot_index: number; opponent: string }[] {
-  return info.slots.map((slot) => ({
-    slot_index: slot.slot_index,
-    opponent: String(selections[slot.slot_index] ?? '').trim(),
-  }))
+  selections: CrossRegionSelections,
+): { slot_index: number; opponent: string; user_home: boolean }[] {
+  return info.slots.map((slot) => {
+    const sel = selections[slot.slot_index] ?? emptySlotSelection(slot.slot_index)
+    return {
+      slot_index: slot.slot_index,
+      opponent: String(sel.opponent ?? '').trim(),
+      user_home: Boolean(sel.userHome),
+    }
+  })
 }
 
 /** WV classes that use cross-region templates (3A pod-only leagues skip this step). */
@@ -60,6 +79,6 @@ export function crossRegionSlotCountFromSave(saveState: any): number {
   return info?.slot_count ?? 0
 }
 
-export function allSlotsFilled(info: SchedulePlanningInfo, selections: Record<number, string>): boolean {
-  return info.slots.every((s) => Boolean(String(selections[s.slot_index] ?? '').trim()))
+export function allSlotsFilled(info: SchedulePlanningInfo, selections: CrossRegionSelections): boolean {
+  return info.slots.every((s) => Boolean(String(selections[s.slot_index]?.opponent ?? '').trim()))
 }

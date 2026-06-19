@@ -1027,11 +1027,9 @@ def save_team_logo(user_id: str, team_name: str, data: bytes, extension: str) ->
         f.close()
 
 
-def get_team_logo_path(user_id: str, team_name: str) -> Optional[str]:
-    safe_name = _safe_logo_name(team_name)
-    logo_dir = _get_user_logo_dir(user_id)
+def _find_team_logo_by_stem(logo_dir: str, stem: str) -> Optional[str]:
     for ext in _LOGO_EXTENSIONS:
-        plain = os.path.abspath(os.path.join(logo_dir, f"{safe_name}{ext}"))
+        plain = os.path.abspath(os.path.join(logo_dir, f"{stem}{ext}"))
         for p in io_path_candidates(plain):
             try:
                 if os.path.isfile(p):
@@ -1039,6 +1037,89 @@ def get_team_logo_path(user_id: str, team_name: str) -> Optional[str]:
             except OSError:
                 continue
     return None
+
+
+def _find_team_logo_in_dir(logo_dir: str, team_name: str) -> Optional[str]:
+    if not team_name or not os.path.isdir(logo_dir):
+        return None
+    stems_to_try: List[str] = []
+    safe_name = _safe_logo_name(team_name)
+    if safe_name:
+        stems_to_try.append(safe_name)
+    raw = str(team_name).strip()
+    if raw and raw not in stems_to_try:
+        stems_to_try.append(raw)
+    try:
+        from systems.team_asset_lookup import team_asset_name_lookup
+
+        lookup = team_asset_name_lookup()
+        norm = _normalize_name(team_name)
+        for key, canonical in lookup.items():
+            if _normalize_name(canonical) == norm and key != norm:
+                stems_to_try.append(key)
+    except Exception:
+        pass
+    seen: set[str] = set()
+    for stem in stems_to_try:
+        if stem in seen:
+            continue
+        seen.add(stem)
+        path = _find_team_logo_by_stem(logo_dir, stem)
+        if path:
+            return path
+    try:
+        names = os.listdir(logo_dir)
+    except OSError:
+        return None
+    for fname in names:
+        stem, ext = os.path.splitext(fname)
+        if ext.lower() not in _LOGO_EXTENSIONS:
+            continue
+        if match_logo_filename_to_team([team_name], stem) == team_name:
+            plain = os.path.abspath(os.path.join(logo_dir, fname))
+            for p in io_path_candidates(plain):
+                try:
+                    if os.path.isfile(p):
+                        return p
+                except OSError:
+                    continue
+    return None
+
+
+def get_team_logo_path(user_id: str, team_name: str, *, custom_league: bool = False) -> Optional[str]:
+    if not custom_league:
+        from backend.data_paths import default_logos_dir
+
+        path = _find_team_logo_in_dir(default_logos_dir(), team_name)
+        if path:
+            return path
+    return _find_team_logo_in_dir(_get_user_logo_dir(user_id), team_name)
+
+
+def get_default_team_logo_path(team_name: str) -> Optional[str]:
+    """Built-in crest from data/logos/ only (no per-user overrides)."""
+    from backend.data_paths import default_logos_dir
+
+    return _find_team_logo_in_dir(default_logos_dir(), team_name)
+
+
+def default_logos_cache_version() -> int:
+    """Max mtime of files in data/logos/ — for browser cache busting."""
+    from backend.data_paths import default_logos_dir
+
+    logo_dir = default_logos_dir()
+    latest = 0
+    try:
+        for name in os.listdir(logo_dir):
+            path = os.path.join(logo_dir, name)
+            try:
+                if os.path.isfile(path):
+                    latest = max(latest, int(os.path.getmtime(path)))
+            except OSError:
+                continue
+    except OSError:
+        pass
+    return latest
 
 
 def _get_user_stadium_dir(user_id: str) -> str:
@@ -1224,7 +1305,29 @@ def _match_filename_stem_to_team(teams: List[str], filename_stem: str, extra_suf
 
 
 def match_logo_filename_to_team(teams: List[str], filename_stem: str) -> Optional[str]:
-    return _match_filename_stem_to_team(teams, filename_stem, ())
+    hit = _match_filename_stem_to_team(teams, filename_stem, ())
+    if hit:
+        return hit
+    from systems.team_asset_lookup import team_asset_name_lookup
+
+    lookup = team_asset_name_lookup()
+    by_norm: Dict[str, str] = {}
+    for t in teams:
+        name = str(t or "").strip()
+        if not name:
+            continue
+        by_norm[_normalize_name(name)] = name
+    for stem in _stem_variants_for_logo_match(filename_stem):
+        key = _normalize_name(stem)
+        if not key:
+            continue
+        canonical = lookup.get(key)
+        if not canonical:
+            continue
+        cn = _normalize_name(canonical)
+        if cn in by_norm:
+            return by_norm[cn]
+    return None
 
 
 def match_stadium_filename_to_team(teams: List[str], filename_stem: str) -> Optional[str]:
@@ -2916,6 +3019,7 @@ def create_save(
     # the app can branch on it without re-reading the league JSON. Persists
     # for the life of this save (immutable across the dynasty for now).
     state["playoff_system"] = playoff_system_id
+    state["custom_league_json"] = provided_rows is not None
     ensure_playoff_system_in_state(state)
     apply_league_metadata_to_state(state, league_meta)
     ensure_league_metadata_in_state(state)
@@ -7374,7 +7478,7 @@ def _user_cross_region_picks_complete(
     user_team: str,
 ) -> bool:
     """True when the user has no cross-region slots or every slot has a valid opponent."""
-    from systems.schedule_planning import cross_region_slots_for_team
+    from systems.schedule_planning import cross_region_slots_for_team, parse_stored_pick
 
     slots = cross_region_slots_for_team(teams, user_team)
     if not slots:
@@ -7385,11 +7489,11 @@ def _user_cross_region_picks_complete(
         return False
     by_slot = {s.slot_index: s for s in slots}
     for si, slot in by_slot.items():
-        opp = user_picks.get(si)
-        if opp is None:
-            opp = user_picks.get(str(si))
-        opp = str(opp or "").strip()
-        if not opp or opp not in slot.eligible_teams:
+        raw = user_picks.get(si)
+        if raw is None:
+            raw = user_picks.get(str(si))
+        pick = parse_stored_pick(raw)
+        if not pick.opponent or pick.opponent not in slot.eligible_teams:
             return False
     return True
 
