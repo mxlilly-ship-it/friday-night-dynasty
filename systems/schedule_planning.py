@@ -260,6 +260,116 @@ def normalize_cross_region_picks(
     return out
 
 
+def bye_week_index_for_team(
+    pod: List[str],
+    rr_week: List[List[Tuple[str, str]]],
+    team: str,
+) -> Optional[int]:
+    """Week index where ``team`` has its in-region bye, if exactly one bye week exists."""
+    found: Optional[int] = None
+    for wi, week in enumerate(rr_week):
+        playing = {home for home, _away in week} | {away for _home, away in week}
+        if team not in playing:
+            if found is not None:
+                return None
+            found = wi
+    return found
+
+
+def build_rr_with_team_bye_on_week(
+    pod: List[str],
+    team: str,
+    target_week: int,
+    *,
+    seed_base: int = 0,
+) -> List[List[Tuple[str, str]]]:
+    """Build a pod round-robin where ``team`` has its bye on ``target_week``."""
+    from systems.schedule_system import build_weeks_10_game
+
+    if team not in pod:
+        return build_weeks_10_game(list(pod), seed=seed_base)
+    for seed in range(int(seed_base), int(seed_base) + 500):
+        rr = build_weeks_10_game(list(pod), seed=seed)
+        if bye_week_index_for_team(pod, rr, team) == target_week:
+            return rr
+    return build_weeks_10_game(list(pod), seed=seed_base)
+
+
+def align_4x7_slot0_bye_weeks(
+    regs_list: List[List[str]],
+    rr_weeks: List[List[List[Tuple[str, str]]]],
+    teams: Dict[str, "Team"],
+    state: Optional[Dict[str, Any]],
+    classification: str,
+) -> Optional[int]:
+    """
+    For 4x7x4 slot 0, rebuild the opponent pod schedule so the picked opponent shares
+    the user's bye week. Returns the opponent region index that was rebuilt, if any.
+    """
+    if not state:
+        return None
+    user = str(state.get("user_team") or "").strip()
+    if not user or user not in teams:
+        return None
+    picks_raw = state.get("cross_region_picks") or {}
+    user_picks = picks_raw.get(user) if isinstance(picks_raw, dict) else None
+    if not isinstance(user_picks, dict):
+        return None
+    raw = user_picks.get(0)
+    if raw is None:
+        raw = user_picks.get("0")
+    pick = parse_stored_pick(raw)
+    if not pick.opponent or pick.opponent not in teams:
+        return None
+
+    cls_u, user_reg = _team_class_region(teams, user)
+    if cls_u != classification:
+        return None
+    template = detect_class_template(teams, cls_u)
+    if not template or template.template_id != "4x7x4":
+        return None
+    opp_reg = _opponent_region_for_slot(template, user_reg, 0)
+    if not opp_reg:
+        return None
+    try:
+        user_ri = template.region_names.index(user_reg)
+        opp_ri = template.region_names.index(opp_reg)
+    except ValueError:
+        return None
+
+    opponent = pick.opponent
+    user_pod = regs_list[user_ri]
+    opp_pod = regs_list[opp_ri]
+    user_bye_wi = bye_week_index_for_team(user_pod, rr_weeks[user_ri], user)
+    if user_bye_wi is None:
+        return None
+    if bye_week_index_for_team(opp_pod, rr_weeks[opp_ri], opponent) == user_bye_wi:
+        return None
+
+    seed_base = hash((user, opponent, user_bye_wi, classification)) % (2**31)
+    rr_weeks[opp_ri] = build_rr_with_team_bye_on_week(
+        opp_pod,
+        opponent,
+        user_bye_wi,
+        seed_base=seed_base,
+    )
+    return opp_ri
+
+
+def locks_for_bye_teams(
+    locks: List[Tuple[str, str]],
+    bye_a: str,
+    bye_b: str,
+) -> List[Tuple[str, str]]:
+    """Keep only locks that match the two bye teams in this slot-0 week."""
+    pair = frozenset({bye_a, bye_b})
+    out: List[Tuple[str, str]] = []
+    for home, away in locks:
+        if frozenset({home, away}) == pair:
+            out.append((home, away))
+    return out
+
+
 def pair_two_regions_with_locks(
     region_a: List[str],
     region_b: List[str],
@@ -287,7 +397,8 @@ def pair_two_regions_with_locks(
             a_rem.remove(away)
             b_rem.remove(home)
         else:
-            raise ValueError("Cross-region pick conflicts with another school's schedule.")
+            # Lock does not apply to this pairing pool (e.g. slot-0 bye week mismatch).
+            continue
         if ha_counts is not None:
             record_home_away(games[-1][0], games[-1][1], ha_counts)
 

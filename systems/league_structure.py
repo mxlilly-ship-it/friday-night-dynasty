@@ -950,7 +950,13 @@ def build_regular_season_weeks(
         if len(region_names) == 4 and total == 28 and all(s == 7 for s in sizes):
             handled_classes.add(cls)
             regs_list = [list(regs[r]) for r in region_names]
-            rr_weeks, ha = _in_region_rr_weeks(regs_list)
+            from systems.schedule_planning import align_4x7_slot0_bye_weeks, locks_for_bye_teams
+
+            rr_weeks = [build_weeks_10_game(lst) for lst in regs_list]
+            align_4x7_slot0_bye_weeks(regs_list, rr_weeks, teams, state, cls)
+            ha = _ha_counts()
+            for rw in rr_weeks:
+                _record_weeks_to_counts(rw, ha)
             block = []
             for wi in range(7):
                 week_games: List[Tuple[str, str]] = []
@@ -965,12 +971,17 @@ def build_regular_season_weeks(
                     bye_a = _bye_team_in_week(pod_a, week_a)
                     bye_b = _bye_team_in_week(pod_b, week_b)
                     if bye_a and bye_b:
+                        slot0_locks = locks_for_bye_teams(
+                            _cross_locks(cls, region_names[a], region_names[b], 0),
+                            bye_a,
+                            bye_b,
+                        )
                         week_games.extend(
                             _pair_two_regions_week(
                                 [bye_a],
                                 [bye_b],
                                 offset=0,
-                                locks=_cross_locks(cls, region_names[a], region_names[b], 0),
+                                locks=slot0_locks,
                                 ha_counts=ha,
                             )
                         )
