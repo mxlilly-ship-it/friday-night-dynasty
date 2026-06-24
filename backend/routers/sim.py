@@ -30,7 +30,7 @@ from backend.http_errors import exception_detail
 from backend.services.game_service import play_options, submit_play, sim_next_play, sim_to_half, sim_to_end
 from backend.services.game_state import deserialize_game, get_teams_for_coach_game, serialize_game
 from systems.save_system import team_from_dict
-from systems.coach_email_system import ensure_coach_inbox
+from systems.coach_email_system import ensure_coach_inbox, generate_week_checklist_email
 
 
 def _sim_finalize_state(state: Any) -> Any:
@@ -63,6 +63,8 @@ class SimCoachGameplanRequest(BaseModel):
     delete_offense_library_id: Optional[str] = None
     add_defense_library: Optional[Dict[str, Any]] = None
     delete_defense_library_id: Optional[str] = None
+    week_to_week_offense: Optional[bool] = None
+    week_to_week_defense: Optional[bool] = None
 
 
 class SimDepthChartRequest(BaseModel):
@@ -213,6 +215,8 @@ def sim_coach_gameplan_route(payload: SimCoachGameplanRequest = Body(...)):
             or payload.delete_offense_library_id is not None
             or payload.add_defense_library is not None
             or payload.delete_defense_library_id is not None
+            or payload.week_to_week_offense is not None
+            or payload.week_to_week_defense is not None
         ):
             result = save_coach_gameplan_v2_in_state(
                 payload.state,
@@ -223,6 +227,8 @@ def sim_coach_gameplan_route(payload: SimCoachGameplanRequest = Body(...)):
                 delete_offense_library_id=payload.delete_offense_library_id,
                 add_defense_library=payload.add_defense_library,
                 delete_defense_library_id=payload.delete_defense_library_id,
+                week_to_week_offense=payload.week_to_week_offense,
+                week_to_week_defense=payload.week_to_week_defense,
             )
         else:
             result = get_coach_gameplan_v2_from_state(payload.state)
@@ -352,6 +358,7 @@ def sim_hydrate_inbox_route(payload: SimStateRequest = Body(...)):
     try:
         state = payload.state or {}
         ensure_coach_inbox(state)
+        generate_week_checklist_email(state)
         _sim_finalize_state(state)
         return {"state": state}
     except Exception as e:

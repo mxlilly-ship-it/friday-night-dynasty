@@ -182,3 +182,118 @@
 .schedplan-ha-btn:hover:not(.schedplan-ha-btn--active) {
   color: #9aa8c0;
 }
+
+.schedplan-callout {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  max-width: 640px;
+  margin: 0 auto 1rem;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(232, 160, 32, 0.45);
+  background: linear-gradient(135deg, rgba(232, 160, 32, 0.14) 0%, rgba(13, 17, 23, 0.92) 55%);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+}
+
+.schedplan-callout--start {
+  margin-bottom: 1.25rem;
+  border-color: rgba(63, 182, 216, 0.45);
+  background: linear-gradient(135deg, rgba(63, 182, 216, 0.12) 0%, rgba(13, 17, 23, 0.92) 55%);
+}
+
+.schedplan-callout-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: #e8a020;
+  background: rgba(232, 160, 32, 0.12);
+  border: 1px solid rgba(232, 160, 32, 0.35);
+}
+
+.schedplan-callout--start .schedplan-callout-icon {
+  color: #3fb6d8;
+  background: rgba(63, 182, 216, 0.12);
+  border-color: rgba(63, 182, 216, 0.35);
+}
+
+.schedplan-callout-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.schedplan-callout-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #e8d5a8;
+  margin-bottom: 6px;
+}
+
+.schedplan-callout--start .schedplan-callout-title {
+  color: #9ed9ea;
+}
+
+.schedplan-callout-text {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: rgba(236, 238, 242, 0.88);
+}
+
+.schedplan-callout-text strong {
+  color: #f5e6c0;
+  font-weight: 600;
+}
+
+.schedplan-callout--start .schedplan-callout-text strong {
+  color: #c8efff;
+}
+
+.schedplan-callout-btn {
+  margin-top: 10px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(232, 160, 32, 0.5);
+  background: rgba(232, 160, 32, 0.12);
+  color: #f5e6c0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.schedplan-callout-btn:hover {
+  background: rgba(232, 160, 32, 0.22);
+  border-color: rgba(232, 160, 32, 0.75);
+}
+
+.schedplan-welcome {
+  max-width: 640px;
+  margin: 0 auto 1rem;
+  padding: 18px 20px;
+  border-radius: 14px;
+  border: 0.5px solid #1e2a3a;
+  background: #0d1117;
+}
+
+.schedplan-welcome-title {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #dde0f0;
+}
+
+.schedplan-welcome-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #7a8aa8;
+}

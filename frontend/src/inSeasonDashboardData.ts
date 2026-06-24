@@ -425,6 +425,9 @@ export function sortInboxEmailsForDisplay(emails: InboxEmailRow[]): InboxEmailRo
     if (unreadA !== unreadB) return unreadA - unreadB
     const weekDiff = Number(b.e.week ?? 0) - Number(a.e.week ?? 0)
     if (weekDiff !== 0) return weekDiff
+    const checklistA = (a.e.trigger_conditions ?? []).some((t) => String(t) === 'weekly_checklist') ? 1 : 0
+    const checklistB = (b.e.trigger_conditions ?? []).some((t) => String(t) === 'weekly_checklist') ? 1 : 0
+    if (checklistA !== checklistB) return checklistB - checklistA
     const starterA = (a.e.trigger_conditions ?? []).some((t) => String(t).includes('starter')) ? 1 : 0
     const starterB = (b.e.trigger_conditions ?? []).some((t) => String(t).includes('starter')) ? 1 : 0
     if (starterA !== starterB) return starterA - starterB

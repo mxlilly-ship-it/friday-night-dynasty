@@ -2,6 +2,12 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import TeamLogo from './TeamLogo'
 import { COACH_ATTRIBUTE_GROUPS, formatCoachAttributeCell } from './coachAttributes'
 import {
+  ALL_COACHING_CARDS,
+  normalizeLoadout,
+  type CoachingCardLoadout,
+} from './coachingCards'
+import './CoachingCardPicker.css'
+import {
   aggregateCoachCareer,
   buildCoachHistoryFromLeagueHistory,
   downloadTeamSeasonRecap,
@@ -154,6 +160,17 @@ export default function CoachProfilePage({
   const programRegionals = Number(team?.regional_championships ?? 0)
   const prestige = team?.prestige != null ? String(team.prestige) : '—'
 
+  const coachingCards = useMemo((): CoachingCardLoadout => normalizeLoadout(coach?.coaching_cards), [coach?.coaching_cards])
+  const equippedCards = useMemo(
+    () => ALL_COACHING_CARDS.filter((c) => {
+      const lo = coachingCards
+      if (c.layer === 'program') return lo.program_identity === c.id
+      if (c.layer === 'position') return lo.position.includes(c.id)
+      return lo.platinum.includes(c.id)
+    }),
+    [coachingCards],
+  )
+
   const teamWithLogo = (name: string, size = 22) => (
     <span className="teamhome-name-with-logo coach-profile-team-logo">
       <TeamLogo apiBase={apiBase} teamName={name} logoVersion={logoVersion} headers={headers} size={size} />
@@ -236,6 +253,28 @@ export default function CoachProfilePage({
             </dl>
           </div>
         ) : null}
+      </section>
+
+      <section className="coach-cards-panel" aria-label="Coaching cards">
+        <h2>Coaching cards</h2>
+        {equippedCards.length === 0 ? (
+          <p className="teamhome-small" style={{ color: '#64748b', margin: 0 }}>
+            No coaching cards equipped.
+          </p>
+        ) : (
+          <div className="coach-cards-mini-grid">
+            {equippedCards.map((c) => (
+              <div
+                key={c.id}
+                className="coach-card-mini"
+                style={{ '--cc-accent': c.accent } as React.CSSProperties}
+              >
+                <strong>{c.name}</strong>
+                <span>{c.ability}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="coach-profile-career" aria-label="Career from league history">

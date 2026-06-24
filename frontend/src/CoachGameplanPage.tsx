@@ -199,6 +199,7 @@ export default function CoachGameplanPage({
   const [offenseLibrary, setOffenseLibrary] = useState<GamePlanLibrary | null>(null)
   const [defenseLibrary, setDefenseLibrary] = useState<GamePlanLibrary | null>(null)
   const [goForItMaxYtg, setGoForItMaxYtg] = useState<number>(2)
+  const [weekToWeek, setWeekToWeek] = useState(false)
 
   const [scoreSituation, setScoreSituation] = useState<(typeof SCORE_SITUATIONS)[number]>(SCORE_SITUATIONS[3])
   const [fieldArea, setFieldArea] = useState<(typeof FIELD_AREAS)[number]>(FIELD_AREAS[1])
@@ -215,6 +216,8 @@ export default function CoachGameplanPage({
   onSaveStateRef.current = onSaveState
   const headersRef = useRef(headers)
   headersRef.current = headers
+
+  const currentWeek = Number((saveState as { current_week?: number })?.current_week ?? 0)
 
   const fetchPlan = useCallback(async (opts?: { showLoading?: boolean }) => {
     if (!saveId) {
@@ -239,6 +242,8 @@ export default function CoachGameplanPage({
       setDefenseLibrary((j.defense_library as GamePlanLibrary | undefined) ?? null)
       const raw = Number(j.fourth_down?.go_for_it_max_ytg)
       setGoForItMaxYtg(Number.isFinite(raw) ? Math.max(0, Math.min(10, Math.round(raw))) : 2)
+      const wtw = j.week_to_week
+      setWeekToWeek(Boolean(side === 'offense' ? wtw?.offense : wtw?.defense))
     } catch (e: unknown) {
       setLoadError(e instanceof Error ? e.message : 'Failed to load gameplan')
     } finally {
@@ -248,8 +253,7 @@ export default function CoachGameplanPage({
 
   useEffect(() => {
     void fetchPlan({ showLoading: true })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [saveId])
+  }, [saveId, currentWeek, side, fetchPlan])
 
   const rows = useMemo(() => {
     const p = plan
@@ -420,8 +424,56 @@ export default function CoachGameplanPage({
     await persistImportedPlan(nextPlan, file.name || 'Imported plan')
   }
 
+  const onWeekToWeekChange = async (checked: boolean) => {
+    if (!saveId) return
+    if (checked && plan) {
+      const full = validateEntirePlan(plan)
+      if (!full.ok) {
+        onError(`Set a valid full gameplan before enabling week-to-week carry. ${full.msg}`)
+        return
+      }
+    }
+    setWeekToWeek(checked)
+    setBusy(true)
+    try {
+      const fourth_down = { go_for_it_max_ytg: Math.max(0, Math.min(10, Math.round(Number(goForItMaxYtg) || 0))) }
+      const body =
+        side === 'offense'
+          ? {
+              week_to_week_offense: checked,
+              ...(checked && plan ? { offense: plan, fourth_down } : {}),
+            }
+          : {
+              week_to_week_defense: checked,
+              ...(checked && plan ? { defense: plan } : {}),
+            }
+      const j = await saveCoachGameplan(apiBase ?? '', saveId, saveStateRef.current, headersRef.current, body)
+      if (j.state) onSaveStateRef.current?.(j.state)
+      setMatchupKey(j.matchup_key ?? null)
+      setOffense(j.offense as Plan)
+      setDefense(j.defense as Plan)
+      setOffenseLibrary((j.offense_library as GamePlanLibrary | undefined) ?? null)
+      setDefenseLibrary((j.defense_library as GamePlanLibrary | undefined) ?? null)
+      const raw = Number(j.fourth_down?.go_for_it_max_ytg)
+      setGoForItMaxYtg(Number.isFinite(raw) ? Math.max(0, Math.min(10, Math.round(raw))) : 2)
+      const wtw = j.week_to_week
+      setWeekToWeek(Boolean(side === 'offense' ? wtw?.offense : wtw?.defense))
+      onError('')
+    } catch (e: unknown) {
+      setWeekToWeek(!checked)
+      onError(e instanceof Error ? e.message : 'Failed to save week-to-week setting')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const onConfirm = async () => {
     if (!saveId || !plan) return
+    const full = validateEntirePlan(plan)
+    if (!full.ok) {
+      onError(full.msg)
+      return
+    }
     const v = validateCurrentTable()
     if (!v.ok) {
       onError(v.msg)
@@ -430,8 +482,10 @@ export default function CoachGameplanPage({
     setBusy(true)
     try {
       const fourth_down = { go_for_it_max_ytg: Math.max(0, Math.min(10, Math.round(Number(goForItMaxYtg) || 0))) }
-      // 4th-down decisions are offensive-only. Don't allow DEF confirm to overwrite them.
-      const body = side === 'offense' ? { offense: plan, fourth_down } : { defense: plan }
+      const body =
+        side === 'offense'
+          ? { offense: plan, fourth_down, week_to_week_offense: weekToWeek }
+          : { defense: plan, week_to_week_defense: weekToWeek }
       const j = await saveCoachGameplan(apiBase ?? '', saveId, saveState, headers, body)
       if (j.state) onSaveState?.(j.state)
       setMatchupKey(j.matchup_key ?? null)
@@ -441,6 +495,8 @@ export default function CoachGameplanPage({
       setDefenseLibrary((j.defense_library as GamePlanLibrary | undefined) ?? null)
       const raw = Number(j.fourth_down?.go_for_it_max_ytg)
       setGoForItMaxYtg(Number.isFinite(raw) ? Math.max(0, Math.min(10, Math.round(raw))) : 2)
+      const wtw = j.week_to_week
+      setWeekToWeek(Boolean(side === 'offense' ? wtw?.offense : wtw?.defense))
       onError('')
     } catch (e: any) {
       onError(e?.message ?? 'Failed to save gameplan')
@@ -450,7 +506,7 @@ export default function CoachGameplanPage({
   }
 
   return (
-    <div className="gp2-root">
+    <div className={`gp2-root gp2-root--${side}`}>
       <div className="gp2-topbar">
         <button type="button" className="gp2-back" onClick={onBack} disabled={!onBack}>
           Back
@@ -599,7 +655,7 @@ export default function CoachGameplanPage({
           </div>
 
           <div className="gp2-tablewrap">
-            <table className="gp2-table">
+            <table className={`gp2-table gp2-table--${side}`}>
               <thead>
                 <tr>
                   <th>D&amp;D</th>
@@ -635,7 +691,16 @@ export default function CoachGameplanPage({
             </table>
           </div>
 
-          <div className="gp2-bottom">
+          <div className={`gp2-bottom${side === 'defense' ? ' gp2-bottom--defense' : ''}`}>
+            <label className="gp2-week-to-week" title="Reuse this side's last confirmed plan each week until you change it">
+              <input
+                type="checkbox"
+                checked={weekToWeek}
+                onChange={(e) => void onWeekToWeekChange(e.target.checked)}
+                disabled={busy}
+              />
+              <span>Save week to week</span>
+            </label>
             {side === 'offense' ? (
               <div className="gp2-fourth">
                 <div className="gp2-label">4th down</div>

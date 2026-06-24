@@ -29,6 +29,7 @@ import {
 } from './authSession.js'
 import { getAuthInstance, resetPassword } from './auth.js'
 import SignupTermsConsent from './SignupTermsConsent'
+import ScreenshotsGallery from './ScreenshotsGallery'
 import { getOrCreateDeviceId } from './deviceId.js'
 
 /** Stable reference so child effects do not re-run when logged out (browser saves). */
@@ -108,6 +109,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
     Array<{ device_id: string; label?: string | null; last_seen_at?: number }>
   >([])
   const [screen, setScreen] = useState<Screen>('title')
+  const [showScreenshotsGallery, setShowScreenshotsGallery] = useState(false)
   const [saves, setSaves] = useState<SaveListItem[]>([])
   const [cloudSaves, setCloudSaves] = useState<CloudSaveListItem[]>([])
   const [saveId, setSaveId] = useState<string>('')
@@ -1039,6 +1041,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
       improve_culture_cumulative_pp?: number
       improve_boosters_cumulative_pp?: number
       coach_dev_allocations?: Record<string, number>
+      coaching_cards?: { program_identity?: string | null; position?: string[]; platinum?: string[] }
       carousel_job_applications?: string[]
       transfer_stage_1_ack_results?: boolean
       transfer_stage_2_ack_results?: boolean
@@ -1287,12 +1290,17 @@ export default function App({ devNoFirebase = false }: AppProps) {
   titleNavRef.current = { onNewSaveClick, onLoadSaveClick }
 
   useEffect(() => {
+    if (screen !== 'title') setShowScreenshotsGallery(false)
+  }, [screen])
+
+  useEffect(() => {
     function onMessage(e: MessageEvent) {
       if (e.origin !== window.location.origin) return
       const d = e.data as { type?: string; action?: string } | null
       if (!d || d.type !== 'fnd-title') return
       if (d.action === 'new') void titleNavRef.current.onNewSaveClick()
       else if (d.action === 'load') void titleNavRef.current.onLoadSaveClick()
+      else if (d.action === 'screenshots') setShowScreenshotsGallery(true)
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
@@ -1506,7 +1514,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
         <iframe
           className="fnd-title-iframe"
           title="Friday Night Dynasty"
-          src={`${import.meta.env.BASE_URL}fnd_homepage.html?v=20260618b`}
+          src={`${import.meta.env.BASE_URL}fnd_homepage.html?v=20260620a`}
         />
       ) : (
         <div className="fnd-title-inner">
@@ -1849,6 +1857,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
         {successMessage ? <div className="fnd-success">{successMessage}</div> : null}
         </div>
       )}
+      <ScreenshotsGallery open={showScreenshotsGallery} onClose={() => setShowScreenshotsGallery(false)} />
     </div>
   )
 }

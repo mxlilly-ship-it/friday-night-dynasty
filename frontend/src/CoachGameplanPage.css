@@ -1,5 +1,5 @@
 .gp2-root {
-  padding: 18px 18px 26px;
+  padding: 12px 0 20px;
   max-width: 1480px;
   margin: 0 auto;
   color: #eef0f8;
@@ -189,7 +189,8 @@
   flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 12px 16px;
+  gap: 14px 18px;
+  margin-bottom: 2px;
 }
 
 .gp2-control {
@@ -246,16 +247,34 @@
 }
 
 .gp2-tablewrap {
-  margin-top: 14px;
+  margin-top: 16px;
   overflow: auto;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.gp2-root--defense .gp2-tablewrap {
+  width: fit-content;
+  max-width: 100%;
 }
 
 .gp2-table {
   width: 100%;
   border-collapse: collapse;
   min-width: 780px;
+}
+
+.gp2-table--defense {
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+  table-layout: fixed;
+}
+
+.gp2-table--defense th:not(:first-child):not(:last-child),
+.gp2-table--defense td:not(:first-child):not(:last-child) {
+  text-align: center;
+  width: 108px;
 }
 
 .gp2-table th,
@@ -280,6 +299,11 @@
 .gp2-dd {
   font-weight: 950;
   white-space: nowrap;
+  width: 88px;
+}
+
+.gp2-table--defense .gp2-dd {
+  width: 72px;
 }
 
 .gp2-input {
@@ -297,6 +321,8 @@
   font-weight: 950;
   text-align: right;
   opacity: 0.9;
+  width: 64px;
+  padding-left: 12px !important;
 }
 
 .gp2-badrow .gp2-total {
@@ -307,8 +333,36 @@
   display: flex;
   gap: 10px;
   justify-content: flex-end;
-  margin-top: 14px;
+  margin-top: 16px;
   align-items: center;
+  flex-wrap: wrap;
+}
+
+.gp2-week-to-week {
+  margin-right: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: rgba(239, 241, 248, 0.88);
+  cursor: pointer;
+  user-select: none;
+}
+
+.gp2-week-to-week input {
+  width: 16px;
+  height: 16px;
+  accent-color: #3b82f6;
+  cursor: pointer;
+}
+
+.gp2-bottom--defense {
+  width: 100%;
+  box-sizing: border-box;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 12px;
 }
 
 .gp2-fourth {

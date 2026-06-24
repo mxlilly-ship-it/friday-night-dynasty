@@ -229,14 +229,31 @@ TWO_WAY_PAIRS = {
 # Potential tier distribution (matches overall chart: most bench/role, few All-State/Elite, rare Generational)
 # (min, max, weight) - weight = relative chance to land in this tier
 POTENTIAL_TIER_WEIGHTS = [
-    (40, 55, 40),   # Bench / developmental
+    (40, 55, 42),   # Bench / developmental
     (56, 65, 34),   # Role player
     (66, 75, 18),   # Solid starter
-    (76, 85, 7),    # All-State (<10%)
-    (86, 95, 1),    # Elite (<3%)
-    (96, 100, 0),   # Generational - handled separately, very rare
+    (76, 82, 5),    # All-State (rare at generation)
+    (83, 88, 1),    # Elite HS ceiling at creation (very rare)
+    (89, 92, 0),    # Generational HS - handled separately
 ]
-GENERATIONAL_CHANCE = 0.003  # ~0.3% - may be 0-1 in entire league
+GENERATIONAL_CHANCE = 0.001  # ~0.1% league-wide; rolls 89-92 only at creation
+
+# Hard caps at player creation (development/cards can exceed later).
+GEN_MAX_POTENTIAL = 92
+GEN_MAX_OVR_FRESHMAN = 62
+GEN_MAX_OVR_VETERAN = 82
+
+_GEN_CLAMP_ATTRS = (
+    "speed", "agility", "acceleration", "strength", "balance", "jumping",
+    "stamina", "injury", "frame",
+    "toughness", "effort", "football_iq", "coachability", "confidence",
+    "discipline", "leadership", "composure",
+    "throw_power", "throw_accuracy", "decisions", "catching",
+    "run_blocking", "pass_blocking", "vision", "ball_security",
+    "break_tackle", "elusiveness", "route_running", "coverage",
+    "blitz", "pass_rush", "run_defense", "pursuit", "tackling", "block_shedding",
+    "kick_power", "kick_accuracy",
+)
 
 # Name pools: 150 U.S. first names × 150 surnames (generate_name / new players).
 FIRST_NAMES = [
@@ -290,10 +307,45 @@ def _apply_community_modifier(
     return base_value + modifier
 
 
+def clamp_generated_player_caps(player: Player) -> None:
+    """Enforce HS creation ceilings on potential and overall (no 90+ OVR at gen)."""
+    from systems.team_ratings import calculate_player_overall
+
+    year = int(getattr(player, "year", 10) or 10)
+    young = year <= 9 or int(getattr(player, "age", 15) or 15) <= 14
+    max_ovr = GEN_MAX_OVR_FRESHMAN if young else GEN_MAX_OVR_VETERAN
+
+    pot = int(getattr(player, "potential", 50) or 50)
+    player.potential = max(40, min(GEN_MAX_POTENTIAL, pot))
+
+    ovr = int(calculate_player_overall(player))
+    if ovr <= max_ovr:
+        if player.potential < ovr:
+            player.potential = min(GEN_MAX_POTENTIAL, ovr + 3)
+        return
+
+    ratio = max_ovr / max(ovr, 1)
+    for attr in _GEN_CLAMP_ATTRS:
+        val = getattr(player, attr, None)
+        if isinstance(val, (int, float)):
+            scaled = max(RATING_ATTR_MIN, int(round(float(val) * ratio)))
+            setattr(player, attr, min(RATING_ATTR_MAX, scaled))
+
+    new_ovr = int(calculate_player_overall(player))
+    if new_ovr > max_ovr:
+        for attr in _GEN_CLAMP_ATTRS:
+            val = int(getattr(player, attr, RATING_ATTR_MIN) or RATING_ATTR_MIN)
+            setattr(player, attr, max(RATING_ATTR_MIN, val - 1))
+        new_ovr = int(calculate_player_overall(player))
+
+    floor_pot = min(GEN_MAX_POTENTIAL, max(new_ovr + 2, int(player.potential or new_ovr)))
+    player.potential = max(new_ovr, floor_pot)
+
+
 def _roll_potential_from_tiers() -> int:
-    """Roll potential using tier distribution. Returns 40-100. Generational very rare."""
+    """Roll potential using tier distribution. Returns 40-92 at creation."""
     if random.random() < GENERATIONAL_CHANCE:
-        return random.randint(96, 100)
+        return random.randint(89, GEN_MAX_POTENTIAL)
     total_weight = sum(w for _, _, w in POTENTIAL_TIER_WEIGHTS if w > 0)
     r = random.randint(1, total_weight)
     for min_ovr, max_ovr, weight in POTENTIAL_TIER_WEIGHTS:
@@ -328,7 +380,7 @@ def _potential_modifier(
     # Coach player_development (1-10): 5=0, 10=+3
     if coach_player_dev is not None:
         mod += max(0, (coach_player_dev - 5) // 2)
-    return max(-10, min(14, mod))
+    return max(-10, min(10, mod))
 
 
 def _apply_weak_program_depth_tail(
@@ -609,8 +661,8 @@ def generate_player(
         base = max(22, min(43, base))
         talent_weight = 0.30
     else:
-        base = 45 + int((team_prestige - 5) * 2.65) + int((talent - 5) * 0.55)
-        base = max(24, min(59, base))
+        base = 45 + int((team_prestige - 5) * 2.35) + int((talent - 5) * 0.50)
+        base = max(24, min(55, base))
         talent_weight = 0.72  # Stronger community influence
     attrs: Dict[str, int] = {}
     skill_attrs = [
@@ -642,7 +694,7 @@ def generate_player(
     potential += _potential_modifier(community_type, team_prestige, classification, coach_dev)
     # Small random variance (±2) so similar programs still get variety
     potential += random.randint(-2, 2)
-    attrs["potential"] = max(40, min(RATING_ATTR_MAX, potential))
+    attrs["potential"] = max(40, min(GEN_MAX_POTENTIAL, potential))
 
     # Growth_rate: influenced by community facilities and coach player_development
     facilities = get_community_rating(community_type, "facilities")
@@ -664,7 +716,7 @@ def generate_player(
         "K": ["kick_power", "kick_accuracy"],
         "P": ["kick_power", "kick_accuracy"],
     }
-    pos_boost_hi = 2 if young_freshman else 8
+    pos_boost_hi = 2 if young_freshman else 6
     for attr in pos_emphasis.get(position, []):
         attrs[attr] = min(RATING_ATTR_MAX, attrs[attr] + random.randint(0, pos_boost_hi))
 
@@ -711,7 +763,7 @@ def generate_player(
 
     # Build Player
     rating_attrs = {k: v for k, v in attrs.items() if k not in ("height", "weight", "peak_age")}
-    return Player(
+    player = Player(
         name=name,
         age=age,
         year=year,
@@ -722,6 +774,8 @@ def generate_player(
         peak_age=peak_age,
         **rating_attrs,
     )
+    clamp_generated_player_caps(player)
+    return player
 
 
 def generate_roster(

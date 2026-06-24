@@ -617,6 +617,10 @@
   min-width: 0;
 }
 
+.teamhome-content:has(.gp2-root) {
+  padding: 8px 16px 16px;
+}
+
 .teamhome-roster-shell:has(.ti-root) {
   border: none;
   background: transparent;
@@ -1151,6 +1155,13 @@ td .teamhome-roster-name--profile {
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.02em;
+  color: rgba(239, 241, 248, 0.72);
+}
+
+.teamhome-depth-year {
+  font-size: 0.92em;
+  font-weight: 600;
+  opacity: 0.85;
   color: rgba(239, 241, 248, 0.72);
 }
 
@@ -3354,24 +3365,47 @@ td .teamhome-roster-name--profile {
 }
 
 /* STATE → League History */
-.teamhome-league-history-root {
-  color: #e6e6ea;
+.teamhome-roster-shell.teamhome-league-history-root {
+  background: #ececee;
+  color: #1c1c20;
+  border-color: rgba(0, 0, 0, 0.14);
 }
 .teamhome-league-history-root .teamhome-small,
 .teamhome-league-history-root .teamhome-league-history-blurb,
 .teamhome-league-history-root .teamhome-league-history-hint,
 .teamhome-league-history-root .teamhome-league-history-recap-hint {
-  color: rgba(226, 232, 240, 0.92);
+  color: #1c1c20;
+  opacity: 1;
 }
 .teamhome-league-history-root .teamhome-card-title {
-  color: rgba(241, 245, 249, 0.95);
+  color: #1c1c20;
 }
 .teamhome-league-history-root .teamhome-teaminfo-picker-label {
-  color: rgba(203, 213, 225, 0.78);
+  color: #1c1c20;
+}
+.teamhome-league-history-root .teamhome-roster-empty {
+  color: #333;
 }
 .teamhome-league-history-class-card .teamhome-roster-cell,
 .teamhome-league-history-class-card .teamhome-roster-name,
 .teamhome-league-history-class-card .teamhome-roster-head .teamhome-roster-cell {
+  color: #1c1c20;
+}
+.teamhome-league-history-root .teamhome-microcol-title {
+  color: #1c1c20;
+  opacity: 0.72;
+}
+.teamhome-league-history-root .teamhome-playoffs-row {
+  color: #1c1c20;
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(0, 0, 0, 0.12);
+}
+.teamhome-league-history-root .teamhome-playoffs-teamline,
+.teamhome-league-history-root .teamhome-playoffs-line-score,
+.teamhome-league-history-root .teamhome-playoffs-seed {
+  color: #1c1c20;
+}
+.teamhome-league-history-root .teamhome-league-history-champ-pill {
   color: #1c1c20;
 }
 .teamhome-league-history-root .teamhome-league-history-section-head {
@@ -3656,7 +3690,7 @@ td .teamhome-roster-name--profile {
 .teamhome-season-end-stack {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 1rem;
 }
 
 .season-summary-schedule-note {
@@ -3722,8 +3756,9 @@ td .teamhome-roster-name--profile {
   margin: 12px 0 16px;
   padding: 12px 14px;
   border-radius: 10px;
-  border: 1px solid rgba(99, 102, 241, 0.35);
-  background: linear-gradient(165deg, rgba(30, 27, 75, 0.45), rgba(15, 23, 42, 0.88));
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  background: rgba(255, 255, 255, 0.72);
+  color: #1c1c20;
 }
 
 .teamhome-league-history-recap-bar .teamhome-teaminfo-select {
@@ -3822,7 +3857,8 @@ td .teamhome-roster-name--profile {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  min-height: min(70vh, 640px);
+  flex: 1;
+  min-height: 0;
 }
 .coach-inbox-header {
   display: flex;
@@ -3930,7 +3966,8 @@ td .teamhome-roster-name--profile {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
   gap: 12px;
   align-items: stretch;
-  min-height: 420px;
+  flex: 1;
+  min-height: 0;
 }
 .coach-inbox-list,
 .coach-inbox-detail {
@@ -4042,6 +4079,13 @@ td .teamhome-roster-name--profile {
   opacity: 0.75;
   text-transform: none;
   letter-spacing: 0.02em;
+}
+.coach-inbox-tag--read {
+  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
 }
 .coach-inbox-empty {
   padding: 28px 16px;

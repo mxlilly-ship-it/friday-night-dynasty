@@ -1,0 +1,260 @@
+.cc-picker {
+  text-align: left;
+  margin-top: 12px;
+}
+
+.cc-picker--compact .cc-intro,
+.cc-picker--compact .cc-tabs,
+.cc-picker--compact .cc-section {
+  display: none;
+}
+
+.cc-hardcore-banner {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98));
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+
+.cc-hardcore-banner p {
+  margin: 0 0 10px;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: #e2e8f0;
+}
+
+.cc-hardcore-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  color: #f8fafc;
+}
+
+.cc-intro {
+  font-size: 0.9rem;
+  color: #94a3b8;
+  margin: 0 0 10px;
+  line-height: 1.45;
+}
+
+.cc-cp-ledger {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  font-size: 0.88rem;
+  color: #cbd5e1;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: rgba(15, 23, 42, 0.55);
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.cc-cp-ledger .cc-cp-negative {
+  color: #fca5a5;
+}
+
+.cc-tile-cost {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fbbf24;
+  margin-bottom: 4px;
+}
+
+.cc-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.82rem;
+  color: #cbd5e1;
+  margin-bottom: 12px;
+}
+
+.cc-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.cc-tabs button {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.6);
+  color: #e2e8f0;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.cc-tabs button.active {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.15);
+  color: #f0f9ff;
+}
+
+.cc-section-title {
+  font-size: 0.95rem;
+  margin: 0 0 10px;
+  color: #f1f5f9;
+  font-weight: 600;
+}
+
+.cc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.cc-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  padding: 14px 12px 12px;
+  border-radius: 12px;
+  border: 2px solid rgba(148, 163, 184, 0.2);
+  background: linear-gradient(160deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.88) 100%);
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+  min-height: 140px;
+}
+
+.cc-tile:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: var(--cc-accent, #64748b);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.cc-tile--on {
+  border-color: var(--cc-accent, #38bdf8);
+  box-shadow: 0 0 0 1px var(--cc-accent), 0 10px 28px rgba(0, 0, 0, 0.4);
+}
+
+.cc-tile--dim {
+  opacity: 0.45;
+}
+
+.cc-tile--platinum {
+  background: linear-gradient(145deg, #1e293b 0%, #334155 40%, #475569 100%);
+}
+
+.cc-tile--platinum.cc-tile--on {
+  border-color: #fbbf24;
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.35);
+}
+
+.cc-tile-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cc-accent, #94a3b8);
+  margin-bottom: 6px;
+}
+
+.cc-tile-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #f8fafc;
+  margin-bottom: 6px;
+  line-height: 1.2;
+}
+
+.cc-tile-ability {
+  font-size: 0.78rem;
+  color: #86efac;
+  margin: 0 0 4px;
+  line-height: 1.35;
+}
+
+.cc-tile-tradeoff {
+  font-size: 0.72rem;
+  color: #fca5a5;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.cc-tile-equipped {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #0f172a;
+  background: var(--cc-accent, #38bdf8);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.cc-errors {
+  color: #fecaca;
+  font-size: 0.85rem;
+  margin-bottom: 10px;
+}
+
+.cc-equipped-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cc-equipped-chip {
+  font-size: 0.8rem;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid;
+  color: #e2e8f0;
+  background: rgba(15, 23, 42, 0.7);
+}
+
+.cc-equipped-empty {
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+/* Coach profile equipped cards */
+.coach-cards-panel {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.coach-cards-panel h2 {
+  font-size: 1rem;
+  margin: 0 0 12px;
+  color: #f1f5f9;
+}
+
+.coach-cards-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.coach-card-mini {
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  padding: 10px 12px;
+  background: rgba(15, 23, 42, 0.65);
+  border-left: 4px solid var(--cc-accent, #64748b);
+}
+
+.coach-card-mini strong {
+  display: block;
+  font-size: 0.88rem;
+  color: #f8fafc;
+  margin-bottom: 4px;
+}
+
+.coach-card-mini span {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  line-height: 1.3;
+}

@@ -112,11 +112,16 @@ from systems.win_path_io import (
 )
 from systems.coach_development import (
     COACH_DEV_SKILLS,
+    LEVEL_CP_THRESHOLDS,
+    CP_ECONOMY_VERSION,
     apply_ai_coach_season_development,
     apply_coach_development,
+    apply_coaching_card_cp_transaction,
     build_bulk_sim_coach_dev_body,
+    build_initial_coach_dev_banks_for_dynasty,
     build_offseason_coach_dev_banks_for_league,
     compute_coach_development_bank,
+    migrate_state_coach_dev_banks,
 )
 from systems.position_changes import apply_position_changes_to_team, run_ai_position_changes_for_team
 from systems.regional_titles import (
@@ -149,6 +154,7 @@ from systems.coach_email_system import (
     ensure_coach_inbox,
     generate_coach_game_touch_emails,
     generate_playoff_round_emails,
+    generate_week_checklist_email,
     generate_week_sim_emails,
     mark_emails_read,
     resolve_email_choice,
@@ -190,6 +196,7 @@ def _hydrate_coach_inbox_persist_if_needed(user_id: str, save_id: str, state: Di
     if isinstance(inbox, dict) and isinstance(inbox.get("emails"), list):
         n_before = len(inbox["emails"])
     ensure_coach_inbox(state)
+    _maybe_generate_week_checklist_email(state)
     inbox2 = state.get("coach_inbox")
     n_after = 0
     if isinstance(inbox2, dict) and isinstance(inbox2.get("emails"), list):
@@ -2067,10 +2074,43 @@ def _empty_coach_dev_bank() -> Dict[str, Any]:
         "available_cp": 0.0,
         "allocations": {sk: 0.0 for sk in COACH_DEV_SKILLS},
         "levels": {sk: 1 for sk in COACH_DEV_SKILLS},
-        "thresholds": {1: 0, 2: 20, 3: 50, 4: 90, 5: 140, 6: 200, 7: 275, 8: 350, 9: 425, 10: 500},
+        "thresholds": dict(LEVEL_CP_THRESHOLDS),
+        "card_ledger": {},
+        "cp_economy_version": CP_ECONOMY_VERSION,
         "breakdown": None,
         "applied": None,
     }
+
+
+def _apply_coach_dev_stage_for_team(
+    coach: Any,
+    bank: Dict[str, Any],
+    *,
+    body: Optional[Dict[str, Any]] = None,
+    is_user: bool = False,
+) -> None:
+    if coach is None or not isinstance(bank, dict):
+        return
+    from systems.coaching_cards import ai_select_coaching_cards, apply_loadout_to_coach, get_coach_loadout
+
+    if is_user:
+        if body and body.get("coaching_cards") is not None:
+            old_loadout = get_coach_loadout(coach)
+            new_loadout = body.get("coaching_cards")
+            apply_coaching_card_cp_transaction(bank, old_loadout, new_loadout)
+            apply_loadout_to_coach(coach, new_loadout)
+        apply_coach_development(coach, bank, _merge_user_coach_development_body(bank, body))
+        return
+
+    if not is_user:
+        old_loadout = get_coach_loadout(coach)
+        try:
+            new_loadout = ai_select_coaching_cards(coach, getattr(coach, "coaching_cards", None))
+            apply_coaching_card_cp_transaction(bank, old_loadout, new_loadout)
+            apply_loadout_to_coach(coach, new_loadout)
+        except Exception:
+            pass
+    apply_ai_coach_season_development(coach, bank)
 
 
 def _merge_user_coach_development_body(bank: Dict[str, Any], body: Optional[Dict[str, Any]]) -> Dict[str, Any]:
@@ -2457,9 +2497,9 @@ def advance_offseason(
                 b = _empty_coach_dev_bank()
                 banks_cd[name] = b
             if name == user_team_name and ut and ut.coach:
-                apply_coach_development(ut.coach, b, _merge_user_coach_development_body(b, body))
+                _apply_coach_dev_stage_for_team(ut.coach, b, body=body, is_user=True)
             elif name != user_team_name:
-                apply_ai_coach_season_development(coach, b)
+                _apply_coach_dev_stage_for_team(coach, b, is_user=False)
         if user_team_name:
             ub = banks_cd.get(user_team_name)
             if isinstance(ub, dict):
@@ -3023,6 +3063,10 @@ def create_save(
     ensure_playoff_system_in_state(state)
     apply_league_metadata_to_state(state, league_meta)
     ensure_league_metadata_in_state(state)
+    state["offseason_coach_dev_banks"] = build_initial_coach_dev_banks_for_dynasty(teams)
+    user_bank = state["offseason_coach_dev_banks"].get(user_team)
+    if isinstance(user_bank, dict):
+        state["offseason_coach_dev_bank"] = user_bank
     save_state(user_id, save_id, state, _save_dir)
 
     return {"save_id": save_id}
@@ -3592,6 +3636,15 @@ def _sync_derived_save_fields(state: Dict[str, Any], save_dir: str) -> bool:
     changed = False
     if migrate_state_team_points_fields(state):
         changed = True
+    teams_for_migrate: Dict[str, Any] = {}
+    try:
+        for row in state.get("teams") or []:
+            if isinstance(row, dict) and row.get("name"):
+                teams_for_migrate[str(row["name"])] = team_from_dict(row)
+    except Exception:
+        teams_for_migrate = {}
+    if migrate_state_coach_dev_banks(state, teams_for_migrate):
+        changed = True
     if _repair_playoffs_complete_to_season_summary(state, save_dir):
         changed = True
     if _repair_missing_archived_season(state, save_dir):
@@ -4026,6 +4079,11 @@ def _maybe_generate_week_sim_emails_if_complete(state: Dict[str, Any], *, comple
     generate_week_sim_emails(state, completed_week=int(completed_week))
 
 
+def _maybe_generate_week_checklist_email(state: Dict[str, Any], *, week: Optional[int] = None) -> None:
+    """Append the static Monday checklist for the active regular-season week (idempotent)."""
+    generate_week_checklist_email(state, week=week)
+
+
 def _apply_game_result_to_standings(
     standings: Dict[str, Dict[str, Any]],
     home: str,
@@ -4256,31 +4314,152 @@ def delete_defense_from_gameplan_library_in_state(state: Dict[str, Any], entry_i
     return True
 
 
-def attach_user_coach_gameplan_v2_from_save_state(
-    state: Dict[str, Any],
-    home_team: Any,
-    away_team: Any,
-    user_team_name: Optional[str],
-) -> None:
-    """
-    Copy the user's saved matchup gameplan from league state onto their coach object.
-    Playable games rebuild teams from JSON and otherwise would miss game_plan_v2_* on Coach.
-    """
-    if not user_team_name:
-        return
+def _gameplan_week_to_week_flags(state: Dict[str, Any]) -> Dict[str, bool]:
+    raw = state.get("gameplan_week_to_week")
+    if not isinstance(raw, dict):
+        return {"offense": False, "defense": False}
+    return {"offense": bool(raw.get("offense")), "defense": bool(raw.get("defense"))}
+
+
+def _gameplan_last_confirmed(state: Dict[str, Any]) -> Dict[str, Any]:
+    raw = state.get("gameplan_last_confirmed")
+    return raw if isinstance(raw, dict) else {}
+
+
+def _sync_last_confirmed_from_matchup_store(state: Dict[str, Any]) -> None:
+    """Copy the current matchup's saved plans into gameplan_last_confirmed."""
     key = _coach_gameplan_v2_matchup_key(state)
+    if not key:
+        return
     store = state.get("coach_gameplans_v2") if isinstance(state.get("coach_gameplans_v2"), dict) else {}
-    entry = store.get(key) if key and isinstance(store, dict) else None
+    entry = store.get(key) if isinstance(store.get(key), dict) else None
     if not isinstance(entry, dict):
         return
-    if getattr(home_team, "name", None) == user_team_name:
-        target = home_team
-    elif getattr(away_team, "name", None) == user_team_name:
-        target = away_team
-    else:
-        return
-    coach = getattr(target, "coach", None)
-    if coach is None:
+    last = dict(_gameplan_last_confirmed(state))
+    changed = False
+    off = entry.get("offense")
+    if isinstance(off, dict):
+        ok, _ = validate_gameplan_v2(off, categories=GAMEPLAN_V2_OFF_CATEGORIES)
+        if ok:
+            last["offense"] = off
+            changed = True
+    deff = entry.get("defense")
+    if isinstance(deff, dict):
+        ok, _ = validate_gameplan_v2(deff, categories=GAMEPLAN_V2_DEF_CATEGORIES)
+        if ok:
+            last["defense"] = deff
+            changed = True
+    fd = entry.get("fourth_down")
+    if isinstance(fd, dict):
+        last["fourth_down"] = fd
+        changed = True
+    if changed:
+        state["gameplan_last_confirmed"] = last
+
+
+def _carried_side_plan(state: Dict[str, Any], side: str, categories: List[str]) -> Optional[Dict[str, Any]]:
+    """Template plan for week-to-week carry: last confirmed, else most recent matchup save."""
+    last = _gameplan_last_confirmed(state)
+    direct = last.get(side)
+    if isinstance(direct, dict):
+        ok, _ = validate_gameplan_v2(direct, categories=categories)
+        if ok:
+            return direct
+
+    store = state.get("coach_gameplans_v2") if isinstance(state.get("coach_gameplans_v2"), dict) else {}
+    best_plan: Optional[Dict[str, Any]] = None
+    best_ts = -1
+    for entry in store.values():
+        if not isinstance(entry, dict):
+            continue
+        plan = entry.get(side)
+        if not isinstance(plan, dict):
+            continue
+        ok, _ = validate_gameplan_v2(plan, categories=categories)
+        if not ok:
+            continue
+        try:
+            ts = int(entry.get("updated_at") or 0)
+        except Exception:
+            ts = 0
+        if ts >= best_ts:
+            best_ts = ts
+            best_plan = plan
+    return best_plan
+
+
+def _materialize_carried_gameplan_for_current_week(state: Dict[str, Any]) -> bool:
+    """Ensure coach_gameplans_v2 has an entry for this week when carry-forward is enabled."""
+    key = _coach_gameplan_v2_matchup_key(state)
+    if not key:
+        return False
+    flags = _gameplan_week_to_week_flags(state)
+    if not (flags.get("offense") or flags.get("defense")):
+        return False
+
+    store = state.get("coach_gameplans_v2")
+    if not isinstance(store, dict):
+        store = {}
+    entry = dict(store.get(key)) if isinstance(store.get(key), dict) else {}
+    changed = False
+
+    if flags.get("offense") and not isinstance(entry.get("offense"), dict):
+        carried = _carried_side_plan(state, "offense", GAMEPLAN_V2_OFF_CATEGORIES)
+        if isinstance(carried, dict):
+            entry["offense"] = carried
+            changed = True
+        if not isinstance(entry.get("fourth_down"), dict):
+            fd = _gameplan_last_confirmed(state).get("fourth_down")
+            if not isinstance(fd, dict):
+                for prev in store.values():
+                    if isinstance(prev, dict) and isinstance(prev.get("fourth_down"), dict):
+                        fd = prev.get("fourth_down")
+                        break
+            if isinstance(fd, dict):
+                entry["fourth_down"] = fd
+                changed = True
+
+    if flags.get("defense") and not isinstance(entry.get("defense"), dict):
+        carried = _carried_side_plan(state, "defense", GAMEPLAN_V2_DEF_CATEGORIES)
+        if isinstance(carried, dict):
+            entry["defense"] = carried
+            changed = True
+
+    if changed:
+        entry["updated_at"] = int(time.time())
+        store[key] = entry
+        state["coach_gameplans_v2"] = store
+    return changed
+
+
+def _resolved_matchup_gameplan_entry(state: Dict[str, Any]) -> Dict[str, Any]:
+    """Per-matchup plans with optional week-to-week carry from last confirmed."""
+    key = _coach_gameplan_v2_matchup_key(state)
+    store = state.get("coach_gameplans_v2") if isinstance(state.get("coach_gameplans_v2"), dict) else {}
+    stored = store.get(key) if key and isinstance(store.get(key), dict) else {}
+    entry: Dict[str, Any] = dict(stored) if isinstance(stored, dict) else {}
+
+    flags = _gameplan_week_to_week_flags(state)
+
+    if flags.get("offense") and not isinstance(entry.get("offense"), dict):
+        carried = _carried_side_plan(state, "offense", GAMEPLAN_V2_OFF_CATEGORIES)
+        if isinstance(carried, dict):
+            entry["offense"] = carried
+        if not isinstance(entry.get("fourth_down"), dict):
+            fd = _gameplan_last_confirmed(state).get("fourth_down")
+            if isinstance(fd, dict):
+                entry["fourth_down"] = fd
+
+    if flags.get("defense") and not isinstance(entry.get("defense"), dict):
+        carried = _carried_side_plan(state, "defense", GAMEPLAN_V2_DEF_CATEGORIES)
+        if isinstance(carried, dict):
+            entry["defense"] = carried
+
+    return entry
+
+
+def _apply_gameplan_entry_to_coach(coach: Any, entry: Dict[str, Any]) -> None:
+    if coach is None or not isinstance(entry, dict):
         return
     off_plan = entry.get("offense")
     def_plan = entry.get("defense")
@@ -4298,22 +4477,45 @@ def attach_user_coach_gameplan_v2_from_save_state(
             coach.fourth_down_go_for_it_max_ytg = 2
 
 
+def attach_user_coach_gameplan_v2_from_save_state(
+    state: Dict[str, Any],
+    home_team: Any,
+    away_team: Any,
+    user_team_name: Optional[str],
+) -> None:
+    """
+    Copy the user's saved matchup gameplan from league state onto their coach object.
+    Playable games rebuild teams from JSON and otherwise would miss game_plan_v2_* on Coach.
+    """
+    if not user_team_name:
+        return
+    entry = _resolved_matchup_gameplan_entry(state)
+    if not entry:
+        return
+    if getattr(home_team, "name", None) == user_team_name:
+        target = home_team
+    elif getattr(away_team, "name", None) == user_team_name:
+        target = away_team
+    else:
+        return
+    coach = getattr(target, "coach", None)
+    if coach is None:
+        return
+    _apply_gameplan_entry_to_coach(coach, entry)
+
+
 def get_coach_gameplan_v2_from_state(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get the coach gameplan (OFF + DEF) for the user's next game.
     Stored inside the save so it travels with the dynasty.
     """
+    _materialize_carried_gameplan_for_current_week(state)
     key = _coach_gameplan_v2_matchup_key(state)
-    store = state.get("coach_gameplans_v2") if isinstance(state.get("coach_gameplans_v2"), dict) else {}
-    entry = store.get(key) if key and isinstance(store, dict) else None
+    resolved = _resolved_matchup_gameplan_entry(state)
 
-    offense = None
-    defense = None
-    fourth_down = None
-    if isinstance(entry, dict):
-        offense = entry.get("offense")
-        defense = entry.get("defense")
-        fourth_down = entry.get("fourth_down")
+    offense = resolved.get("offense")
+    defense = resolved.get("defense")
+    fourth_down = resolved.get("fourth_down")
 
     if not isinstance(offense, dict):
         offense = make_default_offense_gameplan_v2()
@@ -4340,6 +4542,7 @@ def get_coach_gameplan_v2_from_state(state: Dict[str, Any]) -> Dict[str, Any]:
         "offense": offense,
         "defense": defense,
         "fourth_down": fourth_down,
+        "week_to_week": _gameplan_week_to_week_flags(state),
         "offense_library": _offense_gameplan_library_payload(state),
         "defense_library": _defense_gameplan_library_payload(state),
         "meta": {
@@ -4351,7 +4554,9 @@ def get_coach_gameplan_v2_from_state(state: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def get_coach_gameplan_v2(user_id: str, save_id: str) -> Dict[str, Any]:
-    state, _save_dir = load_state(user_id, save_id)
+    state, save_dir = load_state(user_id, save_id)
+    if _materialize_carried_gameplan_for_current_week(state):
+        save_state(user_id, save_id, state, save_dir)
     return get_coach_gameplan_v2_from_state(state)
 
 
@@ -4365,6 +4570,8 @@ def save_coach_gameplan_v2_in_state(
     delete_offense_library_id: Optional[str] = None,
     add_defense_library: Optional[Dict[str, Any]] = None,
     delete_defense_library_id: Optional[str] = None,
+    week_to_week_offense: Optional[bool] = None,
+    week_to_week_defense: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """Save the user's coach gameplan for the next game (mutates state in memory)."""
     library_changed = False
@@ -4393,6 +4600,17 @@ def save_coach_gameplan_v2_in_state(
         delete_defense_from_gameplan_library_in_state(state, delete_defense_library_id)
         library_changed = True
 
+    carry_changed = week_to_week_offense is not None or week_to_week_defense is not None
+    if carry_changed:
+        carry = state.get("gameplan_week_to_week")
+        if not isinstance(carry, dict):
+            carry = {}
+        if week_to_week_offense is not None:
+            carry["offense"] = bool(week_to_week_offense)
+        if week_to_week_defense is not None:
+            carry["defense"] = bool(week_to_week_defense)
+        state["gameplan_week_to_week"] = carry
+
     matchup_changed = offense is not None or defense is not None or fourth_down is not None
     if matchup_changed:
         key = _coach_gameplan_v2_matchup_key(state)
@@ -4412,12 +4630,22 @@ def save_coach_gameplan_v2_in_state(
             if not ok:
                 raise ValueError("Invalid OFF gameplan: " + "; ".join(errs[:10]))
             entry["offense"] = offense
+            last = _gameplan_last_confirmed(state)
+            if not isinstance(last, dict):
+                last = {}
+            last["offense"] = offense
+            state["gameplan_last_confirmed"] = last
 
         if defense is not None:
             ok, errs = validate_gameplan_v2(defense, categories=GAMEPLAN_V2_DEF_CATEGORIES)
             if not ok:
                 raise ValueError("Invalid DEF gameplan: " + "; ".join(errs[:10]))
             entry["defense"] = defense
+            last = _gameplan_last_confirmed(state)
+            if not isinstance(last, dict):
+                last = {}
+            last["defense"] = defense
+            state["gameplan_last_confirmed"] = last
 
         if fourth_down is not None:
             if not isinstance(fourth_down, dict):
@@ -4427,12 +4655,22 @@ def save_coach_gameplan_v2_in_state(
             except Exception:
                 raise ValueError("Invalid 4th down settings: go_for_it_max_ytg must be a number.")
             entry["fourth_down"] = {"go_for_it_max_ytg": go_max}
+            last = _gameplan_last_confirmed(state)
+            if not isinstance(last, dict):
+                last = {}
+            last["fourth_down"] = {"go_for_it_max_ytg": go_max}
+            state["gameplan_last_confirmed"] = last
 
         entry["updated_at"] = int(time.time())
         store[key] = entry
         state["coach_gameplans_v2"] = store
-    elif not library_changed:
+    elif not library_changed and not carry_changed:
         raise ValueError("Nothing to save.")
+
+    flags = _gameplan_week_to_week_flags(state)
+    if flags.get("offense") or flags.get("defense"):
+        _sync_last_confirmed_from_matchup_store(state)
+    _materialize_carried_gameplan_for_current_week(state)
 
     return get_coach_gameplan_v2_from_state(state)
 
@@ -4448,6 +4686,8 @@ def save_coach_gameplan_v2(
     delete_offense_library_id: Optional[str] = None,
     add_defense_library: Optional[Dict[str, Any]] = None,
     delete_defense_library_id: Optional[str] = None,
+    week_to_week_offense: Optional[bool] = None,
+    week_to_week_defense: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """Save the user's coach gameplan for the next game."""
     state, save_dir = load_state(user_id, save_id)
@@ -4460,6 +4700,8 @@ def save_coach_gameplan_v2(
         delete_offense_library_id=delete_offense_library_id,
         add_defense_library=add_defense_library,
         delete_defense_library_id=delete_defense_library_id,
+        week_to_week_offense=week_to_week_offense,
+        week_to_week_defense=week_to_week_defense,
     )
     save_state(user_id, save_id, state, save_dir)
     return result
@@ -4903,27 +5145,14 @@ def sim_week(user_id: str, save_id: str) -> Dict[str, Any]:
         restore_attrs: Optional[Tuple[Any, Any]] = None
         if user_team and user_team in teams and (home == user_team or away == user_team):
             try:
-                key = _coach_gameplan_v2_matchup_key(state)
-                store = state.get("coach_gameplans_v2") if isinstance(state.get("coach_gameplans_v2"), dict) else {}
-                entry = store.get(key) if key and isinstance(store, dict) else None
-                off_plan = entry.get("offense") if isinstance(entry, dict) else None
-                def_plan = entry.get("defense") if isinstance(entry, dict) else None
-                fourth_down = entry.get("fourth_down") if isinstance(entry, dict) else None
+                entry = _resolved_matchup_gameplan_entry(state)
                 coach = getattr(teams[user_team], "coach", None)
-                if coach is not None:
+                if coach is not None and isinstance(entry, dict) and entry:
                     prev_off = getattr(coach, "game_plan_v2_offense", None)
                     prev_def = getattr(coach, "game_plan_v2_defense", None)
                     prev_4th = getattr(coach, "fourth_down_go_for_it_max_ytg", None)
                     restore_attrs = (prev_off, prev_def, prev_4th)
-                    if isinstance(off_plan, dict):
-                        coach.game_plan_v2_offense = off_plan
-                    if isinstance(def_plan, dict):
-                        coach.game_plan_v2_defense = def_plan
-                    if isinstance(fourth_down, dict):
-                        try:
-                            coach.fourth_down_go_for_it_max_ytg = max(0, min(10, int(fourth_down.get("go_for_it_max_ytg", 2))))
-                        except Exception:
-                            coach.fourth_down_go_for_it_max_ytg = 2
+                    _apply_gameplan_entry_to_coach(coach, entry)
             except Exception:
                 restore_attrs = None
 
@@ -4989,6 +5218,9 @@ def sim_week(user_id: str, save_id: str) -> Dict[str, Any]:
     if _coach_sim_emails_enabled():
         generate_week_sim_emails(state, completed_week=current_week)
     state["current_week"] = current_week + 1
+    _materialize_carried_gameplan_for_current_week(state)
+    if state["current_week"] <= len(weeks):
+        _maybe_generate_week_checklist_email(state, week=int(state["current_week"]))
     if state["current_week"] > len(weeks):
         award_regular_season_regional_titles(state)
         _begin_playoffs_phase(state, teams, standings)
@@ -5064,27 +5296,14 @@ def sim_week_state(state: Dict[str, Any]) -> Dict[str, Any]:
         restore_attrs: Optional[Tuple[Any, Any]] = None
         if user_team and user_team in teams and (home == user_team or away == user_team):
             try:
-                key = _coach_gameplan_v2_matchup_key(state)
-                store = state.get("coach_gameplans_v2") if isinstance(state.get("coach_gameplans_v2"), dict) else {}
-                entry = store.get(key) if key and isinstance(store, dict) else None
-                off_plan = entry.get("offense") if isinstance(entry, dict) else None
-                def_plan = entry.get("defense") if isinstance(entry, dict) else None
-                fourth_down = entry.get("fourth_down") if isinstance(entry, dict) else None
+                entry = _resolved_matchup_gameplan_entry(state)
                 coach = getattr(teams[user_team], "coach", None)
-                if coach is not None:
+                if coach is not None and isinstance(entry, dict) and entry:
                     prev_off = getattr(coach, "game_plan_v2_offense", None)
                     prev_def = getattr(coach, "game_plan_v2_defense", None)
                     prev_4th = getattr(coach, "fourth_down_go_for_it_max_ytg", None)
                     restore_attrs = (prev_off, prev_def, prev_4th)
-                    if isinstance(off_plan, dict):
-                        coach.game_plan_v2_offense = off_plan
-                    if isinstance(def_plan, dict):
-                        coach.game_plan_v2_defense = def_plan
-                    if isinstance(fourth_down, dict):
-                        try:
-                            coach.fourth_down_go_for_it_max_ytg = max(0, min(10, int(fourth_down.get("go_for_it_max_ytg", 2))))
-                        except Exception:
-                            coach.fourth_down_go_for_it_max_ytg = 2
+                    _apply_gameplan_entry_to_coach(coach, entry)
             except Exception:
                 restore_attrs = None
 
@@ -5148,7 +5367,10 @@ def sim_week_state(state: Dict[str, Any]) -> Dict[str, Any]:
     if _coach_sim_emails_enabled():
         generate_week_sim_emails(state, completed_week=current_week)
     state["current_week"] = current_week + 1
+    _materialize_carried_gameplan_for_current_week(state)
     entering_playoffs = state["current_week"] > len(weeks)
+    if not entering_playoffs:
+        _maybe_generate_week_checklist_email(state, week=int(state["current_week"]))
     if entering_playoffs:
         _begin_playoffs_phase(state, teams, standings)
     state["teams"] = [team_to_dict(t) for t in teams.values()]
@@ -5358,6 +5580,7 @@ def advance_preseason_state(state: Dict[str, Any], playbook: Optional[Dict[str, 
         state["season_phase"] = "regular"
         state["current_week"] = max(1, int(state.get("current_week", 1)))
         state["teams"] = [team_to_dict(t) for t in teams.values()]
+        _maybe_generate_week_checklist_email(state)
         return {"state": state, "phase_completed": None}
 
     phase_norm = str(state.get("season_phase") or "preseason").strip().lower()
@@ -5481,6 +5704,7 @@ def advance_preseason_state(state: Dict[str, Any], playbook: Optional[Dict[str, 
     if state["preseason_stage_index"] >= len(stages):
         state["season_phase"] = "regular"
         state["current_week"] = max(1, int(state.get("current_week", 1)))
+        _maybe_generate_week_checklist_email(state)
 
     new_idx = state["preseason_stage_index"]
     _maybe_assign_preseason_scrimmage_opponents_on_advance(state, team_names, new_idx, stages)
@@ -6120,6 +6344,7 @@ def advance_preseason(user_id: str, save_id: str, playbook: Optional[Dict[str, A
     if idx >= len(stages):
         state["season_phase"] = "regular"
         state["current_week"] = max(1, int(state.get("current_week", 1)))
+        _maybe_generate_week_checklist_email(state)
         save_state(user_id, save_id, state, save_dir)
         return {"state": state, "phase_completed": None}
 
@@ -6258,6 +6483,7 @@ def advance_preseason(user_id: str, save_id: str, playbook: Optional[Dict[str, A
     if state["preseason_stage_index"] >= len(stages):
         state["season_phase"] = "regular"
         state["current_week"] = 1
+        _maybe_generate_week_checklist_email(state)
 
     new_idx = state["preseason_stage_index"]
     _maybe_assign_preseason_scrimmage_opponents_on_advance(state, team_names, new_idx, stages)
@@ -6818,6 +7044,7 @@ def finish_coach_scrimmage_state(state: Dict[str, Any], game: Any, scrimmage_sta
         if state["preseason_stage_index"] >= len(stages):
             state["season_phase"] = "regular"
             state["current_week"] = 1
+            _maybe_generate_week_checklist_email(state)
     team_names = [t.get("name") for t in (state.get("teams") or []) if isinstance(t, dict) and t.get("name")]
     _maybe_assign_preseason_scrimmage_opponents_on_advance(
         state, team_names, int(state.get("preseason_stage_index", 0)), stages
@@ -7145,6 +7372,7 @@ def finish_coach_scrimmage(
         if state["preseason_stage_index"] >= len(stages):
             state["season_phase"] = "regular"
             state["current_week"] = 1
+            _maybe_generate_week_checklist_email(state)
 
     save_state(user_id, save_id, state, save_dir)
     return {"state": state}

@@ -16,6 +16,14 @@ import {
   type TeamJsonRow,
   type TeamsDataResponse,
 } from './newSaveTypes'
+import CoachingCardPicker from './CoachingCardPicker'
+import {
+  CREATION_BONUS_CP_DEFAULT,
+  CREATION_BONUS_CP_LOW_PRESTIGE,
+  COACH_DEV_THRESHOLDS,
+  creationBonusCpForPrestige,
+} from './coachDevelopment'
+import { EMPTY_COACHING_LOADOUT, computeLoadoutEquipCost, normalizeLoadout, type CoachingCardLoadout } from './coachingCards'
 
 const STEPS = ['Save slot', 'Coach', 'Attributes', 'Your school'] as const
 
@@ -94,6 +102,8 @@ export function NewSaveFlow({
   const logoFilesInputRef = useRef<HTMLInputElement | null>(null)
   const [defaultLogoVersion, setDefaultLogoVersion] = useState<number | undefined>(undefined)
   const [showCustomLeagueHelp, setShowCustomLeagueHelp] = useState(false)
+  const [coachingCardsLoadout, setCoachingCardsLoadout] = useState<CoachingCardLoadout>(() => ({ ...EMPTY_COACHING_LOADOUT }))
+  const [hardcoreNoCards, setHardcoreNoCards] = useState(false)
 
   const setLogoFolderInputEl = useCallback((el: HTMLInputElement | null) => {
     logoFolderInputRef.current = el
@@ -368,6 +378,30 @@ export function NewSaveFlow({
     return list.filter((t) => t.name?.toLowerCase().includes(q))
   }, [teamsData, teamSearch])
 
+  const selectedTeamRow = useMemo(
+    () => (teamsData?.teams ?? []).find((t) => t.name === userTeam) ?? null,
+    [teamsData, userTeam],
+  )
+
+  const skillsAllocatedCp = useMemo(() => {
+    const keys = [
+      'playcalling',
+      'player_development',
+      'community_outreach',
+      'culture',
+      'recruiting',
+      'scheme_teach',
+    ] as const
+    return keys.reduce((sum, key) => {
+      const lv = Math.max(1, Math.min(10, Number(skills[key] ?? 5)))
+      return sum + (COACH_DEV_THRESHOLDS[lv] ?? 0)
+    }, 0)
+  }, [skills])
+
+  const creationBonusCp = creationBonusCpForPrestige(selectedTeamRow?.prestige)
+  const coachingCardEquipCp = hardcoreNoCards ? 0 : computeLoadoutEquipCost(coachingCardsLoadout)
+  const creationUnallocatedCp = Math.round((creationBonusCp - coachingCardEquipCp) * 10) / 10
+
   const coachConfig = useMemo(
     () => ({
       name: coachName.trim(),
@@ -383,8 +417,9 @@ export function NewSaveFlow({
       winter_strength_pct: skills.winter_strength_pct,
       offensive_formation: skills.offensive_formation,
       defensive_formation: skills.defensive_formation,
+      coaching_cards: hardcoreNoCards ? { ...EMPTY_COACHING_LOADOUT } : normalizeLoadout(coachingCardsLoadout),
     }),
-    [coachName, coachAge, skills],
+    [coachName, coachAge, skills, coachingCardsLoadout, hardcoreNoCards],
   )
 
   async function createSave() {
@@ -869,6 +904,25 @@ export function NewSaveFlow({
               </div>
             </div>
           </div>
+          <CoachingCardPicker
+            loadout={coachingCardsLoadout}
+            onChange={setCoachingCardsLoadout}
+            showHardcore
+            hardcore={hardcoreNoCards}
+            onHardcoreChange={setHardcoreNoCards}
+            showCosts
+            creationBonusCp={CREATION_BONUS_CP_DEFAULT}
+            availableCp={
+              hardcoreNoCards
+                ? CREATION_BONUS_CP_DEFAULT
+                : Math.round((CREATION_BONUS_CP_DEFAULT - computeLoadoutEquipCost(coachingCardsLoadout)) * 10) / 10
+            }
+          />
+          <p className="newsave-sub" style={{ marginTop: 10 }}>
+            Low-prestige schools receive <strong>{CREATION_BONUS_CP_LOW_PRESTIGE} CP</strong> creation bonus instead of{' '}
+            <strong>{CREATION_BONUS_CP_DEFAULT}</strong>. Card costs apply when your dynasty starts; skill allocations use
+            separate threshold CP.
+          </p>
         </>
       )}
 
@@ -999,6 +1053,20 @@ export function NewSaveFlow({
             <strong>{skills.defensive_formation || '—'}</strong> (def)
             <br />
             School: <strong>{userTeam || '—'}</strong>
+            <br />
+            Opening CP: <strong>{skillsAllocatedCp}</strong> allocated to skills · <strong>{creationBonusCp}</strong>{' '}
+            creation bonus
+            {!hardcoreNoCards ? (
+              <>
+                {' '}
+                · <strong>{coachingCardEquipCp}</strong> coaching cards
+              </>
+            ) : null}
+            <br />
+            Unallocated CP after cards:{' '}
+            <strong style={{ color: creationUnallocatedCp < 0 ? '#b91c1c' : undefined }}>
+              {creationUnallocatedCp}
+            </strong>
           </div>
         </>
       )}

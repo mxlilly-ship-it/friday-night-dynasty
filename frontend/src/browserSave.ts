@@ -214,6 +214,7 @@ export type CoachGameplanResponse = {
   offense: Record<string, unknown>
   defense: Record<string, unknown>
   fourth_down?: { go_for_it_max_ytg?: number }
+  week_to_week?: { offense?: boolean; defense?: boolean }
   offense_library?: GamePlanLibrary
   defense_library?: GamePlanLibrary
   meta?: unknown
@@ -254,6 +255,8 @@ export async function saveCoachGameplan(
     delete_offense_library_id?: string
     add_defense_library?: { name: string; plan: Record<string, unknown> }
     delete_defense_library_id?: string
+    week_to_week_offense?: boolean
+    week_to_week_defense?: boolean
   },
 ): Promise<CoachGameplanResponse> {
   if (shouldUseSimApi(saveId, headers)) {

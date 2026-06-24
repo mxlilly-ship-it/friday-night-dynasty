@@ -204,6 +204,11 @@ def coach_to_dict(c: Coach) -> Dict[str, Any]:
         "years_since_scheme_change": c.years_since_scheme_change,
         "last_preferred_playbook_change_year": getattr(c, "last_preferred_playbook_change_year", 0),
         "hot_seat": getattr(c, "hot_seat", 0),
+        "coaching_cards": getattr(c, "coaching_cards", None) or {
+            "program_identity": None,
+            "position": [],
+            "platinum": [],
+        },
     }
 
 
@@ -219,7 +224,7 @@ def coach_from_dict(d: Dict[str, Any]) -> Coach:
         def_style = DefensiveStyle[def_] if isinstance(def_, str) else def_
     except KeyError:
         def_style = DefensiveStyle.BASE
-    return Coach(
+    coach = Coach(
         name=d.get("name", "Unknown"),
         age=d.get("age", 35),
         preferred_schemes=d.get("preferred_schemes", {}),
@@ -240,7 +245,14 @@ def coach_from_dict(d: Dict[str, Any]) -> Coach:
         years_since_scheme_change=d.get("years_since_scheme_change", 0),
         last_preferred_playbook_change_year=int(d.get("last_preferred_playbook_change_year", 0) or 0),
         hot_seat=int(d.get("hot_seat", 0) or 0),
+        coaching_cards=d.get("coaching_cards")
+        if isinstance(d.get("coaching_cards"), dict)
+        else {"program_identity": None, "position": [], "platinum": []},
     )
+    from systems.coaching_cards import normalize_loadout
+
+    coach.coaching_cards = normalize_loadout(coach.coaching_cards)
+    return coach
 
 
 def _community_from_value(value: Any) -> CommunityType:

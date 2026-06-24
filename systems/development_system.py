@@ -11,6 +11,7 @@ pass for the offseason they enter on; first offseason gains apply as sophomores 
 import random
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
+from systems.coach_development import coach_skill_factor
 from models.player import RATING_ATTR_MAX, RATING_ATTR_MIN
 
 if TYPE_CHECKING:
@@ -252,6 +253,13 @@ def _development_gain(
         return 0
     current = getattr(player, attribute, 50)
     potential = player.potential
+    if team is not None:
+        try:
+            from systems.coaching_cards import effective_potential_cap as _epc
+
+            potential = _epc(player, getattr(team, "coach", None))
+        except Exception:
+            potential = player.potential
     room = max(0, potential - current)
     if room <= 0:
         return 0
@@ -262,7 +270,7 @@ def _development_gain(
     coach_dev = 5
     if team.coach is not None:
         coach_dev = getattr(team.coach, "player_development", 5)
-    coach_factor = 0.6 + (coach_dev / 10) * 0.4  # 0.6 to 1.0
+    coach_factor = coach_skill_factor(coach_dev)
 
     growth_factor = player.growth_rate / 100.0
     age_factor = _age_curve_multiplier(player)
@@ -272,6 +280,13 @@ def _development_gain(
     year_factor = 1.0 + (SENIOR_YEAR - year) * 0.02  # seniors 1.0, freshmen ~1.06
 
     base_gain = room * growth_factor * facility_factor * coach_factor * age_factor * year_factor
+    if team is not None:
+        try:
+            from systems.coaching_cards import coaching_card_dev_multiplier
+
+            base_gain *= coaching_card_dev_multiplier(player, team, phase="offseason" if is_offseason else "inseason")
+        except Exception:
+            pass
     if is_offseason:
         base_gain *= 2.0  # off-season is main development period
     # Random variance + position relevance tier
@@ -286,6 +301,7 @@ def develop_player(
     attributes: Optional[List[str]] = None,
     *,
     use_position_weights: bool = True,
+    boom_bust_outcome: Optional[str] = None,
 ) -> int:
     """
     Apply development to one player. Updates attributes in place.
@@ -305,6 +321,13 @@ def develop_player(
             is_offseason=is_offseason,
             attr_weight=tier * spread,
         )
+        if boom_bust_outcome and is_offseason:
+            try:
+                from systems.coaching_cards import apply_boom_or_bust_gain
+
+                gain = apply_boom_or_bust_gain(gain, boom_bust_outcome)
+            except Exception:
+                pass
         if gain > 0:
             current = getattr(player, attr, 50)
             new_val = max(RATING_ATTR_MIN, min(RATING_ATTR_MAX, current + gain))
@@ -898,9 +921,16 @@ def run_offseason_development(team: "Team") -> Dict[str, Any]:
     for player in list(team.roster):
         if not _player_receives_offseason_training(player):
             continue
+        boom_outcome = None
+        try:
+            from systems.coaching_cards import roll_boom_or_bust_outcome
+
+            boom_outcome = roll_boom_or_bust_outcome(player, team)
+        except Exception:
+            pass
         before_attrs = snapshot_developable_attributes(player)
         before_ovr = int(calculate_player_overall(player))
-        develop_player(player, team, is_offseason=True)
+        develop_player(player, team, is_offseason=True, boom_bust_outcome=boom_outcome)
         mid_attrs = snapshot_developable_attributes(player)
         base_deltas = {
             attr: mid_attrs[attr] - before_attrs.get(attr, mid_attrs[attr])
@@ -923,10 +953,18 @@ def run_offseason_development(team: "Team") -> Dict[str, Any]:
                 ),
             }
         )
+    card_extras: Dict[str, Any] = {}
+    try:
+        from systems.coaching_cards import apply_offseason_card_extras
+
+        card_extras = apply_offseason_card_extras(team)
+    except Exception:
+        card_extras = {}
     return {
         **equipment,
         "equipment_points_applied": int(equipment_points),
         "player_reports": player_reports,
+        "coaching_card_extras": card_extras,
     }
 
 

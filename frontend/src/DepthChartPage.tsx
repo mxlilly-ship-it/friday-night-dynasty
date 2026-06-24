@@ -91,6 +91,13 @@ function formatPlayerYear(year: any) {
   return String(year)
 }
 
+function formatPlayerNameWithYear(name: string | null | undefined, year: unknown) {
+  const label = name && name !== '—' ? name : '—'
+  if (label === '—') return '—'
+  const yr = formatPlayerYear(year)
+  return yr !== '—' ? `${label} (${yr})` : label
+}
+
 type Props = {
   saveState: any
   userTeam: string
@@ -185,6 +192,7 @@ function buildStartersFromLayout(
     return {
       slot,
       name: name && name !== '—' ? name : '—',
+      yearLabel: player ? formatPlayerYear(player.year) : '—',
       offPosition: player ? getPlayerSidePosition(player, 'offense') : '—',
       defPosition: player ? getPlayerSidePosition(player, 'defense') : '—',
       offRating: player ? getBestSideRating(player, 'offense') : 0,
@@ -223,7 +231,7 @@ function SlotSelect({
         <option value="—">—</option>
         {pool.map((p: any, i: number) => (
           <option key={`${slot.id}-${p?.name ?? i}`} value={p?.name ?? '—'}>
-            {p?.name ?? '—'}
+            {formatPlayerNameWithYear(p?.name, p?.year)}
           </option>
         ))}
       </select>
@@ -380,6 +388,7 @@ export default function DepthChartPage({
               >
                 <span className="teamhome-depth-slot-label">{s.slot.label}:</span>{' '}
                 <PlayerProfileName teamName={userTeam} playerName={s.name} as="span" />
+                {s.yearLabel !== '—' ? <span className="teamhome-depth-year"> ({s.yearLabel})</span> : null}
                 {s.name !== '—' ? (
                   <span className="teamhome-depth-subline">
                     {s.measure ? `${s.measure} · ` : ''}
@@ -410,6 +419,7 @@ export default function DepthChartPage({
               >
                 <span className="teamhome-depth-slot-label">{s.slot.label}:</span>{' '}
                 <PlayerProfileName teamName={userTeam} playerName={s.name} as="span" />
+                {s.yearLabel !== '—' ? <span className="teamhome-depth-year"> ({s.yearLabel})</span> : null}
                 {s.name !== '—' ? (
                   <span className="teamhome-depth-subline">
                     {s.measure ? `${s.measure} · ` : ''}

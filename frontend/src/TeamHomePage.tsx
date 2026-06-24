@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './TeamHomePage.css'
 import './NewSaveFlow.css'
 import type { CSSProperties } from 'react'
@@ -27,6 +27,22 @@ import { buildTeamInfoData } from './teamInfoData'
 import { gameOfTheWeekLabel, isGameOfTheWeek, pickGameOfTheWeekForWeek } from './gameOfTheWeek'
 import { buildPlayerStatRows } from './playerSeasonStats'
 import { CoachProfileName, CoachProfileProvider } from './CoachProfileContext'
+import CoachingCardPicker from './CoachingCardPicker'
+import {
+  COACH_DEV_SKILLS,
+  COACH_DEV_THRESHOLDS,
+  coachDevCpToNextLevel,
+  coachDevLevelFromCp,
+  coachDevNextThreshold,
+  formatCoachCpDelta,
+  type CoachDevBreakdown,
+} from './coachDevelopment'
+import {
+  EMPTY_COACHING_LOADOUT,
+  computeLoadoutChangeCp,
+  normalizeLoadout,
+  type CoachingCardLoadout,
+} from './coachingCards'
 import { PlayerProfileName, PlayerProfileProvider } from './PlayerProfileContext'
 import { buildOffseasonPlayerReport } from './offseasonPlayerReport'
 import OffseasonReportPlayerName from './OffseasonReportPlayerName'
@@ -63,12 +79,13 @@ import { themeLabelForGame } from './homeGameThemes'
 import type { HomeThemeSelection } from './homeGameThemes'
 import CoachInboxPanel from './CoachInboxPanel'
 import InSeasonDashboard from './InSeasonDashboard'
-import SchedulePlanningPanel from './SchedulePlanningPanel'
+import SchedulePlanningPanel, { SchedulePlanningScrollCallout } from './SchedulePlanningPanel'
 import {
   allSlotsFilled,
   buildCrossRegionPicksPayload,
   crossRegionSlotCountFromSave,
   emptySlotSelection,
+  isInitialDynastySchedulePlanning,
   schedulePlanningInfoFromState,
   userClassExpectsCrossRegionPicks,
   type CrossRegionSelections,
@@ -77,6 +94,13 @@ import { deriveUiPhaseFromSave } from './seasonPhase'
 import { buildPregamePreviewData } from './pregamePreviewData'
 import PregamePreviewModal from './PregamePreviewModal'
 import ProgramDevelopmentPanel from './ProgramDevelopmentPanel'
+import ProgramInvestmentBoosterCards from './ProgramInvestmentBoosterCards'
+import {
+  clampImprovementLevel,
+  formatProgramPpDelta,
+  pillarCumulativePpValue,
+  PROGRAM_INVESTMENT_PILLAR_THEME,
+} from './programInvestment'
 import TeamFacilitiesPage from './TeamFacilitiesPage'
 import catalogJson from './programEquipmentCatalog.json'
 import {
@@ -127,15 +151,6 @@ function defaultTeamMenuForPhase(phase: string): string {
   if (phase === 'playoffs') return PLAYOFF_BRACKET_MENU
   return 'Roster'
 }
-
-const COACH_DEV_SKILLS = [
-  { key: 'playcalling', label: 'Playcalling' },
-  { key: 'player_development', label: 'Player development' },
-  { key: 'community_outreach', label: 'Community outreach' },
-  { key: 'culture', label: 'Culture' },
-  { key: 'recruiting', label: 'Recruiting' },
-  { key: 'scheme_teach', label: 'Scheme teaching' },
-] as const
 
 const SPRING_OFFENSE_OPTIONS: { value: string; label: string }[] = [
   { value: 'run_blocking', label: 'Run Blocking' },
@@ -224,34 +239,8 @@ function springLabel(value: string, side: 'offense' | 'defense'): string {
   return list.find((o) => o.value === value)?.label ?? value
 }
 
-const COACH_DEV_THRESHOLDS: Record<number, number> = {
-  1: 0,
-  2: 20,
-  3: 50,
-  4: 90,
-  5: 140,
-  6: 200,
-  7: 275,
-  8: 350,
-  9: 425,
-  10: 500,
-}
-
 function emptyCoachDevAllocations(): Record<string, number> {
   return Object.fromEntries(COACH_DEV_SKILLS.map(({ key }) => [key, 0])) as Record<string, number>
-}
-
-function coachDevLevelFromCp(cp: number): number {
-  let level = 1
-  for (let i = 1; i <= 10; i++) {
-    if (cp >= (COACH_DEV_THRESHOLDS[i] ?? 0)) level = i
-  }
-  return level
-}
-
-function coachDevNextThreshold(level: number): number | null {
-  if (level >= 10) return null
-  return COACH_DEV_THRESHOLDS[level + 1] ?? null
 }
 
 type Props = {
@@ -377,71 +366,6 @@ function findTeam(state: any, teamName: string) {
 }
 
 /** Matches backend `league_service._improvement_pp_delta` (offseason school Improvements). Negative = spend PP. */
-function clampImprovementLevel(raw: number, fallback: number): number {
-  const x = Number(raw)
-  const base = Number.isFinite(x) ? x : fallback
-  return Math.max(1, Math.min(10, Math.floor(base)))
-}
-
-const UPGRADE_COST_BY_LEVEL: Record<number, number> = {
-  1: 100,
-  2: 300,
-  3: 500,
-  4: 800,
-  5: 1200,
-  6: 1500,
-  7: 1900,
-  8: 2400,
-  9: 3000,
-}
-
-const PILLAR_CUMULATIVE_PP_MAX = (() => {
-  let s = 0
-  for (let k = 1; k <= 9; k += 1) s += UPGRADE_COST_BY_LEVEL[k] ?? 3000
-  return s
-})()
-
-/** Step for pillar +/- controls and range slider (less sensitive than 1 PP per tick). */
-const PILLAR_SLIDER_STEP = 5
-
-function pillarCumulativePpValue(level: number, progressPts: number): number {
-  const L = clampImprovementLevel(level, 5)
-  const pts = Math.max(0, Math.min(3500, Math.floor(Number(progressPts) || 0)))
-  let total = 0
-  for (let k = 1; k < L; k += 1) total += UPGRADE_COST_BY_LEVEL[k] ?? 3000
-  if (L < 10) {
-    const cap = UPGRADE_COST_BY_LEVEL[L] ?? 3000
-    total += Math.min(pts, cap)
-  }
-  return total
-}
-
-function pillarStateFromCumulativePpValue(target: number): { level: number; progressPts: number } {
-  let v = Math.max(0, Math.min(PILLAR_CUMULATIVE_PP_MAX, Math.floor(Number(target) || 0)))
-  let L = 1
-  while (L < 10) {
-    const need = UPGRADE_COST_BY_LEVEL[L] ?? 3000
-    if (v < need) return { level: L, progressPts: v }
-    v -= need
-    L += 1
-  }
-  return { level: 10, progressPts: 0 }
-}
-
-function formatPillarMeter(cumulativePp: number): string {
-  const { level, progressPts } = pillarStateFromCumulativePpValue(cumulativePp)
-  if (level >= 10) return 'Level 10 (max)'
-  const need = UPGRADE_COST_BY_LEVEL[level] ?? 3000
-  return `Level ${level} · ${progressPts} / ${need} PP toward level ${level + 1}`
-}
-function formatProgramPpDelta(n: number): string {
-  const v = Number(n)
-  if (!Number.isFinite(v)) return '—'
-  if (v > 0) return `+${Math.round(v)}`
-  if (v < 0) return String(Math.round(v))
-  return '0'
-}
-
 function displayOffseasonStageLabel(stage: string): string {
   if (stage === 'Improvements') return 'Program development'
   return stage
@@ -1760,6 +1684,15 @@ function TeamHomePageBody({
     () => (schedulePlanningInfo ? allSlotsFilled(schedulePlanningInfo, crossRegionSelections) : false),
     [schedulePlanningInfo, crossRegionSelections],
   )
+  const initialDynastySchedulePlanning = useMemo(
+    () => isInitialDynastySchedulePlanning(saveState, phase),
+    [saveState, phase],
+  )
+  const needsCrossRegionPickUi = Boolean(schedulePlanningInfo && !crossRegionReady)
+
+  const scrollToSchedulePlanning = useCallback(() => {
+    document.getElementById('schedplan-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [])
   const [teamMenu, setTeamMenu] = useState(() => defaultTeamMenuForPhase(derivePhaseFromSave(saveState)))
   const [stateMenu, setStateMenu] = useState('Dashboard')
   const prevPhaseRef = useRef<string | null>(null)
@@ -4063,6 +3996,8 @@ function TeamHomePageBody({
   const [improveCulCumulative, setImproveCulCumulative] = useState(0)
   const [improveBooCumulative, setImproveBooCumulative] = useState(0)
   const [coachDevAllocations, setCoachDevAllocations] = useState<Record<string, number>>(() => emptyCoachDevAllocations())
+  const [coachingCardsLoadout, setCoachingCardsLoadout] = useState<CoachingCardLoadout>(() => ({ ...EMPTY_COACHING_LOADOUT }))
+  const [coachDevSavedLoadout, setCoachDevSavedLoadout] = useState<CoachingCardLoadout>(() => ({ ...EMPTY_COACHING_LOADOUT }))
   const [programDevPendingActions, setProgramDevPendingActions] = useState<ProgramDevAction[]>([])
   const [offseasonTrainingSort, setOffseasonTrainingSort] = useState<OffseasonTrainingSortMode>('position')
   const [offseasonReportPlayer, setOffseasonReportPlayer] = useState<string | null>(null)
@@ -4161,14 +4096,30 @@ function TeamHomePageBody({
   }, [phase, offseasonCurrentStage, saveState, userTeam])
 
   useEffect(() => {
+    if (phase !== 'offseason' || offseasonCurrentStage !== 'Coach development') return
+    const coachObj = findTeam(saveState, userTeam)?.coach
+    const normalized = normalizeLoadout(coachObj?.coaching_cards)
+    setCoachingCardsLoadout(normalized)
+    setCoachDevSavedLoadout(normalized)
+  }, [phase, offseasonCurrentStage, saveState, userTeam])
+
+  useEffect(() => {
     if (phase !== 'offseason' || offseasonCurrentStage !== 'Program Development') {
       setProgramDevPendingActions([])
     }
   }, [phase, offseasonCurrentStage])
 
-  const coachDevTotalCp = Number(saveState?.offseason_coach_dev_bank?.cp_total ?? 0)
+  const coachDevBank = saveState?.offseason_coach_dev_bank
+  const coachDevTotalCp = Number(coachDevBank?.cp_total ?? 0)
   const coachDevAllocatedCp = COACH_DEV_SKILLS.reduce((sum, { key }) => sum + Number(coachDevAllocations[key] ?? 0), 0)
-  const coachDevAvailableCp = coachDevTotalCp - coachDevAllocatedCp
+  const coachDevCardLedger = (coachDevBank?.card_ledger ?? {}) as Record<string, number>
+  const coachDevCardNetCost = useMemo(
+    () => computeLoadoutChangeCp(coachDevSavedLoadout, coachingCardsLoadout, coachDevCardLedger).netCost,
+    [coachDevSavedLoadout, coachingCardsLoadout, coachDevCardLedger],
+  )
+  const coachDevProjectedTotalCp = Math.round((coachDevTotalCp - coachDevCardNetCost) * 10) / 10
+  const coachDevAvailableCp = Math.round((coachDevProjectedTotalCp - coachDevAllocatedCp) * 10) / 10
+  const coachDevBreakdown = (coachDevBank?.breakdown ?? null) as CoachDevBreakdown | null
   const springBallResult = saveState?.offseason_spring_ball_results?.user_team_result ?? null
   const sevenOnSevenResult = saveState?.offseason_7on7_results ?? null
   const winterTrainingResult = saveState?.offseason_winter_training_results?.user_team_result ?? null
@@ -4238,7 +4189,9 @@ function TeamHomePageBody({
     const emptyPillars: Array<{
       id: string
       label: string
+      badge: string
       accent: string
+      accentDim: string
       fromCumulative: number
       targetCumulative: number
       pillarDeltaPp: number
@@ -4283,7 +4236,9 @@ function TeamHomePageBody({
       {
         id: 'facilities',
         label: 'Facilities',
-        accent: '#38bdf8',
+        badge: PROGRAM_INVESTMENT_PILLAR_THEME.facilities.badge,
+        accent: PROGRAM_INVESTMENT_PILLAR_THEME.facilities.accent,
+        accentDim: PROGRAM_INVESTMENT_PILLAR_THEME.facilities.accentDim,
         fromCumulative: vFacFrom,
         targetCumulative: improveFacCumulative,
         pillarDeltaPp: facD,
@@ -4291,7 +4246,9 @@ function TeamHomePageBody({
       {
         id: 'culture',
         label: 'Culture',
-        accent: '#c084fc',
+        badge: PROGRAM_INVESTMENT_PILLAR_THEME.culture.badge,
+        accent: PROGRAM_INVESTMENT_PILLAR_THEME.culture.accent,
+        accentDim: PROGRAM_INVESTMENT_PILLAR_THEME.culture.accentDim,
         fromCumulative: vCulFrom,
         targetCumulative: improveCulCumulative,
         pillarDeltaPp: culD,
@@ -4299,7 +4256,9 @@ function TeamHomePageBody({
       {
         id: 'boosters',
         label: 'Booster support',
-        accent: '#fbbf24',
+        badge: PROGRAM_INVESTMENT_PILLAR_THEME.boosters.badge,
+        accent: PROGRAM_INVESTMENT_PILLAR_THEME.boosters.accent,
+        accentDim: PROGRAM_INVESTMENT_PILLAR_THEME.boosters.accentDim,
         fromCumulative: vBooFrom,
         targetCumulative: improveBooCumulative,
         pillarDeltaPp: booD,
@@ -4327,6 +4286,21 @@ function TeamHomePageBody({
     improveCulCumulative,
     improveBooCumulative,
   ])
+
+  const improvementsResetKey = useMemo(() => {
+    if (phase !== 'offseason' || offseasonCurrentStage !== 'Improvements') return ''
+    const t = findTeam(saveState, userTeam)
+    const fac = pillarCumulativePpValue(Number(t?.facilities_grade ?? 5), Number(t?.facilities_progress_pts ?? 0))
+    const cul = pillarCumulativePpValue(Number(t?.culture_grade ?? 5), Number(t?.culture_progress_pts ?? 0))
+    const boo = pillarCumulativePpValue(Number(t?.booster_support ?? 5), Number(t?.boosters_progress_pts ?? 0))
+    return `${userTeam}-${saveState?.current_year ?? 0}-${fac}-${cul}-${boo}`
+  }, [phase, offseasonCurrentStage, saveState, userTeam])
+
+  const handleImprovementTargetChange = useCallback((pillarId: string, nextCumulative: number) => {
+    if (pillarId === 'facilities') setImproveFacCumulative(nextCumulative)
+    else if (pillarId === 'culture') setImproveCulCumulative(nextCumulative)
+    else setImproveBooCumulative(nextCumulative)
+  }, [])
 
   const offseasonTrainingRowsRaw = useMemo(
     () => (saveState?.offseason_training_results?.players ?? []) as OffseasonTrainingRow[],
@@ -5071,7 +5045,10 @@ function TeamHomePageBody({
                       improve_boosters_cumulative_pp: improveBooCumulative,
                     }
                   } else if (offseasonCurrentStage === 'Coach development') {
-                    offseasonBody = { coach_dev_allocations: coachDevAllocations }
+                    offseasonBody = {
+                      coach_dev_allocations: coachDevAllocations,
+                      coaching_cards: coachingCardsLoadout,
+                    }
                   } else if (offseasonCurrentStage === 'Program Development') {
                     offseasonBody = { program_development_actions: programDevPendingActions }
                   } else if (
@@ -5295,39 +5272,50 @@ function TeamHomePageBody({
             </div>
           ) : (
             <div className="teamhome-season-end-stack">
-              <SeasonSummaryPanel
-                apiBase={apiBase}
-                headers={headers}
-                logoVersion={logoVersion}
-                saveState={saveState}
-                userTeam={userTeam}
-                leagueHistory={leagueHistory}
-                seasonYear={Number(saveState?.current_year)}
-                playoffView={playoffView}
-                standingsRows={seasonSummaryStandingsRows}
-                bracketSlot={seasonSummaryBracketNode}
-                bracketToolbar={playoffBracketToolbar}
-                teamWithLogo={teamWithLogo}
-                onOpenLeagueHistory={() => setStateMenu('League History')}
-                onOpenTeamHistory={() => setStateMenu('Team History')}
-              />
-              {schedulePlanningInfo ? (
-                <>
-                  <p className="season-summary-schedule-note">
-                    <span className="season-summary-schedule-note-mark">*</span>
-                    Scroll down to pick your out-of-region opponents before continuing.
+              {needsCrossRegionPickUi ? (
+                <SchedulePlanningScrollCallout
+                  slotCount={effectiveCrossRegionSlots || schedulePlanningInfo?.slot_count || 1}
+                  variant={initialDynastySchedulePlanning ? 'start' : 'scroll'}
+                  onScrollToPicks={initialDynastySchedulePlanning ? undefined : scrollToSchedulePlanning}
+                />
+              ) : null}
+              {initialDynastySchedulePlanning ? (
+                <div className="schedplan-welcome">
+                  <h2 className="schedplan-welcome-title">Welcome to your dynasty</h2>
+                  <p className="schedplan-welcome-text">
+                    Before your first season kicks off, choose who you play from other regions in your class.
+                    In-region games are already on the calendar.
                   </p>
-                  <SchedulePlanningPanel
-                    apiBase={apiBase}
-                    headers={headers}
-                    logoVersion={logoVersion}
-                    userTeam={userTeam}
-                    seasonYear={Number(saveState?.current_year ?? '—')}
-                    info={schedulePlanningInfo}
-                    selections={crossRegionSelections}
-                    onSelectionsChange={setCrossRegionSelections}
-                  />
-                </>
+                </div>
+              ) : (
+                <SeasonSummaryPanel
+                  apiBase={apiBase}
+                  headers={headers}
+                  logoVersion={logoVersion}
+                  saveState={saveState}
+                  userTeam={userTeam}
+                  leagueHistory={leagueHistory}
+                  seasonYear={Number(saveState?.current_year)}
+                  playoffView={playoffView}
+                  standingsRows={seasonSummaryStandingsRows}
+                  bracketSlot={seasonSummaryBracketNode}
+                  bracketToolbar={playoffBracketToolbar}
+                  teamWithLogo={teamWithLogo}
+                  onOpenLeagueHistory={() => setStateMenu('League History')}
+                  onOpenTeamHistory={() => setStateMenu('Team History')}
+                />
+              )}
+              {schedulePlanningInfo ? (
+                <SchedulePlanningPanel
+                  apiBase={apiBase}
+                  headers={headers}
+                  logoVersion={logoVersion}
+                  userTeam={userTeam}
+                  seasonYear={Number(saveState?.current_year ?? '—')}
+                  info={schedulePlanningInfo}
+                  selections={crossRegionSelections}
+                  onSelectionsChange={setCrossRegionSelections}
+                />
               ) : phase === 'schedule_planning' ? (
                 <div className="teamhome-preseason-panelA teamhome-preseason-panelA--compact teamhome-schedplan-fallback">
                   <div className="teamhome-preseason-title">Non-region selection</div>
@@ -6147,6 +6135,7 @@ function TeamHomePageBody({
                                 <thead>
                                   <tr>
                                     <th style={{ textAlign: 'left' }}>Name</th>
+                                    <th>OVR</th>
                                     <th>Pos</th>
                                     <th>Year</th>
                                   </tr>
@@ -6161,6 +6150,7 @@ function TeamHomePageBody({
                                           as="span"
                                         />
                                       </td>
+                                      <td>{computePlayerOverall(p)}</td>
                                       <td>{p?.position ?? '—'}</td>
                                       <td>{formatPlayerYear(p?.year)}</td>
                                     </tr>
@@ -6177,12 +6167,77 @@ function TeamHomePageBody({
                   <>
                     <div className="teamhome-preseason-title">Coach development</div>
                     <div className="teamhome-preseason-sub" style={{ marginTop: 8, maxWidth: 760 }}>
-                      Allocate CP by attribute. Levels are automatic from thresholds; they increase or decrease as allocated CP crosses
-                      each tier.
+                      Spend Coach Points (CP) on skill allocations and coaching cards. Levels update automatically when
+                      allocated CP crosses each threshold.
                     </div>
+                    {coachDevBreakdown ? (
+                      <div className="teamhome-improvements-ledger" style={{ marginTop: 12, maxWidth: 640, textAlign: 'left' }}>
+                        <div className="teamhome-improvements-ledger-head">
+                          <span className="teamhome-improvements-ledger-title">Season CP earned</span>
+                          {coachDevBreakdown.wins != null && coachDevBreakdown.losses != null ? (
+                            <span className="teamhome-improvements-ledger-record">
+                              {coachDevBreakdown.wins}-{coachDevBreakdown.losses}
+                            </span>
+                          ) : null}
+                        </div>
+                        <ul className="teamhome-improvements-ledger-rows">
+                          <li>
+                            <span>Base (coached a season)</span>
+                            <span>{formatCoachCpDelta(Number(coachDevBreakdown.base_cp ?? 10))}</span>
+                          </li>
+                          <li>
+                            <span>Record (wins − losses)</span>
+                            <span>{formatCoachCpDelta(Number(coachDevBreakdown.record_cp ?? coachDevBreakdown.wins_cp ?? 0))}</span>
+                          </li>
+                          <li>
+                            <span>Postseason</span>
+                            <span>{formatCoachCpDelta(Number(coachDevBreakdown.playoffs_bonus ?? 0))}</span>
+                          </li>
+                          <li>
+                            <span>Season goals</span>
+                            <span>{formatCoachCpDelta(Number(coachDevBreakdown.goal_cp ?? 0))}</span>
+                          </li>
+                          <li>
+                            <span>Loyalty (years at school)</span>
+                            <span>{formatCoachCpDelta(Number(coachDevBreakdown.loyalty_bonus ?? 0))}</span>
+                          </li>
+                          {(Number(coachDevBreakdown.losing_season_penalty ?? 0) !== 0 ||
+                            Number(coachDevBreakdown.age_modifier ?? 0) !== 0) && (
+                            <>
+                              {Number(coachDevBreakdown.losing_season_penalty ?? 0) !== 0 ? (
+                                <li>
+                                  <span>Losing season</span>
+                                  <span>{formatCoachCpDelta(Number(coachDevBreakdown.losing_season_penalty ?? 0))}</span>
+                                </li>
+                              ) : null}
+                              {Number(coachDevBreakdown.age_modifier ?? 0) !== 0 ? (
+                                <li>
+                                  <span>Age modifier</span>
+                                  <span>{formatCoachCpDelta(Number(coachDevBreakdown.age_modifier ?? 0))}</span>
+                                </li>
+                              ) : null}
+                            </>
+                          )}
+                          <li>
+                            <span>
+                              <b>Net this season</b>
+                            </span>
+                            <span>
+                              <b>{formatCoachCpDelta(Number(coachDevBreakdown.cp_change ?? 0))}</b>
+                            </span>
+                          </li>
+                        </ul>
+                      </div>
+                    ) : null}
                     <div style={{ marginTop: 12, textAlign: 'left', maxWidth: 860 }}>
                       <div className="teamhome-small">
                         Total CP: <b>{coachDevTotalCp.toFixed(1)}</b>
+                        {coachDevCardNetCost > 0 ? (
+                          <>
+                            {' '}
+                            → after cards: <b>{coachDevProjectedTotalCp.toFixed(1)}</b>
+                          </>
+                        ) : null}
                       </div>
                       <div className="teamhome-small">
                         Allocated CP: <b>{coachDevAllocatedCp.toFixed(1)}</b>
@@ -6190,6 +6245,11 @@ function TeamHomePageBody({
                       <div className="teamhome-small" style={{ color: coachDevAvailableCp < 0 ? '#7f1d1d' : undefined }}>
                         Available CP: <b>{coachDevAvailableCp.toFixed(1)}</b>
                       </div>
+                      {coachDevCardNetCost > 0 ? (
+                        <div className="teamhome-small" style={{ marginTop: 4 }}>
+                          Card changes this stage: <b>−{coachDevCardNetCost.toFixed(1)} CP</b>
+                        </div>
+                      ) : null}
                     </div>
                     <div style={{ marginTop: 12, textAlign: 'left', width: '100%', maxWidth: 940 }}>
                       <table className="teamhome-roster-table" style={{ width: '100%' }}>
@@ -6198,7 +6258,7 @@ function TeamHomePageBody({
                             <th style={{ textAlign: 'left' }}>Attribute</th>
                             <th>Level</th>
                             <th>Allocated CP</th>
-                            <th>Next Level</th>
+                            <th>Progress</th>
                             <th style={{ textAlign: 'center' }}>Adjust</th>
                           </tr>
                         </thead>
@@ -6206,46 +6266,112 @@ function TeamHomePageBody({
                           {COACH_DEV_SKILLS.map(({ key, label }) => {
                             const cp = Number(coachDevAllocations[key] ?? 0)
                             const lv = coachDevLevelFromCp(cp)
-                            const curTh = COACH_DEV_THRESHOLDS[lv] ?? 0
                             const nextTh = coachDevNextThreshold(lv)
+                            const progress = coachDevCpToNextLevel(cp)
+                            const progressPct =
+                              progress && progress.next > progress.current
+                                ? Math.min(
+                                    100,
+                                    Math.round(
+                                      ((cp - progress.current) / (progress.next - progress.current)) * 100,
+                                    ),
+                                  )
+                                : 100
                             return (
                               <tr key={key}>
                                 <td>{label}</td>
                                 <td>{lv}</td>
                                 <td>{cp.toFixed(1)}</td>
-                                <td>{nextTh == null ? 'Maxed' : `${curTh} -> ${nextTh}`}</td>
-                                <td style={{ textAlign: 'center' }}>
+                                <td style={{ minWidth: 120 }}>
+                                  {nextTh == null ? (
+                                    'Maxed'
+                                  ) : (
+                                    <div>
+                                      <div style={{ fontSize: '0.8rem', opacity: 0.85 }}>
+                                        {progress?.remaining ?? 0} CP to Lv {lv + 1}
+                                      </div>
+                                      <div
+                                        style={{
+                                          height: 6,
+                                          borderRadius: 4,
+                                          background: 'rgba(148,163,184,0.25)',
+                                          marginTop: 4,
+                                          overflow: 'hidden',
+                                        }}
+                                      >
+                                        <div
+                                          style={{
+                                            width: `${progressPct}%`,
+                                            height: '100%',
+                                            background: '#38bdf8',
+                                          }}
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+                                </td>
+                                <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                                   <button
                                     type="button"
                                     className="teamhome-select"
-                                    style={{ marginRight: 8 }}
+                                    style={{ marginRight: 6 }}
                                     onClick={() =>
                                       setCoachDevAllocations((prev) => ({
                                         ...prev,
-                                        [key]: Math.max(0, Math.round((Number(prev[key] ?? 0) - 5) * 10) / 10),
+                                        [key]: Math.max(0, Math.round((Number(prev[key] ?? 0) - 10) * 10) / 10),
                                       }))
                                     }
                                   >
-                                    -
+                                    −10
                                   </button>
                                   <button
                                     type="button"
                                     className="teamhome-select"
+                                    style={{ marginRight: 6 }}
                                     onClick={() =>
                                       setCoachDevAllocations((prev) => ({
                                         ...prev,
-                                        [key]: Math.round((Number(prev[key] ?? 0) + 5) * 10) / 10,
+                                        [key]: Math.round((Number(prev[key] ?? 0) + 10) * 10) / 10,
                                       }))
                                     }
                                   >
-                                    +
+                                    +10
                                   </button>
+                                  {nextTh != null ? (
+                                    <button
+                                      type="button"
+                                      className="teamhome-select"
+                                      onClick={() =>
+                                        setCoachDevAllocations((prev) => ({
+                                          ...prev,
+                                          [key]: nextTh,
+                                        }))
+                                      }
+                                    >
+                                      Next Lv
+                                    </button>
+                                  ) : null}
                                 </td>
                               </tr>
                             )
                           })}
                         </tbody>
                       </table>
+                    </div>
+                    <div style={{ marginTop: 24, width: '100%', maxWidth: 980 }}>
+                      <div className="teamhome-preseason-title" style={{ fontSize: '1.05rem' }}>
+                        Coaching cards
+                      </div>
+                      <div className="teamhome-preseason-sub" style={{ marginTop: 6, maxWidth: 760 }}>
+                        Specialize your program identity and position development. Card changes deduct CP now; unequipping
+                        refunds 50%. Swapping program identity adds a fee.
+                      </div>
+                      <CoachingCardPicker
+                        loadout={coachingCardsLoadout}
+                        onChange={setCoachingCardsLoadout}
+                        showCosts
+                        availableCp={coachDevAvailableCp}
+                      />
                     </div>
                   </>
                 ) : offseasonCurrentStage === 'Program Development' ? (
@@ -6268,52 +6394,12 @@ function TeamHomePageBody({
                   <>
                     <div className="teamhome-preseason-title">Program improvements</div>
                     <div className="teamhome-preseason-sub teamhome-improvements-lead">
-                      Use <b>− / +</b> (5 PP per click) or drag each <b>pillar slider</b> to invest your flex <b>program points (PP)</b> into
-                      that program track. You can sit
-                      between full grades (partial progress) so the program moves smoothly — level-ups still happen when you cross the
-                      PP thresholds from the in-season system. Use <b>Continue</b> to apply and advance.
+                      Drop <b>invest chips</b> on facilities, culture, or booster support to spend program points (PP) from your
+                      booster bank. Withdraw chips pull PP back out. Partial progress between grades is supported — level-ups fire when
+                      you cross the same PP thresholds as in-season. Use <b>Continue</b> to lock in and advance.
                     </div>
 
                     <div className="teamhome-improvements-wrap">
-                      <div className="teamhome-improvements-metrics">
-                        <div className="teamhome-improvements-metric teamhome-improvements-metric--total">
-                          <div className="teamhome-improvements-metric-label">Total program points</div>
-                          <div className="teamhome-improvements-metric-value">{improvementsBudget.ppTotal}</div>
-                          <div className="teamhome-improvements-metric-hint">In your offseason PP bank</div>
-                        </div>
-                        <div className="teamhome-improvements-metric teamhome-improvements-metric--bank">
-                          <div className="teamhome-improvements-metric-label">Unspent PP</div>
-                          <div
-                            className={`teamhome-improvements-metric-value ${
-                              improvementsBudget.ppRemaining <= 0 ? 'teamhome-improvements-num--warn' : 'teamhome-improvements-num--cyan'
-                            }`}
-                          >
-                            {improvementsBudget.ppRemaining}
-                          </div>
-                          <div className="teamhome-improvements-metric-hint">Available before pillar changes</div>
-                        </div>
-                        <div className="teamhome-improvements-metric teamhome-improvements-metric--projected">
-                          <div className="teamhome-improvements-metric-label">After Continue (projected)</div>
-                          <div
-                            className={`teamhome-improvements-metric-value ${
-                              improvementsBudget.projectedRemaining < 0
-                                ? 'teamhome-improvements-num--bad'
-                                : improvementsBudget.projectedRemaining === improvementsBudget.ppRemaining
-                                  ? 'teamhome-improvements-num--muted'
-                                  : 'teamhome-improvements-num--good'
-                            }`}
-                          >
-                            {improvementsBudget.projectedRemaining}
-                          </div>
-                          <div className="teamhome-improvements-metric-hint">
-                            Net from pillar picks:{' '}
-                            <strong className={improvementsBudget.deltaPp < 0 ? 'teamhome-improvements-num--bad' : improvementsBudget.deltaPp > 0 ? 'teamhome-improvements-num--good' : 'teamhome-improvements-num--muted'}>
-                              {formatProgramPpDelta(improvementsBudget.deltaPp)}
-                            </strong>
-                          </div>
-                        </div>
-                      </div>
-
                       <div className="teamhome-improvements-ledger">
                         <div className="teamhome-improvements-ledger-head">
                           <span className="teamhome-improvements-ledger-title">Last season</span>
@@ -6411,91 +6497,13 @@ function TeamHomePageBody({
                         )}
                       </div>
 
-                      <div className="teamhome-improvements-sliders">
-                        {improvementsBudget.pillars.map((row) => {
-                          const setC = (v: number) => {
-                            const x = Math.max(0, Math.min(PILLAR_CUMULATIVE_PP_MAX, Math.round(v)))
-                            if (row.id === 'facilities') setImproveFacCumulative(x)
-                            else if (row.id === 'culture') setImproveCulCumulative(x)
-                            else setImproveBooCumulative(x)
-                          }
-                          const pct = PILLAR_CUMULATIVE_PP_MAX > 0 ? (row.targetCumulative / PILLAR_CUMULATIVE_PP_MAX) * 100 : 0
-                          return (
-                            <div
-                              key={row.id}
-                              className="teamhome-improvements-slider-row"
-                              style={{ borderLeftColor: row.accent }}
-                            >
-                              <div className="teamhome-improvements-slider-head">
-                                <span className="teamhome-improvements-slider-title">{row.label}</span>
-                                <span className="teamhome-improvements-slider-meter">{formatPillarMeter(row.targetCumulative)}</span>
-                              </div>
-                              <div className="teamhome-improvements-slider-track-wrap" aria-hidden>
-                                <div
-                                  className="teamhome-improvements-slider-track-fill"
-                                  style={{
-                                    width: `${pct}%`,
-                                    background: `linear-gradient(90deg, ${row.accent}99, ${row.accent})`,
-                                  }}
-                                />
-                              </div>
-                              <div className="teamhome-improvements-slider-controls">
-                                <button
-                                  type="button"
-                                  className="teamhome-improvements-step-btn"
-                                  onClick={() => setC(row.targetCumulative - PILLAR_SLIDER_STEP)}
-                                  disabled={row.targetCumulative <= 0}
-                                  aria-label={`Decrease ${row.label} investment by ${PILLAR_SLIDER_STEP} PP`}
-                                >
-                                  −
-                                </button>
-                                <input
-                                  type="range"
-                                  className="teamhome-improvements-range"
-                                  min={0}
-                                  max={PILLAR_CUMULATIVE_PP_MAX}
-                                  step={PILLAR_SLIDER_STEP}
-                                  value={row.targetCumulative}
-                                  onChange={(e) => setC(Number(e.target.value))}
-                                  aria-label={`${row.label} program investment`}
-                                  aria-valuemin={0}
-                                  aria-valuemax={PILLAR_CUMULATIVE_PP_MAX}
-                                  aria-valuenow={row.targetCumulative}
-                                />
-                                <button
-                                  type="button"
-                                  className="teamhome-improvements-step-btn"
-                                  onClick={() => setC(row.targetCumulative + PILLAR_SLIDER_STEP)}
-                                  disabled={row.targetCumulative >= PILLAR_CUMULATIVE_PP_MAX}
-                                  aria-label={`Increase ${row.label} investment by ${PILLAR_SLIDER_STEP} PP`}
-                                >
-                                  +
-                                </button>
-                              </div>
-                              <div className="teamhome-improvements-slider-meta">
-                                <span className="teamhome-small">
-                                  PP vs current:{' '}
-                                  <strong
-                                    className={
-                                      row.pillarDeltaPp < 0
-                                        ? 'teamhome-improvements-num--bad'
-                                        : row.pillarDeltaPp > 0
-                                          ? 'teamhome-improvements-num--good'
-                                          : 'teamhome-improvements-num--muted'
-                                    }
-                                  >
-                                    {formatProgramPpDelta(row.pillarDeltaPp)}
-                                  </strong>{' '}
-                                  (negative spends bank)
-                                </span>
-                                <span className="teamhome-improvements-slider-scale teamhome-small">
-                                  0 — {PILLAR_CUMULATIVE_PP_MAX} PP · ±{PILLAR_SLIDER_STEP} per click or slider step
-                                </span>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
+                      <ProgramInvestmentBoosterCards
+                        pillars={improvementsBudget.pillars}
+                        bankAmount={improvementsBudget.projectedRemaining}
+                        netCredited={improvementsSeasonLedger?.net ?? null}
+                        onTargetChange={handleImprovementTargetChange}
+                        resetToken={improvementsResetKey}
+                      />
 
                       {saveState?.offseason_improvements_bank?.breakdown ? (
                         <details className="teamhome-improvements-details">
@@ -6618,7 +6626,7 @@ function TeamHomePageBody({
                         {improvementsBudget.invalid ? (
                           <>Fix PP above, then use Continue.</>
                         ) : improvementsBudget.atProgramFloor && improvementsBudget.projectedRemaining > 0 ? (
-                          <>At grade 1 on all pillars you cannot spend more PP here — use Continue with leftover bank or unchanged sliders.</>
+                          <>At grade 1 on all pillars you cannot spend more PP here — use Continue with leftover bank.</>
                         ) : (
                           <>Use Continue to lock in pillar grades and advance.</>
                         )}

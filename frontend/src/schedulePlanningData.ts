@@ -82,3 +82,23 @@ export function crossRegionSlotCountFromSave(saveState: any): number {
 export function allSlotsFilled(info: SchedulePlanningInfo, selections: CrossRegionSelections): boolean {
   return info.slots.every((s) => Boolean(String(selections[s.slot_index]?.opponent ?? '').trim()))
 }
+
+/** True once any regular-season week result slot is marked played. */
+export function saveHasPlayedRegularSeasonGames(saveState: any): boolean {
+  const weeks = saveState?.week_results
+  if (!Array.isArray(weeks)) return false
+  for (const wk of weeks) {
+    if (!Array.isArray(wk)) continue
+    for (const g of wk) {
+      if (g && typeof g === 'object' && g.played) return true
+    }
+  }
+  return false
+}
+
+/** Dynasty start: schedule planning before the first regular-season game. */
+export function isInitialDynastySchedulePlanning(saveState: any, phase: string): boolean {
+  if (String(phase || '').trim().toLowerCase() !== 'schedule_planning') return false
+  if (saveState?.cross_region_picks) return false
+  return !saveHasPlayedRegularSeasonGames(saveState)
+}

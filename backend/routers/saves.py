@@ -160,6 +160,7 @@ class AdvanceOffseasonBody(BaseModel):
     improve_boosters_cumulative_pp: Optional[int] = None
     # Coach development CP threshold allocations (skill -> allocated CP)
     coach_dev_allocations: Optional[Dict[str, Any]] = None
+    coaching_cards: Optional[Dict[str, Any]] = None
     # Coaching carousel (stages I–III): user's ranked HC job applications (team names).
     carousel_job_applications: Optional[List[str]] = None
     # Transfer portal: second Continue on Transfers I / II after reviewing results.
@@ -607,6 +608,8 @@ class CoachGameplanV2Body(BaseModel):
     delete_offense_library_id: Optional[str] = None
     add_defense_library: Optional[Dict[str, Any]] = None
     delete_defense_library_id: Optional[str] = None
+    week_to_week_offense: Optional[bool] = None
+    week_to_week_defense: Optional[bool] = None
 
 
 class CoachInboxChooseBody(BaseModel):
@@ -645,6 +648,8 @@ def save_coach_gameplan_v2_route(save_id: str, body: CoachGameplanV2Body, user=D
             delete_offense_library_id=body.delete_offense_library_id,
             add_defense_library=body.add_defense_library,
             delete_defense_library_id=body.delete_defense_library_id,
+            week_to_week_offense=body.week_to_week_offense,
+            week_to_week_defense=body.week_to_week_defense,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=_save_route_exception_detail(e))

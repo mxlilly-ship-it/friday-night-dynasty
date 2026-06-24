@@ -65,6 +65,11 @@ class Coach:
     last_preferred_playbook_change_year: int = 0
     hot_seat: int = 0              # 0–100 job pressure (updated each offseason carousel)
 
+    # Coaching Card System: program identity (1), position (3), platinum (2)
+    coaching_cards: Dict[str, Any] = field(
+        default_factory=lambda: {"program_identity": None, "position": [], "platinum": []}
+    )
+
     def __post_init__(self):
         self._clamp_skills()
 
@@ -80,6 +85,8 @@ class Coach:
             self.spring_offense_focus = "run_game"
         if self.spring_defense_focus not in ("run_defense", "pass_rush", "tackling", "pass_defense", "block_defeat"):
             self.spring_defense_focus = "pass_defense"
+        if not isinstance(getattr(self, "coaching_cards", None), dict):
+            self.coaching_cards = {"program_identity": None, "position": [], "platinum": []}
 
 
 def _coerce_offensive_style(value: Any) -> OffensiveStyle:
@@ -120,6 +127,13 @@ def apply_coach_config_dict(coach: "Coach", config: Dict[str, Any]) -> None:
             coach.offensive_style = _coerce_offensive_style(v)
         elif k == "defensive_style":
             coach.defensive_style = _coerce_defensive_style(v)
+        elif k == "coaching_cards":
+            from systems.coaching_cards import normalize_loadout, validate_loadout
+
+            lo = normalize_loadout(v)
+            ok, errs = validate_loadout(lo)
+            if ok:
+                coach.coaching_cards = lo
         elif k in fields:
             setattr(coach, k, v)
     coach._clamp_skills()

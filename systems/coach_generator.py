@@ -103,7 +103,7 @@ def generate_coach(
     spring_offense = random.choice(["run_blocking", "pass_protection", "receiving", "pass_game", "run_game"])
     spring_defense = random.choice(["run_defense", "pass_rush", "tackling", "pass_defense", "block_defeat"])
 
-    return Coach(
+    coach = Coach(
         name=name,
         age=age,
         preferred_schemes={},
@@ -121,6 +121,13 @@ def generate_coach(
         recruiting=min(10, recruiting),
         scheme_teach=min(10, scheme_teach),
     )
+    try:
+        from systems.coaching_cards import ai_select_coaching_cards, apply_loadout_to_coach
+
+        apply_loadout_to_coach(coach, ai_select_coaching_cards(coach))
+    except Exception:
+        pass
+    return coach
 
 
 def generate_coach_for_team(team: "Team") -> Coach:

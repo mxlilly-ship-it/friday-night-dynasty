@@ -4,6 +4,57 @@ import type { CrossRegionSelections, SchedulePlanningInfo } from './schedulePlan
 import { defaultUserHomeForSlot, emptySlotSelection } from './schedulePlanningData'
 import './SchedulePlanningPanel.css'
 
+type ScrollCalloutProps = {
+  slotCount: number
+  variant: 'scroll' | 'start'
+  onScrollToPicks?: () => void
+}
+
+export function SchedulePlanningScrollCallout({ slotCount, variant, onScrollToPicks }: ScrollCalloutProps) {
+  const gameLabel = slotCount === 1 ? 'out-of-region opponent' : 'out-of-region opponents'
+  const isStart = variant === 'start'
+
+  return (
+    <div
+      className={`schedplan-callout${isStart ? ' schedplan-callout--start' : ''}`}
+      role="status"
+    >
+      <div className="schedplan-callout-icon" aria-hidden>
+        {isStart ? '①' : '↓'}
+      </div>
+      <div className="schedplan-callout-body">
+        <div className="schedplan-callout-title">
+          {isStart ? 'First step: build your schedule' : 'Action required below'}
+        </div>
+        <p className="schedplan-callout-text">
+          {isStart ? (
+            <>
+              Your in-region games are already set. Pick{' '}
+              <strong>
+                {slotCount} {gameLabel}
+              </strong>{' '}
+              in the section below, then use <strong>Continue</strong> (top right) to start the offseason.
+            </>
+          ) : (
+            <>
+              <strong>Scroll down</strong> to pick your{' '}
+              <strong>
+                {slotCount} {gameLabel}
+              </strong>{' '}
+              before you continue. Region games are locked in — you only choose the cross-region matchups.
+            </>
+          )}
+        </p>
+        {!isStart && onScrollToPicks ? (
+          <button type="button" className="schedplan-callout-btn" onClick={onScrollToPicks}>
+            Jump to non-region picks
+          </button>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
 type Props = {
   apiBase: string
   headers: Record<string, string>
@@ -54,7 +105,7 @@ export default function SchedulePlanningPanel({
   }
 
   return (
-    <div className="schedplan" role="region" aria-label="Schedule planning">
+    <div className="schedplan" id="schedplan-anchor" role="region" aria-label="Schedule planning">
       <div className="schedplan-header">
         <div className="schedplan-eyebrow">
           <span className="schedplan-dot" />

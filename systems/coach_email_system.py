@@ -62,6 +62,7 @@ def ensure_coach_inbox(state: Dict[str, Any]) -> Dict[str, Any]:
     inbox.setdefault("job_security", 72)
     inbox.setdefault("last_week_sim_batch_key", None)
     inbox.setdefault("last_playoff_batch_key", None)
+    inbox.setdefault("last_week_checklist_key", None)
     seed_starter_coach_emails(state, inbox)
     return inbox
 
@@ -717,6 +718,93 @@ def generate_week_sim_emails(
     _append_emails(inbox, emails[:target])
 
 
+def _user_opponent_for_week(state: Dict[str, Any], user_team: str, week: int) -> Tuple[str, str]:
+    """Return (opponent_name, site) where site is home|away|unknown."""
+    weeks = state.get("weeks") or []
+    wk_idx = int(week) - 1
+    if wk_idx < 0 or wk_idx >= len(weeks):
+        return "your opponent", "unknown"
+    wk = weeks[wk_idx]
+    if not isinstance(wk, list):
+        return "your opponent", "unknown"
+    for g in wk:
+        if not isinstance(g, dict):
+            continue
+        h, a = g.get("home"), g.get("away")
+        if user_team == h:
+            return str(a or "your opponent"), "home"
+        if user_team == a:
+            return str(h or "your opponent"), "away"
+    return "your opponent", "unknown"
+
+
+def generate_week_checklist_email(state: Dict[str, Any], *, week: Optional[int] = None) -> None:
+    """Append a Monday checklist email once per regular-season week (before kickoff)."""
+    inbox = ensure_coach_inbox(state)
+    ut = str(state.get("user_team") or "").strip()
+    if not ut:
+        return
+    phase = str(state.get("season_phase") or "").strip().lower()
+    if phase != "regular":
+        return
+
+    target_week = int(week if week is not None else (state.get("current_week", 1) or 1))
+    if target_week < 1:
+        return
+
+    year = int(state.get("current_year", 1))
+    batch_key = f"{year}|regular|{target_week}|checklist"
+    if inbox.get("last_week_checklist_key") == batch_key:
+        has_checklist = any(
+            isinstance(e, dict)
+            and "weekly_checklist" in (e.get("trigger_conditions") or [])
+            and int(e.get("week", 0) or 0) == target_week
+            for e in (inbox.get("emails") or [])
+        )
+        if has_checklist:
+            return
+        inbox["last_week_checklist_key"] = None
+
+    weeks = state.get("weeks") or []
+    if target_week > len(weeks):
+        return
+
+    opponent, site = _user_opponent_for_week(state, ut, target_week)
+    coach = _starter_display_coach_name(state)
+    matchup_line = f"Week {target_week} vs {opponent}"
+    if site == "home":
+        matchup_line += " (home)"
+    elif site == "away":
+        matchup_line += " (road)"
+
+    body = (
+        f"{coach} — quick checklist before Friday lights.\n\n"
+        f"Matchup: {matchup_line}\n\n"
+        "1. Depth chart — confirm starters and backups are set.\n"
+        "2. Game plan — set offensive and defensive plans for this opponent.\n"
+        "3. Scouting — review the opponent report in Team / Scouting.\n"
+        "4. Inbox — reply to anything urgent from staff or parents.\n"
+        "5. Kickoff — sim the week or coach the game when you're ready.\n\n"
+        f"Stay on schedule and {ut} will take care of the rest."
+    )
+
+    rng = random.Random((hash(batch_key) ^ hash(ut)) % (2**32))
+    email = _make_email(
+        sender_type=SENDER_AD,
+        sender_name="Athletic director",
+        subject=f"Week {target_week} checklist — {opponent}",
+        body=body,
+        category="admin",
+        year=year,
+        week=target_week,
+        virtual_day="Monday",
+        trigger_conditions=["weekly_checklist"],
+        rng=rng,
+    )
+    inbox["last_week_checklist_key"] = batch_key
+    _append_emails(inbox, [email])
+
+
 def generate_playoff_round_emails(state: Dict[str, Any]) -> None:
     """Light batch after playoff simulation / round (user team)."""
     inbox = ensure_coach_inbox(state)
@@ -897,9 +985,9 @@ def apply_choice_effects(inbox: Dict[str, Any], effects: Dict[str, Any]) -> None
 
 
 def mark_emails_read(inbox: Dict[str, Any], ids: List[str]) -> None:
-    want = set(ids)
+    want = {str(x) for x in ids if x}
     for e in inbox.get("emails") or []:
-        if isinstance(e, dict) and e.get("id") in want:
+        if isinstance(e, dict) and str(e.get("id") or "") in want:
             e["read"] = True
 
 
