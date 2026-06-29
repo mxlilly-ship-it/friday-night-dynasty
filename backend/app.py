@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from backend.routers import auth, saves, games, sim
+from backend.routers import auth, saves, games, sim, billing
 from backend.spa_bundle import spa_dist_bundle_is_stale, spa_dist_dir, spa_frontend_dir, spa_ui_debug_meta
 from systems.playbook_system import (
     DEFENSIVE_PLAYBOOK_FORMATIONS,
@@ -221,6 +221,7 @@ def create_app() -> FastAPI:
             firebase_env_status,
         )
         from backend.services.league_service import _coach_sim_emails_enabled
+        from backend.billing_config import billing_checkout_configured, billing_required
 
         label = os.environ.get("FND_BUILD_LABEL", "").strip()
         disable_raw = os.environ.get("FND_DISABLE_WEEK_SIM_EMAILS")
@@ -246,6 +247,8 @@ def create_app() -> FastAPI:
             "firebase_configured": firebase_configured(),
             "firebase_env_set": firebase_env_status(),
             "firebase_env_keys_in_process": firebase_env_keys_in_process(),
+            "billing_configured": billing_checkout_configured(),
+            "billing_required": billing_required(),
         }
 
     @app.get("/_fnd/ui-meta")
@@ -258,6 +261,7 @@ def create_app() -> FastAPI:
         return spa_ui_debug_meta(index_html)
 
     app.include_router(auth.router, prefix="/auth", tags=["auth"])
+    app.include_router(billing.router, prefix="/billing", tags=["billing"])
     app.include_router(saves.router, prefix="/saves", tags=["saves"])
     app.include_router(games.router, prefix="/games", tags=["games"])
     app.include_router(sim.router, prefix="/sim", tags=["sim"])

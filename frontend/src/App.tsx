@@ -31,6 +31,7 @@ import { getAuthInstance, resetPassword } from './auth.js'
 import SignupTermsConsent from './SignupTermsConsent'
 import ScreenshotsGallery from './ScreenshotsGallery'
 import { getOrCreateDeviceId } from './deviceId.js'
+import { confirmCheckoutSession, createCheckoutSession, fetchBillingStatus, type BillingStatus } from './billing'
 
 /** Stable reference so child effects do not re-run when logged out (browser saves). */
 const EMPTY_AUTH_HEADERS: Record<string, string> = Object.freeze({})
@@ -121,6 +122,9 @@ export default function App({ devNoFirebase = false }: AppProps) {
   const [lastCrashPromptKey, setLastCrashPromptKey] = useState<string>('')
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string>('')
+  const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null)
+  const [billingChecking, setBillingChecking] = useState(false)
+  const [billingBusy, setBillingBusy] = useState(false)
   const [autosaveEnabled, setAutosaveEnabled] = useState<boolean>(() => {
     const raw = localStorage.getItem('fnd_autosave_enabled')
     return raw == null ? true : raw === 'true'
@@ -134,6 +138,9 @@ export default function App({ devNoFirebase = false }: AppProps) {
   const [showBackupPrompt, setShowBackupPrompt] = useState(false)
   const [backupPromptReason, setBackupPromptReason] = useState('')
   const inLocalRuntime = Boolean(localBundle) && isBrowserSaveId(saveId)
+  const needsBillingPurchase = Boolean(
+    billingStatus?.billing_required && !billingStatus?.entitled,
+  )
 
   const saveStateRef = useRef<any>(null)
   saveStateRef.current = saveState
@@ -377,6 +384,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
     localStorage.removeItem('fnd_token')
     localStorage.removeItem('fnd_username')
     setToken('')
+    setBillingStatus(null)
     void firebaseSignOut()
   }
 
@@ -422,6 +430,47 @@ export default function App({ devNoFirebase = false }: AppProps) {
     if (label) {
       localStorage.setItem('fnd_username', label)
       setUsername(label)
+    }
+    void refreshBillingStatus({ Authorization: `Bearer ${data.token}` })
+  }
+
+  async function refreshBillingStatus(authHeaders?: Record<string, string>) {
+    const auth =
+      authHeaders ??
+      (token.trim() ? { Authorization: `Bearer ${token.trim()}` } : null)
+    if (!auth?.Authorization) {
+      setBillingStatus(null)
+      return null
+    }
+    setBillingChecking(true)
+    try {
+      const status = await fetchBillingStatus(API_BASE, auth)
+      setBillingStatus(status)
+      return status
+    } catch {
+      setBillingStatus(null)
+      return null
+    } finally {
+      setBillingChecking(false)
+    }
+  }
+
+  async function startCheckout() {
+    setError('')
+    setBillingBusy(true)
+    try {
+      const auth = await getAuthHeaders()
+      if (!auth.Authorization) {
+        setError('Sign in first, then complete checkout.')
+        return
+      }
+      const url = await createCheckoutSession(API_BASE, auth)
+      window.location.href = url
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Could not start checkout'
+      setError(msg)
+    } finally {
+      setBillingBusy(false)
     }
   }
 
@@ -1328,12 +1377,66 @@ export default function App({ devNoFirebase = false }: AppProps) {
     if (!token) return
     void validateSession(token).then((ok) => {
       if (!ok) clearStaleSession()
-      else if (screen === 'load') {
-        void loadBrowserSaveList()
-        void loadCloudSaves()
+      else {
+        void refreshBillingStatus({ Authorization: `Bearer ${token}` })
+        if (screen === 'load') {
+          void loadBrowserSaveList()
+          void loadCloudSaves()
+        }
       }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- validate stored token once on load
+  }, [])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const billing = params.get('billing')
+    const sessionId = params.get('session_id')?.trim()
+    if (!billing) return
+
+    const cleanBillingParams = () => {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('billing')
+      url.searchParams.delete('session_id')
+      const next = `${url.pathname}${url.search}${url.hash}`
+      window.history.replaceState({}, '', next)
+    }
+
+    if (billing === 'cancelled') {
+      cleanBillingParams()
+      setError('Checkout was cancelled. You can try again when ready.')
+      return
+    }
+
+    if (billing !== 'success' || !sessionId) return
+
+    const storedToken = (localStorage.getItem('fnd_token') ?? token).trim()
+    if (!storedToken) {
+      setError('Sign in with the same account you used for checkout, then open the success link again.')
+      cleanBillingParams()
+      return
+    }
+
+    void (async () => {
+      setBillingBusy(true)
+      try {
+        await confirmCheckoutSession(
+          API_BASE,
+          { Authorization: `Bearer ${storedToken}` },
+          sessionId,
+        )
+        await refreshBillingStatus({ Authorization: `Bearer ${storedToken}` })
+        setSuccessMessage('Purchase complete — welcome to Friday Night Dynasty!')
+        setTimeout(() => setSuccessMessage(''), 6000)
+        cleanBillingParams()
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Could not confirm purchase'
+        setError(msg)
+      } finally {
+        setBillingBusy(false)
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once for Stripe return URL
   }, [])
 
   useEffect(() => {
@@ -1798,7 +1901,31 @@ export default function App({ devNoFirebase = false }: AppProps) {
           </div>
         )}
 
-        {screen === 'new' && token ? (
+        {screen === 'new' && token && needsBillingPurchase ? (
+          <div className="fnd-panel">
+            <button type="button" className="fnd-back" onClick={goTitle}>
+              ← Back
+            </button>
+            <h2>Unlock Friday Night Dynasty</h2>
+            <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
+              You&apos;re signed in as <strong style={{ color: '#d0d4dc' }}>{username}</strong>. Complete a one-time
+              purchase to create a new dynasty and use cloud saves.
+            </p>
+            {billingChecking ? (
+              <p style={{ color: '#9ca3af', fontSize: '0.9rem' }}>Checking purchase status…</p>
+            ) : (
+              <button
+                type="button"
+                className="fnd-title-btn"
+                style={{ maxWidth: '100%' }}
+                disabled={billingBusy}
+                onClick={() => void startCheckout()}
+              >
+                {billingBusy ? 'Redirecting to checkout…' : 'Buy now — secure checkout'}
+              </button>
+            )}
+          </div>
+        ) : screen === 'new' && token ? (
           <NewSaveFlow
             apiBase={API_BASE}
             headers={headers}

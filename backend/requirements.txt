@@ -4,4 +4,5 @@ pydantic
 httpx
 python-multipart
 firebase-admin
+stripe
 

@@ -1,0 +1,57 @@
+export type BillingStatus = {
+  billing_required: boolean
+  billing_configured: boolean
+  entitled: boolean
+  purchased_at: number | null
+}
+
+export async function fetchBillingStatus(
+  apiBase: string,
+  headers: Record<string, string>,
+): Promise<BillingStatus> {
+  const r = await fetch(`${apiBase}/billing/status`, { headers })
+  if (!r.ok) {
+    const text = await r.text()
+    throw new Error(text || `Billing status failed (${r.status})`)
+  }
+  return r.json()
+}
+
+export async function createCheckoutSession(
+  apiBase: string,
+  headers: Record<string, string>,
+): Promise<string> {
+  const r = await fetch(`${apiBase}/billing/create-checkout-session`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+  })
+  const text = await r.text()
+  let data: { checkout_url?: string; detail?: unknown } | null = null
+  try {
+    data = text ? JSON.parse(text) : null
+  } catch {
+    data = null
+  }
+  if (!r.ok) {
+    const detail = data?.detail
+    throw new Error(typeof detail === 'string' ? detail : text || `Checkout failed (${r.status})`)
+  }
+  const url = String(data?.checkout_url ?? '').trim()
+  if (!url) throw new Error('Server did not return a checkout URL.')
+  return url
+}
+
+export async function confirmCheckoutSession(
+  apiBase: string,
+  headers: Record<string, string>,
+  sessionId: string,
+): Promise<BillingStatus> {
+  const q = new URLSearchParams({ session_id: sessionId })
+  const r = await fetch(`${apiBase}/billing/confirm?${q}`, { headers })
+  if (!r.ok) {
+    const text = await r.text()
+    throw new Error(text || `Confirm checkout failed (${r.status})`)
+  }
+  await r.json()
+  return fetchBillingStatus(apiBase, headers)
+}

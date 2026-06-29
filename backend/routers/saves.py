@@ -7,7 +7,7 @@ from pydantic import BaseModel
 import json
 from typing import Any, Dict, List, Optional
 
-from backend.deps import require_user
+from backend.deps import require_entitled
 from backend.services.league_service import (
     create_save,
     list_saves,
@@ -188,12 +188,12 @@ class SimulateSeasonsBody(BaseModel):
 
 
 @router.get("", response_model=List[Dict[str, Any]])
-def list_saves_route(user=Depends(require_user)):
+def list_saves_route(user=Depends(require_entitled)):
     return list_saves(user["user_id"])
 
 
 @router.post("", response_model=Dict[str, Any])
-def create_save_route(body: CreateSaveRequest, user=Depends(require_user)):
+def create_save_route(body: CreateSaveRequest, user=Depends(require_entitled)):
     try:
         return create_save(
             user["user_id"],
@@ -217,7 +217,7 @@ def create_save_route(body: CreateSaveRequest, user=Depends(require_user)):
 
 
 @router.get("/meta/teams", response_model=List[Dict[str, Any]])
-def list_teams_meta_route(user=Depends(require_user)):
+def list_teams_meta_route(user=Depends(require_entitled)):
     teams = load_teams_from_json()
     return [{"name": t.get("name", ""), "prestige": t.get("prestige", 5), "classification": t.get("classification")} for t in teams if t.get("name")]
 
@@ -249,7 +249,7 @@ def teams_json_file_route():
 async def bulk_upload_team_logos_route(
     save_id: str = Query(..., description="Save ID used to resolve valid team names"),
     logos: List[UploadFile] = File(...),
-    user=Depends(require_user),
+    user=Depends(require_entitled),
 ):
     try:
         state, _save_dir = load_state(user["user_id"], save_id)
@@ -289,7 +289,7 @@ async def bulk_upload_team_logos_route(
 
 
 @router.post("/logos/{team_name}", response_model=Dict[str, Any])
-async def upload_team_logo_route(team_name: str, logo: UploadFile = File(...), user=Depends(require_user)):
+async def upload_team_logo_route(team_name: str, logo: UploadFile = File(...), user=Depends(require_entitled)):
     name = (team_name or "").strip()
     if not name:
         raise HTTPException(status_code=400, detail="Missing team name")
@@ -309,7 +309,7 @@ async def upload_team_logo_route(team_name: str, logo: UploadFile = File(...), u
 def get_team_logo_route(
     team_name: str,
     save_id: Optional[str] = Query(None, description="Save ID — custom JSON leagues skip built-in default crests"),
-    user=Depends(require_user),
+    user=Depends(require_entitled),
 ):
     name = (team_name or "").strip()
     if not name:
@@ -342,7 +342,7 @@ def get_team_logo_route(
 async def bulk_upload_team_stadiums_route(
     save_id: str = Query(..., description="Save ID used to resolve valid team names"),
     stadiums: List[UploadFile] = File(...),
-    user=Depends(require_user),
+    user=Depends(require_entitled),
 ):
     try:
         state, _save_dir = load_state(user["user_id"], save_id)
@@ -382,7 +382,7 @@ async def bulk_upload_team_stadiums_route(
 
 
 @router.post("/stadiums/{team_name}", response_model=Dict[str, Any])
-async def upload_team_stadium_route(team_name: str, stadium: UploadFile = File(...), user=Depends(require_user)):
+async def upload_team_stadium_route(team_name: str, stadium: UploadFile = File(...), user=Depends(require_entitled)):
     name = (team_name or "").strip()
     if not name:
         raise HTTPException(status_code=400, detail="Missing team name")
@@ -399,7 +399,7 @@ async def upload_team_stadium_route(team_name: str, stadium: UploadFile = File(.
 
 
 @router.get("/stadiums/{team_name}")
-def get_team_stadium_route(team_name: str, user=Depends(require_user)):
+def get_team_stadium_route(team_name: str, user=Depends(require_entitled)):
     name = (team_name or "").strip()
     if not name:
         raise HTTPException(status_code=400, detail="Missing team name")
@@ -420,7 +420,7 @@ def get_team_stadium_route(team_name: str, user=Depends(require_user)):
 async def bulk_upload_team_helmets_route(
     save_id: str = Query(..., description="Save ID used to resolve valid team names"),
     helmets: List[UploadFile] = File(...),
-    user=Depends(require_user),
+    user=Depends(require_entitled),
 ):
     try:
         state, _save_dir = load_state(user["user_id"], save_id)
@@ -460,7 +460,7 @@ async def bulk_upload_team_helmets_route(
 
 
 @router.post("/helmets/{team_name}", response_model=Dict[str, Any])
-async def upload_team_helmet_route(team_name: str, helmet: UploadFile = File(...), user=Depends(require_user)):
+async def upload_team_helmet_route(team_name: str, helmet: UploadFile = File(...), user=Depends(require_entitled)):
     name = (team_name or "").strip()
     if not name:
         raise HTTPException(status_code=400, detail="Missing team name")
@@ -477,7 +477,7 @@ async def upload_team_helmet_route(team_name: str, helmet: UploadFile = File(...
 
 
 @router.get("/helmets/{team_name}")
-def get_team_helmet_route(team_name: str, user=Depends(require_user)):
+def get_team_helmet_route(team_name: str, user=Depends(require_entitled)):
     name = (team_name or "").strip()
     if not name:
         raise HTTPException(status_code=400, detail="Missing team name")
@@ -498,7 +498,7 @@ def get_team_helmet_route(team_name: str, user=Depends(require_user)):
 async def bulk_upload_team_jerseys_route(
     save_id: str = Query(..., description="Save ID used to resolve valid team names"),
     jerseys: List[UploadFile] = File(...),
-    user=Depends(require_user),
+    user=Depends(require_entitled),
 ):
     try:
         state, _save_dir = load_state(user["user_id"], save_id)
@@ -542,7 +542,7 @@ async def upload_team_jersey_route(
     team_name: str,
     kind: str,
     jersey: UploadFile = File(...),
-    user=Depends(require_user),
+    user=Depends(require_entitled),
 ):
     name = (team_name or "").strip()
     if not name:
@@ -560,7 +560,7 @@ async def upload_team_jersey_route(
 
 
 @router.get("/jerseys/{team_name}/{kind}")
-def get_team_jersey_route(team_name: str, kind: str, user=Depends(require_user)):
+def get_team_jersey_route(team_name: str, kind: str, user=Depends(require_entitled)):
     name = (team_name or "").strip()
     if not name:
         raise HTTPException(status_code=400, detail="Missing team name")
@@ -577,7 +577,7 @@ def get_team_jersey_route(team_name: str, kind: str, user=Depends(require_user))
 
 
 @router.get("/{save_id}/play-selection", response_model=Dict[str, Any])
-def get_play_selection_route(save_id: str, user=Depends(require_user)):
+def get_play_selection_route(save_id: str, user=Depends(require_entitled)):
     """Play selection with names for game plan UI (preseason stage 2)."""
     try:
         return get_play_selection_for_team(user["user_id"], save_id)
@@ -591,7 +591,7 @@ def get_play_selection_route(save_id: str, user=Depends(require_user)):
 
 
 @router.get("/{save_id}/play-learning-summary", response_model=Dict[str, Any])
-def get_play_learning_summary_route(save_id: str, user=Depends(require_user)):
+def get_play_learning_summary_route(save_id: str, user=Depends(require_entitled)):
     """Offensive/defensive percent learned + overall grade (Play Selection Results screen)."""
     return get_play_learning_summary(user["user_id"], save_id)
 
@@ -624,7 +624,7 @@ class CoachInboxPatchBody(BaseModel):
 
 
 @router.get("/{save_id}/coach-gameplan", response_model=Dict[str, Any])
-def get_coach_gameplan_v2_route(save_id: str, user=Depends(require_user)):
+def get_coach_gameplan_v2_route(save_id: str, user=Depends(require_entitled)):
     """Get OFF+DEF coach gameplan (v2) for the user's next game."""
     try:
         return get_coach_gameplan_v2(user["user_id"], save_id)
@@ -635,7 +635,7 @@ def get_coach_gameplan_v2_route(save_id: str, user=Depends(require_user)):
 
 
 @router.put("/{save_id}/coach-gameplan", response_model=Dict[str, Any])
-def save_coach_gameplan_v2_route(save_id: str, body: CoachGameplanV2Body, user=Depends(require_user)):
+def save_coach_gameplan_v2_route(save_id: str, body: CoachGameplanV2Body, user=Depends(require_entitled)):
     """Save OFF and/or DEF coach gameplan (v2) for the user's next game."""
     try:
         return save_coach_gameplan_v2(
@@ -658,7 +658,7 @@ def save_coach_gameplan_v2_route(save_id: str, body: CoachGameplanV2Body, user=D
 
 
 @router.put("/{save_id}/depth-chart", response_model=Dict[str, Any])
-def update_depth_chart_route(save_id: str, body: UpdateDepthChartBody, user=Depends(require_user)):
+def update_depth_chart_route(save_id: str, body: UpdateDepthChartBody, user=Depends(require_entitled)):
     """Save depth chart order (from Team menu or preseason). Returns updated save state."""
     state = update_depth_chart(user["user_id"], save_id, body.depth_chart)
     return {"state": state}
@@ -668,7 +668,7 @@ def update_depth_chart_route(save_id: str, body: UpdateDepthChartBody, user=Depe
 def get_team_history_route(
     save_id: str,
     team_name: str = Query("", description="Team to view (defaults to user team)"),
-    user=Depends(require_user),
+    user=Depends(require_entitled),
 ):
     """Team History table for the selected team."""
     try:
@@ -683,7 +683,7 @@ def get_team_history_route(
 def get_coach_history_route(
     save_id: str,
     coach_name: str = Query(..., description="Coach display name to match (case-insensitive)"),
-    user=Depends(require_user),
+    user=Depends(require_entitled),
 ):
     """Coach History: one row per season/team where this coach name appears in saved standings."""
     try:
@@ -699,7 +699,7 @@ def download_team_season_recap_route(
     save_id: str,
     team_name: str = Query(...),
     year: int = Query(...),
-    user=Depends(require_user),
+    user=Depends(require_entitled),
 ):
     """Download a season recap .txt for a team/year (if available)."""
     try:
@@ -716,7 +716,7 @@ def download_team_season_recap_route(
 
 
 @router.get("/{save_id}", response_model=Dict[str, Any])
-def get_save_route(save_id: str, user=Depends(require_user)):
+def get_save_route(save_id: str, user=Depends(require_entitled)):
     try:
         return get_save(user["user_id"], save_id)
     except Exception as e:
@@ -724,7 +724,7 @@ def get_save_route(save_id: str, user=Depends(require_user)):
 
 
 @router.patch("/{save_id}/coach-inbox", response_model=Dict[str, Any])
-def patch_coach_inbox_route(save_id: str, body: CoachInboxPatchBody = Body(...), user=Depends(require_user)):
+def patch_coach_inbox_route(save_id: str, body: CoachInboxPatchBody = Body(...), user=Depends(require_entitled)):
     """Mark coach inbox messages read, apply a response choice, and/or delete messages."""
     try:
         choose = body.choose.model_dump() if body.choose else None
@@ -736,7 +736,7 @@ def patch_coach_inbox_route(save_id: str, body: CoachInboxPatchBody = Body(...),
 
 
 @router.delete("/{save_id}")
-def delete_save_route(save_id: str, user=Depends(require_user)):
+def delete_save_route(save_id: str, user=Depends(require_entitled)):
     """Delete a save/dynasty. Cannot be undone."""
     try:
         delete_save(user["user_id"], save_id)
@@ -748,7 +748,7 @@ def delete_save_route(save_id: str, user=Depends(require_user)):
 
 
 @router.post("/{save_id}/week/sim", response_model=Dict[str, Any])
-def sim_week_route(save_id: str, user=Depends(require_user)):
+def sim_week_route(save_id: str, user=Depends(require_entitled)):
     try:
         return sim_week(user["user_id"], save_id)
     except Exception as e:
@@ -756,7 +756,7 @@ def sim_week_route(save_id: str, user=Depends(require_user)):
 
 
 @router.post("/{save_id}/simulate-seasons", response_model=Dict[str, Any])
-def simulate_seasons_route(save_id: str, body: SimulateSeasonsBody, user=Depends(require_user)):
+def simulate_seasons_route(save_id: str, body: SimulateSeasonsBody, user=Depends(require_entitled)):
     """CPU-fast-forward N full years (offseason uses default Continue behavior)."""
     try:
         return simulate_seasons_forward(user["user_id"], save_id, int(body.seasons))
@@ -768,7 +768,7 @@ def simulate_seasons_route(save_id: str, body: SimulateSeasonsBody, user=Depends
 def finish_season_route(
     save_id: str,
     body: Optional[FinishSeasonBody] = Body(None),
-    user=Depends(require_user),
+    user=Depends(require_entitled),
 ):
     try:
         begin = bool(body.begin_offseason) if body else False
@@ -784,7 +784,7 @@ def finish_season_route(
 
 
 @router.post("/{save_id}/playoffs/sim", response_model=Dict[str, Any])
-def sim_playoffs_route(save_id: str, user=Depends(require_user)):
+def sim_playoffs_route(save_id: str, user=Depends(require_entitled)):
     """Simulate the full 8-team playoff bracket in one shot (only if no playoff games played yet)."""
     try:
         return sim_playoffs(user["user_id"], save_id)
@@ -793,7 +793,7 @@ def sim_playoffs_route(save_id: str, user=Depends(require_user)):
 
 
 @router.post("/{save_id}/playoffs/sim-round", response_model=Dict[str, Any])
-def sim_playoff_round_route(save_id: str, user=Depends(require_user)):
+def sim_playoff_round_route(save_id: str, user=Depends(require_entitled)):
     """Simulate the next playoff round (quarterfinals, semifinals, or championship)."""
     try:
         return sim_playoff_round(user["user_id"], save_id)
@@ -802,7 +802,7 @@ def sim_playoff_round_route(save_id: str, user=Depends(require_user)):
 
 
 @router.post("/{save_id}/offseason/advance", response_model=Dict[str, Any])
-def advance_offseason_route(save_id: str, body: Optional[AdvanceOffseasonBody] = Body(None), user=Depends(require_user)):
+def advance_offseason_route(save_id: str, body: Optional[AdvanceOffseasonBody] = Body(None), user=Depends(require_entitled)):
     try:
         payload = body.model_dump(exclude_none=True) if body else {}
         return advance_offseason(user["user_id"], save_id, payload)
@@ -811,7 +811,7 @@ def advance_offseason_route(save_id: str, body: Optional[AdvanceOffseasonBody] =
 
 
 @router.post("/{save_id}/preseason/advance", response_model=Dict[str, Any])
-def advance_preseason_route(save_id: str, body: Optional[AdvancePreseasonBody] = Body(None), user=Depends(require_user)):
+def advance_preseason_route(save_id: str, body: Optional[AdvancePreseasonBody] = Body(None), user=Depends(require_entitled)):
     try:
         playbook = body.model_dump(exclude_none=True) if body else {}
         return advance_preseason(user["user_id"], save_id, playbook)
@@ -820,7 +820,7 @@ def advance_preseason_route(save_id: str, body: Optional[AdvancePreseasonBody] =
 
 
 @router.post("/{save_id}/start-coach-game", response_model=Dict[str, Any])
-def start_coach_game_route(save_id: str, body: StartCoachGameBody, user=Depends(require_user)):
+def start_coach_game_route(save_id: str, body: StartCoachGameBody, user=Depends(require_entitled)):
     """Start a coach-playable game. For scrimmage: uses preseason_scrimmage_opponents."""
     try:
         return start_coach_game(user["user_id"], save_id, body.context, body.scrimmage_index)
@@ -831,7 +831,7 @@ def start_coach_game_route(save_id: str, body: StartCoachGameBody, user=Depends(
 
 
 @router.post("/{save_id}/games/{game_id}/finish-scrimmage", response_model=Dict[str, Any])
-def finish_coach_scrimmage_route(save_id: str, game_id: str, user=Depends(require_user), scrimmage_stage: str = Query("Scrimmage 1", description="Scrimmage 1 or Scrimmage 2")):
+def finish_coach_scrimmage_route(save_id: str, game_id: str, user=Depends(require_entitled), scrimmage_stage: str = Query("Scrimmage 1", description="Scrimmage 1 or Scrimmage 2")):
     """Record coach-played scrimmage result and advance preseason."""
     try:
         return finish_coach_scrimmage(user["user_id"], save_id, game_id, scrimmage_stage)
@@ -842,7 +842,7 @@ def finish_coach_scrimmage_route(save_id: str, game_id: str, user=Depends(requir
 
 
 @router.post("/{save_id}/games/{game_id}/finish-week", response_model=Dict[str, Any])
-def finish_coach_week_route(save_id: str, game_id: str, user=Depends(require_user)):
+def finish_coach_week_route(save_id: str, game_id: str, user=Depends(require_entitled)):
     """Record coach-played regular-season game and update standings. Week advances via /week/sim."""
     try:
         return finish_coach_week(user["user_id"], save_id, game_id)
@@ -851,7 +851,7 @@ def finish_coach_week_route(save_id: str, game_id: str, user=Depends(require_use
 
 
 @router.post("/{save_id}/games/{game_id}/finish-playoff", response_model=Dict[str, Any])
-def finish_coach_playoff_route(save_id: str, game_id: str, user=Depends(require_user)):
+def finish_coach_playoff_route(save_id: str, game_id: str, user=Depends(require_entitled)):
     """Record coach-played playoff game. Other games in the round: Continue (sim-round)."""
     try:
         return finish_coach_playoff(user["user_id"], save_id, game_id)
@@ -860,7 +860,7 @@ def finish_coach_playoff_route(save_id: str, game_id: str, user=Depends(require_
 
 
 @router.get("/{save_id}/weeks/{week_num}/games/{game_index}/box-score.txt")
-def week_game_box_score_txt_route(save_id: str, week_num: int, game_index: int, user=Depends(require_user)):
+def week_game_box_score_txt_route(save_id: str, week_num: int, game_index: int, user=Depends(require_entitled)):
     try:
         filename, text = get_week_game_text(user["user_id"], save_id, week_num, game_index, kind="box-score")
         headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
@@ -872,7 +872,7 @@ def week_game_box_score_txt_route(save_id: str, week_num: int, game_index: int, 
 
 
 @router.get("/{save_id}/weeks/{week_num}/games/{game_index}/game-log.txt")
-def week_game_log_txt_route(save_id: str, week_num: int, game_index: int, user=Depends(require_user)):
+def week_game_log_txt_route(save_id: str, week_num: int, game_index: int, user=Depends(require_entitled)):
     try:
         filename, text = get_week_game_text(user["user_id"], save_id, week_num, game_index, kind="game-log")
         headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
@@ -891,7 +891,7 @@ def playoff_game_text_txt_route(
     away: str = Query(..., description="Away team name"),
     kind: str = Query(..., description="box-score | game-log"),
     classification: Optional[str] = Query(None, description="Optional class bracket (e.g. 3A) when multiple"),
-    user=Depends(require_user),
+    user=Depends(require_entitled),
 ):
     """Download playoff box score / game log for a played game."""
     try:

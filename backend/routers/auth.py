@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+import os
 from pydantic import BaseModel, Field
 
 from backend.deps import require_user
@@ -48,6 +49,8 @@ class DeviceRow(BaseModel):
 
 @router.post("/dev-login", response_model=DevLoginResponse)
 def dev_login_route(body: DevLoginRequest):
+    if os.environ.get("FND_ALLOW_DEV_LOGIN", "").strip().lower() not in ("1", "true", "yes"):
+        raise HTTPException(status_code=403, detail="Dev login is disabled on this server.")
     user_id, token = dev_login(body.username)
     return DevLoginResponse(user_id=user_id, token=token)
 

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Any, Dict
 
-from backend.deps import require_user
+from backend.deps import require_entitled
 from backend.services.game_service import (
     get_game,
     game_state_dict,
@@ -26,7 +26,7 @@ class PlayRequest(BaseModel):
 
 
 @router.get("/{game_id}", response_model=Dict[str, Any])
-def get_game_route(game_id: str, user=Depends(require_user)):
+def get_game_route(game_id: str, user=Depends(require_entitled)):
     try:
         game = get_game(game_id)
         return {"game_id": game_id, "state": game_state_dict(game)}
@@ -35,7 +35,7 @@ def get_game_route(game_id: str, user=Depends(require_user)):
 
 
 @router.get("/{game_id}/options", response_model=Dict[str, Any])
-def options_route(game_id: str, save_id: str, user=Depends(require_user)):
+def options_route(game_id: str, save_id: str, user=Depends(require_entitled)):
     try:
         save = get_save(user["user_id"], save_id)
         state = save["state"]
@@ -50,7 +50,7 @@ def options_route(game_id: str, save_id: str, user=Depends(require_user)):
 
 
 @router.post("/{game_id}/play", response_model=Dict[str, Any])
-def play_route(game_id: str, save_id: str, body: PlayRequest, user=Depends(require_user)):
+def play_route(game_id: str, save_id: str, body: PlayRequest, user=Depends(require_entitled)):
     try:
         save = get_save(user["user_id"], save_id)
         state = save["state"]
@@ -67,7 +67,7 @@ def play_route(game_id: str, save_id: str, body: PlayRequest, user=Depends(requi
 
 
 @router.post("/{game_id}/sim-next", response_model=Dict[str, Any])
-def sim_next_route(game_id: str, save_id: str, user=Depends(require_user)):
+def sim_next_route(game_id: str, save_id: str, user=Depends(require_entitled)):
     try:
         save = get_save(user["user_id"], save_id)
         state = save["state"]
@@ -84,7 +84,7 @@ def sim_next_route(game_id: str, save_id: str, user=Depends(require_user)):
 
 
 @router.post("/{game_id}/sim-to-half", response_model=Dict[str, Any])
-def sim_to_half_route(game_id: str, save_id: str, user=Depends(require_user)):
+def sim_to_half_route(game_id: str, save_id: str, user=Depends(require_entitled)):
     try:
         save = get_save(user["user_id"], save_id)
         state = save["state"]
@@ -101,7 +101,7 @@ def sim_to_half_route(game_id: str, save_id: str, user=Depends(require_user)):
 
 
 @router.post("/{game_id}/sim-to-end", response_model=Dict[str, Any])
-def sim_to_end_route(game_id: str, save_id: str, user=Depends(require_user)):
+def sim_to_end_route(game_id: str, save_id: str, user=Depends(require_entitled)):
     try:
         save = get_save(user["user_id"], save_id)
         state = save["state"]

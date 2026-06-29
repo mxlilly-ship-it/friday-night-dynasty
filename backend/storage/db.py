@@ -103,6 +103,35 @@ def init_db() -> None:
             """
         )
         _migrate_users_firebase(conn)
+        _migrate_users_billing(conn)
+
+
+def _migrate_users_billing(conn: sqlite3.Connection) -> None:
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
+    if "entitlement_active" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN entitlement_active INTEGER NOT NULL DEFAULT 0")
+    if "purchased_at" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN purchased_at INTEGER")
+    if "stripe_customer_id" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN stripe_customer_id TEXT")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS purchases (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          stripe_checkout_session_id TEXT UNIQUE,
+          stripe_payment_intent_id TEXT,
+          amount_cents INTEGER,
+          currency TEXT,
+          status TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_purchases_user_id ON purchases(user_id)"
+    )
 
 
 def _migrate_users_firebase(conn: sqlite3.Connection) -> None:
