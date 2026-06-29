@@ -215,6 +215,23 @@
     .social-link:hover {
       color: var(--gold-light);
     }
+
+    .beta-disclaimer {
+      position: absolute;
+      bottom: clamp(14px, 2.4vh, 26px);
+      right: clamp(16px, 2.5vw, 32px);
+      z-index: 20;
+      max-width: min(300px, 44vw);
+      margin: 0;
+      font-family: 'EB Garamond', serif;
+      font-style: italic;
+      font-size: clamp(10px, 1vw, 12px);
+      color: rgba(245, 240, 232, 0.45);
+      letter-spacing: 0.05em;
+      text-align: right;
+      line-height: 1.45;
+      animation: fadeUp 2s .95s both;
+    }
   </style>
 </head>
 <body>
@@ -240,11 +257,13 @@
       >X: FND_HSFootball</a>
     </div>
 
+    <p class="beta-disclaimer">Friday Night Dynasty is still in Beta. Features, balance, and saves may change.</p>
+
     <div id="panel">
       <p class="sub">Welcome to</p>
       <div class="rule"></div>
       <h1>Friday Night <span>Dynasty</span></h1>
-      <p class="version">v-Alpha</p>
+      <p class="version">v-Beta</p>
 
       <div class="btn-row">
         <button class="game-btn" id="btn-new" onclick="startNew()">

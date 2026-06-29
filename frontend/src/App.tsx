@@ -1679,7 +1679,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
         <iframe
           className="fnd-title-iframe"
           title="Friday Night Dynasty"
-          src={`${import.meta.env.BASE_URL}fnd_homepage.html?v=20260620a`}
+          src={`${import.meta.env.BASE_URL}fnd_homepage.html?v=20260629b`}
         />
       ) : (
         <div className="fnd-title-inner">
