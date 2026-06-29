@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import time
 import uuid
 from typing import Any, Dict, Optional
 
 from backend.storage.db import db
+
+logger = logging.getLogger(__name__)
 
 
 def user_is_entitled(user_id: str) -> bool:
@@ -57,55 +60,59 @@ def grant_entitlement(
     user_id = str(user_id or "").strip()
     session_id = str(stripe_checkout_session_id or "").strip()
     if not user_id or not session_id:
-        raise ValueError("user_id and stripe_checkout_session_id required")
+        return False
 
     now = int(time.time())
-    with db() as conn:
-        existing = conn.execute(
-            "SELECT user_id FROM purchases WHERE stripe_checkout_session_id=?",
-            (session_id,),
-        ).fetchone()
-        if existing:
+    try:
+        with db() as conn:
+            existing = conn.execute(
+                "SELECT user_id FROM purchases WHERE stripe_checkout_session_id=?",
+                (session_id,),
+            ).fetchone()
+            if existing:
+                conn.execute(
+                    "UPDATE users SET entitlement_active=1 WHERE id=?",
+                    (existing["user_id"],),
+                )
+                return True
+
+            user_row = conn.execute("SELECT id FROM users WHERE id=?", (user_id,)).fetchone()
+            if not user_row:
+                return False
+
+            purchase_id = str(uuid.uuid4())
             conn.execute(
-                "UPDATE users SET entitlement_active=1 WHERE id=?",
-                (existing["user_id"],),
+                """
+                INSERT INTO purchases (
+                  id, user_id, stripe_checkout_session_id, stripe_payment_intent_id,
+                  amount_cents, currency, status, created_at
+                ) VALUES (?,?,?,?,?,?,?,?)
+                """,
+                (
+                    purchase_id,
+                    user_id,
+                    session_id,
+                    stripe_payment_intent_id,
+                    amount_cents,
+                    currency,
+                    "completed",
+                    now,
+                ),
             )
-            return True
-
-        user_row = conn.execute("SELECT id FROM users WHERE id=?", (user_id,)).fetchone()
-        if not user_row:
-            raise ValueError(f"Unknown user: {user_id}")
-
-        purchase_id = str(uuid.uuid4())
-        conn.execute(
-            """
-            INSERT INTO purchases (
-              id, user_id, stripe_checkout_session_id, stripe_payment_intent_id,
-              amount_cents, currency, status, created_at
-            ) VALUES (?,?,?,?,?,?,?,?)
-            """,
-            (
-                purchase_id,
-                user_id,
-                session_id,
-                stripe_payment_intent_id,
-                amount_cents,
-                currency,
-                "completed",
-                now,
-            ),
-        )
-        conn.execute(
-            """
-            UPDATE users
-            SET entitlement_active=1,
-                purchased_at=COALESCE(purchased_at, ?),
-                stripe_customer_id=COALESCE(?, stripe_customer_id)
-            WHERE id=?
-            """,
-            (now, stripe_customer_id, user_id),
-        )
-    return True
+            conn.execute(
+                """
+                UPDATE users
+                SET entitlement_active=1,
+                    purchased_at=COALESCE(purchased_at, ?),
+                    stripe_customer_id=COALESCE(?, stripe_customer_id)
+                WHERE id=?
+                """,
+                (now, stripe_customer_id, user_id),
+            )
+        return True
+    except Exception:
+        logger.exception("grant_entitlement failed for user %s session %s", user_id, session_id)
+        return False
 
 
 def revoke_entitlement_for_payment_intent(stripe_payment_intent_id: str) -> bool:

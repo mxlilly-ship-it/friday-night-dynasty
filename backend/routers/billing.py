@@ -20,7 +20,7 @@ from backend.billing_config import (
 )
 from backend.deps import require_user
 from backend.storage.billing import get_entitlement_status, grant_entitlement, revoke_entitlement_for_payment_intent, user_is_entitled
-from backend.storage.db import db
+from backend.storage.db import db, init_db
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -68,6 +68,28 @@ def _user_email(user_id: str) -> Optional[str]:
     return email or None
 
 
+def _stripe_id(value: Any) -> Optional[str]:
+    if not value:
+        return None
+    if isinstance(value, str):
+        return value.strip() or None
+    if isinstance(value, dict):
+        return str(value.get("id") or "").strip() or None
+    sid = str(getattr(value, "id", "") or "").strip()
+    return sid or None
+
+
+def _metadata_dict(meta: Any) -> Dict[str, str]:
+    if not meta:
+        return {}
+    if isinstance(meta, dict):
+        return {str(k): str(v) for k, v in meta.items()}
+    try:
+        return {str(k): str(v) for k, v in dict(meta).items()}
+    except Exception:
+        return {}
+
+
 def _session_to_grant_dict(session: Any) -> Dict[str, Any]:
     """Normalize a Stripe Session (API object or webhook dict) for entitlement grant."""
     if isinstance(session, dict):
@@ -75,7 +97,7 @@ def _session_to_grant_dict(session: Any) -> Dict[str, Any]:
         return {
             "id": session.get("id"),
             "client_reference_id": session.get("client_reference_id"),
-            "metadata": dict(meta) if meta else {},
+            "metadata": _metadata_dict(meta),
             "payment_status": session.get("payment_status"),
             "mode": session.get("mode"),
             "payment_intent": session.get("payment_intent"),
@@ -83,11 +105,11 @@ def _session_to_grant_dict(session: Any) -> Dict[str, Any]:
             "currency": session.get("currency"),
             "customer": session.get("customer"),
         }
-    meta = getattr(session, "metadata", None) or {}
+    meta = getattr(session, "metadata", None)
     return {
         "id": session.id,
         "client_reference_id": session.client_reference_id,
-        "metadata": dict(meta) if meta else {},
+        "metadata": _metadata_dict(meta),
         "payment_status": session.payment_status,
         "mode": session.mode,
         "payment_intent": session.payment_intent,
@@ -114,25 +136,25 @@ def _grant_from_checkout_session(session: Dict[str, Any]) -> bool:
 
     amount_cents = None
     currency = None
-    payment_intent_id = session.get("payment_intent")
-    if isinstance(payment_intent_id, dict):
-        payment_intent_id = payment_intent_id.get("id")
+    payment_intent_id = _stripe_id(session.get("payment_intent"))
     amount_total = session.get("amount_total")
     if amount_total is not None:
         amount_cents = int(amount_total)
     currency = str(session.get("currency") or "") or None
-    customer_id = session.get("customer")
-    if isinstance(customer_id, dict):
-        customer_id = customer_id.get("id")
+    customer_id = _stripe_id(session.get("customer"))
 
-    return grant_entitlement(
-        user_id,
-        stripe_checkout_session_id=str(session.get("id") or ""),
-        stripe_payment_intent_id=str(payment_intent_id) if payment_intent_id else None,
-        stripe_customer_id=str(customer_id) if customer_id else None,
-        amount_cents=amount_cents,
-        currency=currency,
-    )
+    try:
+        return grant_entitlement(
+            user_id,
+            stripe_checkout_session_id=str(session.get("id") or ""),
+            stripe_payment_intent_id=payment_intent_id,
+            stripe_customer_id=customer_id,
+            amount_cents=amount_cents,
+            currency=currency,
+        )
+    except Exception:
+        logger.exception("grant_entitlement failed for user %s session %s", user_id, session.get("id"))
+        return False
 
 
 def _grant_from_checkout_session_id(session_id: str) -> bool:
@@ -217,6 +239,70 @@ def confirm_checkout_route(session_id: str = Query(..., min_length=8), user=Depe
     )
 
 
+def _session_matches_user(session: Any, user_id: str, email: Optional[str]) -> bool:
+    ref = str(getattr(session, "client_reference_id", None) or "").strip()
+    if ref == user_id:
+        return True
+    meta = _metadata_dict(getattr(session, "metadata", None))
+    if meta.get("user_id") == user_id:
+        return True
+    if not email:
+        return False
+    details = getattr(session, "customer_details", None)
+    session_email = ""
+    if details is not None:
+        if isinstance(details, dict):
+            session_email = str(details.get("email") or "").strip().lower()
+        else:
+            session_email = str(getattr(details, "email", "") or "").strip().lower()
+    return session_email == email.strip().lower()
+
+
+def _sync_stripe_sessions_for_user(user_id: str) -> None:
+    """Find completed Checkout Sessions in Stripe and grant entitlement when matched."""
+    email = _user_email(user_id)
+    checked = 0
+
+    def _try_grant(session: Any) -> None:
+        if str(getattr(session, "payment_status", "") or "") != "paid":
+            return
+        if str(getattr(session, "mode", "") or "") != "payment":
+            return
+        if not _session_matches_user(session, user_id, email):
+            return
+        _grant_from_checkout_session(_session_to_grant_dict(session))
+
+    # Prefer Stripe Search when available.
+    try:
+        if hasattr(stripe.checkout.Session, "search"):
+            result = stripe.checkout.Session.search(
+                query=f'client_reference_id:"{user_id}"',
+                limit=10,
+            )
+            for session in result.data:
+                _try_grant(session)
+            if user_is_entitled(user_id):
+                return
+    except stripe.StripeError:
+        logger.exception("Stripe checkout session search failed for user %s", user_id)
+    except Exception:
+        logger.exception("Unexpected error during Stripe session search for user %s", user_id)
+
+    # Fallback: scan recent completed sessions (works without Search API).
+    try:
+        for session in stripe.checkout.Session.list(limit=100).auto_paging_iter():
+            checked += 1
+            if checked > 200:
+                break
+            _try_grant(session)
+            if user_is_entitled(user_id):
+                break
+    except stripe.StripeError:
+        logger.exception("Stripe checkout session list failed for user %s", user_id)
+    except Exception:
+        logger.exception("Unexpected error during Stripe session list for user %s", user_id)
+
+
 @router.post("/sync", response_model=BillingStatusResponse)
 def sync_purchases_route(user=Depends(require_user)):
     """
@@ -224,6 +310,7 @@ def sync_purchases_route(user=Depends(require_user)):
     Helps when webhooks used a thin payload or the success redirect was missed.
     """
     user_id = user["user_id"]
+    init_db()
     if user_is_entitled(user_id):
         info = get_entitlement_status(user_id)
         return BillingStatusResponse(
@@ -238,15 +325,10 @@ def sync_purchases_route(user=Depends(require_user)):
 
     _stripe_configure()
     try:
-        result = stripe.checkout.Session.search(
-            query=f'client_reference_id:"{user_id}"',
-            limit=10,
-        )
-        for session in result.data:
-            if str(getattr(session, "payment_status", "") or "") == "paid":
-                _grant_from_checkout_session(_session_to_grant_dict(session))
-    except stripe.StripeError:
-        logger.exception("Stripe checkout session search failed for user %s", user_id)
+        _sync_stripe_sessions_for_user(user_id)
+    except Exception as e:
+        logger.exception("billing sync failed for user %s", user_id)
+        raise HTTPException(status_code=502, detail=f"Could not sync purchase status: {e}") from e
 
     entitled = user_is_entitled(user_id)
     info = get_entitlement_status(user_id)
