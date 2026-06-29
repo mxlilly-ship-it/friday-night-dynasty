@@ -104,6 +104,28 @@ def init_db() -> None:
         )
         _migrate_users_firebase(conn)
         _migrate_users_billing(conn)
+        _migrate_support_tickets(conn)
+
+
+def _migrate_support_tickets(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS support_tickets (
+          id TEXT PRIMARY KEY,
+          user_id TEXT,
+          contact_email TEXT NOT NULL,
+          category TEXT NOT NULL,
+          message TEXT NOT NULL,
+          page_url TEXT,
+          user_agent TEXT,
+          created_at INTEGER NOT NULL,
+          notified INTEGER NOT NULL DEFAULT 0
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_support_tickets_created ON support_tickets(created_at DESC)"
+    )
 
 
 def _migrate_users_billing(conn: sqlite3.Connection) -> None:

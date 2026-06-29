@@ -34,3 +34,15 @@ def require_entitled(user=Depends(require_user)):
         },
     )
 
+
+def optional_user(authorization: str = Header(default="")):
+    """Bearer user when signed in; None when anonymous (support form)."""
+    if not authorization.lower().startswith("bearer "):
+        return None
+    token = authorization.split(" ", 1)[1].strip()
+    user = user_from_token(token)
+    if not user:
+        return None
+    user_id, username = user
+    return {"user_id": user_id, "username": username}
+

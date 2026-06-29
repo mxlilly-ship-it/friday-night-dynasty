@@ -30,6 +30,7 @@ import {
 import { getAuthInstance, resetPassword } from './auth.js'
 import SignupTermsConsent from './SignupTermsConsent'
 import ScreenshotsGallery from './ScreenshotsGallery'
+import SupportContactModal from './SupportContactModal'
 import { getOrCreateDeviceId } from './deviceId.js'
 import { confirmCheckoutSession, createCheckoutSession, fetchBillingStatus, syncBillingAccess as syncBillingAccessApi, type BillingStatus } from './billing'
 
@@ -113,6 +114,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
   >([])
   const [screen, setScreen] = useState<Screen>('title')
   const [showScreenshotsGallery, setShowScreenshotsGallery] = useState(false)
+  const [showSupportContact, setShowSupportContact] = useState(false)
   const [saves, setSaves] = useState<SaveListItem[]>([])
   const [cloudSaves, setCloudSaves] = useState<CloudSaveListItem[]>([])
   const [saveId, setSaveId] = useState<string>('')
@@ -143,6 +145,12 @@ export default function App({ devNoFirebase = false }: AppProps) {
   const needsBillingPurchase = Boolean(
     billingStatus?.billing_required && !billingStatus?.entitled,
   )
+  const supportDefaultEmail = useMemo(() => {
+    const em = email.trim()
+    if (em) return em
+    const u = username.trim()
+    return u.includes('@') ? u : ''
+  }, [email, username])
 
   const saveStateRef = useRef<any>(null)
   saveStateRef.current = saveState
@@ -1406,6 +1414,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
       if (d.action === 'new') void titleNavRef.current.onNewSaveClick()
       else if (d.action === 'load') void titleNavRef.current.onLoadSaveClick()
       else if (d.action === 'screenshots') setShowScreenshotsGallery(true)
+      else if (d.action === 'support') setShowSupportContact(true)
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
@@ -1676,11 +1685,20 @@ export default function App({ devNoFirebase = false }: AppProps) {
   return (
     <div className={screen === 'title' ? 'fnd-title-root fnd-title-root--landing' : 'fnd-title-root'}>
       {screen === 'title' ? (
-        <iframe
-          className="fnd-title-iframe"
-          title="Friday Night Dynasty"
-          src={`${import.meta.env.BASE_URL}fnd_homepage.html?v=20260629b`}
-        />
+        <>
+          <iframe
+            className="fnd-title-iframe"
+            title="Friday Night Dynasty"
+            src={`${import.meta.env.BASE_URL}fnd_homepage.html?v=20260629c`}
+          />
+          <button
+            type="button"
+            className="fnd-support-link"
+            onClick={() => setShowSupportContact(true)}
+          >
+            Help &amp; support
+          </button>
+        </>
       ) : (
         <div className="fnd-title-inner">
         <h1 className="fnd-title-heading">Friday Night Dynasty</h1>
@@ -1691,6 +1709,13 @@ export default function App({ devNoFirebase = false }: AppProps) {
               ← Back
             </button>
             <h2>Load save</h2>
+            <button
+              type="button"
+              className="fnd-support-link fnd-support-link--panel"
+              onClick={() => setShowSupportContact(true)}
+            >
+              Help &amp; support — questions, bugs, refunds
+            </button>
             <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
               Dynasties are stored in <strong style={{ color: '#d0d4dc' }}>this browser</strong> (IndexedDB). Download backups
               to keep a copy on your computer.
@@ -1868,6 +1893,13 @@ export default function App({ devNoFirebase = false }: AppProps) {
               ← Back
             </button>
             <h2>New dynasty</h2>
+            <button
+              type="button"
+              className="fnd-support-link fnd-support-link--panel"
+              onClick={() => setShowSupportContact(true)}
+            >
+              Help &amp; support — questions, bugs, refunds
+            </button>
             <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
               {devNoFirebase
                 ? 'Local dev mode: enter a coach name (no Firebase). Dynasties save in this browser and on the API when you create a save.'
@@ -1997,6 +2029,14 @@ export default function App({ devNoFirebase = false }: AppProps) {
                 </button>
               </>
             )}
+            <button
+              type="button"
+              className="fnd-support-link fnd-support-link--panel"
+              style={{ marginTop: 12 }}
+              onClick={() => setShowSupportContact(true)}
+            >
+              Need help or a refund?
+            </button>
           </div>
         ) : screen === 'new' && token ? (
           <NewSaveFlow
@@ -2058,6 +2098,18 @@ export default function App({ devNoFirebase = false }: AppProps) {
         </div>
       )}
       <ScreenshotsGallery open={showScreenshotsGallery} onClose={() => setShowScreenshotsGallery(false)} />
+      <SupportContactModal
+        open={showSupportContact}
+        onClose={() => setShowSupportContact(false)}
+        apiBase={API_BASE}
+        getAuthHeaders={getAuthHeaders}
+        defaultEmail={supportDefaultEmail}
+        onSuccess={(msg) => {
+          setSuccessMessage(msg)
+          setTimeout(() => setSuccessMessage(''), 8000)
+        }}
+        onError={(msg) => setError(msg)}
+      />
     </div>
   )
 }

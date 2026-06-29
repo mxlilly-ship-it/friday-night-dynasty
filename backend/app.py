@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from backend.routers import auth, saves, games, sim, billing
+from backend.routers import auth, saves, games, sim, billing, support
 from backend.spa_bundle import spa_dist_bundle_is_stale, spa_dist_dir, spa_frontend_dir, spa_ui_debug_meta
 from systems.playbook_system import (
     DEFENSIVE_PLAYBOOK_FORMATIONS,
@@ -262,6 +262,7 @@ def create_app() -> FastAPI:
 
     app.include_router(auth.router, prefix="/auth", tags=["auth"])
     app.include_router(billing.router, prefix="/billing", tags=["billing"])
+    app.include_router(support.router, prefix="/support", tags=["support"])
     app.include_router(saves.router, prefix="/saves", tags=["saves"])
     app.include_router(games.router, prefix="/games", tags=["games"])
     app.include_router(sim.router, prefix="/sim", tags=["sim"])
