@@ -35,6 +35,7 @@ class BillingStatusResponse(BaseModel):
 
 class CreateCheckoutResponse(BaseModel):
     checkout_url: str
+    session_id: str
 
 
 class ConfirmCheckoutResponse(BaseModel):
@@ -67,12 +68,46 @@ def _user_email(user_id: str) -> Optional[str]:
     return email or None
 
 
+def _session_to_grant_dict(session: Any) -> Dict[str, Any]:
+    """Normalize a Stripe Session (API object or webhook dict) for entitlement grant."""
+    if isinstance(session, dict):
+        meta = session.get("metadata") or {}
+        return {
+            "id": session.get("id"),
+            "client_reference_id": session.get("client_reference_id"),
+            "metadata": dict(meta) if meta else {},
+            "payment_status": session.get("payment_status"),
+            "mode": session.get("mode"),
+            "payment_intent": session.get("payment_intent"),
+            "amount_total": session.get("amount_total"),
+            "currency": session.get("currency"),
+            "customer": session.get("customer"),
+        }
+    meta = getattr(session, "metadata", None) or {}
+    return {
+        "id": session.id,
+        "client_reference_id": session.client_reference_id,
+        "metadata": dict(meta) if meta else {},
+        "payment_status": session.payment_status,
+        "mode": session.mode,
+        "payment_intent": session.payment_intent,
+        "amount_total": session.amount_total,
+        "currency": session.currency,
+        "customer": session.customer,
+    }
+
+
 def _grant_from_checkout_session(session: Dict[str, Any]) -> bool:
     user_id = str(session.get("client_reference_id") or (session.get("metadata") or {}).get("user_id") or "").strip()
     if not user_id:
         logger.warning("Checkout session missing user_id metadata: %s", session.get("id"))
         return False
     if str(session.get("payment_status") or "") != "paid":
+        logger.info(
+            "Checkout session %s not paid yet (status=%s)",
+            session.get("id"),
+            session.get("payment_status"),
+        )
         return False
     if str(session.get("mode") or "") != "payment":
         return False
@@ -98,6 +133,20 @@ def _grant_from_checkout_session(session: Dict[str, Any]) -> bool:
         amount_cents=amount_cents,
         currency=currency,
     )
+
+
+def _grant_from_checkout_session_id(session_id: str) -> bool:
+    """Load full Checkout Session from Stripe (needed for thin webhook payloads)."""
+    session_id = str(session_id or "").strip()
+    if not session_id:
+        return False
+    _stripe_configure()
+    try:
+        session = stripe.checkout.Session.retrieve(session_id)
+    except stripe.StripeError:
+        logger.exception("Failed to retrieve Checkout Session %s", session_id)
+        return False
+    return _grant_from_checkout_session(_session_to_grant_dict(session))
 
 
 @router.get("/status", response_model=BillingStatusResponse)
@@ -137,9 +186,10 @@ def create_checkout_session_route(request: Request, user=Depends(require_user)):
         raise HTTPException(status_code=502, detail=f"Stripe error: {e}") from e
 
     url = str(getattr(session, "url", None) or "").strip()
-    if not url:
+    sid = str(getattr(session, "id", None) or "").strip()
+    if not url or not sid:
         raise HTTPException(status_code=502, detail="Stripe did not return a checkout URL.")
-    return CreateCheckoutResponse(checkout_url=url)
+    return CreateCheckoutResponse(checkout_url=url, session_id=sid)
 
 
 @router.get("/confirm", response_model=ConfirmCheckoutResponse)
@@ -159,22 +209,51 @@ def confirm_checkout_route(session_id: str = Query(..., min_length=8), user=Depe
     if session_user != user["user_id"]:
         raise HTTPException(status_code=403, detail="Checkout session does not belong to this account.")
 
-    _grant_from_checkout_session(
-        {
-            "id": session.id,
-            "client_reference_id": session.client_reference_id,
-            "metadata": dict(meta),
-            "payment_status": session.payment_status,
-            "mode": session.mode,
-            "payment_intent": session.payment_intent,
-            "amount_total": session.amount_total,
-            "currency": session.currency,
-            "customer": session.customer,
-        }
-    )
+    _grant_from_checkout_session(_session_to_grant_dict(session))
     info = get_entitlement_status(user["user_id"])
     return ConfirmCheckoutResponse(
         entitled=bool(info.get("entitled")),
+        purchased_at=info.get("purchased_at"),
+    )
+
+
+@router.post("/sync", response_model=BillingStatusResponse)
+def sync_purchases_route(user=Depends(require_user)):
+    """
+    Re-check Stripe for a completed checkout tied to this account.
+    Helps when webhooks used a thin payload or the success redirect was missed.
+    """
+    user_id = user["user_id"]
+    if user_is_entitled(user_id):
+        info = get_entitlement_status(user_id)
+        return BillingStatusResponse(
+            billing_required=billing_required(),
+            billing_configured=billing_checkout_configured(),
+            entitled=True,
+            purchased_at=info.get("purchased_at"),
+        )
+
+    if not billing_checkout_configured():
+        raise HTTPException(status_code=503, detail="Stripe checkout is not configured.")
+
+    _stripe_configure()
+    try:
+        result = stripe.checkout.Session.search(
+            query=f'client_reference_id:"{user_id}"',
+            limit=10,
+        )
+        for session in result.data:
+            if str(getattr(session, "payment_status", "") or "") == "paid":
+                _grant_from_checkout_session(_session_to_grant_dict(session))
+    except stripe.StripeError:
+        logger.exception("Stripe checkout session search failed for user %s", user_id)
+
+    entitled = user_is_entitled(user_id)
+    info = get_entitlement_status(user_id)
+    return BillingStatusResponse(
+        billing_required=billing_required(),
+        billing_configured=billing_checkout_configured(),
+        entitled=entitled if billing_required() else True,
         purchased_at=info.get("purchased_at"),
     )
 
@@ -198,7 +277,13 @@ async def stripe_webhook_route(request: Request):
     data_object = (event.get("data") or {}).get("object") or {}
 
     if event_type == "checkout.session.completed":
-        _grant_from_checkout_session(dict(data_object))
+        session_id = str(data_object.get("id") or "").strip()
+        if session_id:
+            granted = _grant_from_checkout_session_id(session_id)
+            if not granted:
+                logger.warning("checkout.session.completed did not grant entitlement for %s", session_id)
+        else:
+            _grant_from_checkout_session(dict(data_object))
     elif event_type == "charge.refunded":
         pi = data_object.get("payment_intent")
         if pi:

@@ -62,11 +62,15 @@ def grant_entitlement(
     now = int(time.time())
     with db() as conn:
         existing = conn.execute(
-            "SELECT id FROM purchases WHERE stripe_checkout_session_id=?",
+            "SELECT user_id FROM purchases WHERE stripe_checkout_session_id=?",
             (session_id,),
         ).fetchone()
         if existing:
-            return False
+            conn.execute(
+                "UPDATE users SET entitlement_active=1 WHERE id=?",
+                (existing["user_id"],),
+            )
+            return True
 
         user_row = conn.execute("SELECT id FROM users WHERE id=?", (user_id,)).fetchone()
         if not user_row:

@@ -20,13 +20,13 @@ export async function fetchBillingStatus(
 export async function createCheckoutSession(
   apiBase: string,
   headers: Record<string, string>,
-): Promise<string> {
+): Promise<{ checkoutUrl: string; sessionId: string }> {
   const r = await fetch(`${apiBase}/billing/create-checkout-session`, {
     method: 'POST',
     headers: { ...headers, 'Content-Type': 'application/json' },
   })
   const text = await r.text()
-  let data: { checkout_url?: string; detail?: unknown } | null = null
+  let data: { checkout_url?: string; session_id?: string; detail?: unknown } | null = null
   try {
     data = text ? JSON.parse(text) : null
   } catch {
@@ -36,9 +36,25 @@ export async function createCheckoutSession(
     const detail = data?.detail
     throw new Error(typeof detail === 'string' ? detail : text || `Checkout failed (${r.status})`)
   }
-  const url = String(data?.checkout_url ?? '').trim()
-  if (!url) throw new Error('Server did not return a checkout URL.')
-  return url
+  const checkoutUrl = String(data?.checkout_url ?? '').trim()
+  const sessionId = String(data?.session_id ?? '').trim()
+  if (!checkoutUrl || !sessionId) throw new Error('Server did not return checkout details.')
+  return { checkoutUrl, sessionId }
+}
+
+export async function syncBillingAccess(
+  apiBase: string,
+  headers: Record<string, string>,
+): Promise<BillingStatus> {
+  const r = await fetch(`${apiBase}/billing/sync`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+  })
+  if (!r.ok) {
+    const text = await r.text()
+    throw new Error(text || `Billing sync failed (${r.status})`)
+  }
+  return r.json()
 }
 
 export async function confirmCheckoutSession(

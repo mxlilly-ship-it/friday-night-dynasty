@@ -31,10 +31,12 @@ import { getAuthInstance, resetPassword } from './auth.js'
 import SignupTermsConsent from './SignupTermsConsent'
 import ScreenshotsGallery from './ScreenshotsGallery'
 import { getOrCreateDeviceId } from './deviceId.js'
-import { confirmCheckoutSession, createCheckoutSession, fetchBillingStatus, type BillingStatus } from './billing'
+import { confirmCheckoutSession, createCheckoutSession, fetchBillingStatus, syncBillingAccess as syncBillingAccessApi, type BillingStatus } from './billing'
 
 /** Stable reference so child effects do not re-run when logged out (browser saves). */
 const EMPTY_AUTH_HEADERS: Record<string, string> = Object.freeze({})
+
+const PENDING_CHECKOUT_SESSION_KEY = 'fnd_pending_checkout_session'
 
 /** In dev, use Vite proxy (/api → backend). Production: set VITE_API_BASE or default below. */
 /** Dev: Vite proxy. Production build served from the same host as FastAPI → empty string (same-origin). */
@@ -455,6 +457,54 @@ export default function App({ devNoFirebase = false }: AppProps) {
     }
   }
 
+  async function tryConfirmCheckoutSession(sessionId: string): Promise<boolean> {
+    const sid = sessionId.trim()
+    if (!sid) return false
+    try {
+      const auth = await getAuthHeaders()
+      if (!auth.Authorization) return false
+      const status = await confirmCheckoutSession(API_BASE, auth, sid)
+      setBillingStatus(status)
+      if (status.entitled) {
+        sessionStorage.removeItem(PENDING_CHECKOUT_SESSION_KEY)
+        return true
+      }
+    } catch {
+      /* fall through to Stripe sync */
+    }
+    return false
+  }
+
+  async function syncBillingAccess(sessionId?: string) {
+    setBillingChecking(true)
+    try {
+      const fromUrl = sessionId?.trim()
+      const pending = fromUrl || sessionStorage.getItem(PENDING_CHECKOUT_SESSION_KEY)?.trim() || ''
+      if (pending) {
+        const confirmed = await tryConfirmCheckoutSession(pending)
+        if (confirmed) return
+      }
+      const auth = await getAuthHeaders()
+      if (!auth.Authorization) {
+        await refreshBillingStatus()
+        return
+      }
+      const status = await syncBillingAccessApi(API_BASE, auth)
+      setBillingStatus(status)
+      if (status.entitled) {
+        sessionStorage.removeItem(PENDING_CHECKOUT_SESSION_KEY)
+        setSuccessMessage('Purchase found — your account is unlocked!')
+        setTimeout(() => setSuccessMessage(''), 5000)
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Could not refresh purchase status'
+      setError(msg)
+      await refreshBillingStatus()
+    } finally {
+      setBillingChecking(false)
+    }
+  }
+
   async function startCheckout() {
     setError('')
     setBillingBusy(true)
@@ -464,8 +514,9 @@ export default function App({ devNoFirebase = false }: AppProps) {
         setError('Sign in first, then complete checkout.')
         return
       }
-      const url = await createCheckoutSession(API_BASE, auth)
-      window.location.href = url
+      const { checkoutUrl, sessionId } = await createCheckoutSession(API_BASE, auth)
+      sessionStorage.setItem(PENDING_CHECKOUT_SESSION_KEY, sessionId)
+      window.location.href = checkoutUrl
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Could not start checkout'
       setError(msg)
@@ -1331,6 +1382,11 @@ export default function App({ devNoFirebase = false }: AppProps) {
     setError('')
     if (token && !(await validateSession())) {
       expireSession()
+      setScreen('new')
+      return
+    }
+    if (token) {
+      await syncBillingAccess()
     }
     setScreen('new')
   }
@@ -1420,14 +1476,20 @@ export default function App({ devNoFirebase = false }: AppProps) {
     void (async () => {
       setBillingBusy(true)
       try {
-        await confirmCheckoutSession(
-          API_BASE,
-          { Authorization: `Bearer ${storedToken}` },
-          sessionId,
-        )
-        await refreshBillingStatus({ Authorization: `Bearer ${storedToken}` })
-        setSuccessMessage('Purchase complete — welcome to Friday Night Dynasty!')
-        setTimeout(() => setSuccessMessage(''), 6000)
+        sessionStorage.setItem(PENDING_CHECKOUT_SESSION_KEY, sessionId)
+        await syncBillingAccess(sessionId)
+        const auth = await getAuthHeaders()
+        if (auth.Authorization) {
+          const status = await fetchBillingStatus(API_BASE, auth)
+          setBillingStatus(status)
+          if (status.entitled) {
+            setSuccessMessage('Purchase complete — welcome to Friday Night Dynasty!')
+            setTimeout(() => setSuccessMessage(''), 6000)
+            setScreen('new')
+          } else {
+            setError('Payment received — still syncing access. Tap “Refresh purchase status” on the next screen.')
+          }
+        }
         cleanBillingParams()
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : 'Could not confirm purchase'
@@ -1914,15 +1976,26 @@ export default function App({ devNoFirebase = false }: AppProps) {
             {billingChecking ? (
               <p style={{ color: '#9ca3af', fontSize: '0.9rem' }}>Checking purchase status…</p>
             ) : (
-              <button
-                type="button"
-                className="fnd-title-btn"
-                style={{ maxWidth: '100%' }}
-                disabled={billingBusy}
-                onClick={() => void startCheckout()}
-              >
-                {billingBusy ? 'Redirecting to checkout…' : 'Buy now — secure checkout'}
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="fnd-title-btn"
+                  style={{ maxWidth: '100%', marginBottom: 10 }}
+                  disabled={billingBusy}
+                  onClick={() => void startCheckout()}
+                >
+                  {billingBusy ? 'Redirecting to checkout…' : 'Buy now — secure checkout'}
+                </button>
+                <button
+                  type="button"
+                  className="teamhome-select"
+                  style={{ maxWidth: '100%' }}
+                  disabled={billingBusy}
+                  onClick={() => void syncBillingAccess()}
+                >
+                  {billingBusy ? 'Please wait…' : 'Already paid? Refresh purchase status'}
+                </button>
+              </>
             )}
           </div>
         ) : screen === 'new' && token ? (
