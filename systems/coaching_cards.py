@@ -375,6 +375,11 @@ def normalize_loadout(raw: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         s = str(x).strip()
         if s in PLATINUM_CARDS and s not in plat:
             plat.append(s)
+    # Ensure each platinum has its required base position card equipped.
+    for p in list(plat):
+        req = PLATINUM_REQUIRES.get(p)
+        if req and req in POSITION_CARDS and req not in pos and len(pos) < MAX_POSITION_CARDS:
+            pos.append(req)
     return {"program_identity": pid, "position": pos[:MAX_POSITION_CARDS], "platinum": plat[:MAX_PLATINUM_CARDS]}
 
 
@@ -452,6 +457,39 @@ def effective_potential_cap(player: "Player", coach: Optional["Coach"]) -> int:
     elif pid == "developer":
         mult *= 0.92
     return max(RATING_ATTR_MIN, min(RATING_ATTR_MAX, int(round(base * mult))))
+
+
+def platinum_breakthrough_eligible_player_names(team: "Team") -> List[str]:
+    """Players who may roll a platinum breakthrough during Training Results."""
+    coach = getattr(team, "coach", None)
+    loadout = get_coach_loadout(coach)
+    if not loadout.get("platinum"):
+        return []
+    out: List[str] = []
+    for player in list(getattr(team, "roster", []) or []):
+        if not getattr(player, "potential", None):
+            continue
+        ovr = _player_ovr(player)
+        cap = effective_potential_cap(player, coach)
+        gap = cap - ovr
+        if gap < 0 or gap > 12:
+            continue
+        matched = False
+        for plat_id in loadout.get("platinum") or []:
+            base = PLATINUM_REQUIRES.get(plat_id)
+            if not base:
+                continue
+            card = POSITION_CARDS.get(base)
+            if not card:
+                continue
+            if any(_player_in_group(player, g) for g in card.primary_groups):
+                matched = True
+                break
+        if matched:
+            name = str(getattr(player, "name", "") or "").strip()
+            if name:
+                out.append(name)
+    return out
 
 
 def _position_dev_modifiers(loadout: Dict[str, Any]) -> Dict[str, Tuple[float, float]]:

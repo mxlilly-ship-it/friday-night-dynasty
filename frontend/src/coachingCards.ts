@@ -123,9 +123,16 @@ export function normalizeLoadout(raw: unknown): CoachingCardLoadout {
     const s = String(x).trim()
     if (COACHING_CARD_BY_ID[s]?.layer === 'platinum' && !platinum.includes(s)) platinum.push(s)
   }
+  const positionWithBases = [...position]
+  for (const p of platinum) {
+    const req = PLATINUM_REQUIRES[p]
+    if (req && !positionWithBases.includes(req) && positionWithBases.length < MAX_POSITION_CARDS) {
+      positionWithBases.push(req)
+    }
+  }
   return {
     program_identity,
-    position: position.slice(0, MAX_POSITION_CARDS),
+    position: positionWithBases.slice(0, MAX_POSITION_CARDS),
     platinum: platinum.slice(0, MAX_PLATINUM_CARDS),
   }
 }
@@ -153,17 +160,41 @@ export function isCardEquipped(loadout: CoachingCardLoadout, cardId: string): bo
   return lo.platinum.includes(cardId)
 }
 
-export function canEquipCard(loadout: CoachingCardLoadout, cardId: string): boolean {
+export function canEquipCard(
+  loadout: CoachingCardLoadout,
+  cardId: string,
+  opts?: {
+    availableCp?: number | null
+    savedLoadout?: CoachingCardLoadout
+    cardLedger?: Record<string, number>
+  },
+): boolean {
   const lo = normalizeLoadout(loadout)
   const c = COACHING_CARD_BY_ID[cardId]
   if (!c) return false
   if (isCardEquipped(lo, cardId)) return true
-  if (c.layer === 'program') return lo.program_identity == null || lo.program_identity === cardId
-  if (c.layer === 'position') return lo.position.length < MAX_POSITION_CARDS
+
+  const canAfford = (): boolean => {
+    if (opts?.availableCp == null || !opts.savedLoadout) return true
+    const next = toggleCard(lo, cardId)
+    const { netCost: curNet } = computeLoadoutChangeCp(opts.savedLoadout, lo, opts.cardLedger ?? {})
+    const { netCost: nextNet } = computeLoadoutChangeCp(opts.savedLoadout, next, opts.cardLedger ?? {})
+    return nextNet - curNet <= opts.availableCp + 1e-6
+  }
+
+  if (c.layer === 'program') {
+    return (lo.program_identity == null || lo.program_identity === cardId) && canAfford()
+  }
+  if (c.layer === 'position') {
+    return lo.position.length < MAX_POSITION_CARDS && canAfford()
+  }
   if (c.layer === 'platinum') {
     if (lo.platinum.length >= MAX_PLATINUM_CARDS) return false
     const req = c.requires
-    return Boolean(req && lo.position.includes(req))
+    if (!req) return false
+    const hasBase = lo.position.includes(req)
+    if (!hasBase && lo.position.length >= MAX_POSITION_CARDS) return false
+    return canAfford()
   }
   return false
 }
@@ -190,8 +221,15 @@ export function toggleCard(loadout: CoachingCardLoadout, cardId: string): Coachi
   if (c.layer === 'platinum') {
     const has = lo.platinum.includes(cardId)
     if (has) return { ...lo, platinum: lo.platinum.filter((x) => x !== cardId) }
-    if (!canEquipCard(lo, cardId)) return lo
-    return { ...lo, platinum: [...lo.platinum, cardId].slice(0, MAX_PLATINUM_CARDS) }
+    const req = c.requires
+    if (!req) return lo
+    let position = [...lo.position]
+    if (!position.includes(req)) {
+      if (position.length >= MAX_POSITION_CARDS) return lo
+      position = [...position, req].slice(0, MAX_POSITION_CARDS)
+    }
+    if (lo.platinum.length >= MAX_PLATINUM_CARDS) return lo
+    return { ...lo, position, platinum: [...lo.platinum, cardId].slice(0, MAX_PLATINUM_CARDS) }
   }
   return lo
 }
@@ -330,4 +368,90 @@ export function projectedAvailableCpAfterLoadout(
 ): number {
   const { netCost } = computeLoadoutChangeCp(oldLoadout, newLoadout, ledger)
   return Math.round((cpTotal - netCost - allocatedCp) * 10) / 10
+}
+
+const POSITION_GROUPS: Record<string, Set<string>> = {
+  QB: new Set(['QB']),
+  RB: new Set(['RB']),
+  WR: new Set(['WR']),
+  TE: new Set(['TE']),
+  OL: new Set(['OL']),
+  DL: new Set(['DE', 'DT']),
+  LB: new Set(['LB']),
+  DB: new Set(['CB', 'S']),
+  SKILL: new Set(['QB', 'RB', 'WR', 'TE']),
+  FRONT7: new Set(['DE', 'DT', 'LB']),
+}
+
+function playerPositionCodes(player: Record<string, unknown>): Set<string> {
+  const out = new Set<string>()
+  for (const raw of [player.position, player.secondary_position]) {
+    const p = String(raw ?? '').trim().toUpperCase()
+    if (p) out.add(p)
+  }
+  return out
+}
+
+function playerInGroup(player: Record<string, unknown>, groupKey: string): boolean {
+  const codes = playerPositionCodes(player)
+  if (codes.has(groupKey)) return true
+  const g = POSITION_GROUPS[groupKey]
+  if (!g) return false
+  for (const c of codes) {
+    if (g.has(c)) return true
+  }
+  return false
+}
+
+function playerOverallForBreakthrough(player: Record<string, unknown>): number {
+  const keys = [
+    'speed',
+    'agility',
+    'acceleration',
+    'strength',
+    'football_iq',
+    'coachability',
+    'throw_accuracy',
+    'catching',
+    'run_blocking',
+    'pass_blocking',
+    'tackling',
+    'coverage',
+  ]
+  const vals = keys.map((k) => Number(player?.[k] ?? 50))
+  return vals.reduce((a, b) => a + b, 0) / vals.length
+}
+
+export function effectivePotentialCap(
+  player: Record<string, unknown>,
+  loadout: CoachingCardLoadout,
+): number {
+  const base = Number(player.potential ?? 50) || 50
+  const lo = normalizeLoadout(loadout)
+  const pid = lo.program_identity
+  let mult = 1.0
+  if (pid === 'ceiling_raiser') mult *= 1.12
+  else if (pid === 'developer') mult *= 0.92
+  return Math.max(10, Math.min(99, Math.round(base * mult)))
+}
+
+export function isPlatinumBreakthroughEligible(
+  player: Record<string, unknown>,
+  loadout: CoachingCardLoadout,
+): boolean {
+  if (player.potential == null) return false
+  const lo = normalizeLoadout(loadout)
+  if (!lo.platinum.length) return false
+  const ovr = playerOverallForBreakthrough(player)
+  const cap = effectivePotentialCap(player, lo)
+  const gap = cap - ovr
+  if (gap < 0 || gap > 12) return false
+  for (const platId of lo.platinum) {
+    const base = PLATINUM_REQUIRES[platId]
+    if (!base) continue
+    const card = POSITION_CARDS.find((c) => c.id === base)
+    if (!card?.primary_groups?.length) continue
+    if (card.primary_groups.some((g) => playerInGroup(player, g))) return true
+  }
+  return false
 }

@@ -40,6 +40,7 @@ import {
 import {
   EMPTY_COACHING_LOADOUT,
   computeLoadoutChangeCp,
+  isPlatinumBreakthroughEligible,
   normalizeLoadout,
   type CoachingCardLoadout,
 } from './coachingCards'
@@ -363,6 +364,33 @@ function computeDefenseRating(p: any, pos: string) {
 
 function findTeam(state: any, teamName: string) {
   return (state?.teams ?? []).find((t: any) => t?.name === teamName) ?? null
+}
+
+function patchUserCoachCardsInState(state: any, userTeam: string, loadout: CoachingCardLoadout): any {
+  if (!state || !userTeam || !Array.isArray(state.teams)) return state
+  const cards = normalizeLoadout(loadout)
+  const teams = state.teams.map((t: any) => {
+    if (t?.name !== userTeam || !t?.coach) return t
+    return { ...t, coach: { ...t.coach, coaching_cards: cards } }
+  })
+  return { ...state, teams }
+}
+
+function syncCanonicalOffseasonStagesInState(state: any): any {
+  if (!state || String(state.season_phase ?? '').toLowerCase() !== 'offseason') return state
+  const resolved = resolveOffseasonStagesFromSave(state)
+  const canonical = [...CANONICAL_OFFSEASON_STAGES]
+  const saved = state.offseason_stages
+  const arraysMatch =
+    Array.isArray(saved) &&
+    saved.length === canonical.length &&
+    saved.every((s: string, i: number) => s === canonical[i])
+  if (arraysMatch && Number(state.offseason_stage_index ?? 0) === resolved.stageIndex) return state
+  return {
+    ...state,
+    offseason_stages: canonical,
+    offseason_stage_index: resolved.stageIndex,
+  }
 }
 
 /** Matches backend `league_service._improvement_pp_delta` (offseason school Improvements). Negative = spend PP. */
@@ -1172,6 +1200,33 @@ type OffseasonTrainingRow = {
   before: number
   after: number
   delta: number
+  platinum_breakthrough_eligible?: boolean
+  platinum_breakthrough?: boolean
+  platinum_breakthrough_gain?: number
+}
+
+function BreakthroughStar({
+  eligible,
+  achieved,
+  gain,
+}: {
+  eligible?: boolean
+  achieved?: boolean
+  gain?: number
+}) {
+  if (!eligible && !achieved) return null
+  const title = achieved
+    ? `Platinum breakthrough! +${gain ?? '?'} potential`
+    : 'Near potential cap — platinum breakthrough chance this training cycle'
+  return (
+    <span
+      className={`teamhome-breakthrough-star${achieved ? ' teamhome-breakthrough-star--hit' : ''}`}
+      title={title}
+      aria-label={title}
+    >
+      ★
+    </span>
+  )
 }
 
 const POSITION_SORT_ORDER = ['QB', 'RB', 'WR', 'TE', 'OL', 'DE', 'DT', 'LB', 'CB', 'S', 'K', 'P']
@@ -3998,6 +4053,18 @@ function TeamHomePageBody({
   const [coachDevAllocations, setCoachDevAllocations] = useState<Record<string, number>>(() => emptyCoachDevAllocations())
   const [coachingCardsLoadout, setCoachingCardsLoadout] = useState<CoachingCardLoadout>(() => ({ ...EMPTY_COACHING_LOADOUT }))
   const [coachDevSavedLoadout, setCoachDevSavedLoadout] = useState<CoachingCardLoadout>(() => ({ ...EMPTY_COACHING_LOADOUT }))
+  const coachDevCardsHydratedRef = useRef(false)
+  const offseasonStagesSyncedRef = useRef(false)
+
+  const handleCoachingCardsLoadoutChange = useCallback(
+    (next: CoachingCardLoadout) => {
+      setCoachingCardsLoadout(next)
+      if (phase !== 'offseason' || offseasonCurrentStage !== 'Coach development' || !onSaveState) return
+      const live = getLiveSaveState?.() ?? saveState
+      onSaveState(patchUserCoachCardsInState(live, userTeam, next))
+    },
+    [phase, offseasonCurrentStage, onSaveState, getLiveSaveState, saveState, userTeam],
+  )
   const [programDevPendingActions, setProgramDevPendingActions] = useState<ProgramDevAction[]>([])
   const [offseasonTrainingSort, setOffseasonTrainingSort] = useState<OffseasonTrainingSortMode>('position')
   const [offseasonReportPlayer, setOffseasonReportPlayer] = useState<string | null>(null)
@@ -4096,12 +4163,31 @@ function TeamHomePageBody({
   }, [phase, offseasonCurrentStage, saveState, userTeam])
 
   useEffect(() => {
-    if (phase !== 'offseason' || offseasonCurrentStage !== 'Coach development') return
+    if (phase !== 'offseason' || offseasonCurrentStage !== 'Coach development') {
+      coachDevCardsHydratedRef.current = false
+      return
+    }
+    if (coachDevCardsHydratedRef.current) return
+    coachDevCardsHydratedRef.current = true
     const coachObj = findTeam(saveState, userTeam)?.coach
     const normalized = normalizeLoadout(coachObj?.coaching_cards)
     setCoachingCardsLoadout(normalized)
     setCoachDevSavedLoadout(normalized)
   }, [phase, offseasonCurrentStage, saveState, userTeam])
+
+  useEffect(() => {
+    if (phase !== 'offseason' || !onSaveState) {
+      offseasonStagesSyncedRef.current = false
+      return
+    }
+    if (offseasonStagesSyncedRef.current) return
+    const raw = getLiveSaveState?.() ?? saveState
+    const synced = syncCanonicalOffseasonStagesInState(raw)
+    offseasonStagesSyncedRef.current = true
+    if (synced.offseason_stages !== raw?.offseason_stages || synced.offseason_stage_index !== raw?.offseason_stage_index) {
+      onSaveState(synced)
+    }
+  }, [phase, onSaveState, getLiveSaveState, saveState])
 
   useEffect(() => {
     if (phase !== 'offseason' || offseasonCurrentStage !== 'Program Development') {
@@ -4310,6 +4396,19 @@ function TeamHomePageBody({
     () => sortOffseasonTrainingRows(offseasonTrainingRowsRaw, offseasonTrainingSort),
     [offseasonTrainingRowsRaw, offseasonTrainingSort],
   )
+  const trainingBreakthroughEligibleNames = useMemo(() => {
+    if (phase !== 'offseason') return new Set<string>()
+    const saved = (saveState?.offseason_training_results?.breakthrough_eligible ?? []) as string[]
+    if (saved.length > 0) return new Set(saved.map(String))
+    const team = findTeam(saveState, userTeam)
+    if (!team) return new Set<string>()
+    const loadout = normalizeLoadout((team as { coach?: { coaching_cards?: unknown } }).coach?.coaching_cards)
+    const names = ((team as { roster?: Record<string, unknown>[] }).roster ?? [])
+      .filter((p) => isPlatinumBreakthroughEligible(p, loadout))
+      .map((p) => String(p.name ?? ''))
+      .filter(Boolean)
+    return new Set(names)
+  }, [phase, saveState, userTeam])
   const offseasonPlayerReport = useMemo(() => {
     if (!offseasonReportPlayer || !userTeam) return null
     return buildOffseasonPlayerReport(saveState, userTeam, offseasonReportPlayer)
@@ -5023,6 +5122,7 @@ function TeamHomePageBody({
                     improve_culture_cumulative_pp?: number
                     improve_boosters_cumulative_pp?: number
                     coach_dev_allocations?: Record<string, number>
+                    coaching_cards?: CoachingCardLoadout
                     carousel_job_applications?: string[]
                     transfer_stage_1_ack_results?: boolean
                     transfer_stage_2_ack_results?: boolean
@@ -5045,9 +5145,15 @@ function TeamHomePageBody({
                       improve_boosters_cumulative_pp: improveBooCumulative,
                     }
                   } else if (offseasonCurrentStage === 'Coach development') {
+                    const cards = normalizeLoadout(coachingCardsLoadout)
                     offseasonBody = {
                       coach_dev_allocations: coachDevAllocations,
-                      coaching_cards: coachingCardsLoadout,
+                      coaching_cards: cards,
+                    }
+                    if (onSaveState) {
+                      const live = getLiveSaveState?.() ?? saveState
+                      const synced = syncCanonicalOffseasonStagesInState(live)
+                      onSaveState(patchUserCoachCardsInState(synced, userTeam, cards))
                     }
                   } else if (offseasonCurrentStage === 'Program Development') {
                     offseasonBody = { program_development_actions: programDevPendingActions }
@@ -6368,9 +6474,11 @@ function TeamHomePageBody({
                       </div>
                       <CoachingCardPicker
                         loadout={coachingCardsLoadout}
-                        onChange={setCoachingCardsLoadout}
+                        onChange={handleCoachingCardsLoadoutChange}
                         showCosts
                         availableCp={coachDevAvailableCp}
+                        savedLoadout={coachDevSavedLoadout}
+                        cardLedger={coachDevCardLedger}
                       />
                     </div>
                   </>
@@ -7612,6 +7720,30 @@ function TeamHomePageBody({
                         </ul>
                       </div>
                     ) : null}
+                    {offseasonTrainingRowsRaw.length === 0 && trainingBreakthroughEligibleNames.size > 0 ? (
+                      <div style={{ marginTop: 14, textAlign: 'left' }}>
+                        <div className="teamhome-small" style={{ marginBottom: 8, opacity: 0.9 }}>
+                          <BreakthroughStar eligible />{' '}
+                          Platinum breakthrough eligible — within 12 OVR of potential cap with a matching platinum
+                          card equipped.
+                        </div>
+                        <ul className="teamhome-improvements-ledger-rows" style={{ marginTop: 0 }}>
+                          {[...trainingBreakthroughEligibleNames]
+                            .sort((a, b) => a.localeCompare(b))
+                            .map((name) => (
+                              <li key={name}>
+                                <OffseasonReportPlayerName
+                                  saveState={saveState}
+                                  userTeam={userTeam}
+                                  playerName={name}
+                                  onOpen={setOffseasonReportPlayer}
+                                />{' '}
+                                <BreakthroughStar eligible />
+                              </li>
+                            ))}
+                        </ul>
+                      </div>
+                    ) : null}
                     {offseasonTrainingRowsRaw.length > 0 ? (
                       <div style={{ marginTop: 16 }}>
                         <div className="teamhome-playbook-row" style={{ alignItems: 'flex-end' }}>
@@ -7630,6 +7762,11 @@ function TeamHomePageBody({
                           </div>
                           <span className="teamhome-small">{sortedOffseasonTrainingRows.length} players</span>
                         </div>
+                        {trainingBreakthroughEligibleNames.size > 0 ? (
+                          <div className="teamhome-small" style={{ marginTop: 8, opacity: 0.9 }}>
+                            <BreakthroughStar eligible /> Potential platinum breakthrough
+                          </div>
+                        ) : null}
                         <div style={{ maxHeight: 'min(420px, 60vh)', overflow: 'auto', marginTop: 10 }}>
                           <table className="teamhome-roster-table" style={{ width: '100%' }}>
                             <thead>
@@ -7650,6 +7787,14 @@ function TeamHomePageBody({
                                       userTeam={userTeam}
                                       playerName={row.name}
                                       onOpen={setOffseasonReportPlayer}
+                                    />{' '}
+                                    <BreakthroughStar
+                                      eligible={
+                                        row.platinum_breakthrough_eligible ??
+                                        trainingBreakthroughEligibleNames.has(row.name)
+                                      }
+                                      achieved={row.platinum_breakthrough}
+                                      gain={row.platinum_breakthrough_gain}
                                     />
                                   </td>
                                   <td>{row.position ?? '—'}</td>
@@ -7691,6 +7836,11 @@ function TeamHomePageBody({
                           </div>
                           <span className="teamhome-small">{sortedOffseasonTrainingRows.length} players</span>
                         </div>
+                        {trainingBreakthroughEligibleNames.size > 0 ? (
+                          <div className="teamhome-small" style={{ marginTop: 8, opacity: 0.9 }}>
+                            <BreakthroughStar eligible /> Potential platinum breakthrough
+                          </div>
+                        ) : null}
                         <div style={{ maxHeight: 'min(360px, 50vh)', overflow: 'auto', marginTop: 10 }}>
                           <table className="teamhome-roster-table" style={{ width: '100%' }}>
                             <thead>
@@ -7711,6 +7861,14 @@ function TeamHomePageBody({
                                       userTeam={userTeam}
                                       playerName={row.name}
                                       onOpen={setOffseasonReportPlayer}
+                                    />{' '}
+                                    <BreakthroughStar
+                                      eligible={
+                                        row.platinum_breakthrough_eligible ??
+                                        trainingBreakthroughEligibleNames.has(row.name)
+                                      }
+                                      achieved={row.platinum_breakthrough}
+                                      gain={row.platinum_breakthrough_gain}
                                     />
                                   </td>
                                   <td>{row.position ?? '—'}</td>

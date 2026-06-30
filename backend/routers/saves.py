@@ -8,6 +8,7 @@ import json
 from typing import Any, Dict, List, Optional
 
 from backend.deps import require_entitled
+from backend.storage.billing import TrialSeasonCompleteError, trial_complete_http_detail
 from backend.services.league_service import (
     create_save,
     list_saves,
@@ -804,8 +805,10 @@ def sim_playoff_round_route(save_id: str, user=Depends(require_entitled)):
 @router.post("/{save_id}/offseason/advance", response_model=Dict[str, Any])
 def advance_offseason_route(save_id: str, body: Optional[AdvanceOffseasonBody] = Body(None), user=Depends(require_entitled)):
     try:
-        payload = body.model_dump(exclude_none=True) if body else {}
+        payload = body.model_dump() if body else {}
         return advance_offseason(user["user_id"], save_id, payload)
+    except TrialSeasonCompleteError as e:
+        raise HTTPException(status_code=402, detail=trial_complete_http_detail(str(e))) from e
     except Exception as e:
         raise HTTPException(status_code=400, detail=_save_route_exception_detail(e))
 

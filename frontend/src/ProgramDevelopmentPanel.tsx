@@ -82,6 +82,11 @@ export default function ProgramDevelopmentPanel({
 
   const pendingCost = balance - projectedBal
 
+  const renewQueuedIds = useMemo(
+    () => new Set(pendingActions.filter((a) => a.action === 'renew').map((a) => a.item_id)),
+    [pendingActions],
+  )
+
   const enrichedInventory = useMemo(() => {
     return inventory
       .map((row) => {
@@ -89,11 +94,17 @@ export default function ProgramDevelopmentPanel({
         if (!spec) return null
         const expYears = Math.max(1, Number(spec.expiration_years || 1))
         const rem = Number(row.seasons_remaining ?? 0)
+        const renewQueued = renewQueuedIds.has(String(row.item_id))
+        const displayRem = renewQueued ? expYears : rem
         return {
           ...spec,
           item_id: String(row.item_id),
           seasons_remaining: rem,
-          durability_pct: Math.max(0, Math.min(100, Math.round((rem / expYears) * 100))),
+          renew_queued: renewQueued,
+          durability_pct: renewQueued
+            ? 100
+            : Math.max(0, Math.min(100, Math.round((rem / expYears) * 100))),
+          display_seasons_remaining: displayRem,
           renewal_cost: renewalCost(spec, Number(CATALOG.renewal_cost_multiplier || 0.6)),
         }
       })
@@ -103,9 +114,11 @@ export default function ProgramDevelopmentPanel({
         seasons_remaining: number
         durability_pct: number
         renewal_cost: number
+        renew_queued?: boolean
+        display_seasons_remaining?: number
       }
     >
-  }, [inventory])
+  }, [inventory, renewQueuedIds])
 
   const expiring = enrichedInventory.filter((r) => r.seasons_remaining <= 1)
 
@@ -133,6 +146,7 @@ export default function ProgramDevelopmentPanel({
   }, [guideItems, guideCategory])
 
   const queueAction = (action: ProgramDevAction, label: string) => {
+    if (action.action === 'renew' && renewQueuedIds.has(action.item_id)) return
     onPendingActionsChange([...pendingActions, action])
     setNotice({ text: `${label} queued — press Continue to confirm.` })
     window.setTimeout(() => setNotice(null), 2500)
@@ -276,7 +290,10 @@ export default function ProgramDevelopmentPanel({
                 <p className="program-dev-empty">No equipment owned yet.</p>
               ) : (
                 enrichedInventory.slice(0, 12).map((it) => (
-                  <div key={it.item_id} className="program-dev-fac-row">
+                  <div
+                    key={it.item_id}
+                    className={`program-dev-fac-row${it.renew_queued ? ' program-dev-fac-row--renew-queued' : ''}`}
+                  >
                     <div>
                       <div className="program-dev-shop-name">{it.name}</div>
                       <div className="program-dev-shop-attr">{it.attributes_affected?.[0] || '—'}</div>
@@ -284,11 +301,11 @@ export default function ProgramDevelopmentPanel({
                     <div className="program-dev-dur">
                       <div className="program-dev-dur-bar">
                         <div
-                          className={`program-dev-dur-fill${it.durability_pct > 60 ? ' good' : it.durability_pct > 30 ? ' mid' : ' low'}`}
+                          className={`program-dev-dur-fill${it.renew_queued || it.durability_pct > 60 ? ' good' : it.durability_pct > 30 ? ' mid' : ' low'}`}
                           style={{ width: `${it.durability_pct}%` }}
                         />
                       </div>
-                      <span>{it.durability_pct}%</span>
+                      <span>{it.renew_queued ? 'Renewal queued' : `${it.durability_pct}%`}</span>
                     </div>
                   </div>
                 ))
@@ -306,7 +323,10 @@ export default function ProgramDevelopmentPanel({
               <p className="program-dev-empty">No equipment owned yet.</p>
             ) : (
               enrichedInventory.map((it) => (
-                <div key={it.item_id} className="program-dev-fac-row">
+                <div
+                  key={it.item_id}
+                  className={`program-dev-fac-row${it.renew_queued ? ' program-dev-fac-row--renew-queued' : ''}`}
+                >
                   <div>
                     <div className="program-dev-shop-name">{it.name}</div>
                     <div className="program-dev-shop-attr">{it.category}</div>
@@ -314,11 +334,15 @@ export default function ProgramDevelopmentPanel({
                   <div className="program-dev-dur">
                     <div className="program-dev-dur-bar">
                       <div
-                        className={`program-dev-dur-fill${it.durability_pct > 60 ? ' good' : it.durability_pct > 30 ? ' mid' : ' low'}`}
+                        className={`program-dev-dur-fill${it.renew_queued || it.durability_pct > 60 ? ' good' : it.durability_pct > 30 ? ' mid' : ' low'}`}
                         style={{ width: `${it.durability_pct}%` }}
                       />
                     </div>
-                    <span>{Number(it.seasons_remaining).toFixed(1)} yrs left</span>
+                    <span>
+                      {it.renew_queued
+                        ? 'Renewal queued'
+                        : `${Number(it.display_seasons_remaining ?? it.seasons_remaining).toFixed(1)} yrs left`}
+                    </span>
                   </div>
                 </div>
               ))
@@ -336,30 +360,39 @@ export default function ProgramDevelopmentPanel({
               {expiring.length === 0 ? (
                 <p className="program-dev-empty">Nothing expiring soon.</p>
               ) : (
-                expiring.map((it) => (
+                expiring.map((it) => {
+                  const queued = Boolean(it.renew_queued)
+                  return (
                   <div
                     key={it.item_id}
-                    className={`program-dev-exp-item${it.seasons_remaining <= 0.5 ? ' urgent' : ' soon'}`}
+                    className={`program-dev-exp-item${
+                      queued ? ' renew-queued' : it.seasons_remaining <= 0.5 ? ' urgent' : ' soon'
+                    }`}
                   >
                     <div>
                       <div className="program-dev-exp-badge">
-                        {it.seasons_remaining <= 0.5 ? 'Expires this season' : '1 season remaining'}
+                        {queued
+                          ? 'Renewal queued — press Continue to confirm'
+                          : it.seasons_remaining <= 0.5
+                            ? 'Expires this season'
+                            : '1 season remaining'}
                       </div>
                       <div className="program-dev-shop-name">{it.name}</div>
                       <div className="program-dev-shop-attr">
-                        Renewal: {fmtProgramDollars(it.renewal_cost)}
+                        {queued ? 'Will reset to full durability' : `Renewal: ${fmtProgramDollars(it.renewal_cost)}`}
                       </div>
                     </div>
                     <button
                       type="button"
-                      className="program-dev-renew"
-                      disabled={projectedBal < it.renewal_cost}
+                      className={`program-dev-renew${queued ? ' program-dev-renew--queued' : ''}`}
+                      disabled={queued || projectedBal < it.renewal_cost}
                       onClick={() => queueAction({ item_id: it.item_id, action: 'renew' }, `${it.name} renewal`)}
                     >
-                      Renew
+                      {queued ? 'Queued' : 'Renew'}
                     </button>
                   </div>
-                ))
+                  )
+                })
               )}
             </div>
           </div>

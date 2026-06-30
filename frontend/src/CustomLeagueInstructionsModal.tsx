@@ -5,28 +5,40 @@ type Props = {
   onClose: () => void
 }
 
+const TEMPLATE_URL = `${import.meta.env.BASE_URL}templates/FND_Custom_League_Template.xlsx`
+
 const STEPS = [
   {
-    title: 'Step 1: Download the League File',
+    title: 'Step 1: Download the league template (recommended)',
+    paragraphs: [
+      'Use the Excel workbook to build your league — it matches the game’s teams.json format (schools, stadiums, rivals, community types, and playoff settings).',
+    ],
     bullets: [
-      'Go to the Discord server.',
-      'Locate the specific league file you want to use.',
-      'Download the file to your computer.',
+      <>
+        Download{' '}
+        <a href={TEMPLATE_URL} download="FND_Custom_League_Template.xlsx">
+          FND_Custom_League_Template.xlsx
+        </a>
+        .
+      </>,
+      'Fill in League Info and Teams (see Community Types sheet for school-type descriptions).',
+      'Convert the workbook to .json with: python scripts/excel_league_to_json.py YourLeague.xlsx',
+      'Or build a .json file manually if you prefer.',
     ],
   },
   {
-    title: 'Step 2: Locate the JSON File',
+    title: 'Step 2: Locate the JSON file',
     bullets: [
-      'Open your Downloads folder (or wherever the file was saved).',
-      'Make sure the file format is .json.',
+      'After conversion, open the folder where your .json was saved.',
+      'Confirm the file ends in .json and contains a teams array.',
     ],
   },
   {
-    title: 'Step 3: Upload the JSON File',
+    title: 'Step 3: Upload the JSON file',
     bullets: [
       'On this Dynasty save slot screen, find Team dataset source.',
       'Click Upload .json.',
-      'Select the downloaded league file.',
+      'Select your league file.',
     ],
   },
   {
@@ -106,8 +118,8 @@ export default function CustomLeagueInstructionsModal({ onClose }: Props) {
               ))}
               {step.bullets?.length ? (
                 <ul>
-                  {step.bullets.map((item) => (
-                    <li key={item}>{item}</li>
+                  {step.bullets.map((item, i) => (
+                    <li key={i}>{item}</li>
                   ))}
                 </ul>
               ) : null}

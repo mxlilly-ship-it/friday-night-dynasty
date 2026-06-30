@@ -18,8 +18,13 @@ from backend.billing_config import (
     stripe_secret_key,
     stripe_webhook_secret,
 )
-from backend.deps import require_user
-from backend.storage.billing import get_entitlement_status, grant_entitlement, revoke_entitlement_for_payment_intent, user_is_entitled
+from backend.deps import optional_user, require_user
+from backend.storage.billing import (
+    get_entitlement_status,
+    grant_entitlement,
+    revoke_entitlement_for_payment_intent,
+    user_is_entitled,
+)
 from backend.storage.db import db, init_db
 
 router = APIRouter()
@@ -31,6 +36,8 @@ class BillingStatusResponse(BaseModel):
     billing_configured: bool
     entitled: bool
     purchased_at: Optional[int] = None
+    trial_available: bool = False
+    trial_completed: bool = False
 
 
 class CreateCheckoutResponse(BaseModel):
@@ -173,13 +180,16 @@ def _grant_from_checkout_session_id(session_id: str) -> bool:
 
 @router.get("/status", response_model=BillingStatusResponse)
 def billing_status_route(user=Depends(require_user)):
-    entitled = user_is_entitled(user["user_id"])
     info = get_entitlement_status(user["user_id"])
+    billing_req = billing_required()
+    entitled = bool(info.get("entitled"))
     return BillingStatusResponse(
-        billing_required=billing_required(),
+        billing_required=billing_req,
         billing_configured=billing_checkout_configured(),
-        entitled=entitled if billing_required() else True,
+        entitled=entitled if billing_req else True,
         purchased_at=info.get("purchased_at"),
+        trial_available=bool(info.get("trial_available")) if billing_req else False,
+        trial_completed=bool(info.get("trial_completed")) if billing_req else False,
     )
 
 
@@ -311,13 +321,16 @@ def sync_purchases_route(user=Depends(require_user)):
     """
     user_id = user["user_id"]
     init_db()
+    billing_req = billing_required()
     if user_is_entitled(user_id):
         info = get_entitlement_status(user_id)
         return BillingStatusResponse(
-            billing_required=billing_required(),
+            billing_required=billing_req,
             billing_configured=billing_checkout_configured(),
             entitled=True,
             purchased_at=info.get("purchased_at"),
+            trial_available=False,
+            trial_completed=bool(info.get("trial_completed")) if billing_req else False,
         )
 
     if not billing_checkout_configured():
@@ -333,10 +346,12 @@ def sync_purchases_route(user=Depends(require_user)):
     entitled = user_is_entitled(user_id)
     info = get_entitlement_status(user_id)
     return BillingStatusResponse(
-        billing_required=billing_required(),
+        billing_required=billing_req,
         billing_configured=billing_checkout_configured(),
-        entitled=entitled if billing_required() else True,
+        entitled=entitled if billing_req else True,
         purchased_at=info.get("purchased_at"),
+        trial_available=bool(info.get("trial_available")) if billing_req else False,
+        trial_completed=bool(info.get("trial_completed")) if billing_req else False,
     )
 
 

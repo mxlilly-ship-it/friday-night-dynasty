@@ -248,6 +248,26 @@ def _simulate_match(
         for k, v in frag.items():
             away_stats[k] += v
 
+    # Group standings require a W/L for every game; regulation ties go to OT.
+    ot_possessions = 0
+    while home_score == away_score and ot_possessions < 24:
+        pts, frag = _simulate_possession(home_off, away_def, rng)
+        home_score += pts
+        for k, v in frag.items():
+            home_stats[k] += v
+        if home_score != away_score:
+            break
+        pts, frag = _simulate_possession(away_off, home_def, rng)
+        away_score += pts
+        for k, v in frag.items():
+            away_stats[k] += v
+        ot_possessions += 2
+    if home_score == away_score:
+        if rng.random() < 0.5:
+            home_score += 7
+        else:
+            away_score += 7
+
     return {
         "home": home_name,
         "away": away_name,

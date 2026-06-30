@@ -2,7 +2,7 @@ from fastapi import Depends, Header, HTTPException
 
 from backend.billing_config import billing_required
 from backend.storage.auth import user_from_token
-from backend.storage.billing import user_is_entitled
+from backend.storage.billing import trial_complete_http_detail, user_can_play, user_trial_completed
 
 
 def require_user(authorization: str = Header(default="")):
@@ -21,11 +21,13 @@ def require_user(authorization: str = Header(default="")):
 
 
 def require_entitled(user=Depends(require_user)):
-    """Logged-in user with an active one-time purchase (when billing is enabled)."""
+    """Logged-in user with purchase or an active free-season trial (when billing is enabled)."""
     if not billing_required():
         return user
-    if user_is_entitled(user["user_id"]):
+    if user_can_play(user["user_id"]):
         return user
+    if user_trial_completed(user["user_id"]):
+        raise HTTPException(status_code=402, detail=trial_complete_http_detail())
     raise HTTPException(
         status_code=402,
         detail={

@@ -1,6 +1,9 @@
-from fastapi import APIRouter, Body, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Any, Dict, Optional
+
+from backend.deps import optional_user
+from backend.storage.billing import TrialSeasonCompleteError, trial_complete_http_detail
 
 from backend.services.league_service import (
     sim_week_state,
@@ -19,6 +22,7 @@ from backend.services.league_service import (
     save_coach_gameplan_v2_in_state,
     update_depth_chart_in_state,
     patch_coach_inbox_state,
+    normalize_offseason_stages,
     _sync_user_cross_region_slot_count,
     _finalize_cross_region_schedule_state,
     _ensure_playoffs_migrated,
@@ -35,6 +39,7 @@ from systems.coach_email_system import ensure_coach_inbox, generate_week_checkli
 
 def _sim_finalize_state(state: Any) -> Any:
     if isinstance(state, dict):
+        normalize_offseason_stages(state)
         _finalize_cross_region_schedule_state(state)
     return state
 
@@ -94,11 +99,12 @@ class SimGamePlayRequest(BaseModel):
 
 
 @router.post("", response_model=Dict[str, Any])
-def sim_route(payload: SimRequest = Body(...)):
+def sim_route(payload: SimRequest = Body(...), user=Depends(optional_user)):
     try:
         kind = str(payload.kind or "").strip().lower()
         state = payload.state or {}
         body = payload.body or {}
+        user_id = user["user_id"] if user else None
         if str(state.get("season_phase") or "").strip().lower() in ("playoffs", "season_summary"):
             teams = {t["name"]: team_from_dict(t) for t in state.get("teams", []) if isinstance(t, dict) and t.get("name")}
             if teams:
@@ -117,7 +123,7 @@ def sim_route(payload: SimRequest = Body(...)):
             st = out.get("state") if isinstance(out, dict) else None
             return {"state": _sim_finalize_state(st), "phase_completed": out.get("phase_completed")}
         if kind == "offseason-advance":
-            out = advance_offseason_state(state, body, league_history=payload.league_history)
+            out = advance_offseason_state(state, body, league_history=payload.league_history, user_id=user_id)
             st = out if isinstance(out, dict) else None
             return {"state": _sim_finalize_state(st)}
         if kind == "playoffs-sim":
@@ -170,6 +176,8 @@ def sim_route(payload: SimRequest = Body(...)):
                 "champion": out.get("champion"),
             }
         raise ValueError(f"Unknown kind '{payload.kind}'")
+    except TrialSeasonCompleteError as e:
+        raise HTTPException(status_code=402, detail=trial_complete_http_detail(str(e))) from e
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

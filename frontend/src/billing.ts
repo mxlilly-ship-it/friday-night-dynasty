@@ -3,6 +3,40 @@ export type BillingStatus = {
   billing_configured: boolean
   entitled: boolean
   purchased_at: number | null
+  trial_available: boolean
+  trial_completed: boolean
+}
+
+export type ApiErrorDetail = {
+  message: string
+  code?: string
+}
+
+export async function parseApiError(r: Response): Promise<ApiErrorDetail> {
+  const raw = await r.text()
+  const fallback = `Request failed (${r.status})`
+  try {
+    const j = JSON.parse(raw) as { detail?: unknown }
+    const d = j.detail
+    if (typeof d === 'string') {
+      const trimmed = d.trim()
+      if (trimmed && trimmed.toLowerCase() !== 'none') return { message: trimmed }
+    }
+    if (d && typeof d === 'object' && !Array.isArray(d)) {
+      const obj = d as Record<string, unknown>
+      const message = typeof obj.message === 'string' ? obj.message : fallback
+      const code = typeof obj.code === 'string' ? obj.code : undefined
+      if (message) return { message, code }
+    }
+    if (Array.isArray(d))
+      return {
+        message: d.map((x: any) => (typeof x?.msg === 'string' ? x.msg : JSON.stringify(x))).join('; '),
+      }
+  } catch {
+    /* use raw */
+  }
+  const trimmedRaw = raw.trim()
+  return { message: trimmedRaw && trimmedRaw.toLowerCase() !== 'none' ? trimmedRaw : fallback }
 }
 
 export async function fetchBillingStatus(

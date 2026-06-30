@@ -32,7 +32,7 @@ import SignupTermsConsent from './SignupTermsConsent'
 import ScreenshotsGallery from './ScreenshotsGallery'
 import SupportContactModal from './SupportContactModal'
 import { getOrCreateDeviceId } from './deviceId.js'
-import { confirmCheckoutSession, createCheckoutSession, fetchBillingStatus, syncBillingAccess as syncBillingAccessApi, type BillingStatus } from './billing'
+import { confirmCheckoutSession, createCheckoutSession, fetchBillingStatus, parseApiError, syncBillingAccess as syncBillingAccessApi, type BillingStatus } from './billing'
 
 /** Stable reference so child effects do not re-run when logged out (browser saves). */
 const EMPTY_AUTH_HEADERS: Record<string, string> = Object.freeze({})
@@ -141,9 +141,13 @@ export default function App({ devNoFirebase = false }: AppProps) {
   })
   const [showBackupPrompt, setShowBackupPrompt] = useState(false)
   const [backupPromptReason, setBackupPromptReason] = useState('')
+  const [showTrialPurchaseModal, setShowTrialPurchaseModal] = useState(false)
   const inLocalRuntime = Boolean(localBundle) && isBrowserSaveId(saveId)
   const needsBillingPurchase = Boolean(
-    billingStatus?.billing_required && !billingStatus?.entitled,
+    billingStatus?.billing_required && !billingStatus?.entitled && !billingStatus?.trial_available,
+  )
+  const onFreeTrial = Boolean(
+    billingStatus?.billing_required && !billingStatus?.entitled && billingStatus?.trial_available,
   )
   const supportDefaultEmail = useMemo(() => {
     const em = email.trim()
@@ -442,6 +446,18 @@ export default function App({ devNoFirebase = false }: AppProps) {
       setUsername(label)
     }
     void refreshBillingStatus({ Authorization: `Bearer ${data.token}` })
+  }
+
+  async function handleTrialOrApiError(r: Response): Promise<boolean> {
+    if (await consumeUnauthorized(r)) return true
+    const err = await parseApiError(r)
+    if (r.status === 402 && err.code === 'TRIAL_COMPLETE') {
+      setShowTrialPurchaseModal(true)
+      void refreshBillingStatus()
+      return true
+    }
+    setError(err.message)
+    return true
   }
 
   async function refreshBillingStatus(authHeaders?: Record<string, string>) {
@@ -1214,14 +1230,14 @@ export default function App({ devNoFirebase = false }: AppProps) {
           else payload.body = {}
         }
 
+        const auth = await getAuthHeaders()
         const r = await fetch(`${API_BASE}/sim`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...auth },
           body: JSON.stringify(payload),
         })
         if (!r.ok) {
-          if (await consumeUnauthorized(r)) return false
-          setError(await formatApiErrorBody(r))
+          if (await handleTrialOrApiError(r)) return false
           return false
         }
         const data = await r.json()
@@ -1285,8 +1301,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
       try {
         const r = await fetch(`${API_BASE}/saves/${saveId}/playoffs/sim-round`, { method: 'POST', headers })
         if (!r.ok) {
-          if (await consumeUnauthorized(r)) return false
-          setError(await formatApiErrorBody(r))
+          if (await handleTrialOrApiError(r)) return false
           return false
         }
         const data = await r.json()
@@ -1307,8 +1322,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
           body: JSON.stringify(ob),
         })
         if (!r.ok) {
-          if (await consumeUnauthorized(r)) return false
-          setError(await formatApiErrorBody(r))
+          if (await handleTrialOrApiError(r)) return false
           return false
         }
         const data = await r.json()
@@ -1523,6 +1537,10 @@ export default function App({ devNoFirebase = false }: AppProps) {
   }, [autosaveEnabled])
 
   useEffect(() => {
+    if (billingStatus?.entitled) setShowTrialPurchaseModal(false)
+  }, [billingStatus?.entitled])
+
+  useEffect(() => {
     localStorage.setItem('fnd_backup_reminder_frequency', backupReminderFrequency)
   }, [backupReminderFrequency])
 
@@ -1662,6 +1680,70 @@ export default function App({ devNoFirebase = false }: AppProps) {
                   Download .json
                 </button>
               </div>
+            </div>
+          </div>
+        ) : null}
+        {showTrialPurchaseModal ? (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.65)',
+              zIndex: 10001,
+              display: 'grid',
+              placeItems: 'center',
+              padding: '1rem',
+            }}
+          >
+            <div
+              className="fnd-panel"
+              style={{ width: 'min(520px, 100%)', margin: 0, border: '1px solid #3d4654' }}
+            >
+              <h2 style={{ marginTop: 0 }}>Season complete!</h2>
+              <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
+                You&apos;ve finished your free season — from preseason through schedule release. Purchase once to
+                continue your dynasty into year two and beyond.
+              </p>
+              {billingChecking ? (
+                <p style={{ color: '#9ca3af', fontSize: '0.9rem' }}>Checking purchase status…</p>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="fnd-title-btn"
+                    style={{ maxWidth: '100%', marginBottom: 10 }}
+                    disabled={billingBusy}
+                    onClick={() => void startCheckout()}
+                  >
+                    {billingBusy ? 'Redirecting to checkout…' : 'Buy now — secure checkout'}
+                  </button>
+                  <button
+                    type="button"
+                    className="teamhome-select"
+                    style={{ maxWidth: '100%' }}
+                    disabled={billingBusy}
+                    onClick={() => void syncBillingAccess()}
+                  >
+                    {billingBusy ? 'Please wait…' : 'Already paid? Refresh purchase status'}
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                className="teamhome-select"
+                style={{ marginTop: 12, maxWidth: '100%' }}
+                onClick={() => setShowTrialPurchaseModal(false)}
+              >
+                Keep browsing schedule
+              </button>
+              <button
+                type="button"
+                className="fnd-support-link fnd-support-link--panel"
+                style={{ marginTop: 12 }}
+                onClick={() => setShowSupportContact(true)}
+              >
+                Need help or a refund?
+              </button>
             </div>
           </div>
         ) : null}
@@ -1903,7 +1985,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
             <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
               {devNoFirebase
                 ? 'Local dev mode: enter a coach name (no Firebase). Dynasties save in this browser and on the API when you create a save.'
-                : 'Log in to create a new dynasty. It will be saved in this browser (IndexedDB); download backups anytime.'}
+                : 'Log in to create a new dynasty. Your first full season is free — purchase to continue after schedule release.'}
             </p>
             {devNoFirebase ? (
               <div className="fnd-login-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
@@ -2002,8 +2084,9 @@ export default function App({ devNoFirebase = false }: AppProps) {
             </button>
             <h2>Unlock Friday Night Dynasty</h2>
             <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
-              You&apos;re signed in as <strong style={{ color: '#d0d4dc' }}>{username}</strong>. Complete a one-time
-              purchase to create a new dynasty and use cloud saves.
+              You&apos;ve used your free season on{' '}
+              <strong style={{ color: '#d0d4dc' }}>{username}</strong>. Purchase once to continue your dynasty and
+              start new saves.
             </p>
             {billingChecking ? (
               <p style={{ color: '#9ca3af', fontSize: '0.9rem' }}>Checking purchase status…</p>
@@ -2039,7 +2122,21 @@ export default function App({ devNoFirebase = false }: AppProps) {
             </button>
           </div>
         ) : screen === 'new' && token ? (
-          <NewSaveFlow
+          <>
+            {onFreeTrial ? (
+              <p
+                style={{
+                  margin: '0 0 1rem',
+                  color: '#9ca3af',
+                  fontSize: '0.9rem',
+                  maxWidth: 560,
+                }}
+              >
+                Your <strong style={{ color: '#d0d4dc' }}>first full season is free</strong> — preseason through
+                schedule release. Purchase afterward to continue into year two.
+              </p>
+            ) : null}
+            <NewSaveFlow
             apiBase={API_BASE}
             headers={headers}
             getAuthHeaders={getAuthHeaders}
@@ -2080,6 +2177,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
               }
             }}
           />
+          </>
         ) : null}
 
         {error ? (

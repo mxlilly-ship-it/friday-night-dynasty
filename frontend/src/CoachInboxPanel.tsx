@@ -115,7 +115,7 @@ function mergeInboxPatchResponse(prev: any, next: any, deletedIds: string[] = []
     return updated ? { ...e, ...updated } : e
   })
   for (const [id, row] of nextById) {
-    if (!mergedEmails.some((e) => String(e.id) === id)) mergedEmails.push(row)
+    if (!mergedEmails.some((e: CoachEmail) => String(e.id) === id)) mergedEmails.push(row)
   }
   out.coach_inbox = { ...(out.coach_inbox ?? {}), emails: mergedEmails }
   return out

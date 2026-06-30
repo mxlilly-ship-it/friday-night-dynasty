@@ -136,6 +136,8 @@ def _migrate_users_billing(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE users ADD COLUMN purchased_at INTEGER")
     if "stripe_customer_id" not in cols:
         conn.execute("ALTER TABLE users ADD COLUMN stripe_customer_id TEXT")
+    if "trial_completed" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN trial_completed INTEGER NOT NULL DEFAULT 0")
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS purchases (

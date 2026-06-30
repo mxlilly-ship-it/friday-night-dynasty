@@ -7,6 +7,8 @@ import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
 from backend.storage.db import db
+from backend.storage.billing import check_trial_before_year2_preseason, user_is_entitled
+from backend.billing_config import billing_required
 from systems.save_system import (
     get_save_dir,
     save_league,
@@ -2094,9 +2096,11 @@ def _apply_coach_dev_stage_for_team(
     from systems.coaching_cards import ai_select_coaching_cards, apply_loadout_to_coach, get_coach_loadout
 
     if is_user:
-        if body and body.get("coaching_cards") is not None:
+        from systems.coaching_cards import normalize_loadout
+
+        if body and "coaching_cards" in body:
             old_loadout = get_coach_loadout(coach)
-            new_loadout = body.get("coaching_cards")
+            new_loadout = normalize_loadout(body.get("coaching_cards"))
             apply_coaching_card_cp_transaction(bank, old_loadout, new_loadout)
             apply_loadout_to_coach(coach, new_loadout)
         apply_coach_development(coach, bank, _merge_user_coach_development_body(bank, body))
@@ -2382,6 +2386,7 @@ def advance_offseason(
         raise ValueError("save is not in offseason")
 
     body = body or {}
+    normalize_offseason_stages(state)
     teams = {t["name"]: team_from_dict(t) for t in state.get("teams", [])}
     stages: List[str] = list(state.get("offseason_stages") or OFFSEASON_UI_STAGES)
     state["offseason_stages"] = stages
@@ -2615,6 +2620,9 @@ def advance_offseason(
                     }
                 )
         user_equipment_training: Optional[Dict[str, Any]] = None
+        from systems.coaching_cards import platinum_breakthrough_eligible_player_names
+
+        eligible_before = platinum_breakthrough_eligible_player_names(ut) if ut else []
         for t in teams.values():
             dev_summary = run_offseason_development(t)
             if ut and t.name == ut.name:
@@ -2626,7 +2634,8 @@ def advance_offseason(
                 before_rows,
                 (user_equipment_training or {}).get("player_reports") if isinstance(user_equipment_training, dict) else None,
             )
-        training_payload: Dict[str, Any] = {"players": deltas}
+            _attach_platinum_breakthrough_training_metadata(deltas, user_equipment_training, eligible_before)
+        training_payload: Dict[str, Any] = {"players": deltas, "breakthrough_eligible": eligible_before}
         if user_equipment_training:
             from systems.program_equipment_effects import summarize_equipment_for_training_ui
 
@@ -2665,6 +2674,7 @@ def advance_offseason(
 
     new_idx = int(state["offseason_stage_index"])
     if new_idx >= len(stages):
+        check_trial_before_year2_preseason(user_id)
         teams2 = {t["name"]: team_from_dict(t) for t in state.get("teams", [])}
         _finalize_offseason_to_preseason(state, teams2)
         state["teams"] = [team_to_dict(t) for t in teams2.values()]
@@ -3822,6 +3832,32 @@ def _training_player_rows_from_development(
             }
         )
     return out
+
+
+def _attach_platinum_breakthrough_training_metadata(
+    deltas: List[Dict[str, Any]],
+    user_equipment_training: Optional[Dict[str, Any]],
+    eligible_before: List[str],
+) -> None:
+    eligible_set = {str(n) for n in eligible_before if n}
+    breakthrough_by_name: Dict[str, int] = {}
+    if isinstance(user_equipment_training, dict):
+        extras = user_equipment_training.get("coaching_card_extras") or {}
+        if isinstance(extras, dict):
+            for ev in extras.get("events") or []:
+                if not isinstance(ev, dict) or ev.get("type") != "platinum_breakthrough":
+                    continue
+                n = str(ev.get("player") or "").strip()
+                if n:
+                    breakthrough_by_name[n] = int(ev.get("potential_gain") or 0)
+    for row in deltas:
+        name = str(row.get("name") or "")
+        row["platinum_breakthrough_eligible"] = name in eligible_set
+        if name in breakthrough_by_name:
+            row["platinum_breakthrough"] = True
+            row["platinum_breakthrough_gain"] = breakthrough_by_name[name]
+        else:
+            row["platinum_breakthrough"] = False
 
 
 def _pct_map_from_season_selection(entries: Any) -> Dict[str, float]:
@@ -5716,6 +5752,7 @@ def advance_offseason_state(
     state: Dict[str, Any],
     body: Optional[Dict[str, Any]] = None,
     league_history: Optional[Dict[str, Any]] = None,
+    user_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """In-memory variant of advance_offseason. Pass league_history for coaching carousel (stateless bundle)."""
     phase_s = str(state.get("season_phase") or "").strip().lower()
@@ -5727,12 +5764,14 @@ def advance_offseason_state(
         _sync_cross_region_schedule_ui_fields(state)
         return state
     body = body or {}
+    normalize_offseason_stages(state)
     teams = {t["name"]: team_from_dict(t) for t in state.get("teams", [])}
     stages: List[str] = list(state.get("offseason_stages") or OFFSEASON_UI_STAGES)
     state["offseason_stages"] = stages
     idx = int(state.get("offseason_stage_index", 0))
     if idx >= len(stages):
-        raise ValueError("offseason already complete; continue from preseason")
+        raise ValueError("offseason already complete; load save or continue from preseason")
+
     current = _normalize_offseason_stage_name(stages[idx])
     user_team_name = state.get("user_team")
     ut = teams.get(user_team_name) if user_team_name else None
@@ -5840,9 +5879,9 @@ def advance_offseason_state(
                 b = _empty_coach_dev_bank()
                 banks_cd[name] = b
             if name == user_team_name and ut and ut.coach:
-                apply_coach_development(ut.coach, b, _merge_user_coach_development_body(b, body))
+                _apply_coach_dev_stage_for_team(ut.coach, b, body=body, is_user=True)
             elif name != user_team_name:
-                apply_ai_coach_season_development(coach, b)
+                _apply_coach_dev_stage_for_team(coach, b, is_user=False)
         if user_team_name:
             ub = banks_cd.get(user_team_name)
             if isinstance(ub, dict):
@@ -5938,6 +5977,9 @@ def advance_offseason_state(
             for p in list(ut.roster):
                 before_rows.append({"name": p.name, "position": p.position, "before": calculate_player_overall(p)})
         user_equipment_training: Optional[Dict[str, Any]] = None
+        from systems.coaching_cards import platinum_breakthrough_eligible_player_names
+
+        eligible_before = platinum_breakthrough_eligible_player_names(ut) if ut else []
         for t in teams.values():
             dev_summary = run_offseason_development(t)
             if ut and t.name == ut.name:
@@ -5949,7 +5991,8 @@ def advance_offseason_state(
                 before_rows,
                 (user_equipment_training or {}).get("player_reports") if isinstance(user_equipment_training, dict) else None,
             )
-        training_payload: Dict[str, Any] = {"players": deltas}
+            _attach_platinum_breakthrough_training_metadata(deltas, user_equipment_training, eligible_before)
+        training_payload: Dict[str, Any] = {"players": deltas, "breakthrough_eligible": eligible_before}
         if user_equipment_training:
             from systems.program_equipment_effects import summarize_equipment_for_training_ui
 
@@ -5980,6 +6023,7 @@ def advance_offseason_state(
     state["teams"] = [team_to_dict(t) for t in teams.values()]
     new_idx = int(state["offseason_stage_index"])
     if new_idx >= len(stages):
+        check_trial_before_year2_preseason(user_id)
         teams2 = {t["name"]: team_from_dict(t) for t in state.get("teams", [])}
         _finalize_offseason_to_preseason(state, teams2)
         state["teams"] = [team_to_dict(t) for t in teams2.values()]
@@ -8839,6 +8883,8 @@ def simulate_seasons_forward(user_id: str, save_id: str, seasons: int) -> Dict[s
     seasons_i = int(seasons)
     if seasons_i not in BULK_SIMULATE_SEASONS_OPTIONS:
         raise ValueError("seasons must be 1, 5, 10, or 20")
+    if billing_required() and not user_is_entitled(user_id):
+        raise ValueError("Multi-season fast-forward requires a full purchase.")
 
     for _ in range(seasons_i):
         guard = 0
