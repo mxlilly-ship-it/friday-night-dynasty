@@ -211,6 +211,7 @@ def create_checkout_session_route(request: Request, user=Depends(require_user)):
             cancel_url=billing_cancel_url(base),
             client_reference_id=user["user_id"],
             metadata={"user_id": user["user_id"]},
+            allow_promotion_codes=True,
             **({"customer_email": email} if email else {}),
         )
     except stripe.StripeError as e:
