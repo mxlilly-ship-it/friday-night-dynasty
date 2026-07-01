@@ -57,6 +57,14 @@ export type TeamInfoRecordRank = {
   classification: string
 }
 
+export type TeamInfoRatings = {
+  overall: number
+  offense: number
+  defense: number
+  run: number
+  pass: number
+}
+
 export type TeamInfoData = {
   teamName: string
   nickname: string
@@ -87,6 +95,7 @@ export type TeamInfoData = {
   trophies: TeamInfoTrophy[]
   totalHonours: number
   rankingHistory: TeamInfoRankingPoint[]
+  ratings: TeamInfoRatings | null
 }
 
 function safeStr(v: unknown): string {
@@ -557,6 +566,7 @@ export function buildTeamInfoData(args: {
       recordRank.stateRank,
       currentYear,
     ),
+    ratings: null,
   }
 }
 

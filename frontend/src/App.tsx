@@ -91,7 +91,7 @@ function preseasonStructurallyComplete(state: any): boolean {
 }
 
 type SaveListItem = { save_id: string; save_name: string; updated_at: number }
-type Screen = 'title' | 'load' | 'new' | 'playing'
+type Screen = 'title' | 'load' | 'new' | 'purchase' | 'playing'
 type BackupReminderFrequency = 'none' | '3_weeks' | '6_weeks' | 'stage'
 type CloudSaveListItem = { save_id: string; save_name: string; updated_at: number }
 
@@ -1413,8 +1413,34 @@ export default function App({ devNoFirebase = false }: AppProps) {
     setScreen('new')
   }
 
-  const titleNavRef = useRef({ onNewSaveClick, onLoadSaveClick })
-  titleNavRef.current = { onNewSaveClick, onLoadSaveClick }
+  async function onPurchaseClick() {
+    setError('')
+    setSuccessMessage('')
+    if (!token) {
+      setScreen('purchase')
+      return
+    }
+    if (!(await validateSession())) {
+      expireSession()
+      setScreen('purchase')
+      return
+    }
+    const status = await refreshBillingStatus()
+    if (status?.entitled) {
+      setSuccessMessage('Your account already has full access.')
+      setScreen('purchase')
+      return
+    }
+    if (status && !status.billing_required) {
+      setSuccessMessage('Purchase is not required on this server.')
+      setScreen('purchase')
+      return
+    }
+    await startCheckout()
+  }
+
+  const titleNavRef = useRef({ onNewSaveClick, onLoadSaveClick, onPurchaseClick })
+  titleNavRef.current = { onNewSaveClick, onLoadSaveClick, onPurchaseClick }
 
   useEffect(() => {
     if (screen !== 'title') setShowScreenshotsGallery(false)
@@ -1427,6 +1453,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
       if (!d || d.type !== 'fnd-title') return
       if (d.action === 'new') void titleNavRef.current.onNewSaveClick()
       else if (d.action === 'load') void titleNavRef.current.onLoadSaveClick()
+      else if (d.action === 'purchase') void titleNavRef.current.onPurchaseClick()
       else if (d.action === 'screenshots') setShowScreenshotsGallery(true)
       else if (d.action === 'support') setShowSupportContact(true)
     }
@@ -1446,6 +1473,17 @@ export default function App({ devNoFirebase = false }: AppProps) {
     setError('')
     const ok = devNoFirebase ? await devAuthSubmit() : await firebaseAuthSubmit(authMode)
     if (ok) setScreen('new')
+  }
+
+  async function onContinuePurchase() {
+    setError('')
+    const ok = devNoFirebase ? await devAuthSubmit() : await firebaseAuthSubmit(authMode)
+    if (!ok) return
+    const status = await refreshBillingStatus()
+    if (status?.entitled) {
+      setSuccessMessage('Your account already has full access!')
+      return
+    }
   }
 
   useEffect(() => {
@@ -1771,7 +1809,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
           <iframe
             className="fnd-title-iframe"
             title="Friday Night Dynasty"
-            src={`${import.meta.env.BASE_URL}fnd_homepage.html?v=20260629c`}
+            src={`${import.meta.env.BASE_URL}fnd_homepage.html?v=20260630a`}
           />
           <button
             type="button"
@@ -1968,6 +2006,140 @@ export default function App({ devNoFirebase = false }: AppProps) {
             )}
           </div>
         )}
+
+        {screen === 'purchase' && !token && (
+          <div className="fnd-panel">
+            <button type="button" className="fnd-back" onClick={goTitle}>
+              ← Back
+            </button>
+            <h2>Purchase</h2>
+            <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
+              Sign in, then complete secure checkout to unlock the full game after your free season.
+            </p>
+            {devNoFirebase ? (
+              <div className="fnd-login-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+                <input
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Coach name"
+                  onKeyDown={(e) => e.key === 'Enter' && void onContinuePurchase()}
+                />
+                <button type="button" disabled={authBusy} onClick={() => void onContinuePurchase()}>
+                  {authBusy ? 'Please wait…' : 'Continue'}
+                </button>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  <button
+                    type="button"
+                    className={authMode === 'login' ? 'fnd-title-btn' : 'fnd-back'}
+                    style={{ flex: 1, maxWidth: 'none', margin: 0 }}
+                    onClick={() => setAuthMode('login')}
+                  >
+                    Log in
+                  </button>
+                  <button
+                    type="button"
+                    className={authMode === 'signup' ? 'fnd-title-btn' : 'fnd-back'}
+                    style={{ flex: 1, maxWidth: 'none', margin: 0 }}
+                    onClick={() => setAuthMode('signup')}
+                  >
+                    Sign up
+                  </button>
+                </div>
+                <div className="fnd-login-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+                  <input
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Email"
+                    type="email"
+                    autoComplete="email"
+                  />
+                  <input
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Password"
+                    type="password"
+                    autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'}
+                    onKeyDown={(e) => e.key === 'Enter' && void onContinuePurchase()}
+                  />
+                  {authMode === 'signup' ? (
+                    <SignupTermsConsent checked={termsAccepted} onChange={setTermsAccepted} />
+                  ) : null}
+                  <button
+                    type="button"
+                    disabled={authBusy || (authMode === 'signup' && !termsAccepted)}
+                    onClick={() => void onContinuePurchase()}
+                  >
+                    {authBusy ? 'Please wait…' : authMode === 'signup' ? 'Create account' : 'Log in'}
+                  </button>
+                </div>
+              </>
+            )}
+            <button
+              type="button"
+              className="fnd-support-link fnd-support-link--panel"
+              style={{ marginTop: 12 }}
+              onClick={() => setShowSupportContact(true)}
+            >
+              Need help or a refund?
+            </button>
+          </div>
+        )}
+
+        {screen === 'purchase' && token ? (
+          <div className="fnd-panel">
+            <button type="button" className="fnd-back" onClick={goTitle}>
+              ← Back
+            </button>
+            <h2>Purchase</h2>
+            <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
+              One-time purchase unlocks year two and beyond for{' '}
+              <strong style={{ color: '#d0d4dc' }}>{username}</strong>.
+            </p>
+            {billingChecking ? (
+              <p style={{ color: '#9ca3af', fontSize: '0.9rem' }}>Checking purchase status…</p>
+            ) : billingStatus?.entitled ? (
+              <p style={{ color: '#86efac', fontSize: '0.9rem', margin: 0 }}>
+                This account already has full access.
+              </p>
+            ) : billingStatus && !billingStatus.billing_required ? (
+              <p style={{ color: '#9ca3af', fontSize: '0.9rem', margin: 0 }}>
+                Purchase is not required on this server.
+              </p>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="fnd-title-btn"
+                  style={{ maxWidth: '100%', marginBottom: 10 }}
+                  disabled={billingBusy}
+                  onClick={() => void startCheckout()}
+                >
+                  {billingBusy ? 'Redirecting to checkout…' : 'Buy now — secure checkout'}
+                </button>
+                <button
+                  type="button"
+                  className="teamhome-select"
+                  style={{ maxWidth: '100%' }}
+                  disabled={billingBusy}
+                  onClick={() => void syncBillingAccess()}
+                >
+                  {billingBusy ? 'Please wait…' : 'Already paid? Refresh purchase status'}
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              className="fnd-support-link fnd-support-link--panel"
+              style={{ marginTop: 12 }}
+              onClick={() => setShowSupportContact(true)}
+            >
+              Need help or a refund?
+            </button>
+          </div>
+        ) : null}
 
         {screen === 'new' && !token && (
           <div className="fnd-panel">

@@ -309,6 +309,54 @@
   color: var(--ti-red);
 }
 
+.ti-ratings-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  border-top: 1px solid var(--ti-border);
+}
+
+.ti-rating-cell {
+  padding: 12px 14px;
+  border-right: 1px solid var(--ti-border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ti-rating-cell:last-child {
+  border-right: none;
+}
+
+.ti-rating-cell--ovr .ti-rating-val {
+  color: var(--ti-gold);
+  font-size: 1.35rem;
+}
+
+.ti-rating-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+}
+
+.ti-rating-val {
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.ti-ratings-empty {
+  padding: 14px;
+  opacity: 0.8;
+  font-size: 0.9rem;
+}
+
+.ti-ratings-note {
+  padding: 8px 14px 12px;
+  font-size: 0.78rem;
+  opacity: 0.72;
+  border-top: 1px solid var(--ti-border);
+}
+
 .ti-program-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

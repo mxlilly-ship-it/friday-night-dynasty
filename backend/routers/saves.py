@@ -46,6 +46,7 @@ from backend.services.league_service import (
     get_coach_gameplan_v2,
     save_coach_gameplan_v2,
     get_team_history,
+    get_team_ratings,
     get_coach_history,
     get_team_season_recap_text,
     patch_coach_inbox,
@@ -674,6 +675,17 @@ def get_team_history_route(
     """Team History table for the selected team."""
     try:
         return get_team_history(user["user_id"], save_id, team_name)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=_save_route_exception_detail(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=_save_route_exception_detail(e))
+
+
+@router.get("/{save_id}/team-ratings", response_model=Dict[str, Any])
+def get_team_ratings_route(save_id: str, user=Depends(require_entitled)):
+    """Roster-derived offense/defense/run/pass/overall ratings for all teams (matches game sim)."""
+    try:
+        return get_team_ratings(user["user_id"], save_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=_save_route_exception_detail(e))
     except Exception as e:

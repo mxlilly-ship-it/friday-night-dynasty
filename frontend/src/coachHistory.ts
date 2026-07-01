@@ -968,3 +968,171 @@ export async function downloadTeamSeasonRecap(opts: DownloadTeamSeasonRecapOpts)
   a.remove()
   setTimeout(() => URL.revokeObjectURL(dlUrl), 250)
 }
+
+export type CoachStatsRow = {
+  coachName: string
+  school: string
+  wins: number
+  losses: number
+  winPct: number
+  regionalTitles: number
+  playoffAppearances: number
+  stateRunnerUps: number
+  stateChampionships: number
+  seasons: number
+}
+
+function seasonEntryForYear(leagueHistory: any, year: number): any | null {
+  if (!Number.isFinite(year)) return null
+  const seasons = Array.isArray(leagueHistory?.seasons) ? leagueHistory.seasons : []
+  for (const s of seasons) {
+    if (!s || typeof s !== 'object') continue
+    const y = Number((s as { year?: unknown }).year ?? (s as { season?: unknown }).season)
+    if (y === year) return s
+  }
+  return null
+}
+
+/** Head coaches only — career log, archived standings, and current rosters. */
+function collectHeadCoachDisplayNames(saveState: any, leagueHistory: any): Map<string, string> {
+  const map = new Map<string, string>()
+  const add = (raw: unknown) => {
+    const disp = typeof raw === 'string' ? raw.trim() : ''
+    if (!disp || disp === '—') return
+    const key = normCoach(disp)
+    if (!key) return
+    if (!map.has(key)) map.set(key, disp)
+  }
+
+  const careerLog = saveState?.coach_career_log
+  if (Array.isArray(careerLog)) {
+    for (const e of careerLog) {
+      if (!e || typeof e !== 'object') continue
+      add((e as { coach?: unknown }).coach)
+    }
+  }
+
+  const seasons = Array.isArray(leagueHistory?.seasons) ? leagueHistory.seasons : []
+  for (const s of seasons) {
+    if (!s || typeof s !== 'object') continue
+    const standingsList = Array.isArray((s as { standings?: unknown }).standings)
+      ? (s as { standings: unknown[] }).standings
+      : []
+    for (const stRow of standingsList) {
+      if (!stRow || typeof stRow !== 'object') continue
+      add((stRow as { coach?: unknown }).coach)
+    }
+  }
+
+  if (Array.isArray(saveState?.teams)) {
+    for (const t of saveState.teams) {
+      if (!t || typeof t !== 'object') continue
+      add((t as { coach?: { name?: unknown } }).coach?.name)
+    }
+  }
+
+  for (const t of saveState?.teams ?? []) {
+    if (!t || typeof t !== 'object') continue
+    const disp = String((t as { coach?: { name?: unknown } }).coach?.name ?? '').trim()
+    const key = normCoach(disp)
+    if (key && disp) map.set(key, disp)
+  }
+
+  return map
+}
+
+function countRegionalTitlesForCoachRows(rows: CoachHistoryRow[], leagueHistory: any): number {
+  let n = 0
+  for (const r of rows) {
+    const y = Number(r.year)
+    const team = String(r.team ?? '').trim()
+    if (!team || !Number.isFinite(y)) continue
+    const season = seasonEntryForYear(leagueHistory, y)
+    if (!season) continue
+    const rc = (season as { regional_champions?: unknown }).regional_champions
+    if (Array.isArray(rc) && rc.includes(team)) n += 1
+  }
+  return n
+}
+
+function countPlayoffAppearancesForCoachRows(
+  rows: CoachHistoryRow[],
+  leagueHistory: any,
+  saveState?: any,
+): number {
+  let n = 0
+  const countedYears = new Set<string>()
+  for (const r of rows) {
+    const y = Number(r.year)
+    const team = String(r.team ?? '').trim()
+    if (!team || !Number.isFinite(y)) continue
+    const season = seasonEntryForYear(leagueHistory, y)
+    if (season && teamHadPostseasonBracketAppearance(team, season)) {
+      n += 1
+      countedYears.add(`${y}|${team}`)
+    }
+  }
+  const phase = String(saveState?.season_phase ?? '').toLowerCase()
+  if (phase === 'playoffs' && saveState) {
+    const cy = Number(saveState.current_year)
+    if (Number.isFinite(cy)) {
+      for (const r of rows) {
+        if (Number(r.year) !== cy) continue
+        const team = String(r.team ?? '').trim()
+        if (!team) continue
+        if (countedYears.has(`${cy}|${team}`)) continue
+        if (teamInActivePlayoffBracket(team, saveState)) n += 1
+      }
+    }
+  }
+  return n
+}
+
+function schoolForCoach(norm: string, saveState: any, rows: CoachHistoryRow[]): string {
+  const linked = findCoachTeamInSave(saveState, '', norm)
+  if (linked?.teamName) return linked.teamName
+  if (rows.length > 0) return String(rows[0].team ?? '').trim()
+  return ''
+}
+
+/** League-wide head coach leaderboard from career log + league history. */
+export function buildCoachStatsLeaderboard(saveState: any, leagueHistory: any): CoachStatsRow[] {
+  const coachMap = collectHeadCoachDisplayNames(saveState, leagueHistory)
+  const careerLog = saveState?.coach_career_log
+  const saveTeams = saveState?.teams
+  const out: CoachStatsRow[] = []
+
+  for (const [norm, displayName] of coachMap) {
+    const archived = buildCoachHistoryFromLeagueHistory(leagueHistory, displayName, saveTeams, careerLog)
+    const schoolHint = schoolForCoach(norm, saveState, archived)
+    const rows = mergeInProgressCoachHistory(archived, displayName, schoolHint || undefined, saveState)
+    if (rows.length === 0) continue
+
+    const career = aggregateCoachCareer(rows)
+    const wins = career.totalWins
+    const losses = career.totalLosses
+    const games = wins + losses
+    const winPct = games > 0 ? wins / games : 0
+
+    out.push({
+      coachName: displayName,
+      school: schoolForCoach(norm, saveState, rows),
+      wins,
+      losses,
+      winPct,
+      regionalTitles: countRegionalTitlesForCoachRows(rows, leagueHistory),
+      playoffAppearances: countPlayoffAppearancesForCoachRows(rows, leagueHistory, saveState),
+      stateRunnerUps: career.runnerUps,
+      stateChampionships: career.stateChampionships,
+      seasons: career.seasons,
+    })
+  }
+
+  out.sort((a, b) => {
+    if (b.stateChampionships !== a.stateChampionships) return b.stateChampionships - a.stateChampionships
+    if (b.wins !== a.wins) return b.wins - a.wins
+    return a.coachName.localeCompare(b.coachName)
+  })
+
+  return out
+}

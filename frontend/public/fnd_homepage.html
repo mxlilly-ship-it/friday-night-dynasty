@@ -172,6 +172,17 @@
     .game-btn:hover::after  { opacity: 0.3; transform: scale(1.06); }
     .game-btn:active { transform: scale(0.97); }
 
+    .btn-row--purchase {
+      margin-top: clamp(10px, 1.8vh, 18px);
+      animation: fadeUp 1.4s .62s cubic-bezier(.16,1,.3,1) both;
+    }
+
+    .game-btn--small {
+      font-size: clamp(11px, 1.35vw, 15px);
+      letter-spacing: 0.22em;
+      padding: 8px 26px;
+    }
+
     @keyframes flicker {
       0%,100% { filter: brightness(0.55) saturate(1.05); }
       20%      { filter: brightness(0.38) saturate(0.9); }
@@ -279,6 +290,11 @@
           <span class="fill"></span>Support
         </button>
       </div>
+      <div class="btn-row btn-row--purchase">
+        <button class="game-btn game-btn--small" id="btn-purchase" onclick="startPurchase()">
+          <span class="fill"></span>Purchase
+        </button>
+      </div>
     </div>
   </div>
 
@@ -302,6 +318,7 @@
     function loadGame() { fndPost('load'); }
     function showScreenshots() { fndPost('screenshots'); }
     function showSupport() { fndPost('support'); }
+    function startPurchase() { fndPost('purchase'); }
   </script>
 </body>
 </html>

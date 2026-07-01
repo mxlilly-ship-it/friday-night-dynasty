@@ -27,6 +27,8 @@ import { buildTeamInfoData } from './teamInfoData'
 import { gameOfTheWeekLabel, isGameOfTheWeek, pickGameOfTheWeekForWeek } from './gameOfTheWeek'
 import { buildPlayerStatRows } from './playerSeasonStats'
 import { CoachProfileName, CoachProfileProvider } from './CoachProfileContext'
+import CoachStatsPage from './CoachStatsPage'
+import TeamRatingsPage from './TeamRatingsPage'
 import CoachingCardPicker from './CoachingCardPicker'
 import {
   COACH_DEV_SKILLS,
@@ -69,6 +71,12 @@ import {
   mergeInProgressTeamProgramTotals,
   type TeamProgramTotalsDisplay,
 } from './coachHistory'
+import {
+  buildTeamRatingsFromSaveState,
+  fetchTeamRatings,
+  ratingsForTeam,
+  type TeamRatingRow,
+} from './teamRatings'
 import {
   findSeasonEntryByCalendarYear,
   getHistoricalPlayoffsByClass,
@@ -2013,6 +2021,8 @@ function TeamHomePageBody({
   )
   const playoffSeedDisplayMode = playoffView.isRegional ? ('regional' as const) : ('overall' as const)
   const [teamHistoryLoading, setTeamHistoryLoading] = useState(false)
+  const [teamRatingsRows, setTeamRatingsRows] = useState<TeamRatingRow[]>([])
+  const [teamRatingsLoading, setTeamRatingsLoading] = useState(false)
   const [teamHistoryRows, setTeamHistoryRows] = useState<any[]>([])
   const [teamHistoryTotals, setTeamHistoryTotals] = useState<TeamProgramTotalsDisplay | null>(null)
   const teamScheduleRows = useMemo(
@@ -2437,6 +2447,52 @@ function TeamHomePageBody({
     saveState?.last_completed_year,
     saveState?.last_completed_standings,
   ])
+
+  useEffect(() => {
+    if (stateMenu !== 'Team Ratings' && stateMenu !== 'Team Info') return
+
+    const applyClientRows = () => {
+      setTeamRatingsRows(buildTeamRatingsFromSaveState(saveState))
+    }
+
+    if (isLocalBundle) {
+      setTeamRatingsLoading(false)
+      applyClientRows()
+      return
+    }
+
+    applyClientRows()
+
+    if (!apiBase || !saveId) {
+      setTeamRatingsLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setTeamRatingsLoading(true)
+    void (async () => {
+      try {
+        const hdrs = headers?.Authorization ? headers : {}
+        const rows = await fetchTeamRatings({ apiBase, saveId, headers: hdrs })
+        if (!cancelled) {
+          setTeamRatingsRows(rows)
+          onError('')
+        }
+      } catch (e: unknown) {
+        if (!cancelled) {
+          applyClientRows()
+          onError(e instanceof Error ? e.message : 'Failed to load team ratings from server (showing local estimate)')
+        }
+      } finally {
+        if (!cancelled) setTeamRatingsLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onError identity can churn from parent
+  }, [stateMenu, apiBase, headers, saveId, isLocalBundle, saveState, saveState?.teams])
+
   const sortedPlayerStatRows = useMemo(() => {
     const arr = [...playerStatRows]
     arr.sort((a, b) => {
@@ -2890,7 +2946,7 @@ function TeamHomePageBody({
   const teamInfoPageData = useMemo(() => {
     if (!teamInfoViewTeam) return null
     const rr = buildRecordAndRankForTeam(saveState, teamInfoViewTeam)
-    return buildTeamInfoData({
+    const base = buildTeamInfoData({
       saveState,
       leagueHistory,
       teamName: teamInfoViewTeam,
@@ -2901,7 +2957,20 @@ function TeamHomePageBody({
         classification: rr.classification,
       },
     })
-  }, [saveState, leagueHistory, teamInfoViewTeam])
+    const rating = ratingsForTeam(teamRatingsRows, teamInfoViewTeam)
+    return {
+      ...base,
+      ratings: rating
+        ? {
+            overall: rating.overall,
+            offense: rating.offense,
+            defense: rating.defense,
+            run: rating.run,
+            pass: rating.pass,
+          }
+        : null,
+    }
+  }, [saveState, leagueHistory, teamInfoViewTeam, teamRatingsRows])
 
   /** League / state views shown when TEAM menu is Overview (regular season). */
   const leagueStatePanel =
@@ -3137,6 +3206,17 @@ function TeamHomePageBody({
           )}
         </div>
       </div>
+    ) : stateMenu === 'Team Ratings' ? (
+      <TeamRatingsPage
+        rows={teamRatingsRows}
+        loading={teamRatingsLoading}
+        classFilter={leagueClassFilter}
+        classFilterBar={leagueClassFilterBar}
+        apiBase={apiBase}
+        headers={headers}
+        logoVersion={logoVersion}
+        userTeam={userTeam}
+      />
     ) : stateMenu === 'Stats' ? (
       <div className="teamhome-roster-shell">
         {leagueClassFilterBar}
@@ -3481,6 +3561,15 @@ function TeamHomePageBody({
           )
         })()}
       </div>
+    ) : stateMenu === 'Coach Stats' ? (
+      <CoachStatsPage
+        saveState={saveState}
+        leagueHistory={leagueHistory}
+        apiBase={apiBase}
+        headers={headers}
+        logoVersion={logoVersion}
+        userCoachName={String(findTeam(saveState, userTeam)?.coach?.name ?? '')}
+      />
     ) : stateMenu === 'Team History' ? (
       <div className="teamhome-roster-shell">
         <div className="teamhome-teaminfo-header">
@@ -5044,10 +5133,12 @@ function TeamHomePageBody({
             <option value="Weekly schedule">Weekly schedule</option>
             <option value="Team Schedule">Team Schedule</option>
             <option value="Rankings">Rankings</option>
+            <option value="Team Ratings">Team Ratings</option>
             <option value="Stats">Stats</option>
             <option value="Team Info">Team Info</option>
             <option value="Facilities">Facilities</option>
             <option value="Coaching changes">Coaching changes</option>
+            <option value="Coach Stats">Coach Stats</option>
             <option value="Team History">Team History</option>
             <option value="Prestige report">Prestige report</option>
             <option value="League History">League History</option>

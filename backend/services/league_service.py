@@ -100,7 +100,8 @@ from systems.program_progression import (
 )
 from systems.offseason_manager import reset_team_season_stats, run_offseason_roster_turnover
 from systems.seven_on_seven import VALID_TOURNAMENT_TIERS, run_seven_on_seven_tournament
-from systems.team_ratings import calculate_player_overall
+from systems.team_ratings import calculate_player_overall, calculate_team_ratings
+from systems.program_progression import team_composite_strength
 from systems.save_system import league_history_path
 from systems.win_path_io import (
     io_path_candidates,
@@ -4956,6 +4957,38 @@ def _postseason_label_live(state: Dict[str, Any], team: str, teams: Dict[str, An
     if playoffs.get("runner_up") == team:
         return "Runner-up"
     return "—"
+
+
+def get_team_ratings(user_id: str, save_id: str) -> Dict[str, Any]:
+    """Roster-derived team ratings (offense, defense, run, pass, overall) for every team in the save."""
+    state, _save_dir = load_state(user_id, save_id)
+    standings = state.get("standings") if isinstance(state.get("standings"), dict) else {}
+    rows: List[Dict[str, Any]] = []
+    for t_dict in state.get("teams") or []:
+        if not isinstance(t_dict, dict):
+            continue
+        name = str(t_dict.get("name") or "").strip()
+        if not name:
+            continue
+        team = team_from_dict(t_dict)
+        ratings = calculate_team_ratings(team)
+        overall = int(round(team_composite_strength(ratings)))
+        st = standings.get(name) if isinstance(standings, dict) else None
+        st_dict = st if isinstance(st, dict) else {}
+        rows.append({
+            "team_name": name,
+            "classification": str(t_dict.get("classification") or "").strip() or "—",
+            "region": str(t_dict.get("region") or "").strip() or "—",
+            "wins": int(st_dict.get("wins", 0) or 0),
+            "losses": int(st_dict.get("losses", 0) or 0),
+            "overall": overall,
+            "offense": int(ratings.get("offense", 50)),
+            "defense": int(ratings.get("defense", 50)),
+            "run": int(ratings.get("run", 50)),
+            "pass": int(ratings.get("pass", 50)),
+        })
+    rows.sort(key=lambda r: (-int(r.get("overall", 0) or 0), -int(r.get("offense", 0) or 0), str(r.get("team_name") or "")))
+    return {"teams": rows}
 
 
 def get_team_history(user_id: str, save_id: str, team_name: str) -> Dict[str, Any]:

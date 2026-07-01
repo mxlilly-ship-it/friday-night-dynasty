@@ -245,6 +245,39 @@ export default function TeamInfoPage({
           </section>
 
           <section className="ti-panel">
+            <div className="ti-sec-head">Team Ratings</div>
+            {data.ratings ? (
+              <div className="ti-ratings-grid">
+                <div className="ti-rating-cell ti-rating-cell--ovr">
+                  <span className="ti-rating-label">Overall</span>
+                  <span className="ti-rating-val">{data.ratings.overall}</span>
+                </div>
+                <div className="ti-rating-cell">
+                  <span className="ti-rating-label">Offense</span>
+                  <span className="ti-rating-val">{data.ratings.offense}</span>
+                </div>
+                <div className="ti-rating-cell">
+                  <span className="ti-rating-label">Defense</span>
+                  <span className="ti-rating-val">{data.ratings.defense}</span>
+                </div>
+                <div className="ti-rating-cell">
+                  <span className="ti-rating-label">Run</span>
+                  <span className="ti-rating-val">{data.ratings.run}</span>
+                </div>
+                <div className="ti-rating-cell">
+                  <span className="ti-rating-label">Pass</span>
+                  <span className="ti-rating-val">{data.ratings.pass}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="ti-ratings-empty">Ratings loading…</div>
+            )}
+            <div className="ti-ratings-note">
+              Starter-weighted roster talent (same ratings used in game simulation).
+            </div>
+          </section>
+
+          <section className="ti-panel">
             <div className="ti-sec-head">Program History</div>
             <div className="ti-program-stats">
               <div className="ti-ps-cell">
