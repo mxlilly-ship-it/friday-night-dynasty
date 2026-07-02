@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+backend/dynasty.sqlite3
+backend/dynasty.sqlite3-shm
+backend/dynasty.sqlite3-wal

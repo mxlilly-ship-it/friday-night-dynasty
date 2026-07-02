@@ -605,6 +605,9 @@ class UpdateDepthChartBody(BaseModel):
 class CoachGameplanV2Body(BaseModel):
     offense: Optional[Dict[str, Any]] = None
     defense: Optional[Dict[str, Any]] = None
+    offense_package: Optional[Dict[str, Any]] = None
+    defense_package: Optional[Dict[str, Any]] = None
+    team_script: Optional[Dict[str, Any]] = None
     fourth_down: Optional[Dict[str, Any]] = None
     add_offense_library: Optional[Dict[str, Any]] = None
     delete_offense_library_id: Optional[str] = None
@@ -612,6 +615,9 @@ class CoachGameplanV2Body(BaseModel):
     delete_defense_library_id: Optional[str] = None
     week_to_week_offense: Optional[bool] = None
     week_to_week_defense: Optional[bool] = None
+    confirm_offense: Optional[bool] = None
+    confirm_defense: Optional[bool] = None
+    autofill_callsheet: Optional[bool] = None
 
 
 class CoachInboxChooseBody(BaseModel):
@@ -645,6 +651,9 @@ def save_coach_gameplan_v2_route(save_id: str, body: CoachGameplanV2Body, user=D
             save_id,
             offense=body.offense,
             defense=body.defense,
+            offense_package=body.offense_package,
+            defense_package=body.defense_package,
+            team_script=body.team_script,
             fourth_down=body.fourth_down,
             add_offense_library=body.add_offense_library,
             delete_offense_library_id=body.delete_offense_library_id,
@@ -652,6 +661,9 @@ def save_coach_gameplan_v2_route(save_id: str, body: CoachGameplanV2Body, user=D
             delete_defense_library_id=body.delete_defense_library_id,
             week_to_week_offense=body.week_to_week_offense,
             week_to_week_defense=body.week_to_week_defense,
+            confirm_offense=body.confirm_offense,
+            confirm_defense=body.confirm_defense,
+            autofill_callsheet=body.autofill_callsheet,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=_save_route_exception_detail(e))

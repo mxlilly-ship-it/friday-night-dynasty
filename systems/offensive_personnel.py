@@ -29,6 +29,8 @@ OFFENSIVE_FORMATION_PERSONNEL: Dict[str, Tuple[int, int, int, int]] = {
     "Power I": (5, 3, 1, 1),
     "Wing T": (5, 3, 1, 1),
     "Doubles": (5, 1, 1, 3),
+    "Wide Slot": (5, 1, 1, 3),
+    "Goalline": (5, 2, 3, 0),
 }
 
 

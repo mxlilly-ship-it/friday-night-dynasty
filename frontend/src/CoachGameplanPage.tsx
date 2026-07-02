@@ -1,6 +1,30 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchCoachGameplan, saveCoachGameplan, type GamePlanLibrary } from './browserSave'
 import './CoachGameplanPage.css'
+import './OffGameplanPage.css'
+import './DefGameplanPage.css'
+import WeeklyGameplanSections, {
+  GameplanModeToggle,
+  computeOffTabWarnings,
+  computeDefTabWarnings,
+  type GameplanTab,
+  type OffGameplanTab,
+} from './WeeklyGameplanSections'
+import {
+  defaultDefenseUsage,
+  defaultOffenseUsage,
+  defaultTeamScript,
+  emptyDefenseCallsheet,
+  emptyHalftimeSlots,
+  emptyOffenseCallsheet,
+  emptyPractice,
+  buildSkillTargetPlayers,
+  buildGameplanExportPayload,
+  type HalftimeTrigger,
+  type InstalledPlay,
+  type SidePackage,
+  type TeamScript,
+} from './weeklyGameplanTypes'
 
 type Side = 'offense' | 'defense'
 
@@ -25,6 +49,64 @@ const DD_BUCKETS = ['1&10', '2&10+', '2&7-10', '2&3-6', '2&1-3', '3&10+', '3&7-9
 
 const OFF_CATS = ['Inside Run', 'Outside Run', 'Quick', 'Medium', 'Long', 'Play Action'] as const
 const DEF_CATS = ['Zones', 'Man', 'Zone Pressure', 'Man Pressure'] as const
+
+const OFF_CAT_INPUT_CLASS: Record<(typeof OFF_CATS)[number], string> = {
+  'Inside Run': 'ogp-run',
+  'Outside Run': 'ogp-run',
+  Quick: 'ogp-pass',
+  Medium: 'ogp-pass',
+  Long: 'ogp-pass',
+  'Play Action': 'ogp-pa',
+}
+
+const OFF_CAT_TH_CLASS: Record<(typeof OFF_CATS)[number], string> = {
+  'Inside Run': 'ogp-run',
+  'Outside Run': 'ogp-run',
+  Quick: 'ogp-pass',
+  Medium: 'ogp-pass',
+  Long: 'ogp-pass',
+  'Play Action': 'ogp-pa',
+}
+
+const OFF_GAMEPLAN_TABS: { id: OffGameplanTab; label: string }[] = [
+  { id: 'gameplan', label: 'Gameplan' },
+  { id: 'usage', label: 'Usage' },
+  { id: 'practice', label: 'Practice' },
+  { id: 'halftime', label: 'Halftime' },
+  { id: 'script', label: 'Team Script' },
+]
+
+const OFF_BYE_TABS: { id: OffGameplanTab; label: string }[] = [
+  { id: 'practice', label: 'Practice' },
+  { id: 'script', label: 'Team Script' },
+]
+
+const DEF_CAT_INPUT_CLASS: Record<(typeof DEF_CATS)[number], string> = {
+  Zones: 'dgp-zone',
+  Man: 'dgp-man',
+  'Zone Pressure': 'dgp-zp',
+  'Man Pressure': 'dgp-mp',
+}
+
+const DEF_CAT_TH_CLASS: Record<(typeof DEF_CATS)[number], string> = {
+  Zones: 'dgp-zone',
+  Man: 'dgp-man',
+  'Zone Pressure': 'dgp-zp',
+  'Man Pressure': 'dgp-mp',
+}
+
+const DEF_GAMEPLAN_TABS: { id: GameplanTab; label: string }[] = [
+  { id: 'gameplan', label: 'Gameplan' },
+  { id: 'usage', label: 'Usage' },
+  { id: 'practice', label: 'Practice' },
+  { id: 'halftime', label: 'Halftime' },
+  { id: 'script', label: 'Team Script' },
+]
+
+const DEF_BYE_TABS: { id: GameplanTab; label: string }[] = [
+  { id: 'practice', label: 'Practice' },
+  { id: 'script', label: 'Team Script' },
+]
 
 type PlanCell = Record<string, number>
 type Plan = Record<string, Record<string, Record<string, PlanCell>>>
@@ -88,6 +170,20 @@ function makeDefaultCell(cats: readonly string[]): PlanCell {
     out[c] = base + (i < remainder ? 1 : 0)
   })
   return out
+}
+
+function makeDefaultSidePackage(side: Side, grid?: Plan): SidePackage {
+  const g = grid ?? makeDefaultPlan(side === 'offense' ? OFF_CATS : DEF_CATS)
+  return {
+    version: 1,
+    gameplan_mode: 'grid',
+    confirmed: false,
+    grid: g as unknown as Record<string, unknown>,
+    callsheet: (side === 'offense' ? emptyOffenseCallsheet() : emptyDefenseCallsheet()) as Record<string, unknown>,
+    usage: side === 'offense' ? defaultOffenseUsage() : defaultDefenseUsage(),
+    practice: emptyPractice(side),
+    halftime: { slots: emptyHalftimeSlots() },
+  }
 }
 
 function makeDefaultPlan(cats: readonly string[]): Plan {
@@ -198,15 +294,37 @@ export default function CoachGameplanPage({
   const [defense, setDefense] = useState<Plan | null>(null)
   const [offenseLibrary, setOffenseLibrary] = useState<GamePlanLibrary | null>(null)
   const [defenseLibrary, setDefenseLibrary] = useState<GamePlanLibrary | null>(null)
-  const [goForItMaxYtg, setGoForItMaxYtg] = useState<number>(2)
   const [weekToWeek, setWeekToWeek] = useState(false)
+  const [offensePackage, setOffensePackage] = useState<SidePackage | null>(null)
+  const [defensePackage, setDefensePackage] = useState<SidePackage | null>(null)
+  const [teamScript, setTeamScript] = useState<TeamScript>(defaultTeamScript())
+  const [installedOffense, setInstalledOffense] = useState<InstalledPlay[]>([])
+  const [installedDefense, setInstalledDefense] = useState<InstalledPlay[]>([])
+  const [halftimeTriggersOff, setHalftimeTriggersOff] = useState<HalftimeTrigger[]>([])
+  const [halftimeTriggersDef, setHalftimeTriggersDef] = useState<HalftimeTrigger[]>([])
+  const [isByeWeek, setIsByeWeek] = useState(false)
+  const [gameplanAvailable, setGameplanAvailable] = useState(true)
 
   const [scoreSituation, setScoreSituation] = useState<(typeof SCORE_SITUATIONS)[number]>(SCORE_SITUATIONS[3])
   const [fieldArea, setFieldArea] = useState<(typeof FIELD_AREAS)[number]>(FIELD_AREAS[1])
+  const [offActiveTab, setOffActiveTab] = useState<OffGameplanTab>('gameplan')
+  const [defActiveTab, setDefActiveTab] = useState<GameplanTab>('gameplan')
 
   const cats = useMemo(() => (side === 'offense' ? OFF_CATS : DEF_CATS), [side])
   const plan = side === 'offense' ? offense : defense
   const setPlan = side === 'offense' ? setOffense : setDefense
+
+  const sidePackage = side === 'offense' ? offensePackage : defensePackage
+  const setSidePackage = side === 'offense' ? setOffensePackage : setDefensePackage
+
+  const targetPlayers = useMemo(() => {
+    const st = saveState as {
+      teams?: Record<string, unknown>[]
+      user_team?: string
+    }
+    const team = (st?.teams ?? []).find((t) => t?.name === st?.user_team) as Record<string, unknown> | undefined
+    return buildSkillTargetPlayers(team)
+  }, [saveState])
 
   const sideLibrary = side === 'offense' ? offenseLibrary : defenseLibrary
 
@@ -240,8 +358,17 @@ export default function CoachGameplanPage({
       setDefense(j.defense as Plan)
       setOffenseLibrary((j.offense_library as GamePlanLibrary | undefined) ?? null)
       setDefenseLibrary((j.defense_library as GamePlanLibrary | undefined) ?? null)
-      const raw = Number(j.fourth_down?.go_for_it_max_ytg)
-      setGoForItMaxYtg(Number.isFinite(raw) ? Math.max(0, Math.min(10, Math.round(raw))) : 2)
+      const offGrid = j.offense as Plan
+      const defGrid = j.defense as Plan
+      setOffensePackage((j.offense_package as SidePackage | undefined) ?? makeDefaultSidePackage('offense', offGrid))
+      setDefensePackage((j.defense_package as SidePackage | undefined) ?? makeDefaultSidePackage('defense', defGrid))
+      setTeamScript({ ...defaultTeamScript(), ...((j.team_script as TeamScript | undefined) ?? {}) })
+      setInstalledOffense((j.installed_plays_offense as InstalledPlay[]) ?? [])
+      setInstalledDefense((j.installed_plays_defense as InstalledPlay[]) ?? [])
+      setHalftimeTriggersOff((j.halftime_triggers_offense as HalftimeTrigger[]) ?? [])
+      setHalftimeTriggersDef((j.halftime_triggers_defense as HalftimeTrigger[]) ?? [])
+      setIsByeWeek(Boolean(j.is_bye_week))
+      setGameplanAvailable(Boolean((j.meta as { gameplan_available?: boolean })?.gameplan_available ?? true))
       const wtw = j.week_to_week
       setWeekToWeek(Boolean(side === 'offense' ? wtw?.offense : wtw?.defense))
     } catch (e: unknown) {
@@ -319,10 +446,18 @@ export default function CoachGameplanPage({
     })
   }
 
-  const onExportJson = () => {
-    if (!plan) return
+  const onExportJson = (opts?: { promptName?: boolean }) => {
     const key = matchupKey ? matchupKey.replaceAll(':', '_').replaceAll(' ', '_') : 'gameplan'
-    downloadFile(`${side.toUpperCase()}_${key}.json`, 'application/json', JSON.stringify(plan, null, 2))
+    let label = `GAMEPLAN_${key}`
+    if (opts?.promptName) {
+      const custom = window.prompt('Name this exported gameplan (optional):', '')?.trim()
+      if (custom) {
+        label = custom.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_').slice(0, 64) || label
+      }
+    }
+    const payload = buildGameplanExportPayload(offensePackage, defensePackage, teamScript)
+    downloadFile(`${label}.json`, 'application/json', JSON.stringify(payload, null, 2))
+    onError('')
   }
 
   const onExportCsv = () => {
@@ -425,8 +560,8 @@ export default function CoachGameplanPage({
   }
 
   const onWeekToWeekChange = async (checked: boolean) => {
-    if (!saveId) return
-    if (checked && plan) {
+    if (!saveId || !sidePackage) return
+    if (checked && sidePackage.gameplan_mode === 'grid' && plan) {
       const full = validateEntirePlan(plan)
       if (!full.ok) {
         onError(`Set a valid full gameplan before enabling week-to-week carry. ${full.msg}`)
@@ -436,26 +571,27 @@ export default function CoachGameplanPage({
     setWeekToWeek(checked)
     setBusy(true)
     try {
-      const fourth_down = { go_for_it_max_ytg: Math.max(0, Math.min(10, Math.round(Number(goForItMaxYtg) || 0))) }
+      const pkg = sidePackage.gameplan_mode === 'grid' && plan ? { ...sidePackage, grid: plan } : sidePackage
       const body =
         side === 'offense'
           ? {
               week_to_week_offense: checked,
-              ...(checked && plan ? { offense: plan, fourth_down } : {}),
+              ...(checked ? { offense_package: pkg, team_script: teamScript } : {}),
             }
           : {
               week_to_week_defense: checked,
-              ...(checked && plan ? { defense: plan } : {}),
+              ...(checked ? { defense_package: pkg, team_script: teamScript } : {}),
             }
       const j = await saveCoachGameplan(apiBase ?? '', saveId, saveStateRef.current, headersRef.current, body)
       if (j.state) onSaveStateRef.current?.(j.state)
       setMatchupKey(j.matchup_key ?? null)
       setOffense(j.offense as Plan)
       setDefense(j.defense as Plan)
+      setOffensePackage((j.offense_package as SidePackage | undefined) ?? offensePackage)
+      setDefensePackage((j.defense_package as SidePackage | undefined) ?? defensePackage)
+      setTeamScript({ ...defaultTeamScript(), ...((j.team_script as TeamScript | undefined) ?? {}) })
       setOffenseLibrary((j.offense_library as GamePlanLibrary | undefined) ?? null)
       setDefenseLibrary((j.defense_library as GamePlanLibrary | undefined) ?? null)
-      const raw = Number(j.fourth_down?.go_for_it_max_ytg)
-      setGoForItMaxYtg(Number.isFinite(raw) ? Math.max(0, Math.min(10, Math.round(raw))) : 2)
       const wtw = j.week_to_week
       setWeekToWeek(Boolean(side === 'offense' ? wtw?.offense : wtw?.defense))
       onError('')
@@ -468,33 +604,53 @@ export default function CoachGameplanPage({
   }
 
   const onConfirm = async () => {
-    if (!saveId || !plan) return
-    const full = validateEntirePlan(plan)
-    if (!full.ok) {
-      onError(full.msg)
-      return
-    }
-    const v = validateCurrentTable()
-    if (!v.ok) {
-      onError(v.msg)
-      return
+    if (!saveId || !sidePackage) return
+    if (!isByeWeek && !plan) return
+    if (!isByeWeek && sidePackage.gameplan_mode === 'grid' && plan) {
+      const full = validateEntirePlan(plan)
+      if (!full.ok) {
+        onError(full.msg)
+        return
+      }
+      const v = validateCurrentTable()
+      if (!v.ok) {
+        onError(v.msg)
+        return
+      }
     }
     setBusy(true)
     try {
-      const fourth_down = { go_for_it_max_ytg: Math.max(0, Math.min(10, Math.round(Number(goForItMaxYtg) || 0))) }
+      const pkg = {
+        ...sidePackage,
+        ...(plan ? { grid: plan } : {}),
+        confirmed: true,
+      }
       const body =
         side === 'offense'
-          ? { offense: plan, fourth_down, week_to_week_offense: weekToWeek }
-          : { defense: plan, week_to_week_defense: weekToWeek }
+          ? {
+              ...(plan ? { offense: plan } : {}),
+              offense_package: pkg,
+              team_script: teamScript,
+              week_to_week_offense: weekToWeek,
+              confirm_offense: true,
+            }
+          : {
+              ...(plan ? { defense: plan } : {}),
+              defense_package: pkg,
+              team_script: teamScript,
+              week_to_week_defense: weekToWeek,
+              confirm_defense: true,
+            }
       const j = await saveCoachGameplan(apiBase ?? '', saveId, saveState, headers, body)
       if (j.state) onSaveState?.(j.state)
       setMatchupKey(j.matchup_key ?? null)
       setOffense(j.offense as Plan)
       setDefense(j.defense as Plan)
+      setOffensePackage((j.offense_package as SidePackage | undefined) ?? null)
+      setDefensePackage((j.defense_package as SidePackage | undefined) ?? null)
+      setTeamScript({ ...defaultTeamScript(), ...((j.team_script as TeamScript | undefined) ?? {}) })
       setOffenseLibrary((j.offense_library as GamePlanLibrary | undefined) ?? null)
       setDefenseLibrary((j.defense_library as GamePlanLibrary | undefined) ?? null)
-      const raw = Number(j.fourth_down?.go_for_it_max_ytg)
-      setGoForItMaxYtg(Number.isFinite(raw) ? Math.max(0, Math.min(10, Math.round(raw))) : 2)
       const wtw = j.week_to_week
       setWeekToWeek(Boolean(side === 'offense' ? wtw?.offense : wtw?.defense))
       onError('')
@@ -505,228 +661,661 @@ export default function CoachGameplanPage({
     }
   }
 
-  return (
-    <div className={`gp2-root gp2-root--${side}`}>
-      <div className="gp2-topbar">
-        <button type="button" className="gp2-back" onClick={onBack} disabled={!onBack}>
-          Back
-        </button>
-        <div className="gp2-title">{side === 'offense' ? 'OFF Gameplan' : 'DEF Gameplan'}</div>
-        <div className="gp2-sub">{matchupKey ? `For: ${matchupKey}` : 'For: next game'}</div>
+  const onAutofillCallsheet = async () => {
+    if (!saveId) return
+    setBusy(true)
+    try {
+      const j = await saveCoachGameplan(apiBase ?? '', saveId, saveStateRef.current, headersRef.current, {
+        autofill_callsheet: true,
+      })
+      if (j.state) onSaveStateRef.current?.(j.state)
+      setOffensePackage((j.offense_package as SidePackage | undefined) ?? offensePackage)
+      setDefensePackage((j.defense_package as SidePackage | undefined) ?? defensePackage)
+      onError('')
+    } catch (e: unknown) {
+      onError(e instanceof Error ? e.message : 'Autofill failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const offGridInvalid = useMemo(() => {
+    if (!plan || !sidePackage || sidePackage.gameplan_mode !== 'grid') return false
+    return !validateEntirePlan(plan).ok
+  }, [plan, sidePackage])
+
+  const offTabWarnings = useMemo(() => {
+    if (!sidePackage) return {}
+    return computeOffTabWarnings(sidePackage, targetPlayers, offGridInvalid)
+  }, [sidePackage, targetPlayers, offGridInvalid])
+
+  const defGridInvalid = useMemo(() => {
+    if (!plan || !sidePackage || sidePackage.gameplan_mode !== 'grid') return false
+    return !validateEntirePlan(plan).ok
+  }, [plan, sidePackage])
+
+  const defTabWarnings = useMemo(() => {
+    if (!sidePackage) return {}
+    return computeDefTabWarnings(sidePackage, defGridInvalid)
+  }, [sidePackage, defGridInvalid])
+
+  const renderDefenseGridEditor = () => (
+    <>
+      <div className="dgp-toolbar">
+        <div className="dgp-field">
+          <label>Situation (score margin)</label>
+          <select value={scoreSituation} onChange={(e) => setScoreSituation(e.target.value as any)} disabled={busy}>
+            {SCORE_SITUATIONS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="dgp-field">
+          <label>Field area</label>
+          <select value={fieldArea} onChange={(e) => setFieldArea(e.target.value as any)} disabled={busy}>
+            {FIELD_AREAS.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="dgp-toolbar-actions">
+          <button type="button" className="dgp-btn" onClick={onImportClick} disabled={busy}>
+            Import
+          </button>
+          <button type="button" className="dgp-btn" onClick={duplicateToAllSituations} disabled={busy}>
+            Duplicate to all situations
+          </button>
+          <button type="button" className="dgp-btn" onClick={duplicateToAllFieldAreas} disabled={busy}>
+            Duplicate to all field areas
+          </button>
+          <button type="button" className="dgp-btn" onClick={() => onExportJson()} disabled={busy}>
+            Export JSON
+          </button>
+          <button type="button" className="dgp-btn" onClick={onExportCsv} disabled={busy}>
+            Export CSV
+          </button>
+        </div>
       </div>
+      <table className="dgp-grid">
+        <thead>
+          <tr>
+            <th style={{ textAlign: 'left' }}>D&amp;D</th>
+            {DEF_CATS.map((c) => (
+              <th key={c} className={DEF_CAT_TH_CLASS[c]}>
+                {c.toLowerCase()}
+              </th>
+            ))}
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => {
+            const total = sumCell(r.cell, DEF_CATS)
+            const bad = total !== 100
+            return (
+              <tr key={r.dd} className={bad ? 'invalid' : ''}>
+                <td className="dgp-dd">{r.dd}</td>
+                {DEF_CATS.map((c) => (
+                  <td key={c}>
+                    <input
+                      className={DEF_CAT_INPUT_CLASS[c]}
+                      inputMode="numeric"
+                      value={String(Number(r.cell?.[c]) || 0)}
+                      onChange={(e) => setCellValue(r.dd, c, Number(e.target.value))}
+                      disabled={busy}
+                    />
+                  </td>
+                ))}
+                <td className="dgp-total">{total}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+      <p className="dgp-grid-note">
+        Rows highlighted in red do not total 100% and will block Confirm and Save week to week.
+      </p>
+    </>
+  )
+
+  const renderDefenseLibrary = () => {
+    if (!sideLibrary) return null
+    return (
+      <aside className="dgp-sidebar">
+        <h3 className="dgp-head-font">Saved game plans</h3>
+        <p className="dgp-helper">
+          Pick a plan to load into this week&apos;s editor, then Confirm. Library is grid-only — percentages only.
+        </p>
+        <div className="dgp-plan-group">
+          <div className="dgp-group-label">Built-in presets</div>
+          {sideLibrary.presets.map((entry) => (
+            <div key={entry.id} className="dgp-plan-item">
+              <div>
+                <div className="dgp-name">{entry.name}</div>
+                {entry.description ? <div className="dgp-desc">{entry.description}</div> : null}
+              </div>
+              <button
+                type="button"
+                className="dgp-mini-btn"
+                onClick={() => applyLibraryPlan(entry.plan as Plan)}
+                disabled={busy}
+              >
+                Apply
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="dgp-plan-group">
+          <div className="dgp-group-label">My saved plans</div>
+          {sideLibrary.saved.length === 0 ? (
+            <p className="dgp-helper">Import JSON/CSV to add a custom plan here.</p>
+          ) : (
+            sideLibrary.saved.map((entry) => (
+              <div key={entry.id} className="dgp-plan-item">
+                <div>
+                  <div className="dgp-name">{entry.name}</div>
+                </div>
+                <div className="dgp-plan-item-actions">
+                  <button
+                    type="button"
+                    className="dgp-mini-btn"
+                    onClick={() => applyLibraryPlan(entry.plan as Plan)}
+                    disabled={busy}
+                  >
+                    Apply
+                  </button>
+                  <button
+                    type="button"
+                    className="dgp-mini-btn dgp-danger"
+                    onClick={() => void deleteSavedPlan(entry.id)}
+                    disabled={busy}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </aside>
+    )
+  }
+
+  const renderDefenseFooter = (confirmLabel = 'Confirm') => (
+    <div className="dgp-footer-bar">
+      <label className="dgp-chk-wrap" title="Reuse this side's last confirmed plan each week until you change it">
+        <input
+          type="checkbox"
+          checked={weekToWeek}
+          onChange={(e) => void onWeekToWeekChange(e.target.checked)}
+          disabled={busy}
+        />
+        Save week to week
+      </label>
+      {!isByeWeek ? (
+        <button type="button" className="dgp-btn" onClick={() => void onAutofillCallsheet()} disabled={busy}>
+          Autofill call sheet
+        </button>
+      ) : null}
+      <div className="dgp-spacer" />
+      <button type="button" className="dgp-btn" onClick={() => void fetchPlan({ showLoading: true })} disabled={busy}>
+        Reload
+      </button>
+      <button
+        type="button"
+        className="dgp-btn dgp-blue"
+        title="Save OFF + DEF packages and team script for reuse. Pass targets are not included."
+        onClick={() => onExportJson({ promptName: true })}
+        disabled={busy}
+      >
+        Export gameplan (JSON)
+      </button>
+      <button type="button" className="dgp-btn confirm" onClick={() => void onConfirm()} disabled={busy}>
+        {busy ? 'Saving…' : confirmLabel}
+      </button>
+    </div>
+  )
+
+  const renderOffenseGridEditor = () => (
+    <>
+      <div className="ogp-toolbar">
+        <div className="ogp-field">
+          <label>Situation (score margin)</label>
+          <select value={scoreSituation} onChange={(e) => setScoreSituation(e.target.value as any)} disabled={busy}>
+            {SCORE_SITUATIONS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="ogp-field">
+          <label>Field area</label>
+          <select value={fieldArea} onChange={(e) => setFieldArea(e.target.value as any)} disabled={busy}>
+            {FIELD_AREAS.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="ogp-toolbar-actions">
+          <button type="button" className="ogp-btn" onClick={onImportClick} disabled={busy}>
+            Import
+          </button>
+          <button type="button" className="ogp-btn" onClick={duplicateToAllSituations} disabled={busy}>
+            Duplicate to all situations
+          </button>
+          <button type="button" className="ogp-btn" onClick={duplicateToAllFieldAreas} disabled={busy}>
+            Duplicate to all field areas
+          </button>
+          <button type="button" className="ogp-btn" onClick={() => onExportJson()} disabled={busy}>
+            Export JSON
+          </button>
+          <button type="button" className="ogp-btn" onClick={onExportCsv} disabled={busy}>
+            Export CSV
+          </button>
+        </div>
+      </div>
+      <table className="ogp-grid">
+        <thead>
+          <tr>
+            <th style={{ textAlign: 'left' }}>D&amp;D</th>
+            {OFF_CATS.map((c) => (
+              <th key={c} className={OFF_CAT_TH_CLASS[c]}>
+                {c.toLowerCase()}
+              </th>
+            ))}
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => {
+            const total = sumCell(r.cell, OFF_CATS)
+            const bad = total !== 100
+            return (
+              <tr key={r.dd} className={bad ? 'invalid' : ''}>
+                <td className="ogp-dd">{r.dd}</td>
+                {OFF_CATS.map((c) => (
+                  <td key={c}>
+                    <input
+                      className={OFF_CAT_INPUT_CLASS[c]}
+                      inputMode="numeric"
+                      value={String(Number(r.cell?.[c]) || 0)}
+                      onChange={(e) => setCellValue(r.dd, c, Number(e.target.value))}
+                      disabled={busy}
+                    />
+                  </td>
+                ))}
+                <td className="ogp-total">{total}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+      <p className="ogp-grid-note">
+        Rows highlighted in red do not total 100% and will block Confirm and Save week to week.
+      </p>
+    </>
+  )
+
+  const renderOffenseLibrary = () => {
+    if (!sideLibrary) return null
+    return (
+      <aside className="ogp-sidebar">
+        <h3 className="ogp-head-font">Saved game plans</h3>
+        <p className="ogp-helper">
+          Pick a plan to load into this week&apos;s editor, then Confirm. Library is grid-only — percentages only.
+        </p>
+        <div className="ogp-plan-group">
+          <div className="ogp-group-label">Built-in presets</div>
+          {sideLibrary.presets.map((entry) => (
+            <div key={entry.id} className="ogp-plan-item">
+              <div>
+                <div className="ogp-name">{entry.name}</div>
+                {entry.description ? <div className="ogp-desc">{entry.description}</div> : null}
+              </div>
+              <button
+                type="button"
+                className="ogp-mini-btn"
+                onClick={() => applyLibraryPlan(entry.plan as Plan)}
+                disabled={busy}
+              >
+                Apply
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="ogp-plan-group">
+          <div className="ogp-group-label">My saved plans</div>
+          {sideLibrary.saved.length === 0 ? (
+            <p className="ogp-helper">Import JSON/CSV to add a custom plan here.</p>
+          ) : (
+            sideLibrary.saved.map((entry) => (
+              <div key={entry.id} className="ogp-plan-item">
+                <div>
+                  <div className="ogp-name">{entry.name}</div>
+                </div>
+                <div className="ogp-plan-item-actions">
+                  <button
+                    type="button"
+                    className="ogp-mini-btn"
+                    onClick={() => applyLibraryPlan(entry.plan as Plan)}
+                    disabled={busy}
+                  >
+                    Apply
+                  </button>
+                  <button
+                    type="button"
+                    className="ogp-mini-btn ogp-danger"
+                    onClick={() => void deleteSavedPlan(entry.id)}
+                    disabled={busy}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </aside>
+    )
+  }
+
+  const renderOffenseFooter = (confirmLabel = 'Confirm') => (
+    <div className="ogp-footer-bar">
+      <label className="ogp-chk-wrap" title="Reuse this side's last confirmed plan each week until you change it">
+        <input
+          type="checkbox"
+          checked={weekToWeek}
+          onChange={(e) => void onWeekToWeekChange(e.target.checked)}
+          disabled={busy}
+        />
+        Save week to week
+      </label>
+      {!isByeWeek ? (
+        <button type="button" className="ogp-btn" onClick={() => void onAutofillCallsheet()} disabled={busy}>
+          Autofill call sheet
+        </button>
+      ) : null}
+      <div className="ogp-spacer" />
+      <button type="button" className="ogp-btn" onClick={() => void fetchPlan({ showLoading: true })} disabled={busy}>
+        Reload
+      </button>
+      <button
+        type="button"
+        className="ogp-btn ogp-blue"
+        title="Save OFF + DEF packages and team script for reuse. Pass targets are not included."
+        onClick={() => onExportJson({ promptName: true })}
+        disabled={busy}
+      >
+        Export gameplan (JSON)
+      </button>
+      <button type="button" className="ogp-btn confirm" onClick={() => void onConfirm()} disabled={busy}>
+        {busy ? 'Saving…' : confirmLabel}
+      </button>
+    </div>
+  )
+
+  if (side === 'offense') {
+    const tabs = isByeWeek ? OFF_BYE_TABS : OFF_GAMEPLAN_TABS
+    const activeTab = tabs.some((t) => t.id === offActiveTab) ? offActiveTab : tabs[0].id
+
+    return (
+      <div className="ogp-root">
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".json,.csv,application/json,text/csv"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            e.target.value = ''
+            if (!f) return
+            void (async () => {
+              try {
+                await onImportFile(f)
+                onError('')
+              } catch (err: any) {
+                onError(err?.message ?? 'Import failed')
+              }
+            })()
+          }}
+        />
+
+        <header className="ogp-header">
+          <button type="button" className="ogp-back-btn" onClick={onBack} disabled={!onBack}>
+            ← Team Home
+          </button>
+          <div>
+            <h1>OFF Gameplan</h1>
+            <p className="ogp-subtitle">{matchupKey ? `For: ${matchupKey}` : 'For: next game'}</p>
+          </div>
+        </header>
+
+        {loading ? (
+          <div className="ogp-loading">Loading…</div>
+        ) : loadError ? (
+          <div className="ogp-card" style={{ margin: '20px 24px' }}>
+            <p>{loadError}</p>
+            <button type="button" className="ogp-btn" onClick={() => void fetchPlan({ showLoading: true })}>
+              Retry
+            </button>
+          </div>
+        ) : !sidePackage ? (
+          <div className="ogp-loading">No gameplan loaded.</div>
+        ) : (
+          <div className="ogp-shell">
+            {!isByeWeek ? renderOffenseLibrary() : null}
+            <main className="ogp-main">
+              {isByeWeek ? (
+                <div className="ogp-bye-banner">Bye week — practice planning only (no opponent gameplan).</div>
+              ) : null}
+
+              <nav className="ogp-tabbar">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    className={`ogp-tab${activeTab === tab.id ? ' active' : ''}`}
+                    onClick={() => setOffActiveTab(tab.id)}
+                  >
+                    {tab.label}
+                    {offTabWarnings[tab.id] ? <span className="ogp-dot" /> : null}
+                  </button>
+                ))}
+              </nav>
+
+              {isByeWeek ? (
+                <WeeklyGameplanSections
+                  side="offense"
+                  pkg={sidePackage}
+                  teamScript={teamScript}
+                  installedPlays={installedOffense}
+                  halftimeTriggers={halftimeTriggersOff}
+                  targetPlayers={targetPlayers}
+                  disabled={busy}
+                  onPkgChange={(p) => setSidePackage(p)}
+                  onScriptChange={setTeamScript}
+                  uiVariant="off-tabs"
+                  activeTab={activeTab}
+                />
+              ) : activeTab === 'gameplan' ? (
+                <WeeklyGameplanSections
+                  side="offense"
+                  pkg={sidePackage}
+                  teamScript={teamScript}
+                  installedPlays={installedOffense}
+                  halftimeTriggers={halftimeTriggersOff}
+                  targetPlayers={targetPlayers}
+                  disabled={busy || !gameplanAvailable}
+                  onPkgChange={(p) => setSidePackage(p)}
+                  onScriptChange={setTeamScript}
+                  uiVariant="off-tabs"
+                  activeTab="gameplan"
+                  gridSlot={sidePackage.gameplan_mode === 'grid' ? renderOffenseGridEditor() : null}
+                />
+              ) : (
+                <WeeklyGameplanSections
+                  side="offense"
+                  pkg={sidePackage}
+                  teamScript={teamScript}
+                  installedPlays={installedOffense}
+                  halftimeTriggers={halftimeTriggersOff}
+                  targetPlayers={targetPlayers}
+                  disabled={busy || !gameplanAvailable}
+                  onPkgChange={(p) => setSidePackage(p)}
+                  onScriptChange={setTeamScript}
+                  uiVariant="off-tabs"
+                  activeTab={activeTab}
+                />
+              )}
+            </main>
+          </div>
+        )}
+
+        {!loading && sidePackage ? renderOffenseFooter(isByeWeek ? 'Confirm practice plan' : 'Confirm') : null}
+      </div>
+    )
+  }
+
+  const tabs = isByeWeek ? DEF_BYE_TABS : DEF_GAMEPLAN_TABS
+  const activeTab = tabs.some((t) => t.id === defActiveTab) ? defActiveTab : tabs[0].id
+
+  return (
+    <div className="dgp-root">
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".json,.csv,application/json,text/csv"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          e.target.value = ''
+          if (!f) return
+          void (async () => {
+            try {
+              await onImportFile(f)
+              onError('')
+            } catch (err: any) {
+              onError(err?.message ?? 'Import failed')
+            }
+          })()
+        }}
+      />
+
+      <header className="dgp-header">
+        <button type="button" className="dgp-back-btn" onClick={onBack} disabled={!onBack}>
+          ← Team Home
+        </button>
+        <div>
+          <h1>DEF Gameplan</h1>
+          <p className="dgp-subtitle">{matchupKey ? `For: ${matchupKey}` : 'For: next game'}</p>
+        </div>
+      </header>
 
       {loading ? (
-        <div className="gp2-card">Loading…</div>
+        <div className="dgp-loading">Loading…</div>
       ) : loadError ? (
-        <div className="gp2-card">
+        <div className="dgp-card" style={{ margin: '20px 24px' }}>
           <p>{loadError}</p>
-          <button type="button" className="gp2-refresh" onClick={() => void fetchPlan({ showLoading: true })}>
+          <button type="button" className="dgp-btn" onClick={() => void fetchPlan({ showLoading: true })}>
             Retry
           </button>
         </div>
-      ) : !plan ? (
-        <div className="gp2-card">No gameplan loaded.</div>
+      ) : !sidePackage ? (
+        <div className="dgp-loading">No gameplan loaded.</div>
       ) : (
-        <div className="gp2-layout">
-          {sideLibrary ? (
-            <aside className="gp2-library">
-              <div className="gp2-library-head">
-                <div className="gp2-label">Saved game plans</div>
-                <p className="gp2-library-note">Pick a plan to load into this week&apos;s editor, then Confirm.</p>
-              </div>
-
-              <div className="gp2-library-section">
-                <div className="gp2-library-section-title">Built-in</div>
-                <div className="gp2-library-list">
-                  {sideLibrary.presets.map((entry) => (
-                    <div key={entry.id} className="gp2-library-item">
-                      <div className="gp2-library-item-main">
-                        <div className="gp2-library-name">{entry.name}</div>
-                        {entry.description ? <div className="gp2-library-desc">{entry.description}</div> : null}
-                      </div>
-                      <button
-                        type="button"
-                        className="gp2-library-apply"
-                        onClick={() => applyLibraryPlan(entry.plan as Plan)}
-                        disabled={busy}
-                      >
-                        Apply
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="gp2-library-section">
-                <div className="gp2-library-section-title">Imported</div>
-                {sideLibrary.saved.length === 0 ? (
-                  <p className="gp2-library-empty">Import JSON/CSV to add a custom plan here.</p>
-                ) : (
-                  <div className="gp2-library-list">
-                    {sideLibrary.saved.map((entry) => (
-                      <div key={entry.id} className="gp2-library-item">
-                        <div className="gp2-library-item-main">
-                          <div className="gp2-library-name">{entry.name}</div>
-                        </div>
-                        <div className="gp2-library-item-actions">
-                          <button
-                            type="button"
-                            className="gp2-library-apply"
-                            onClick={() => applyLibraryPlan(entry.plan as Plan)}
-                            disabled={busy}
-                          >
-                            Apply
-                          </button>
-                          <button
-                            type="button"
-                            className="gp2-library-delete"
-                            onClick={() => void deleteSavedPlan(entry.id)}
-                            disabled={busy}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </aside>
+        <>
+          {!isByeWeek && sidePackage ? (
+            <div className="dgp-toplevel-mode">
+              <GameplanModeToggle
+                mode={sidePackage.gameplan_mode}
+                disabled={busy || !gameplanAvailable}
+                onChange={(mode) => setSidePackage({ ...sidePackage, gameplan_mode: mode })}
+                variant="def"
+              />
+            </div>
           ) : null}
 
-          <div className="gp2-card">
-          <input
-            ref={importInputRef}
-            type="file"
-            accept=".json,.csv,application/json,text/csv"
-            style={{ display: 'none' }}
-            onChange={(e) => {
-              const f = e.target.files?.[0]
-              e.target.value = ''
-              if (!f) return
-              void (async () => {
-                try {
-                  await onImportFile(f)
-                  onError('')
-                } catch (err: any) {
-                  onError(err?.message ?? 'Import failed')
-                }
-              })()
-            }}
-          />
-          <div className="gp2-controls">
-            <div className="gp2-control">
-              <div className="gp2-label">Situation</div>
-              <select className="gp2-select" value={scoreSituation} onChange={(e) => setScoreSituation(e.target.value as any)} disabled={busy}>
-                {SCORE_SITUATIONS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="gp2-control">
-              <div className="gp2-label">Field area</div>
-              <select className="gp2-select" value={fieldArea} onChange={(e) => setFieldArea(e.target.value as any)} disabled={busy}>
-                {FIELD_AREAS.map((a) => (
-                  <option key={a} value={a}>
-                    {a}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="gp2-actions">
-              <button type="button" className="gp2-link" onClick={onImportClick} disabled={busy}>
-                Import JSON/CSV
-              </button>
-              <button type="button" className="gp2-link" onClick={duplicateToAllSituations} disabled={busy}>
-                Duplicate to all situations
-              </button>
-              <button type="button" className="gp2-link" onClick={duplicateToAllFieldAreas} disabled={busy}>
-                Duplicate to all field areas
-              </button>
-              <button type="button" className="gp2-link" onClick={onExportJson} disabled={busy}>
-                Export JSON
-              </button>
-              <button type="button" className="gp2-link" onClick={onExportCsv} disabled={busy}>
-                Export CSV
-              </button>
-            </div>
-          </div>
+          <div className="dgp-shell">
+            {!isByeWeek ? renderDefenseLibrary() : null}
+            <main className="dgp-main">
+              {isByeWeek ? (
+                <div className="dgp-bye-banner">Bye week — practice planning only (no opponent gameplan).</div>
+              ) : null}
 
-          <div className="gp2-tablewrap">
-            <table className={`gp2-table gp2-table--${side}`}>
-              <thead>
-                <tr>
-                  <th>D&amp;D</th>
-                  {cats.map((c) => (
-                    <th key={c}>{c}</th>
-                  ))}
-                  <th>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => {
-                  const total = sumCell(r.cell, cats)
-                  const bad = total !== 100
-                  return (
-                    <tr key={r.dd} className={bad ? 'gp2-badrow' : ''}>
-                      <td className="gp2-dd">{r.dd}</td>
-                      {cats.map((c) => (
-                        <td key={c}>
-                          <input
-                            className="gp2-input"
-                            inputMode="numeric"
-                            value={String(Number(r.cell?.[c]) || 0)}
-                            onChange={(e) => setCellValue(r.dd, c, Number(e.target.value))}
-                            disabled={busy}
-                          />
-                        </td>
-                      ))}
-                      <td className="gp2-total">{total}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+              <nav className="dgp-tabbar">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    className={`dgp-tab${activeTab === tab.id ? ' active' : ''}`}
+                    onClick={() => setDefActiveTab(tab.id)}
+                  >
+                    {tab.label}
+                    {defTabWarnings[tab.id] ? <span className="dgp-dot" /> : null}
+                  </button>
+                ))}
+              </nav>
 
-          <div className={`gp2-bottom${side === 'defense' ? ' gp2-bottom--defense' : ''}`}>
-            <label className="gp2-week-to-week" title="Reuse this side's last confirmed plan each week until you change it">
-              <input
-                type="checkbox"
-                checked={weekToWeek}
-                onChange={(e) => void onWeekToWeekChange(e.target.checked)}
-                disabled={busy}
-              />
-              <span>Save week to week</span>
-            </label>
-            {side === 'offense' ? (
-              <div className="gp2-fourth">
-                <div className="gp2-label">4th down</div>
-                <div className="gp2-fourth-row">
-                  <span className="gp2-fourth-text">Go for it when yards to go ≤</span>
-                  <input
-                    className="gp2-input"
-                    inputMode="numeric"
-                    value={String(goForItMaxYtg)}
-                    onChange={(e) => setGoForItMaxYtg(Math.max(0, Math.min(10, Math.round(Number(e.target.value) || 0))))}
-                    disabled={busy}
-                  />
-                  <span className="gp2-fourth-text">(otherwise punt unless in FG range)</span>
-                </div>
-              </div>
-            ) : null}
-            <button type="button" className="gp2-confirm" onClick={() => void onConfirm()} disabled={busy}>
-              {busy ? 'Saving…' : 'Confirm'}
-            </button>
-            <button type="button" className="gp2-refresh" onClick={() => void fetchPlan({ showLoading: true })} disabled={busy}>
-              Reload
-            </button>
+              {isByeWeek ? (
+                <WeeklyGameplanSections
+                  side="defense"
+                  pkg={sidePackage}
+                  teamScript={teamScript}
+                  installedPlays={installedDefense}
+                  halftimeTriggers={halftimeTriggersDef}
+                  targetPlayers={targetPlayers}
+                  disabled={busy}
+                  onPkgChange={(p) => setSidePackage(p)}
+                  onScriptChange={setTeamScript}
+                  uiVariant="def-tabs"
+                  activeTab={activeTab}
+                  hideModeToggle
+                />
+              ) : activeTab === 'gameplan' ? (
+                <WeeklyGameplanSections
+                  side="defense"
+                  pkg={sidePackage}
+                  teamScript={teamScript}
+                  installedPlays={installedDefense}
+                  halftimeTriggers={halftimeTriggersDef}
+                  targetPlayers={targetPlayers}
+                  disabled={busy || !gameplanAvailable}
+                  onPkgChange={(p) => setSidePackage(p)}
+                  onScriptChange={setTeamScript}
+                  uiVariant="def-tabs"
+                  activeTab="gameplan"
+                  hideModeToggle
+                  gridSlot={sidePackage.gameplan_mode === 'grid' ? renderDefenseGridEditor() : null}
+                />
+              ) : (
+                <WeeklyGameplanSections
+                  side="defense"
+                  pkg={sidePackage}
+                  teamScript={teamScript}
+                  installedPlays={installedDefense}
+                  halftimeTriggers={halftimeTriggersDef}
+                  targetPlayers={targetPlayers}
+                  disabled={busy || !gameplanAvailable}
+                  onPkgChange={(p) => setSidePackage(p)}
+                  onScriptChange={setTeamScript}
+                  uiVariant="def-tabs"
+                  activeTab={activeTab}
+                  hideModeToggle
+                />
+              )}
+            </main>
           </div>
-          </div>
-        </div>
+        </>
       )}
+
+      {!loading && sidePackage ? renderDefenseFooter(isByeWeek ? 'Confirm practice plan' : 'Confirm') : null}
     </div>
   )
 }

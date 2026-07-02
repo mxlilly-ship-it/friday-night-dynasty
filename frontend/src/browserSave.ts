@@ -213,6 +213,14 @@ export type CoachGameplanResponse = {
   matchup_key: string | null
   offense: Record<string, unknown>
   defense: Record<string, unknown>
+  offense_package?: Record<string, unknown>
+  defense_package?: Record<string, unknown>
+  team_script?: Record<string, unknown>
+  is_bye_week?: boolean
+  installed_plays_offense?: { id: string; name: string }[]
+  installed_plays_defense?: { id: string; name: string }[]
+  halftime_triggers_offense?: { id: string; label: string }[]
+  halftime_triggers_defense?: { id: string; label: string }[]
   fourth_down?: { go_for_it_max_ytg?: number }
   week_to_week?: { offense?: boolean; defense?: boolean }
   offense_library?: GamePlanLibrary
@@ -250,7 +258,13 @@ export async function saveCoachGameplan(
   body: {
     offense?: Record<string, unknown>
     defense?: Record<string, unknown>
-    fourth_down?: { go_for_it_max_ytg?: number }
+    offense_package?: Record<string, unknown>
+    defense_package?: Record<string, unknown>
+    team_script?: Record<string, unknown>
+    confirm_offense?: boolean
+    confirm_defense?: boolean
+    autofill_callsheet?: boolean
+    fourth_down?: { go_for_it_max_ytg?: number; risk?: number }
     add_offense_library?: { name: string; plan: Record<string, unknown> }
     delete_offense_library_id?: string
     add_defense_library?: { name: string; plan: Record<string, unknown> }

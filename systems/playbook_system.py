@@ -19,14 +19,20 @@ OFFENSIVE_PLAYBOOK_VALUES: Tuple[str, ...] = (
 DEFENSIVE_PLAYBOOK_KEYS: Tuple[str, ...] = ("4-3", "3-4", "5-2", "3-3 Stack")
 DEFENSIVE_BASE_VALUES: Tuple[str, ...] = DEFENSIVE_PLAYBOOK_KEYS  # legacy name for imports
 
+from systems.playbook_overlay import GOALLINE_FORMATION, WIDE_SLOT_FORMATION
+
 OFFENSIVE_PLAYBOOK_FORMATIONS: Dict[str, List[str]] = {
-    "Spread": ["Dual", "Trio", "Empty", "Doubles"],
+    "Spread": ["Dual", "Trio", "Empty", "Doubles", WIDE_SLOT_FORMATION],
     "Pro": ["Pro", "Twins", "Dual", "Doubles", "Trey Wing", "Wing"],
     "Flexbone": ["Flexbone", "Power I", "Dual"],
     "Smashmouth": ["Power I", "Trey Wing", "Wing", "Dual"],
     "Double Wing": ["Double Wing", "Power I", "Dual"],
     "Wing T": ["Wing T", "Power I", "Flexbone", "Dual"],
 }
+
+for _playbook in OFFENSIVE_PLAYBOOK_VALUES:
+    if GOALLINE_FORMATION not in OFFENSIVE_PLAYBOOK_FORMATIONS[_playbook]:
+        OFFENSIVE_PLAYBOOK_FORMATIONS[_playbook].append(GOALLINE_FORMATION)
 
 DEFENSIVE_PLAYBOOK_FORMATIONS: Dict[str, List[str]] = {
     "4-3": ["4-3", "Nickel", "Dime", "6-2"],

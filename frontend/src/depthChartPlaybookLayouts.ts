@@ -68,6 +68,8 @@ const OFFENSIVE_FORMATION_PERSONNEL: Record<string, Personnel> = {
   'Power I': { ol: 5, rb: 3, te: 1, wr: 1 },
   'Wing T': { ol: 5, rb: 3, te: 1, wr: 1 },
   Doubles: { ol: 5, rb: 1, te: 1, wr: 3 },
+  'Wide Slot': { ol: 5, rb: 1, te: 1, wr: 3 },
+  Goalline: { ol: 5, rb: 2, te: 3, wr: 0 },
 }
 
 /** (DL, LB, DB) — mirrors DEFENSIVE_FORMATION_PERSONNEL. */

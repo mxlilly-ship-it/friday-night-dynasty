@@ -159,6 +159,7 @@ def _run_scrimmage_game_impl(home_team, away_team):
     )
     game.home_team_name = home_name
     game.away_team_name = away_name
+    game.use_weekly_gameplan_sim = False
     sync_game_ratings(game, home_ratings, away_ratings, home_turnover, away_turnover)
     game.apply_opening_kickoff()
 
@@ -402,6 +403,7 @@ def run_game(
     )
     game.home_team_name = home_name
     game.away_team_name = away_name
+    game.use_weekly_gameplan_sim = True
     sync_game_ratings(game, home_ratings, away_ratings, home_turnover, away_turnover)
     game.apply_opening_kickoff()
 
@@ -437,7 +439,9 @@ def run_game(
         off_pb = home_playbook if game.possession == "home" else away_playbook
         def_pb = away_playbook if game.possession == "home" else home_playbook
         situation = build_situation_from_game(game, offense_team=off_obj, defense_team=def_obj)
-        offense_play, defense_play = call_plays_for_situation(off_pb, def_pb, situation)
+        offense_play, defense_play = call_plays_for_situation(
+            off_pb, def_pb, situation, offense_team=off_obj, defense_team=def_obj, game=game
+        )
 
         # game_engine.run_play supports either Play objects or legacy string calls.
         offense_call = offense_play if offense_play is not None else game.get_ai_play_call()
@@ -488,6 +492,21 @@ def run_game(
             except Exception:
                 offense_call_code = "2"
         record_play(stats_map, home_team, away_team, home_dc, away_dc, possession_side, offense_call_code, result)
+
+        try:
+            from systems.weekly_gameplan import record_first_half_stat
+
+            is_run_play = (offense_call_code == "1") if isinstance(offense_call_code, str) else False
+            record_first_half_stat(
+                game,
+                off_obj,
+                def_obj,
+                result if isinstance(result, dict) else {},
+                down_before=down_before,
+                is_run=is_run_play,
+            )
+        except Exception:
+            pass
 
         # Fatigue: drain on-field, recover bench, apply subs. Build context from play.
         yards = result.get("yards", 0)

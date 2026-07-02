@@ -5108,8 +5108,8 @@ function TeamHomePageBody({
             <option>Team Stats</option>
             <option>Player Stats</option>
             <option>Playbook</option>
-            <option>OFF Gameplan</option>
-            <option>DEF Gameplan</option>
+            {phase !== 'preseason' ? <option>OFF Gameplan</option> : null}
+            {phase !== 'preseason' ? <option>DEF Gameplan</option> : null}
             <option value={SCOUTING_MENU_OFFENSE}>Offensive Scouting Report</option>
             <option value={SCOUTING_MENU_DEFENSE}>Defensive Scouting Report</option>
             <option value={COACH_INBOX_MENU}>

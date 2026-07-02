@@ -365,6 +365,13 @@
   gap: 12px;
 }
 
+.gp2-export-bottom {
+  flex-basis: 100%;
+  text-align: right;
+  margin-top: 4px;
+  font-size: 0.88rem;
+}
+
 .gp2-fourth {
   margin-right: auto;
   display: flex;
@@ -419,5 +426,515 @@
 .gp2-refresh:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+/* Weekly gameplan sections (call sheet, usage, practice, halftime, script) */
+.wg-section {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.wg-section-title {
+  font-size: 0.78rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  margin-bottom: 10px;
+}
+
+.wg-mode-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.wg-mode-btn {
+  font: inherit;
+  font-weight: 800;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: #eef0f8;
+  cursor: pointer;
+}
+
+.wg-mode-btn.is-active {
+  background: rgba(59, 130, 246, 0.35);
+  border-color: rgba(96, 165, 250, 0.5);
+}
+
+.wg-callsheet-block {
+  margin-bottom: 14px;
+}
+
+.wg-callsheet-label {
+  font-weight: 850;
+  font-size: 0.88rem;
+  margin-bottom: 6px;
+}
+
+.wg-callsheet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 6px;
+}
+
+.wg-select,
+.wg-input {
+  width: 100%;
+  font: inherit;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.25);
+  color: #eef0f8;
+}
+
+.wg-knob {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.wg-knob input[type='range'] {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+.wg-knob-label {
+  font-size: 0.86rem;
+  font-weight: 750;
+}
+
+.wg-knob-val {
+  font-weight: 950;
+  font-size: 0.86rem;
+  opacity: 0.85;
+}
+
+.wg-practice-grid {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) repeat(4, minmax(56px, 1fr));
+  gap: 4px;
+  font-size: 0.82rem;
+  overflow-x: auto;
+}
+
+.wg-practice-grid input {
+  width: 100%;
+  font: inherit;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.2);
+  color: #eef0f8;
+  text-align: center;
+}
+
+.wg-halftime-slot {
+  margin-bottom: 14px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.wg-halftime-slot-head {
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.6;
+  margin-bottom: 8px;
+}
+
+.wg-halftime-responses {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.wg-halftime-choice {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 8px 10px;
+  align-items: start;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+}
+
+.wg-halftime-choice.is-selected {
+  border-color: rgba(96, 165, 250, 0.45);
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.wg-halftime-choice-key {
+  font-weight: 950;
+  min-width: 1.2rem;
+}
+
+.wg-halftime-choice-text {
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+.wg-halftime-clear {
+  align-self: flex-start;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: #cbd5e1;
+  cursor: pointer;
+}
+
+.wg-usage-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.wg-note {
+  font-size: 0.82rem;
+  opacity: 0.72;
+  margin: 6px 0 0;
+}
+
+.gp2-link {
+  font: inherit;
+  font-weight: 850;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: #93c5fd;
+  cursor: pointer;
+}
+
+.gp2-link:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.gp2-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.gp2-mode-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.wg-block {
+  margin-bottom: 4px;
+}
+
+.wg-h3 {
+  margin: 0 0 10px;
+  font-size: 0.78rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.wg-play-summary {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.wg-play-summary--bottom {
+  margin-top: 16px;
+  margin-bottom: 0;
+}
+
+.wg-play-summary-title {
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.65;
+  margin-bottom: 8px;
+}
+
+.wg-play-summary-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.wg-play-summary-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.86rem;
+}
+
+.wg-play-summary-count {
+  font-weight: 950;
+  font-size: 0.78rem;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.25);
+  color: #93c5fd;
+}
+
+.wg-play-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wg-play-slot-label {
+  font-size: 0.72rem;
+  font-weight: 850;
+  opacity: 0.55;
+}
+
+.wg-play-slot-meta {
+  font-size: 0.72rem;
+  opacity: 0.7;
+  font-weight: 700;
+}
+
+.wg-play-slot-meta--auto {
+  font-style: italic;
+  opacity: 0.5;
+}
+
+.wg-practice-day-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.wg-practice-budget {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  font-size: 0.82rem;
+  font-weight: 750;
+  opacity: 0.85;
+}
+
+.wg-practice-budget--over {
+  color: #fca5a5;
+}
+
+.wg-note--warn {
+  color: #fcd34d;
+}
+
+.wg-knob-hint {
+  grid-column: 1 / -1;
+  font-size: 0.76rem;
+  line-height: 1.35;
+  opacity: 0.68;
+  font-weight: 650;
+}
+
+.wg-knob-hint--standalone {
+  margin: -4px 0 10px;
+}
+
+.wg-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-weight: 750;
+  font-size: 0.88rem;
+}
+
+.wg-cs-section {
+  margin-bottom: 14px;
+}
+
+.wg-cs-slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.gp2-mode-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.wg-block {
+  margin-bottom: 4px;
+}
+
+.wg-h3 {
+  margin: 0 0 10px;
+  font-size: 0.78rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.wg-play-summary {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.wg-play-summary--bottom {
+  margin-top: 16px;
+  margin-bottom: 0;
+}
+
+.wg-play-summary-title {
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.65;
+  margin-bottom: 8px;
+}
+
+.wg-play-summary-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.wg-play-summary-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.86rem;
+}
+
+.wg-play-summary-count {
+  font-weight: 950;
+  font-size: 0.78rem;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.25);
+  color: #93c5fd;
+}
+
+.wg-play-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wg-play-slot-label {
+  font-size: 0.72rem;
+  font-weight: 850;
+  opacity: 0.55;
+}
+
+.wg-play-slot-meta {
+  font-size: 0.72rem;
+  opacity: 0.7;
+  font-weight: 700;
+}
+
+.wg-play-slot-meta--auto {
+  font-style: italic;
+  opacity: 0.5;
+}
+
+.wg-practice-day-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.wg-practice-budget {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  font-size: 0.82rem;
+  font-weight: 750;
+  opacity: 0.85;
+}
+
+.wg-practice-budget--over {
+  color: #fca5a5;
+}
+
+.wg-note--warn {
+  color: #fcd34d;
+}
+
+.wg-knob-hint {
+  grid-column: 1 / -1;
+  font-size: 0.76rem;
+  line-height: 1.35;
+  opacity: 0.68;
+  font-weight: 650;
+}
+
+.wg-knob-hint--standalone {
+  margin: -4px 0 10px;
+}
+
+.wg-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-weight: 750;
+  font-size: 0.88rem;
+}
+
+.wg-cs-section {
+  margin-bottom: 14px;
+}
+
+.wg-cs-slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
 }
 

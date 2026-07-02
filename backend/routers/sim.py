@@ -63,6 +63,9 @@ class SimCoachGameplanRequest(BaseModel):
     state: Dict[str, Any]
     offense: Optional[Dict[str, Any]] = None
     defense: Optional[Dict[str, Any]] = None
+    offense_package: Optional[Dict[str, Any]] = None
+    defense_package: Optional[Dict[str, Any]] = None
+    team_script: Optional[Dict[str, Any]] = None
     fourth_down: Optional[Dict[str, Any]] = None
     add_offense_library: Optional[Dict[str, Any]] = None
     delete_offense_library_id: Optional[str] = None
@@ -70,6 +73,9 @@ class SimCoachGameplanRequest(BaseModel):
     delete_defense_library_id: Optional[str] = None
     week_to_week_offense: Optional[bool] = None
     week_to_week_defense: Optional[bool] = None
+    confirm_offense: Optional[bool] = None
+    confirm_defense: Optional[bool] = None
+    autofill_callsheet: Optional[bool] = None
 
 
 class SimDepthChartRequest(BaseModel):
@@ -218,6 +224,9 @@ def sim_coach_gameplan_route(payload: SimCoachGameplanRequest = Body(...)):
         if (
             payload.offense is not None
             or payload.defense is not None
+            or payload.offense_package is not None
+            or payload.defense_package is not None
+            or payload.team_script is not None
             or payload.fourth_down is not None
             or payload.add_offense_library is not None
             or payload.delete_offense_library_id is not None
@@ -225,11 +234,17 @@ def sim_coach_gameplan_route(payload: SimCoachGameplanRequest = Body(...)):
             or payload.delete_defense_library_id is not None
             or payload.week_to_week_offense is not None
             or payload.week_to_week_defense is not None
+            or payload.confirm_offense is not None
+            or payload.confirm_defense is not None
+            or payload.autofill_callsheet
         ):
             result = save_coach_gameplan_v2_in_state(
                 payload.state,
                 offense=payload.offense,
                 defense=payload.defense,
+                offense_package=payload.offense_package,
+                defense_package=payload.defense_package,
+                team_script=payload.team_script,
                 fourth_down=payload.fourth_down,
                 add_offense_library=payload.add_offense_library,
                 delete_offense_library_id=payload.delete_offense_library_id,
@@ -237,6 +252,9 @@ def sim_coach_gameplan_route(payload: SimCoachGameplanRequest = Body(...)):
                 delete_defense_library_id=payload.delete_defense_library_id,
                 week_to_week_offense=payload.week_to_week_offense,
                 week_to_week_defense=payload.week_to_week_defense,
+                confirm_offense=payload.confirm_offense,
+                confirm_defense=payload.confirm_defense,
+                autofill_callsheet=payload.autofill_callsheet,
             )
         else:
             result = get_coach_gameplan_v2_from_state(payload.state)

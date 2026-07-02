@@ -1,10 +1,14 @@
+:root {
+  --fnd-news-ticker-height: 34px;
+}
+
 .fnd-news-ticker-viewport {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
   z-index: 70;
-  height: 34px;
+  height: var(--fnd-news-ticker-height);
   overflow: hidden;
   background: linear-gradient(180deg, #0a0a0c 0%, #050506 100%);
   border-top: 1px solid rgba(255, 255, 255, 0.12);

@@ -177,6 +177,19 @@ from systems.gameplan_v2 import (
     OFFENSE_CATEGORIES as GAMEPLAN_V2_OFF_CATEGORIES,
     DEFENSE_CATEGORIES as GAMEPLAN_V2_DEF_CATEGORIES,
 )
+from systems.weekly_gameplan import (
+    HALFTIME_TRIGGERS_DEF,
+    HALFTIME_TRIGGERS_OFF,
+    apply_packages_to_coach,
+    attach_cpu_coach_packages_for_game,
+    autofill_callsheet_from_install,
+    default_side_package,
+    default_team_script,
+    export_full_package,
+    normalize_matchup_entry,
+    normalize_side_package,
+    validate_side_package,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1011,6 +1024,31 @@ def _saves_base_dir() -> str:
 def _get_user_logo_dir(user_id: str) -> str:
     safe_user = _safe_path_segment(user_id, default="user")
     return os.path.join(_saves_base_dir(), safe_user, "_logos")
+
+
+def save_dir_team_logo(save_dir: str, team_name: str, data: bytes, extension: str) -> str:
+    """Write a team crest into ``save_dir/_logos/`` (multiplayer league or save folder)."""
+    ext = str(extension or "").lower().strip()
+    if ext not in _LOGO_EXTENSIONS:
+        raise ValueError("Unsupported logo file type. Use PNG, JPG, JPEG, or WEBP.")
+    if not data:
+        raise ValueError("Logo file is empty.")
+    safe_name = _safe_logo_name(team_name)
+    logo_dir = os.path.join(save_dir, "_logos")
+    logo_dir_abs = os.path.abspath(os.path.normpath(logo_dir))
+    try:
+        makedirs_with_path_fallback(logo_dir_abs)
+    except OSError:
+        os.makedirs(logo_dir, exist_ok=True)
+    for old_ext in _LOGO_EXTENSIONS:
+        unlink_if_exists_any(os.path.abspath(os.path.join(logo_dir, f"{safe_name}{old_ext}")))
+    out_plain = os.path.abspath(os.path.join(logo_dir, f"{safe_name}{ext}"))
+    f = open_binary_with_path_fallback(out_plain, "wb")
+    try:
+        f.write(data)
+        return f.name
+    finally:
+        f.close()
 
 
 def save_team_logo(user_id: str, team_name: str, data: bytes, extension: str) -> str:
@@ -4440,26 +4478,36 @@ def _materialize_carried_gameplan_for_current_week(state: Dict[str, Any]) -> boo
     entry = dict(store.get(key)) if isinstance(store.get(key), dict) else {}
     changed = False
 
-    if flags.get("offense") and not isinstance(entry.get("offense"), dict):
-        carried = _carried_side_plan(state, "offense", GAMEPLAN_V2_OFF_CATEGORIES)
-        if isinstance(carried, dict):
-            entry["offense"] = carried
+    if flags.get("offense") and not isinstance(entry.get("offense_package"), dict):
+        last = _gameplan_last_confirmed(state)
+        carried_pkg = last.get("offense_package")
+        if isinstance(carried_pkg, dict):
+            entry["offense_package"] = copy.deepcopy(carried_pkg)
             changed = True
-        if not isinstance(entry.get("fourth_down"), dict):
-            fd = _gameplan_last_confirmed(state).get("fourth_down")
-            if not isinstance(fd, dict):
-                for prev in store.values():
-                    if isinstance(prev, dict) and isinstance(prev.get("fourth_down"), dict):
-                        fd = prev.get("fourth_down")
-                        break
-            if isinstance(fd, dict):
-                entry["fourth_down"] = fd
+        elif not isinstance(entry.get("offense"), dict):
+            carried = _carried_side_plan(state, "offense", GAMEPLAN_V2_OFF_CATEGORIES)
+            if isinstance(carried, dict):
+                entry["offense"] = carried
+                entry["offense_package"] = default_side_package("offense", carried)
                 changed = True
 
-    if flags.get("defense") and not isinstance(entry.get("defense"), dict):
-        carried = _carried_side_plan(state, "defense", GAMEPLAN_V2_DEF_CATEGORIES)
-        if isinstance(carried, dict):
-            entry["defense"] = carried
+    if flags.get("defense") and not isinstance(entry.get("defense_package"), dict):
+        last = _gameplan_last_confirmed(state)
+        carried_pkg = last.get("defense_package")
+        if isinstance(carried_pkg, dict):
+            entry["defense_package"] = copy.deepcopy(carried_pkg)
+            changed = True
+        elif not isinstance(entry.get("defense"), dict):
+            carried = _carried_side_plan(state, "defense", GAMEPLAN_V2_DEF_CATEGORIES)
+            if isinstance(carried, dict):
+                entry["defense"] = carried
+                entry["defense_package"] = default_side_package("defense", carried)
+                changed = True
+
+    if flags.get("offense") or flags.get("defense"):
+        last = _gameplan_last_confirmed(state)
+        if isinstance(last.get("team_script"), dict) and not isinstance(entry.get("team_script"), dict):
+            entry["team_script"] = copy.deepcopy(last["team_script"])
             changed = True
 
     if changed:
@@ -4478,40 +4526,38 @@ def _resolved_matchup_gameplan_entry(state: Dict[str, Any]) -> Dict[str, Any]:
 
     flags = _gameplan_week_to_week_flags(state)
 
-    if flags.get("offense") and not isinstance(entry.get("offense"), dict):
-        carried = _carried_side_plan(state, "offense", GAMEPLAN_V2_OFF_CATEGORIES)
+    if flags.get("offense") and not isinstance(entry.get("offense_package"), dict):
+        carried = _gameplan_last_confirmed(state).get("offense_package")
         if isinstance(carried, dict):
-            entry["offense"] = carried
-        if not isinstance(entry.get("fourth_down"), dict):
-            fd = _gameplan_last_confirmed(state).get("fourth_down")
-            if isinstance(fd, dict):
-                entry["fourth_down"] = fd
+            entry["offense_package"] = copy.deepcopy(carried)
+        elif not isinstance(entry.get("offense"), dict):
+            carried_grid = _carried_side_plan(state, "offense", GAMEPLAN_V2_OFF_CATEGORIES)
+            if isinstance(carried_grid, dict):
+                entry["offense"] = carried_grid
+                entry["offense_package"] = default_side_package("offense", carried_grid)
 
-    if flags.get("defense") and not isinstance(entry.get("defense"), dict):
-        carried = _carried_side_plan(state, "defense", GAMEPLAN_V2_DEF_CATEGORIES)
+    if flags.get("defense") and not isinstance(entry.get("defense_package"), dict):
+        carried = _gameplan_last_confirmed(state).get("defense_package")
         if isinstance(carried, dict):
-            entry["defense"] = carried
+            entry["defense_package"] = copy.deepcopy(carried)
+        elif not isinstance(entry.get("defense"), dict):
+            carried_grid = _carried_side_plan(state, "defense", GAMEPLAN_V2_DEF_CATEGORIES)
+            if isinstance(carried_grid, dict):
+                entry["defense"] = carried_grid
+                entry["defense_package"] = default_side_package("defense", carried_grid)
 
-    return entry
+    ts = _gameplan_last_confirmed(state).get("team_script")
+    if (flags.get("offense") or flags.get("defense")) and isinstance(ts, dict) and not isinstance(entry.get("team_script"), dict):
+        entry["team_script"] = copy.deepcopy(ts)
+
+    return normalize_matchup_entry(entry)
 
 
 def _apply_gameplan_entry_to_coach(coach: Any, entry: Dict[str, Any]) -> None:
     if coach is None or not isinstance(entry, dict):
         return
-    off_plan = entry.get("offense")
-    def_plan = entry.get("defense")
-    fourth_down = entry.get("fourth_down")
-    if isinstance(off_plan, dict):
-        coach.game_plan_v2_offense = off_plan
-    if isinstance(def_plan, dict):
-        coach.game_plan_v2_defense = def_plan
-    if isinstance(fourth_down, dict):
-        try:
-            coach.fourth_down_go_for_it_max_ytg = max(
-                0, min(10, int(fourth_down.get("go_for_it_max_ytg", 2)))
-            )
-        except Exception:
-            coach.fourth_down_go_for_it_max_ytg = 2
+    norm = normalize_matchup_entry(entry)
+    apply_packages_to_coach(coach, norm)
 
 
 def attach_user_coach_gameplan_v2_from_save_state(
@@ -4541,6 +4587,38 @@ def attach_user_coach_gameplan_v2_from_save_state(
     _apply_gameplan_entry_to_coach(coach, entry)
 
 
+def _installed_plays_payload(state: Dict[str, Any], side: str) -> List[Dict[str, str]]:
+    """Installed play ids/names for call sheet dropdowns."""
+    user = state.get("user_team")
+    teams = {t.get("name"): t for t in (state.get("teams") or []) if isinstance(t, dict)}
+    tdat = teams.get(user) if user else None
+    if not isinstance(tdat, dict):
+        return []
+    team = team_from_dict(tdat)
+    sel = (
+        getattr(team, "season_offensive_play_selection", None)
+        if side == "offense"
+        else getattr(team, "season_defensive_play_selection", None)
+    )
+    if not isinstance(sel, dict):
+        return []
+    from systems.play_selection import filter_active_play_entries
+
+    out: List[Dict[str, str]] = []
+    seen: set = set()
+    for entries in sel.values():
+        if not isinstance(entries, list):
+            continue
+        for play_id, _pct in filter_active_play_entries(entries):
+            pid = str(play_id)
+            if pid in seen:
+                continue
+            seen.add(pid)
+            out.append({"id": pid, "name": pid.replace("_", " ").title()})
+    out.sort(key=lambda x: x["name"])
+    return out
+
+
 def get_coach_gameplan_v2_from_state(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get the coach gameplan (OFF + DEF) for the user's next game.
@@ -4548,44 +4626,49 @@ def get_coach_gameplan_v2_from_state(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     _materialize_carried_gameplan_for_current_week(state)
     key = _coach_gameplan_v2_matchup_key(state)
-    resolved = _resolved_matchup_gameplan_entry(state)
+    resolved_raw = _resolved_matchup_gameplan_entry(state)
+    norm = normalize_matchup_entry(resolved_raw)
 
-    offense = resolved.get("offense")
-    defense = resolved.get("defense")
-    fourth_down = resolved.get("fourth_down")
+    offense_pkg = norm["offense_package"]
+    defense_pkg = norm["defense_package"]
+    team_script = norm["team_script"]
 
-    if not isinstance(offense, dict):
-        offense = make_default_offense_gameplan_v2()
-    if not isinstance(defense, dict):
-        defense = make_default_defense_gameplan_v2()
+    # Legacy top-level grid mirrors for older clients
+    offense = offense_pkg["grid"] if offense_pkg.get("gameplan_mode") == "grid" else offense_pkg.get("grid")
+    defense = defense_pkg["grid"] if defense_pkg.get("gameplan_mode") == "grid" else defense_pkg.get("grid")
 
-    if not isinstance(fourth_down, dict):
-        fourth_down = {"go_for_it_max_ytg": 2}
-    try:
-        fourth_down["go_for_it_max_ytg"] = max(0, min(10, int(fourth_down.get("go_for_it_max_ytg", 2))))
-    except Exception:
-        fourth_down["go_for_it_max_ytg"] = 2
-
-    # Validate and fall back to defaults if corrupted.
     ok_off, _ = validate_gameplan_v2(offense, categories=GAMEPLAN_V2_OFF_CATEGORIES)
     ok_def, _ = validate_gameplan_v2(defense, categories=GAMEPLAN_V2_DEF_CATEGORIES)
     if not ok_off:
         offense = make_default_offense_gameplan_v2()
+        offense_pkg = default_side_package("offense", offense)
     if not ok_def:
         defense = make_default_defense_gameplan_v2()
+        defense_pkg = default_side_package("defense", defense)
+
+    is_bye = key is None
+    phase_s = str(state.get("season_phase") or "").strip().lower()
 
     return {
         "matchup_key": key,
+        "is_bye_week": is_bye,
         "offense": offense,
         "defense": defense,
-        "fourth_down": fourth_down,
+        "offense_package": offense_pkg,
+        "defense_package": defense_pkg,
+        "team_script": team_script,
         "week_to_week": _gameplan_week_to_week_flags(state),
         "offense_library": _offense_gameplan_library_payload(state),
         "defense_library": _defense_gameplan_library_payload(state),
+        "installed_plays_offense": _installed_plays_payload(state, "offense"),
+        "installed_plays_defense": _installed_plays_payload(state, "defense"),
+        "halftime_triggers_offense": [{"id": k, "label": v} for k, v in HALFTIME_TRIGGERS_OFF.items()],
+        "halftime_triggers_defense": [{"id": k, "label": v} for k, v in HALFTIME_TRIGGERS_DEF.items()],
         "meta": {
-            "season_phase": str(state.get("season_phase") or ""),
+            "season_phase": phase_s,
             "current_week": int(state.get("current_week", 1) or 1),
             "user_team": str(state.get("user_team") or ""),
+            "gameplan_available": phase_s in ("regular", "playoffs") and not is_bye,
         },
     }
 
@@ -4602,6 +4685,9 @@ def save_coach_gameplan_v2_in_state(
     *,
     offense: Optional[Dict[str, Any]] = None,
     defense: Optional[Dict[str, Any]] = None,
+    offense_package: Optional[Dict[str, Any]] = None,
+    defense_package: Optional[Dict[str, Any]] = None,
+    team_script: Optional[Dict[str, Any]] = None,
     fourth_down: Optional[Dict[str, Any]] = None,
     add_offense_library: Optional[Dict[str, Any]] = None,
     delete_offense_library_id: Optional[str] = None,
@@ -4609,6 +4695,9 @@ def save_coach_gameplan_v2_in_state(
     delete_defense_library_id: Optional[str] = None,
     week_to_week_offense: Optional[bool] = None,
     week_to_week_defense: Optional[bool] = None,
+    confirm_offense: Optional[bool] = None,
+    confirm_defense: Optional[bool] = None,
+    autofill_callsheet: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """Save the user's coach gameplan for the next game (mutates state in memory)."""
     library_changed = False
@@ -4648,11 +4737,27 @@ def save_coach_gameplan_v2_in_state(
             carry["defense"] = bool(week_to_week_defense)
         state["gameplan_week_to_week"] = carry
 
-    matchup_changed = offense is not None or defense is not None or fourth_down is not None
+    matchup_changed = (
+        offense is not None
+        or defense is not None
+        or offense_package is not None
+        or defense_package is not None
+        or team_script is not None
+        or fourth_down is not None
+        or confirm_offense is not None
+        or confirm_defense is not None
+        or autofill_callsheet
+    )
     if matchup_changed:
         key = _coach_gameplan_v2_matchup_key(state)
-        if not key:
+        phase_s = str(state.get("season_phase") or "").strip().lower()
+        if not key and not (phase_s in ("regular", "playoffs")):
             raise ValueError("No upcoming game found to attach a gameplan to.")
+        # Bye week: practice-only updates stored on synthetic bye key
+        if not key:
+            user = str(state.get("user_team") or "")
+            wk = int(state.get("current_week", 1) or 1)
+            key = f"bye:week:{wk}:{user}"
 
         store = state.get("coach_gameplans_v2")
         if not isinstance(store, dict):
@@ -4661,46 +4766,84 @@ def save_coach_gameplan_v2_in_state(
         entry = store.get(key)
         if not isinstance(entry, dict):
             entry = {}
+        entry = normalize_matchup_entry(entry)
 
-        if offense is not None:
+        if offense_package is not None:
+            pkg = normalize_side_package(offense_package, "offense")
+            ok, errs = validate_side_package(pkg, "offense")
+            if not ok:
+                raise ValueError("Invalid OFF package: " + "; ".join(errs[:8]))
+            entry["offense_package"] = pkg
+            if pkg.get("gameplan_mode") == "grid":
+                entry["offense"] = pkg["grid"]
+        elif offense is not None:
             ok, errs = validate_gameplan_v2(offense, categories=GAMEPLAN_V2_OFF_CATEGORIES)
             if not ok:
                 raise ValueError("Invalid OFF gameplan: " + "; ".join(errs[:10]))
+            op = entry.get("offense_package") if isinstance(entry.get("offense_package"), dict) else default_side_package("offense")
+            op = normalize_side_package(op, "offense", offense)
+            op["grid"] = offense
+            entry["offense_package"] = op
             entry["offense"] = offense
-            last = _gameplan_last_confirmed(state)
-            if not isinstance(last, dict):
-                last = {}
-            last["offense"] = offense
-            state["gameplan_last_confirmed"] = last
 
-        if defense is not None:
+        if defense_package is not None:
+            pkg = normalize_side_package(defense_package, "defense")
+            ok, errs = validate_side_package(pkg, "defense")
+            if not ok:
+                raise ValueError("Invalid DEF package: " + "; ".join(errs[:8]))
+            entry["defense_package"] = pkg
+            if pkg.get("gameplan_mode") == "grid":
+                entry["defense"] = pkg["grid"]
+        elif defense is not None:
             ok, errs = validate_gameplan_v2(defense, categories=GAMEPLAN_V2_DEF_CATEGORIES)
             if not ok:
                 raise ValueError("Invalid DEF gameplan: " + "; ".join(errs[:10]))
+            dp = entry.get("defense_package") if isinstance(entry.get("defense_package"), dict) else default_side_package("defense")
+            dp = normalize_side_package(dp, "defense", defense)
+            dp["grid"] = defense
+            entry["defense_package"] = dp
             entry["defense"] = defense
-            last = _gameplan_last_confirmed(state)
-            if not isinstance(last, dict):
-                last = {}
-            last["defense"] = defense
-            state["gameplan_last_confirmed"] = last
 
-        if fourth_down is not None:
-            if not isinstance(fourth_down, dict):
-                raise ValueError("Invalid 4th down settings: must be an object.")
+        if team_script is not None and isinstance(team_script, dict):
+            entry["team_script"] = {**default_team_script(), **team_script}
+
+        if fourth_down is not None and isinstance(fourth_down, dict):
             try:
-                go_max = max(0, min(10, int(fourth_down.get("go_for_it_max_ytg", 2))))
+                risk = max(0, min(100, int(fourth_down.get("risk", fourth_down.get("go_for_it_max_ytg", 50)))))
             except Exception:
-                raise ValueError("Invalid 4th down settings: go_for_it_max_ytg must be a number.")
-            entry["fourth_down"] = {"go_for_it_max_ytg": go_max}
-            last = _gameplan_last_confirmed(state)
-            if not isinstance(last, dict):
-                last = {}
-            last["fourth_down"] = {"go_for_it_max_ytg": go_max}
-            state["gameplan_last_confirmed"] = last
+                risk = 50
+            ts = entry.get("team_script") if isinstance(entry.get("team_script"), dict) else default_team_script()
+            ts["risk"] = risk
+            entry["team_script"] = ts
+
+        if confirm_offense is not None and isinstance(entry.get("offense_package"), dict):
+            entry["offense_package"]["confirmed"] = bool(confirm_offense)
+        if confirm_defense is not None and isinstance(entry.get("defense_package"), dict):
+            entry["defense_package"]["confirmed"] = bool(confirm_defense)
+
+        if autofill_callsheet:
+            user = state.get("user_team")
+            teams = {t["name"]: team_from_dict(t) for t in state.get("teams", []) if isinstance(t, dict) and t.get("name")}
+            team = teams.get(user) if user else None
+            if team is not None:
+                op = entry.get("offense_package") if isinstance(entry.get("offense_package"), dict) else default_side_package("offense")
+                dp = entry.get("defense_package") if isinstance(entry.get("defense_package"), dict) else default_side_package("defense")
+                op["callsheet"] = autofill_callsheet_from_install(team, "offense")
+                dp["callsheet"] = autofill_callsheet_from_install(team, "defense")
+                entry["offense_package"] = op
+                entry["defense_package"] = dp
 
         entry["updated_at"] = int(time.time())
-        store[key] = entry
+        store[key] = normalize_matchup_entry(entry)
         state["coach_gameplans_v2"] = store
+
+        last = dict(_gameplan_last_confirmed(state))
+        last["offense_package"] = store[key]["offense_package"]
+        last["defense_package"] = store[key]["defense_package"]
+        last["team_script"] = store[key]["team_script"]
+        last["offense"] = store[key].get("offense")
+        last["defense"] = store[key].get("defense")
+        state["gameplan_last_confirmed"] = last
     elif not library_changed and not carry_changed:
         raise ValueError("Nothing to save.")
 
@@ -4718,6 +4861,9 @@ def save_coach_gameplan_v2(
     *,
     offense: Optional[Dict[str, Any]] = None,
     defense: Optional[Dict[str, Any]] = None,
+    offense_package: Optional[Dict[str, Any]] = None,
+    defense_package: Optional[Dict[str, Any]] = None,
+    team_script: Optional[Dict[str, Any]] = None,
     fourth_down: Optional[Dict[str, Any]] = None,
     add_offense_library: Optional[Dict[str, Any]] = None,
     delete_offense_library_id: Optional[str] = None,
@@ -4725,6 +4871,9 @@ def save_coach_gameplan_v2(
     delete_defense_library_id: Optional[str] = None,
     week_to_week_offense: Optional[bool] = None,
     week_to_week_defense: Optional[bool] = None,
+    confirm_offense: Optional[bool] = None,
+    confirm_defense: Optional[bool] = None,
+    autofill_callsheet: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """Save the user's coach gameplan for the next game."""
     state, save_dir = load_state(user_id, save_id)
@@ -4732,6 +4881,9 @@ def save_coach_gameplan_v2(
         state,
         offense=offense,
         defense=defense,
+        offense_package=offense_package,
+        defense_package=defense_package,
+        team_script=team_script,
         fourth_down=fourth_down,
         add_offense_library=add_offense_library,
         delete_offense_library_id=delete_offense_library_id,
@@ -4739,6 +4891,9 @@ def save_coach_gameplan_v2(
         delete_defense_library_id=delete_defense_library_id,
         week_to_week_offense=week_to_week_offense,
         week_to_week_defense=week_to_week_defense,
+        confirm_offense=confirm_offense,
+        confirm_defense=confirm_defense,
+        autofill_callsheet=autofill_callsheet,
     )
     save_state(user_id, save_id, state, save_dir)
     return result
@@ -5225,6 +5380,11 @@ def sim_week(user_id: str, save_id: str) -> Dict[str, Any]:
             except Exception:
                 restore_attrs = None
 
+        try:
+            attach_cpu_coach_packages_for_game(teams[home], teams[away], user_team=user_team)
+        except Exception:
+            pass
+
         stats_map = run_game_silent(
             teams[home],
             teams[away],
@@ -5375,6 +5535,11 @@ def sim_week_state(state: Dict[str, Any]) -> Dict[str, Any]:
                     _apply_gameplan_entry_to_coach(coach, entry)
             except Exception:
                 restore_attrs = None
+
+        try:
+            attach_cpu_coach_packages_for_game(teams[home], teams[away], user_team=user_team)
+        except Exception:
+            pass
 
         stats_map = run_game_silent(
             teams[home],

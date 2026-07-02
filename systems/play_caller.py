@@ -60,6 +60,113 @@ except ImportError:
     get_weights_from_defensive_game_plan = None  # type: ignore
     validate_defensive_game_plan = None  # type: ignore
 
+try:
+    from systems.weekly_gameplan import (
+        apply_halftime_category_weights,
+        apply_halftime_overlays,
+        installed_play_ids,
+        pick_callsheet_play_id,
+        practice_defense_label_multipliers,
+        practice_offense_label_multipliers,
+        resolve_callsheet_bucket,
+        usage_defense_pressure_boost,
+        usage_offense_play_weight_boost,
+        team_script_defense_weight_adjustment,
+        vertical_shots_multiplier,
+        weekly_sim_enabled,
+    )
+except ImportError:
+    apply_halftime_category_weights = None  # type: ignore
+    apply_halftime_overlays = None  # type: ignore
+    installed_play_ids = None  # type: ignore
+    pick_callsheet_play_id = None  # type: ignore
+    resolve_callsheet_bucket = None  # type: ignore
+    practice_defense_label_multipliers = None  # type: ignore
+    practice_offense_label_multipliers = None  # type: ignore
+    usage_defense_pressure_boost = None  # type: ignore
+    usage_offense_play_weight_boost = None  # type: ignore
+    team_script_defense_weight_adjustment = None  # type: ignore
+    vertical_shots_multiplier = None  # type: ignore
+    weekly_sim_enabled = None  # type: ignore
+
+
+OFF_ENUM_TO_V2_LABEL = {
+    OffensivePlayCategory.INSIDE_RUN: "Inside Run",
+    OffensivePlayCategory.OUTSIDE_RUN: "Outside Run",
+    OffensivePlayCategory.SHORT_PASS: "Quick",
+    OffensivePlayCategory.MEDIUM_PASS: "Medium",
+    OffensivePlayCategory.LONG_PASS: "Long",
+    OffensivePlayCategory.PLAY_ACTION: "Play Action",
+}
+
+DEF_ENUM_TO_V2_LABEL = {
+    DefensivePlayCategory.ZONES: "Zones",
+    DefensivePlayCategory.MANS: "Man",
+    DefensivePlayCategory.ZONE_PRESSURE: "Zone Pressure",
+    DefensivePlayCategory.MAN_PRESSURE: "Man Pressure",
+}
+
+
+def _apply_weekly_offense_modifiers(
+    weights: Dict[OffensivePlayCategory, float],
+    weekly_pkg: Optional[Dict[str, Any]],
+    *,
+    game: Optional[Any] = None,
+    team_name: Optional[str] = None,
+) -> Dict[OffensivePlayCategory, float]:
+    if not isinstance(weekly_pkg, dict):
+        return weights
+    out = dict(weights)
+    if practice_offense_label_multipliers is not None:
+        mults = practice_offense_label_multipliers(weekly_pkg)
+        for cat, label in OFF_ENUM_TO_V2_LABEL.items():
+            if cat in out and label in mults:
+                out[cat] = out[cat] * float(mults[label])
+    cs = weekly_pkg.get("callsheet") if isinstance(weekly_pkg.get("callsheet"), dict) else {}
+    vs_mode = str(cs.get("vertical_shots") or "balanced")
+    if vertical_shots_multiplier is not None:
+        vs = vertical_shots_multiplier(vs_mode)
+        for cat, label in OFF_ENUM_TO_V2_LABEL.items():
+            if cat in out and label in vs:
+                out[cat] = out[cat] * float(vs[label])
+    if (
+        apply_halftime_category_weights is not None
+        and game is not None
+        and team_name
+        and weekly_sim_enabled is not None
+        and weekly_sim_enabled(game)
+    ):
+        label_to_enum = {v: k for k, v in OFF_ENUM_TO_V2_LABEL.items()}
+        out = apply_halftime_category_weights(out, game, team_name, "offense", label_to_enum)
+    return _normalize_offense_weights(out)
+
+
+def _apply_weekly_defense_modifiers(
+    weights: Dict[DefensivePlayCategory, float],
+    weekly_pkg: Optional[Dict[str, Any]],
+    *,
+    game: Optional[Any] = None,
+    team_name: Optional[str] = None,
+) -> Dict[DefensivePlayCategory, float]:
+    if not isinstance(weekly_pkg, dict):
+        return weights
+    out = dict(weights)
+    if practice_defense_label_multipliers is not None:
+        mults = practice_defense_label_multipliers(weekly_pkg)
+        for cat, label in DEF_ENUM_TO_V2_LABEL.items():
+            if cat in out and label in mults:
+                out[cat] = out[cat] * float(mults[label])
+    if (
+        apply_halftime_category_weights is not None
+        and game is not None
+        and team_name
+        and weekly_sim_enabled is not None
+        and weekly_sim_enabled(game)
+    ):
+        label_to_enum = {v: k for k, v in DEF_ENUM_TO_V2_LABEL.items()}
+        out = apply_halftime_category_weights(out, game, team_name, "defense", label_to_enum)
+    return out
+
 
 @dataclass
 class GameSituation:
@@ -130,6 +237,8 @@ def pick_offensive_play(
     *,
     preferred_category: Optional[OffensivePlayCategory] = None,
     offense_team: Optional[Any] = None,
+    defense_team: Optional[Any] = None,
+    game: Optional[Any] = None,
     rng: Optional[random.Random] = None,
 ) -> Optional[Play]:
     """
@@ -141,6 +250,44 @@ def pick_offensive_play(
     Returns None if the playbook has no offensive plays.
     """
     rng = rng or random
+    coach = getattr(offense_team, "coach", None) if offense_team else None
+    weekly_pkg = getattr(coach, "weekly_offense_package", None) if coach else None
+    use_callsheet = (
+        weekly_sim_enabled is not None
+        and weekly_sim_enabled(game)
+        and isinstance(weekly_pkg, dict)
+        and str(weekly_pkg.get("gameplan_mode") or "").lower() == "callsheet"
+        and game is not None
+        and resolve_callsheet_bucket is not None
+        and pick_callsheet_play_id is not None
+    )
+
+    if use_callsheet and apply_halftime_overlays is not None and offense_team and defense_team:
+        apply_halftime_overlays(game, offense_team, defense_team)
+
+    if use_callsheet:
+        bucket = resolve_callsheet_bucket(
+            "offense",
+            situation,
+            offense_team=offense_team,
+            defense_team=defense_team,
+            game=game,
+        )
+        if bucket:
+            pid = pick_callsheet_play_id(
+                "offense",
+                bucket,
+                weekly_pkg,
+                offense_team,
+                defense_team,
+                game,
+                rng,
+            )
+            if pid:
+                for p in playbook.offensive_plays:
+                    if p.id == pid:
+                        return p
+
     candidates: List[Play] = []
 
     if preferred_category is not None:
@@ -149,7 +296,7 @@ def pick_offensive_play(
         candidates = playbook.get_offensive_plays_by_category(preferred_category)
     if not candidates:
         # Situation-based category selection; weighted by run_rating/pass_rating and coach
-        category = _situation_to_offensive_category(situation, rng=rng)
+        category = _situation_to_offensive_category(situation, rng=rng, game=game, offense_team=offense_team)
         candidates = playbook.get_offensive_plays_by_category(category)
     if not candidates:
         # Fallback: any offensive play
@@ -175,10 +322,14 @@ def pick_offensive_play(
     # Use game plan percentages as weights when available
     if weights_from_selection:
         weights = [weights_from_selection.get(p.id, 1.0) for p in candidates]
+        if usage_offense_play_weight_boost is not None and isinstance(weekly_pkg, dict):
+            weights = [w * usage_offense_play_weight_boost(weekly_pkg, p) for w, p in zip(weights, candidates)]
         return rng.choices(candidates, weights=weights, k=1)[0]
     # Per-play weighting by roster fit when team is provided
     if offense_team and get_offensive_play_score is not None:
         weights = [max(1, get_offensive_play_score(offense_team, p.id)) for p in candidates]
+        if usage_offense_play_weight_boost is not None and isinstance(weekly_pkg, dict):
+            weights = [w * usage_offense_play_weight_boost(weekly_pkg, p) for w, p in zip(weights, candidates)]
         return rng.choices(candidates, weights=weights, k=1)[0]
     return rng.choice(candidates)
 
@@ -188,7 +339,9 @@ def pick_defensive_play(
     situation: GameSituation,
     *,
     preferred_category: Optional[DefensivePlayCategory] = None,
+    offense_team: Optional[Any] = None,
     defense_team: Optional[Any] = None,
+    game: Optional[Any] = None,
     rng: Optional[random.Random] = None,
 ) -> Optional[Play]:
     """
@@ -200,6 +353,41 @@ def pick_defensive_play(
     Returns None if the playbook has no defensive plays.
     """
     rng = rng or random
+    coach = getattr(defense_team, "coach", None) if defense_team else None
+    weekly_pkg = getattr(coach, "weekly_defense_package", None) if coach else None
+    use_callsheet = (
+        weekly_sim_enabled is not None
+        and weekly_sim_enabled(game)
+        and isinstance(weekly_pkg, dict)
+        and str(weekly_pkg.get("gameplan_mode") or "").lower() == "callsheet"
+        and game is not None
+        and resolve_callsheet_bucket is not None
+        and pick_callsheet_play_id is not None
+    )
+
+    if use_callsheet and offense_team and defense_team:
+        bucket = resolve_callsheet_bucket(
+            "defense",
+            situation,
+            offense_team=offense_team,
+            defense_team=defense_team,
+            game=game,
+        )
+        if bucket:
+            pid = pick_callsheet_play_id(
+                "defense",
+                bucket,
+                weekly_pkg,
+                offense_team,
+                defense_team,
+                game,
+                rng,
+            )
+            if pid:
+                for p in playbook.defensive_plays:
+                    if p.id == pid:
+                        return p
+
     candidates: List[Play] = []
 
     if preferred_category is not None:
@@ -440,10 +628,15 @@ def _base_offensive_weights(situation: GameSituation) -> Dict[OffensivePlayCateg
     When coach.game_plan is set and valid, use its (situation, area) cell as base weights.
     """
     coach = getattr(situation, "coach_offense", None)
+    weekly_pkg = getattr(coach, "weekly_offense_package", None) if coach else None
+    use_grid = not (
+        isinstance(weekly_pkg, dict) and str(weekly_pkg.get("gameplan_mode") or "").lower() == "callsheet"
+    )
     # V2 coach gameplan (score situation + field area + D&D buckets)
     game_plan_v2 = getattr(coach, "game_plan_v2_offense", None) if coach else None
     if (
-        game_plan_v2 is not None
+        use_grid
+        and game_plan_v2 is not None
         and get_offense_weights_from_plan_v2 is not None
         and validate_plan_v2 is not None
     ):
@@ -673,18 +866,30 @@ def _choose_offensive_category_by_weights(
 
 
 def _situation_to_offensive_category(
-    situation: GameSituation, rng: Optional[random.Random] = None
+    situation: GameSituation,
+    rng: Optional[random.Random] = None,
+    *,
+    game: Optional[Any] = None,
+    offense_team: Optional[Any] = None,
 ) -> OffensivePlayCategory:
     """
     Down-and-distance offensive category logic with adjustments for:
     - score/time game situation
     - offensive coach style (Heavy Run, Lean Run, Balanced, Lean Pass, Heavy Pass)
     - roster strengths (run_rating vs pass_rating)
+    - weekly practice / vertical shots / halftime overlays (sim only)
     """
     rng = rng or random
     weights = _normalize_offense_weights(_base_offensive_weights(situation))
     weights = _apply_game_situation_adjustments(weights, situation)
     weights = _apply_offensive_style_adjustments(weights, situation)
+    coach = getattr(situation, "coach_offense", None)
+    weekly_pkg = getattr(coach, "weekly_offense_package", None) if coach else None
+    team_name = getattr(offense_team, "name", None) if offense_team else None
+    if weekly_sim_enabled is None or weekly_sim_enabled(game):
+        weights = _apply_weekly_offense_modifiers(
+            weights, weekly_pkg if isinstance(weekly_pkg, dict) else None, game=game, team_name=team_name
+        )
     return _choose_offensive_category_by_weights(weights, rng)
 
 
@@ -701,8 +906,22 @@ def _weighted_defensive_category(
     defense_rating = getattr(situation, "defense_rating", None)
     cov_weight = max(25, 100 - defense_rating) if defense_rating is not None else 50.0
     press_weight = max(25, defense_rating) if defense_rating is not None else 50.0
-    # Coach tendency
     coach = getattr(situation, "coach_defense", None)
+    weekly_pkg = getattr(coach, "weekly_defense_package", None) if coach else None
+    if usage_defense_pressure_boost is not None and isinstance(weekly_pkg, dict):
+        cov_boost, press_boost = usage_defense_pressure_boost(weekly_pkg)
+        cov_weight *= cov_boost
+        press_weight *= press_boost
+    script = getattr(coach, "team_script", None) if coach else None
+    if team_script_defense_weight_adjustment is not None and isinstance(script, dict):
+        ts_cov, ts_press = team_script_defense_weight_adjustment(
+            script,
+            down=situation.down,
+            yards_to_go=situation.yards_to_go,
+        )
+        cov_weight *= ts_cov
+        press_weight *= ts_press
+    # Coach tendency
     if coach is not None:
         style = getattr(coach, "defensive_style", None)
         if style is not None:
@@ -746,10 +965,15 @@ def _situation_to_defensive_category(
     """
     rng = rng or random
     coach = getattr(situation, "coach_defense", None)
+    weekly_pkg = getattr(coach, "weekly_defense_package", None) if coach else None
+    use_grid = not (
+        isinstance(weekly_pkg, dict) and str(weekly_pkg.get("gameplan_mode") or "").lower() == "callsheet"
+    )
     # V2 coach gameplan (score situation + field area + D&D buckets)
     game_plan_v2 = getattr(coach, "game_plan_v2_defense", None) if coach else None
     if (
-        game_plan_v2 is not None
+        use_grid
+        and game_plan_v2 is not None
         and get_defense_weights_from_plan_v2 is not None
         and validate_plan_v2 is not None
     ):
@@ -819,6 +1043,9 @@ def call_plays_for_situation(
     defense_playbook: Playbook,
     situation: GameSituation,
     *,
+    offense_team: Optional[Any] = None,
+    defense_team: Optional[Any] = None,
+    game: Optional[Any] = None,
     rng: Optional[random.Random] = None,
 ) -> Tuple[Optional[Play], Optional[Play]]:
     """
@@ -826,6 +1053,10 @@ def call_plays_for_situation(
     Convenience for the play engine when both sides call at once.
     """
     rng = rng or random
-    off = pick_offensive_play(offense_playbook, situation, rng=rng)
-    def_ = pick_defensive_play(defense_playbook, situation, rng=rng)
+    off = pick_offensive_play(
+        offense_playbook, situation, offense_team=offense_team, defense_team=defense_team, game=game, rng=rng
+    )
+    def_ = pick_defensive_play(
+        defense_playbook, situation, offense_team=offense_team, defense_team=defense_team, game=game, rng=rng
+    )
     return (off, def_)

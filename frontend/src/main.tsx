@@ -59,8 +59,11 @@ async function bootstrap() {
     const config = await loadFirebaseConfig()
     initFirebase(config)
   } catch (e: unknown) {
-    if (import.meta.env.DEV) {
-      // Local Vite dev: API may lack Firebase env — still run the game via /auth/dev-login.
+    const localHost =
+      typeof window !== 'undefined' &&
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    if (import.meta.env.DEV || localHost) {
+      // Local Vite dev or same-machine API (127.0.0.1): use /auth/dev-login when Firebase env is missing.
       devNoFirebase = true
     } else {
       const message = e instanceof Error ? e.message : String(e)

@@ -782,15 +782,27 @@ _DEFENSIVE_FORMATIONS: Dict[str, List[Play]] = _extended_defensive_registry()
 
 def get_defensive_formation_plays(formation_name: str) -> List[Play]:
     """Return all plays for a defensive formation. Raises KeyError if unknown."""
+    from systems.playbook_overlay import DEFENSIVE_EXTRA_FORMATIONS, overlay_defensive_plays
+
     key = formation_name.strip()
-    if key not in _DEFENSIVE_FORMATIONS:
+    if key in _DEFENSIVE_FORMATIONS:
+        base = list(_DEFENSIVE_FORMATIONS[key])
+    elif key in DEFENSIVE_EXTRA_FORMATIONS:
+        base = []
+    else:
         raise KeyError(
             f"Unknown defensive formation: {formation_name!r}. "
-            f"Known: {list(_DEFENSIVE_FORMATIONS)}"
+            f"Known: {list_defensive_formations()}"
         )
-    return list(_DEFENSIVE_FORMATIONS[key])
+    return overlay_defensive_plays(key, base)
 
 
 def list_defensive_formations() -> List[str]:
     """Return names of all defined defensive formations."""
-    return list(_DEFENSIVE_FORMATIONS.keys())
+    from systems.playbook_overlay import DEFENSIVE_EXTRA_FORMATIONS
+
+    keys = list(_DEFENSIVE_FORMATIONS.keys())
+    for name in DEFENSIVE_EXTRA_FORMATIONS:
+        if name not in keys:
+            keys.append(name)
+    return keys

@@ -1554,12 +1554,24 @@ _OFFENSIVE_FORMATIONS: Dict[str, List[Play]] = {
 
 def get_formation_plays(formation_name: str) -> List[Play]:
     """Return all plays for an offensive formation. Raises KeyError if unknown."""
+    from systems.playbook_overlay import OFFENSIVE_EXTRA_FORMATIONS, overlay_offensive_plays
+
     key = formation_name.strip()
-    if key not in _OFFENSIVE_FORMATIONS:
-        raise KeyError(f"Unknown formation: {formation_name!r}. Known: {list(_OFFENSIVE_FORMATIONS)}")
-    return list(_OFFENSIVE_FORMATIONS[key])
+    if key in _OFFENSIVE_FORMATIONS:
+        base = list(_OFFENSIVE_FORMATIONS[key])
+    elif key in OFFENSIVE_EXTRA_FORMATIONS:
+        base = []
+    else:
+        raise KeyError(f"Unknown formation: {formation_name!r}. Known: {list_formations()}")
+    return overlay_offensive_plays(key, base)
 
 
 def list_formations() -> List[str]:
     """Return names of all defined offensive formations."""
-    return list(_OFFENSIVE_FORMATIONS.keys())
+    from systems.playbook_overlay import OFFENSIVE_EXTRA_FORMATIONS
+
+    keys = list(_OFFENSIVE_FORMATIONS.keys())
+    for name in OFFENSIVE_EXTRA_FORMATIONS:
+        if name not in keys:
+            keys.append(name)
+    return keys

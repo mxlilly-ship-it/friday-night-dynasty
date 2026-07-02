@@ -42,12 +42,12 @@ export const OFFENSIVE_PLAYBOOKS = ['Spread', 'Pro', 'Flexbone', 'Smashmouth', '
 export type OffensivePlaybook = (typeof OFFENSIVE_PLAYBOOKS)[number]
 
 export const OFFENSIVE_PLAYBOOK_TO_FORMATIONS: Record<OffensivePlaybook, string[]> = {
-  Spread: ['Dual', 'Trio', 'Empty', 'Doubles'],
-  Pro: ['Pro', 'Twins', 'Dual', 'Doubles', 'Trey Wing', 'Wing'],
-  Flexbone: ['Flexbone', 'Power I', 'Dual'],
-  Smashmouth: ['Power I', 'Trey Wing', 'Wing', 'Dual'],
-  'Double Wing': ['Double Wing', 'Power I', 'Dual'],
-  'Wing T': ['Wing T', 'Power I', 'Flexbone', 'Dual'],
+  Spread: ['Dual', 'Trio', 'Empty', 'Doubles', 'Wide Slot', 'Goalline'],
+  Pro: ['Pro', 'Twins', 'Dual', 'Doubles', 'Trey Wing', 'Wing', 'Goalline'],
+  Flexbone: ['Flexbone', 'Power I', 'Dual', 'Goalline'],
+  Smashmouth: ['Power I', 'Trey Wing', 'Wing', 'Dual', 'Goalline'],
+  'Double Wing': ['Double Wing', 'Power I', 'Dual', 'Goalline'],
+  'Wing T': ['Wing T', 'Power I', 'Flexbone', 'Dual', 'Goalline'],
 }
 
 export const DEFENSIVE_STYLES = [

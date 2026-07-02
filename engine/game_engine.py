@@ -504,6 +504,21 @@ class Game:
         self.display_status()
         return good
 
+    def _pace_scale_clock(self, clock_elapsed: int, offense_team=None) -> int:
+        """Apply weekly team-script pace knob during silent sim (not coach-playable games)."""
+        if clock_elapsed <= 0 or not getattr(self, "use_weekly_gameplan_sim", True):
+            return clock_elapsed
+        coach = getattr(offense_team, "coach", None) if offense_team is not None else None
+        script = getattr(coach, "team_script", None) if coach is not None else None
+        if not isinstance(script, dict):
+            return clock_elapsed
+        try:
+            from systems.weekly_gameplan import script_pace_multiplier
+
+            return max(0, int(round(clock_elapsed * script_pace_multiplier(script))))
+        except Exception:
+            return clock_elapsed
+
     # ------------------ 4TH DOWN DECISION ------------------
     def _fourth_down_decision(self):
         """
@@ -1098,6 +1113,7 @@ class Game:
                 sack=sack,
                 scramble=scramble,
             )
+            clock_elapsed = self._pace_scale_clock(clock_elapsed, offense_team)
             self.time_remaining -= clock_elapsed
             if self.time_remaining < 0:
                 self.time_remaining = 0

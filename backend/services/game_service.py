@@ -97,6 +97,7 @@ def create_game(
     game.home_team_name = home_team.name
     game.away_team_name = away_team.name
     game.user_team_name = user_team_name or home_team.name
+    game.use_weekly_gameplan_sim = False
 
     home_ratings = calculate_team_ratings(home_team)
     away_ratings = calculate_team_ratings(away_team)
@@ -481,8 +482,8 @@ def play_options(game: Game, home_team: Any, away_team: Any) -> Dict[str, Any]:
     def_pb = build_playbook_for_team(defense_team)
     sit = build_situation_from_game(game, offense_team=offense_team, defense_team=defense_team)
 
-    ai_off = pick_offensive_play(off_pb, sit, offense_team=offense_team)
-    ai_def = pick_defensive_play(def_pb, sit, defense_team=defense_team)
+    ai_off = pick_offensive_play(off_pb, sit, offense_team=offense_team, defense_team=defense_team, game=game)
+    ai_def = pick_defensive_play(def_pb, sit, offense_team=offense_team, defense_team=defense_team, game=game)
 
     offense_plays = [
         {"id": p.id, "name": p.name, "category": p.offensive_category.name, "formation": getattr(p, "formation", None) or ""}
@@ -1331,8 +1332,8 @@ def sim_next_play(
         off_pb = build_playbook_for_team(offense_team)
         def_pb = build_playbook_for_team(defense_team)
         sit = build_situation_from_game(game, offense_team=offense_team, defense_team=defense_team)
-        o = pick_offensive_play(off_pb, sit, offense_team=offense_team)
-        d = pick_defensive_play(def_pb, sit, defense_team=defense_team)
+        o = pick_offensive_play(off_pb, sit, offense_team=offense_team, defense_team=defense_team, game=game)
+        d = pick_defensive_play(def_pb, sit, offense_team=offense_team, defense_team=defense_team, game=game)
         o = o or off_pb.offensive_plays[0] if off_pb.offensive_plays else None
         d = d or def_pb.defensive_plays[0] if def_pb.defensive_plays else None
         if o and d:

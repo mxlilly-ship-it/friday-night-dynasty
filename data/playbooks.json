@@ -1,31 +1,37 @@
 {
   "offense_playbooks": {
     "Spread": {
-      "formations": ["Dual", "Trio", "Empty", "Doubles"]
+      "formations": ["Dual", "Trio", "Empty", "Doubles", "Wide Slot", "Goalline"]
     },
     "Pro": {
-      "formations": ["Pro", "Twins", "Dual", "Doubles", "Trey Wing", "Wing"]
+      "formations": ["Pro", "Twins", "Dual", "Doubles", "Trey Wing", "Wing", "Goalline"]
     },
     "Flexbone": {
-      "formations": ["Flexbone", "Power I", "Dual"]
+      "formations": ["Flexbone", "Power I", "Dual", "Goalline"]
     },
     "Smashmouth": {
-      "formations": ["Power I", "Trey Wing", "Wing", "Dual"]
+      "formations": ["Power I", "Trey Wing", "Wing", "Dual", "Goalline"]
     },
     "Double Wing": {
-      "formations": ["Double Wing", "Power I", "Dual"]
+      "formations": ["Double Wing", "Power I", "Dual", "Goalline"]
     },
     "Wing T": {
-      "formations": ["Wing T", "Power I", "Flexbone", "Dual"]
+      "formations": ["Wing T", "Power I", "Flexbone", "Dual", "Goalline"]
     }
   },
   "defense_playbooks": {
     "4-3": {
-      "formations": ["4-3", "Nickel"]
+      "formations": ["4-3", "Nickel", "Dime", "6-2"]
     },
     "3-4": {
-      "formations": ["3-4", "Nickel"]
+      "formations": ["3-4", "5-2", "Nickel", "Dime", "6-2"]
+    },
+    "5-2": {
+      "formations": ["5-2", "Nickel", "Dime", "6-2"]
+    },
+    "3-3 Stack": {
+      "formations": ["3-3 Stack", "3-3 Stack 3-High", "Dime", "6-2"]
     }
   },
-  "note": "Current backend builds playbooks from formation play definitions in systems/formation_plays.py and systems/defensive_formations.py. This JSON is a lightweight reference for UI/expansion."
+  "note": "Backend builds playbooks from formation_plays.py + defensive_formations.py with playbook_overlay.py for xlsx sync."
 }
