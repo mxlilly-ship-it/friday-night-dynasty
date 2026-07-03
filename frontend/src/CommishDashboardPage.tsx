@@ -31,6 +31,11 @@ type CommishDashboardPageProps = {
     timezone: string
   }) => Promise<void>
   onOpenLeagueHub?: () => void
+  onOpenMyDynasty?: () => void
+  myDynastyBusy?: boolean
+  onSubmitWeek?: () => void
+  onUnsubmitWeek?: () => void
+  submitBusy?: boolean
   hasCoachTeam?: boolean
   onVacate?: (userId: string) => Promise<void>
   onRemove?: (userId: string) => Promise<void>
@@ -50,12 +55,20 @@ export default function CommishDashboardPage({
   onResetPin,
   onSaveSettings,
   onOpenLeagueHub,
+  onOpenMyDynasty,
+  myDynastyBusy = false,
+  onSubmitWeek,
+  onUnsubmitWeek,
+  submitBusy = false,
   hasCoachTeam = false,
   onVacate,
   onRemove,
   onRevokeInvite,
 }: CommishDashboardPageProps) {
   const readOnly = data.can_manage === false || data.is_read_only_admin === true
+  const coachTeam = data.acting_team_name || null
+  const showCoachActions = Boolean(hasCoachTeam || coachTeam)
+  const submitted = Boolean(data.your_status?.submitted)
   const [inviteEmail, setInviteEmail] = useState('')
   const [assignEmail, setAssignEmail] = useState('')
   const [assignTeam, setAssignTeam] = useState(data.vacant_teams[0] ?? '')
@@ -113,9 +126,54 @@ export default function CommishDashboardPage({
           <button type="button" className="ldash-back-btn" onClick={onBack}>
             ← Leagues
           </button>
-          {hasCoachTeam && onOpenLeagueHub ? (
+          {showCoachActions && onOpenLeagueHub ? (
             <button type="button" className="cdash-btn cdash-btn--blue" onClick={onOpenLeagueHub}>
               League hub
+            </button>
+          ) : null}
+          {showCoachActions && onOpenMyDynasty ? (
+            <button
+              type="button"
+              className="cdash-btn cdash-btn--gold"
+              disabled={myDynastyBusy}
+              onClick={onOpenMyDynasty}
+            >
+              {myDynastyBusy ? 'Opening…' : 'My dynasty'}
+            </button>
+          ) : null}
+          {showCoachActions && onSubmitWeek && !submitted ? (
+            <button
+              type="button"
+              className="cdash-btn cdash-btn--gold"
+              disabled={submitBusy || Boolean(busy)}
+              onClick={() =>
+                void runAction('submit', async () => {
+                  await onSubmitWeek()
+                  setFlash('Week submitted.')
+                })
+              }
+            >
+              {submitBusy || busy === 'submit' ? 'Submitting…' : 'Submit week'}
+            </button>
+          ) : null}
+          {showCoachActions && onUnsubmitWeek && submitted ? (
+            <button
+              type="button"
+              className="cdash-btn"
+              disabled={submitBusy || Boolean(busy) || data.your_status?.can_unsubmit === false}
+              title={
+                data.your_status?.can_unsubmit === false
+                  ? 'Locked — too close to the advance deadline'
+                  : undefined
+              }
+              onClick={() =>
+                void runAction('unsubmit', async () => {
+                  await onUnsubmitWeek()
+                  setFlash('Week unsubmitted — you can keep prepping.')
+                })
+              }
+            >
+              {submitBusy || busy === 'unsubmit' ? '…' : 'Unsubmit'}
             </button>
           ) : null}
           {!readOnly ? (
@@ -158,6 +216,12 @@ export default function CommishDashboardPage({
             <div className="cdash-progress-fill" style={{ width: `${data.progress.percent}%` }} />
           </div>
         </div>
+        {coachTeam ? (
+          <div className="cdash-status-pill">
+            Your team: {coachTeam}
+            {submitted ? ' · Submitted' : ' · Not submitted'}
+          </div>
+        ) : null}
         {data.settings.countdown_value ? (
           <div className="cdash-status-pill">Advance in {data.settings.countdown_value}</div>
         ) : null}

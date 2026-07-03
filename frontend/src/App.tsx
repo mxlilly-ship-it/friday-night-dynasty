@@ -1840,8 +1840,12 @@ export default function App({ devNoFirebase = false }: AppProps) {
   }
 
   async function onMultiplayerSubmitWeek() {
-    const leagueId = mpDashboard?.league_id ?? mpGameContext?.leagueId
-    const teamName = mpDashboard?.acting_team_name ?? mpGameContext?.teamName
+    const leagueId =
+      mpDashboard?.league_id ?? mpCommishDashboard?.league_id ?? mpGameContext?.leagueId
+    const teamName =
+      mpDashboard?.acting_team_name ??
+      mpCommishDashboard?.acting_team_name ??
+      mpGameContext?.teamName
     if (!leagueId || !teamName || mpGameContext?.commishMode) return
     setMpSubmitBusy(true)
     setError('')
@@ -1850,8 +1854,14 @@ export default function App({ devNoFirebase = false }: AppProps) {
         await saveLeagueGame(API_BASE, headers, leagueId, teamName, saveStateRef.current)
       }
       await submitLeagueWeek(API_BASE, headers, leagueId, teamName)
-      const dash = await fetchLeagueDashboard(API_BASE, headers, leagueId, teamName)
-      setMpDashboard(dash)
+      if (mpCommishDashboard?.league_id === leagueId) {
+        const fresh = await fetchCommishDashboard(API_BASE, headers, leagueId)
+        setMpCommishDashboard(fresh)
+      }
+      if (mpDashboard?.league_id === leagueId || !mpCommishDashboard) {
+        const dash = await fetchLeagueDashboard(API_BASE, headers, leagueId, teamName)
+        setMpDashboard(dash)
+      }
       setSuccessMessage('Week submitted. Waiting for the commissioner to advance the league.')
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Submit failed')
@@ -1861,15 +1871,25 @@ export default function App({ devNoFirebase = false }: AppProps) {
   }
 
   async function onMultiplayerUnsubmitWeek() {
-    const leagueId = mpDashboard?.league_id ?? mpGameContext?.leagueId
-    const teamName = mpDashboard?.acting_team_name ?? mpGameContext?.teamName
+    const leagueId =
+      mpDashboard?.league_id ?? mpCommishDashboard?.league_id ?? mpGameContext?.leagueId
+    const teamName =
+      mpDashboard?.acting_team_name ??
+      mpCommishDashboard?.acting_team_name ??
+      mpGameContext?.teamName
     if (!leagueId || !teamName || mpGameContext?.commishMode) return
     setMpSubmitBusy(true)
     setError('')
     try {
       await unsubmitLeagueWeek(API_BASE, headers, leagueId, teamName)
-      const dash = await fetchLeagueDashboard(API_BASE, headers, leagueId, teamName)
-      setMpDashboard(dash)
+      if (mpCommishDashboard?.league_id === leagueId) {
+        const fresh = await fetchCommishDashboard(API_BASE, headers, leagueId)
+        setMpCommishDashboard(fresh)
+      }
+      if (mpDashboard?.league_id === leagueId || !mpCommishDashboard) {
+        const dash = await fetchLeagueDashboard(API_BASE, headers, leagueId, teamName)
+        setMpDashboard(dash)
+      }
       setSuccessMessage('Week unsubmitted — you can keep prepping.')
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Unsubmit failed')
@@ -1878,10 +1898,49 @@ export default function App({ devNoFirebase = false }: AppProps) {
     }
   }
 
-  async function openMultiplayerDynasty() {
-    if (!mpDashboard?.league_id || !mpDashboard.acting_team_name) return
-    const leagueId = mpDashboard.league_id
-    const teamName = mpDashboard.acting_team_name
+  async function openMultiplayerDynasty(opts?: {
+    leagueId?: string
+    teamName?: string
+    leagueName?: string
+    requireCoachSetup?: boolean
+  }) {
+    const leagueId =
+      opts?.leagueId ?? mpDashboard?.league_id ?? mpCommishDashboard?.league_id
+    const teamName =
+      opts?.teamName ?? mpDashboard?.acting_team_name ?? mpCommishDashboard?.acting_team_name
+    const leagueName =
+      opts?.leagueName ?? mpDashboard?.league_name ?? mpCommishDashboard?.league_name ?? 'League'
+    if (!leagueId || !teamName) return
+
+    const needsCoachSetup =
+      opts?.requireCoachSetup === true ||
+      (mpCommishDashboard?.league_id === leagueId && mpCommishDashboard.coach_setup_complete === false)
+    if (needsCoachSetup) {
+      const leagueForSetup: LeagueListItem =
+        mpPendingLeague ??
+        ({
+          league_id: leagueId,
+          name: leagueName,
+          status: 'active',
+          is_commissioner: Boolean(mpCommishDashboard),
+          can_run_league: Boolean(mpCommishDashboard?.can_manage),
+          teams: [
+            {
+              team_name: teamName,
+              status: 'active',
+              control_mode: 'human',
+              role: 'coach',
+              coach_setup_complete: false,
+            },
+          ],
+          updated_at: Date.now(),
+        } satisfies LeagueListItem)
+      setMpPendingLeague(leagueForSetup)
+      setMpCoachSetupTeam(teamName)
+      setScreen('multiplayer_coach_setup')
+      return
+    }
+
     setMpCoachDashBusy(true)
     setError('')
     try {
@@ -1929,7 +1988,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
         seasonRecaps: {},
       }
       const id = multiplayerSaveId(leagueId, teamName)
-      const saveName = String(state?.save_name ?? mpDashboard.league_name ?? 'League').trim() || 'League'
+      const saveName = String(state?.save_name ?? leagueName).trim() || 'League'
       await putBrowserSave({ id, saveName, updatedAt: Date.now(), bundle })
       setMpGameContext({ leagueId, teamName })
       setLocalBundle(bundle)
@@ -2041,7 +2100,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
     }
     if (ctx) {
       try {
-        if (ctx.commishMode) {
+        if (ctx.commishMode || (mpCommishDashboard?.league_id === ctx.leagueId && mpCommishDashboard.can_manage !== false)) {
           await loadCommishDashboard(ctx.leagueId)
         } else {
           await loadLeagueDashboard(ctx.leagueId, ctx.teamName ?? null)
@@ -2389,11 +2448,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
   }
 
   if (screen === 'commish_dashboard' && mpCommishDashboard) {
-    const selfEmail = username.trim().toLowerCase()
-    const coachTeam =
-      mpCommishDashboard.members.find(
-        (m) => m.team_name && m.email.trim().toLowerCase() === selfEmail,
-      )?.team_name ?? null
+    const coachTeam = mpCommishDashboard.acting_team_name ?? null
     const leagueForCoachAccess: LeagueListItem =
       mpPendingLeague ??
       ({
@@ -2465,11 +2520,24 @@ export default function App({ devNoFirebase = false }: AppProps) {
             coachTeam
               ? () => {
                   setMpPendingLeague(leagueForCoachAccess)
-                  beginTeamAccess(leagueForCoachAccess, coachTeam)
-                  setScreen('multiplayer')
+                  void loadLeagueDashboard(mpCommishDashboard.league_id, coachTeam)
                 }
               : undefined
           }
+          onOpenMyDynasty={
+            coachTeam
+              ? () =>
+                  void openMultiplayerDynasty({
+                    leagueId: mpCommishDashboard.league_id,
+                    teamName: coachTeam,
+                    leagueName: mpCommishDashboard.league_name,
+                  })
+              : undefined
+          }
+          myDynastyBusy={mpCoachDashBusy}
+          onSubmitWeek={coachTeam ? () => void onMultiplayerSubmitWeek() : undefined}
+          onUnsubmitWeek={coachTeam ? () => void onMultiplayerUnsubmitWeek() : undefined}
+          submitBusy={mpSubmitBusy}
         />
         {error ? (
           <div className="fnd-error" style={{ position: 'fixed', bottom: 16, left: 16, right: 16, zIndex: 9999 }}>
@@ -2523,7 +2591,12 @@ export default function App({ devNoFirebase = false }: AppProps) {
         <div style={{ position: 'fixed', top: 12, right: 12, zIndex: 9999, display: 'flex', gap: 8, flexWrap: 'wrap', maxWidth: 'min(100vw - 24px, 520px)', justifyContent: 'flex-end' }}>
           {mpGameContext ? (
             <button type="button" className="teamhome-select" onClick={() => void returnToLeagueDashboard()}>
-              ← {mpGameContext.commishMode ? 'Commish dashboard' : 'League dashboard'}
+              ←{' '}
+              {mpGameContext.commishMode ||
+              (mpCommishDashboard?.league_id === mpGameContext.leagueId &&
+                mpCommishDashboard.can_manage !== false)
+                ? 'Commish dashboard'
+                : 'League dashboard'}
             </button>
           ) : null}
           <button type="button" className="teamhome-select" onClick={() => setAutosaveEnabled((v) => !v)} title="Toggle browser autosave">

@@ -139,6 +139,9 @@ export type CommishDashboardData = {
   state_version: number
   is_read_only_admin?: boolean
   can_manage?: boolean
+  acting_team_name?: string | null
+  coach_setup_complete?: boolean
+  your_status?: { submitted: boolean; can_unsubmit?: boolean; label: string; sub_label: string }
 }
 
 export type AssignTeamResult = {

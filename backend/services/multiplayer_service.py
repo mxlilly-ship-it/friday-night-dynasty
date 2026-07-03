@@ -2197,6 +2197,26 @@ def build_commish_dashboard(league_id: str, user_id: str) -> Dict[str, Any]:
     league_name = str(league_row.get("name") or "League")
     deadline_iso = _advance_countdown_iso(league_row)
 
+    acting_team: Optional[str] = None
+    coach_setup_complete = False
+    for r in member_rows:
+        if str(r["user_id"]) == user_id and r["team_name"] and str(r["status"]) == "active":
+            acting_team = str(r["team_name"])
+            coach_setup_complete = bool(r["coach_setup_complete"])
+            break
+    your_submitted = bool(acting_team and acting_team in submitted)
+    unsubmit_locked = _is_unsubmit_locked(league_row)
+    your_status = {
+        "submitted": your_submitted,
+        "can_unsubmit": your_submitted and not unsubmit_locked,
+        "label": "You're submitted" if your_submitted else "Not submitted yet",
+        "sub_label": (
+            f"Locked for {week_label}"
+            if your_submitted and unsubmit_locked
+            else (f"Locked for {week_label}" if your_submitted else f"Complete prep for {week_label}")
+        ),
+    }
+
     return {
         "league_id": league_id,
         "league_name": league_name,
@@ -2224,6 +2244,9 @@ def build_commish_dashboard(league_id: str, user_id: str) -> Dict[str, Any]:
         "state_version": int(league_row.get("state_version") or 0),
         "is_read_only_admin": read_only,
         "can_manage": not read_only,
+        "acting_team_name": acting_team,
+        "coach_setup_complete": coach_setup_complete,
+        "your_status": your_status,
     }
 
 
