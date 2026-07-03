@@ -279,6 +279,10 @@ def create_app() -> FastAPI:
         if screenshots_dir.is_dir():
             app.mount("/screenshots", StaticFiles(directory=str(screenshots_dir)), name="spa_screenshots")
 
+        dev_blog_dir = dist / "dev-blog"
+        if dev_blog_dir.is_dir():
+            app.mount("/dev-blog", StaticFiles(directory=str(dev_blog_dir)), name="spa_dev_blog")
+
         @app.get("/favicon.svg")
         def spa_favicon():
             p = dist / "favicon.svg"
