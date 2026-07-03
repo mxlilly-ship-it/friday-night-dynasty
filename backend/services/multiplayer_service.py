@@ -1749,6 +1749,40 @@ def create_admin_league(
     }
 
 
+def delete_admin_league(owner_user_id: str, league_id: str) -> Dict[str, Any]:
+    """Platform owner permanently deletes a multiplayer league and its save files."""
+    if not is_platform_owner_user(owner_user_id):
+        raise PermissionError("only platform owner can delete leagues")
+    league_row = _load_league_row(league_id)
+    if not league_row:
+        raise ValueError("league not found")
+    save_dir = str(league_row.get("save_dir") or "").strip()
+    league_name = str(league_row.get("name") or league_id)
+    with db() as conn:
+        conn.execute("DELETE FROM league_chat_messages WHERE league_id=?", (league_id,))
+        conn.execute("DELETE FROM league_activity_log WHERE league_id=?", (league_id,))
+        conn.execute("DELETE FROM league_submit_status WHERE league_id=?", (league_id,))
+        conn.execute("DELETE FROM league_invites WHERE league_id=?", (league_id,))
+        conn.execute("DELETE FROM league_members WHERE league_id=?", (league_id,))
+        conn.execute("DELETE FROM leagues WHERE id=?", (league_id,))
+    if save_dir:
+        import shutil
+
+        try:
+            if os.path.isdir(save_dir):
+                shutil.rmtree(save_dir, ignore_errors=True)
+        except Exception:
+            pass
+        # Also remove empty parent league folder if this was leagues/<id>
+        parent = os.path.dirname(save_dir.rstrip("\\/"))
+        try:
+            if parent and os.path.isdir(parent) and not os.listdir(parent):
+                os.rmdir(parent)
+        except Exception:
+            pass
+    return {"ok": True, "league_id": league_id, "name": league_name}
+
+
 def assign_team_to_member(
     league_id: str,
     actor_user_id: str,

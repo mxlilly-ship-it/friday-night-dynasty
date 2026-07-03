@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import './LeagueDashboardPage.css'
 import type { LeagueListItem } from './multiplayer'
-import { fetchMyLeagues } from './multiplayer'
+import { deleteAdminLeague, fetchMyLeagues } from './multiplayer'
 
 type MultiplayerLeaguesPageProps = {
   apiBase: string
@@ -33,20 +33,22 @@ export default function MultiplayerLeaguesPage({
   const [accountEmail, setAccountEmail] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [deletingId, setDeletingId] = useState('')
+  const [flash, setFlash] = useState('')
+
+  const reload = useCallback(async () => {
+    const data = await fetchMyLeagues(apiBase, headers)
+    setLeagues(data.leagues)
+    setIsPlatformOwner(data.is_platform_owner)
+    setPlatformOwnerConfigured(Boolean(data.platform_owner_configured))
+    setAccountEmail(data.account_email ?? '')
+  }, [apiBase, headers])
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError('')
-    void fetchMyLeagues(apiBase, headers)
-      .then((data) => {
-        if (!cancelled) {
-          setLeagues(data.leagues)
-          setIsPlatformOwner(data.is_platform_owner)
-          setPlatformOwnerConfigured(Boolean(data.platform_owner_configured))
-          setAccountEmail(data.account_email ?? '')
-        }
-      })
+    void reload()
       .catch((e: unknown) => {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load leagues')
       })
@@ -56,7 +58,26 @@ export default function MultiplayerLeaguesPage({
     return () => {
       cancelled = true
     }
-  }, [apiBase, headers])
+  }, [reload])
+
+  async function onDeleteLeague(league: LeagueListItem) {
+    const ok = window.confirm(
+      `Delete league "${league.name}" permanently?\n\nThis removes all members, invites, chat, and the shared save. This cannot be undone.`,
+    )
+    if (!ok) return
+    setDeletingId(league.league_id)
+    setError('')
+    setFlash('')
+    try {
+      const res = await deleteAdminLeague(apiBase, headers, league.league_id)
+      await reload()
+      setFlash(`Deleted «${res.name}».`)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to delete league')
+    } finally {
+      setDeletingId('')
+    }
+  }
 
   return (
     <div className="ldash-root">
@@ -77,6 +98,9 @@ export default function MultiplayerLeaguesPage({
       <div style={{ padding: '24px 32px', maxWidth: 720 }}>
         {loading ? <p className="ldash-loading">Loading leagues…</p> : null}
         {error ? <p className="ldash-error">{error}</p> : null}
+        {flash ? (
+          <p style={{ margin: '0 0 12px', color: 'var(--green-status)', fontSize: '0.9rem' }}>{flash}</p>
+        ) : null}
 
         {isPlatformOwner && onCreateLeague ? (
           <div className="ldash-panel" style={{ marginBottom: 16 }}>
@@ -88,7 +112,8 @@ export default function MultiplayerLeaguesPage({
             <div className="ldash-panel-body">
               <p style={{ margin: '0 0 12px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
                 Create a new multiplayer league using the same setup flow as a single-player dynasty — default
-                teams, custom JSON upload, coach profile, and your school.
+                teams, custom JSON upload, coach profile, and your school. You can also permanently delete leagues
+                from the list below.
               </p>
               <button type="button" className="ldash-action-btn ldash-action-btn--gold" onClick={onCreateLeague}>
                 Create new league
@@ -144,14 +169,24 @@ export default function MultiplayerLeaguesPage({
                       ...(league.your_turn ? ['Your turn'] : []),
                     ]
               return (
-                <button
+                <div
                   key={league.league_id}
-                  type="button"
                   className="ldash-div-header"
-                  style={{ padding: '14px 16px', alignItems: 'flex-start' }}
-                  onClick={() => onOpenLeague(league)}
+                  style={{ padding: '14px 16px', alignItems: 'flex-start', display: 'flex', gap: 10 }}
                 >
-                  <span style={{ textAlign: 'left', flex: 1 }}>
+                  <button
+                    type="button"
+                    style={{
+                      flex: 1,
+                      textAlign: 'left',
+                      background: 'transparent',
+                      border: 0,
+                      padding: 0,
+                      color: 'inherit',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => onOpenLeague(league)}
+                  >
                     <span className="ldash-div-name" style={{ fontSize: 15 }}>
                       {league.name}
                     </span>
@@ -170,9 +205,25 @@ export default function MultiplayerLeaguesPage({
                         ))}
                       </span>
                     ) : null}
+                  </button>
+                  <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+                    <span className="ldash-div-count">{league.status}</span>
+                    {isPlatformOwner ? (
+                      <button
+                        type="button"
+                        className="ldash-back-btn"
+                        style={{ color: 'var(--red-status)', borderColor: 'rgba(217, 100, 91, 0.45)' }}
+                        disabled={Boolean(deletingId)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void onDeleteLeague(league)
+                        }}
+                      >
+                        {deletingId === league.league_id ? 'Deleting…' : 'Delete'}
+                      </button>
+                    ) : null}
                   </span>
-                  <span className="ldash-div-count">{league.status}</span>
-                </button>
+                </div>
               )
             })}
           </div>

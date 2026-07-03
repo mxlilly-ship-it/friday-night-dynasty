@@ -288,6 +288,19 @@ export async function fetchCommishDashboard(
   return (await r.json()) as CommishDashboardData
 }
 
+export async function deleteAdminLeague(
+  apiBase: string,
+  headers: Record<string, string>,
+  leagueId: string,
+): Promise<{ ok: boolean; league_id: string; name: string }> {
+  const r = await fetch(`${apiBase}/leagues/admin/leagues/${encodeURIComponent(leagueId)}`, {
+    method: 'DELETE',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+  })
+  if (!r.ok) throw new Error(await r.text())
+  return (await r.json()) as { ok: boolean; league_id: string; name: string }
+}
+
 export async function inviteToLeague(
   apiBase: string,
   headers: Record<string, string>,
