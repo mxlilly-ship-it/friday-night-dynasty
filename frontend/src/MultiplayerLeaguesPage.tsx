@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import './LeagueDashboardPage.css'
-import type { LeagueListItem } from './multiplayer'
-import { deleteAdminLeague, fetchMyLeagues } from './multiplayer'
+import type { DeletedLeagueListItem, LeagueListItem } from './multiplayer'
+import {
+  deleteAdminLeague,
+  fetchDeletedLeagues,
+  fetchMyLeagues,
+  restoreAdminLeague,
+} from './multiplayer'
 
 type MultiplayerLeaguesPageProps = {
   apiBase: string
@@ -34,6 +39,8 @@ export default function MultiplayerLeaguesPage({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [deletingId, setDeletingId] = useState('')
+  const [restoringId, setRestoringId] = useState('')
+  const [deletedLeagues, setDeletedLeagues] = useState<DeletedLeagueListItem[]>([])
   const [flash, setFlash] = useState('')
 
   const reload = useCallback(async () => {
@@ -42,6 +49,15 @@ export default function MultiplayerLeaguesPage({
     setIsPlatformOwner(data.is_platform_owner)
     setPlatformOwnerConfigured(Boolean(data.platform_owner_configured))
     setAccountEmail(data.account_email ?? '')
+    if (data.is_platform_owner) {
+      try {
+        setDeletedLeagues(await fetchDeletedLeagues(apiBase, headers))
+      } catch {
+        setDeletedLeagues([])
+      }
+    } else {
+      setDeletedLeagues([])
+    }
   }, [apiBase, headers])
 
   useEffect(() => {
@@ -61,21 +77,40 @@ export default function MultiplayerLeaguesPage({
   }, [reload])
 
   async function onDeleteLeague(league: LeagueListItem) {
-    const ok = window.confirm(
-      `Delete league "${league.name}" permanently?\n\nThis removes all members, invites, chat, and the shared save. This cannot be undone.`,
+    const typed = window.prompt(
+      `Archive league "${league.name}"?\n\nIt will be hidden from all players but can be restored from Archived leagues below.\n\nType the league name exactly to confirm:`,
     )
-    if (!ok) return
+    if (typed === null) return
+    if (typed.trim() !== league.name) {
+      setError('League name did not match — nothing was deleted.')
+      return
+    }
     setDeletingId(league.league_id)
     setError('')
     setFlash('')
     try {
       const res = await deleteAdminLeague(apiBase, headers, league.league_id)
       await reload()
-      setFlash(`Deleted «${res.name}».`)
+      setFlash(`Archived «${res.name}». You can restore it below.`)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to delete league')
     } finally {
       setDeletingId('')
+    }
+  }
+
+  async function onRestoreLeague(league: DeletedLeagueListItem) {
+    setRestoringId(league.league_id)
+    setError('')
+    setFlash('')
+    try {
+      const res = await restoreAdminLeague(apiBase, headers, league.league_id)
+      await reload()
+      setFlash(`Restored «${res.name}».`)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to restore league')
+    } finally {
+      setRestoringId('')
     }
   }
 
@@ -112,8 +147,8 @@ export default function MultiplayerLeaguesPage({
             <div className="ldash-panel-body">
               <p style={{ margin: '0 0 12px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
                 Create a new multiplayer league using the same setup flow as a single-player dynasty — default
-                teams, custom JSON upload, coach profile, and your school. You can also permanently delete leagues
-                from the list below.
+                teams, custom JSON upload, coach profile, and your school. Archive removes a league from play
+                (type the name to confirm); you can restore it from Archived leagues.
               </p>
               <button type="button" className="ldash-action-btn ldash-action-btn--gold" onClick={onCreateLeague}>
                 Create new league
@@ -219,13 +254,49 @@ export default function MultiplayerLeaguesPage({
                           void onDeleteLeague(league)
                         }}
                       >
-                        {deletingId === league.league_id ? 'Deleting…' : 'Delete'}
+                        {deletingId === league.league_id ? 'Archiving…' : 'Archive'}
                       </button>
                     ) : null}
                   </span>
                 </div>
               )
             })}
+          </div>
+        ) : null}
+
+        {isPlatformOwner && deletedLeagues.length > 0 ? (
+          <div className="ldash-panel" style={{ marginTop: 16 }}>
+            <div className="ldash-panel-header">
+              <span className="ldash-panel-title">
+                Archived <span className="accent">leagues</span>
+              </span>
+            </div>
+            <div className="ldash-panel-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {deletedLeagues.map((league) => (
+                <div
+                  key={league.league_id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: 12,
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{league.name}</div>
+                    <div className="ldash-your-status-sub">Archived</div>
+                  </div>
+                  <button
+                    type="button"
+                    className="ldash-action-btn ldash-action-btn--gold"
+                    disabled={Boolean(restoringId)}
+                    onClick={() => void onRestoreLeague(league)}
+                  >
+                    {restoringId === league.league_id ? 'Restoring…' : 'Restore'}
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         ) : null}
       </div>

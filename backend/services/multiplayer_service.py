@@ -48,6 +48,11 @@ def _load_league_row(league_id: str) -> Optional[Dict[str, Any]]:
     return dict(row) if row else None
 
 
+def _reject_deleted_league(league_row: Dict[str, Any]) -> None:
+    if str(league_row.get("status") or "") == "deleted":
+        raise ValueError("league not found")
+
+
 def _user_email(user_id: str) -> str:
     with db() as conn:
         row = conn.execute("SELECT email, username FROM users WHERE id=?", (user_id,)).fetchone()
@@ -375,6 +380,7 @@ def _verify_commish_game_access(league_id: str, user_id: str) -> Dict[str, Any]:
     league_row = _load_league_row(league_id)
     if not league_row:
         raise ValueError("league not found")
+    _reject_deleted_league(league_row)
     if str(league_row.get("commissioner_user_id") or "") != user_id:
         raise PermissionError("commissioner only")
     return league_row
@@ -385,6 +391,7 @@ def _verify_commish_view_access(league_id: str, user_id: str) -> Tuple[Dict[str,
     league_row = _load_league_row(league_id)
     if not league_row:
         raise ValueError("league not found")
+    _reject_deleted_league(league_row)
     is_commish = str(league_row.get("commissioner_user_id") or "") == user_id
     is_owner = is_platform_owner_user(user_id)
     if not is_commish and not is_owner:
@@ -721,6 +728,7 @@ def _verify_team_game_access(league_id: str, user_id: str, team_name: str) -> Di
     league_row = _load_league_row(league_id)
     if not league_row:
         raise ValueError("league not found")
+    _reject_deleted_league(league_row)
     team_name = str(team_name or "").strip()
     if not team_name:
         raise ValueError("team_name required")
@@ -1140,7 +1148,9 @@ def list_leagues_for_user(user_id: str) -> List[Dict[str, Any]]:
             rows = conn.execute(
                 """
                 SELECT id, name, status, commissioner_user_id, updated_at, save_dir
-                FROM leagues ORDER BY updated_at DESC
+                FROM leagues
+                WHERE status != 'deleted'
+                ORDER BY updated_at DESC
                 """
             ).fetchall()
         else:
@@ -1149,7 +1159,7 @@ def list_leagues_for_user(user_id: str) -> List[Dict[str, Any]]:
                 SELECT DISTINCT l.id, l.name, l.status, l.commissioner_user_id, l.updated_at, l.save_dir
                 FROM leagues l
                 INNER JOIN league_members m ON m.league_id = l.id
-                WHERE m.user_id = ? AND m.status != 'removed'
+                WHERE m.user_id = ? AND m.status != 'removed' AND l.status != 'deleted'
                 ORDER BY l.updated_at DESC
                 """,
                 (user_id,),
@@ -1784,37 +1794,92 @@ def create_admin_league(
 
 
 def delete_admin_league(owner_user_id: str, league_id: str) -> Dict[str, Any]:
-    """Platform owner permanently deletes a multiplayer league and its save files."""
+    """Platform owner soft-deletes a league (hidden from lists; recoverable)."""
     if not is_platform_owner_user(owner_user_id):
         raise PermissionError("only platform owner can delete leagues")
     league_row = _load_league_row(league_id)
     if not league_row:
         raise ValueError("league not found")
-    save_dir = str(league_row.get("save_dir") or "").strip()
+    if str(league_row.get("status") or "") == "deleted":
+        raise ValueError("league already deleted")
     league_name = str(league_row.get("name") or league_id)
+    now = _now()
     with db() as conn:
-        conn.execute("DELETE FROM league_chat_messages WHERE league_id=?", (league_id,))
-        conn.execute("DELETE FROM league_activity_log WHERE league_id=?", (league_id,))
-        conn.execute("DELETE FROM league_submit_status WHERE league_id=?", (league_id,))
-        conn.execute("DELETE FROM league_invites WHERE league_id=?", (league_id,))
-        conn.execute("DELETE FROM league_members WHERE league_id=?", (league_id,))
-        conn.execute("DELETE FROM leagues WHERE id=?", (league_id,))
-    if save_dir:
-        import shutil
+        conn.execute(
+            "UPDATE leagues SET status='deleted', updated_at=? WHERE id=?",
+            (now, league_id),
+        )
+        conn.execute(
+            """
+            INSERT INTO league_activity_log (id, league_id, actor_user_id, action, detail_json, created_at)
+            VALUES (?,?,?,?,?,?)
+            """,
+            (
+                str(uuid.uuid4()),
+                league_id,
+                owner_user_id,
+                "league_deleted",
+                json.dumps({"text": f"League «{league_name}» archived by admin", "icon": "🗑️"}),
+                now,
+            ),
+        )
+    return {"ok": True, "league_id": league_id, "name": league_name, "status": "deleted"}
 
-        try:
-            if os.path.isdir(save_dir):
-                shutil.rmtree(save_dir, ignore_errors=True)
-        except Exception:
-            pass
-        # Also remove empty parent league folder if this was leagues/<id>
-        parent = os.path.dirname(save_dir.rstrip("\\/"))
-        try:
-            if parent and os.path.isdir(parent) and not os.listdir(parent):
-                os.rmdir(parent)
-        except Exception:
-            pass
-    return {"ok": True, "league_id": league_id, "name": league_name}
+
+def restore_admin_league(owner_user_id: str, league_id: str) -> Dict[str, Any]:
+    """Platform owner restores a soft-deleted league."""
+    if not is_platform_owner_user(owner_user_id):
+        raise PermissionError("only platform owner can restore leagues")
+    league_row = _load_league_row(league_id)
+    if not league_row:
+        raise ValueError("league not found")
+    if str(league_row.get("status") or "") != "deleted":
+        raise ValueError("league is not deleted")
+    league_name = str(league_row.get("name") or league_id)
+    now = _now()
+    with db() as conn:
+        conn.execute(
+            "UPDATE leagues SET status='active', updated_at=? WHERE id=?",
+            (now, league_id),
+        )
+        conn.execute(
+            """
+            INSERT INTO league_activity_log (id, league_id, actor_user_id, action, detail_json, created_at)
+            VALUES (?,?,?,?,?,?)
+            """,
+            (
+                str(uuid.uuid4()),
+                league_id,
+                owner_user_id,
+                "league_restored",
+                json.dumps({"text": f"League «{league_name}» restored by admin", "icon": "♻️"}),
+                now,
+            ),
+        )
+    return {"ok": True, "league_id": league_id, "name": league_name, "status": "active"}
+
+
+def list_deleted_leagues_for_admin(owner_user_id: str) -> List[Dict[str, Any]]:
+    if not is_platform_owner_user(owner_user_id):
+        raise PermissionError("only platform owner can list deleted leagues")
+    with db() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, name, status, updated_at, commissioner_user_id
+            FROM leagues WHERE status='deleted'
+            ORDER BY updated_at DESC
+            """
+        ).fetchall()
+    return [
+        {
+            "league_id": str(r["id"]),
+            "name": str(r["name"] or ""),
+            "status": "deleted",
+            "updated_at": int(r["updated_at"] or 0),
+            "commissioner_user_id": str(r["commissioner_user_id"] or ""),
+        }
+        for r in rows
+    ]
 
 
 def assign_team_to_member(

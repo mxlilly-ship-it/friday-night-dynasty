@@ -295,11 +295,42 @@ export async function deleteAdminLeague(
   apiBase: string,
   headers: Record<string, string>,
   leagueId: string,
-): Promise<{ ok: boolean; league_id: string; name: string }> {
+): Promise<{ ok: boolean; league_id: string; name: string; status?: string }> {
   const r = await fetch(`${apiBase}/leagues/admin/leagues/${encodeURIComponent(leagueId)}`, {
     method: 'DELETE',
     headers: { ...headers, 'Content-Type': 'application/json' },
   })
+  if (!r.ok) throw new Error(await r.text())
+  return (await r.json()) as { ok: boolean; league_id: string; name: string; status?: string }
+}
+
+export type DeletedLeagueListItem = {
+  league_id: string
+  name: string
+  status: string
+  updated_at: number
+  commissioner_user_id?: string
+}
+
+export async function fetchDeletedLeagues(
+  apiBase: string,
+  headers: Record<string, string>,
+): Promise<DeletedLeagueListItem[]> {
+  const r = await fetch(`${apiBase}/leagues/admin/leagues/deleted`, { headers })
+  if (!r.ok) throw new Error(await r.text())
+  const data = (await r.json()) as { leagues?: DeletedLeagueListItem[] }
+  return data.leagues ?? []
+}
+
+export async function restoreAdminLeague(
+  apiBase: string,
+  headers: Record<string, string>,
+  leagueId: string,
+): Promise<{ ok: boolean; league_id: string; name: string }> {
+  const r = await fetch(
+    `${apiBase}/leagues/admin/leagues/${encodeURIComponent(leagueId)}/restore`,
+    { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' } },
+  )
   if (!r.ok) throw new Error(await r.text())
   return (await r.json()) as { ok: boolean; league_id: string; name: string }
 }
