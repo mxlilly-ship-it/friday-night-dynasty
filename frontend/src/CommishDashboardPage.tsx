@@ -16,8 +16,6 @@ type CommishDashboardPageProps = {
   data: CommishDashboardData
   onBack: () => void
   onRefresh: () => Promise<void>
-  onOpenRunLeague: () => void
-  runLeagueBusy?: boolean
   onSimWeek: () => Promise<string>
   simWeekBusy?: boolean
   onInvite: (email: string) => Promise<{ email_sent?: boolean } | void>
@@ -46,8 +44,6 @@ export default function CommishDashboardPage({
   data,
   onBack,
   onRefresh,
-  onOpenRunLeague,
-  runLeagueBusy = false,
   onSimWeek,
   simWeekBusy = false,
   onInvite,
@@ -190,14 +186,6 @@ export default function CommishDashboardPage({
             }}
           >
             {simWeekBusy || busy === 'sim' ? 'Simulating…' : 'Sim week'}
-          </button>
-          <button
-            type="button"
-            className="cdash-btn cdash-btn--blue"
-            disabled={runLeagueBusy}
-            onClick={onOpenRunLeague}
-          >
-            {runLeagueBusy ? 'Opening…' : 'Run league'}
           </button>
             </>
           ) : null}

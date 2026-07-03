@@ -121,48 +121,33 @@ def sim_route(payload: SimRequest = Body(...), user=Depends(optional_user)):
                 if not isinstance(state.get("playoffs"), dict) or not (state.get("playoffs") or {}).get("by_class"):
                     state["playoffs"] = _init_playoffs_multiclass(state, teams, st)
                 _ensure_all_eligible_playoff_brackets(state, teams, st)
-        if kind == "week-sim":
-            mp = state.get("multiplayer") if isinstance(state.get("multiplayer"), dict) else {}
-            league_id = str(mp.get("league_id") or "")
-            if league_id and mp.get("team_name") and not mp.get("commish_mode"):
-                raise PermissionError("Only the commissioner can advance the league")
-            if league_id and mp.get("commish_mode"):
-                from backend.services.multiplayer_service import _mp_week_sim_context
-
-                mp_human, mp_submitted = _mp_week_sim_context(league_id, state)
-                state.pop("user_team", None)
-                out = sim_week_state(
-                    state,
-                    mp_human_teams=mp_human,
-                    mp_submitted_teams=mp_submitted,
+        def _block_mp_dynasty_advance(st: Dict[str, Any]) -> None:
+            mp = st.get("multiplayer") if isinstance(st.get("multiplayer"), dict) else {}
+            if mp.get("league_id") or st.get("multiplayer_league"):
+                raise PermissionError(
+                    "Advance the league from the Commissioner dashboard (Sim week) only."
                 )
-            else:
-                out = sim_week_state(state)
+
+        if kind == "week-sim":
+            _block_mp_dynasty_advance(state)
+            out = sim_week_state(state)
             return {"state": _sim_finalize_state(out)}
         if kind == "preseason-advance":
-            mp = state.get("multiplayer") if isinstance(state.get("multiplayer"), dict) else {}
-            if mp.get("league_id") and mp.get("team_name") and not mp.get("commish_mode"):
-                raise PermissionError("Only the commissioner can advance the league")
+            _block_mp_dynasty_advance(state)
             out = advance_preseason_state(state, body)
             st = out.get("state") if isinstance(out, dict) else None
             return {"state": _sim_finalize_state(st), "phase_completed": out.get("phase_completed")}
         if kind == "offseason-advance":
-            mp = state.get("multiplayer") if isinstance(state.get("multiplayer"), dict) else {}
-            if mp.get("league_id") and mp.get("team_name") and not mp.get("commish_mode"):
-                raise PermissionError("Only the commissioner can advance the league")
+            _block_mp_dynasty_advance(state)
             out = advance_offseason_state(state, body, league_history=payload.league_history, user_id=user_id)
             st = out if isinstance(out, dict) else None
             return {"state": _sim_finalize_state(st)}
         if kind == "playoffs-sim":
-            mp = state.get("multiplayer") if isinstance(state.get("multiplayer"), dict) else {}
-            if mp.get("league_id") and mp.get("team_name") and not mp.get("commish_mode"):
-                raise PermissionError("Only the commissioner can advance the league")
+            _block_mp_dynasty_advance(state)
             out = sim_playoffs_state(state)
             return {"state": _sim_finalize_state(out)}
         if kind == "playoffs-sim-round":
-            mp = state.get("multiplayer") if isinstance(state.get("multiplayer"), dict) else {}
-            if mp.get("league_id") and mp.get("team_name") and not mp.get("commish_mode"):
-                raise PermissionError("Only the commissioner can advance the league")
+            _block_mp_dynasty_advance(state)
             try:
                 out = sim_playoff_round_state(state)
                 return {"state": _sim_finalize_state(out)}
@@ -185,9 +170,7 @@ def sim_route(payload: SimRequest = Body(...), user=Depends(optional_user)):
                     "champion": out.get("champion"),
                 }
         if kind == "season-finish":
-            mp = state.get("multiplayer") if isinstance(state.get("multiplayer"), dict) else {}
-            if mp.get("league_id") and mp.get("team_name") and not mp.get("commish_mode"):
-                raise PermissionError("Only the commissioner can advance the league")
+            _block_mp_dynasty_advance(state)
             hist = payload.league_history or {"seasons": []}
             records = payload.records or {}
             bulk_ap = bool((body or {}).get("bulk_autopilot"))

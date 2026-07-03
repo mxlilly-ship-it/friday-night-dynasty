@@ -7,8 +7,6 @@ type LeagueDashboardPageProps = {
   onBack: () => void
   onOpenCoachDashboard?: () => void
   coachDashBusy?: boolean
-  onOpenCommishConsole?: () => void
-  commishConsoleBusy?: boolean
   /** Submit/unsubmit — only passed for multiplayer coach hub views. */
   onSubmitWeek?: () => void
   onUnsubmitWeek?: () => void
@@ -21,8 +19,6 @@ export default function LeagueDashboardPage({
   onBack,
   onOpenCoachDashboard,
   coachDashBusy = false,
-  onOpenCommishConsole,
-  commishConsoleBusy = false,
   onSubmitWeek,
   onUnsubmitWeek,
   submitBusy = false,
@@ -76,7 +72,6 @@ export default function LeagueDashboardPage({
 
   const weekShort = data.week_label.replace(/^Week\s+(\d+).*/, 'Week $1') || data.week_label
   const showCoachCta = Boolean(data.acting_team_name && onOpenCoachDashboard)
-  const showCommishRun = Boolean(data.can_run_league && onOpenCommishConsole)
 
   return (
     <div className="ldash-root">
@@ -94,16 +89,6 @@ export default function LeagueDashboardPage({
           <button type="button" className="ldash-back-btn" onClick={onBack}>
             ← Leagues
           </button>
-          {showCommishRun ? (
-            <button
-              type="button"
-              className="ldash-action-btn"
-              disabled={commishConsoleBusy}
-              onClick={onOpenCommishConsole}
-            >
-              {commishConsoleBusy ? 'Opening…' : 'Run league'}
-            </button>
-          ) : null}
           {showCoachCta ? (
             <button
               type="button"
