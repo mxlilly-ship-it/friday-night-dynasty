@@ -95,6 +95,7 @@ import {
   crossRegionSlotCountFromSave,
   emptySlotSelection,
   isInitialDynastySchedulePlanning,
+  isMultiplayerLeagueSave,
   schedulePlanningInfoFromState,
   userClassExpectsCrossRegionPicks,
   type CrossRegionSelections,
@@ -1767,7 +1768,11 @@ function TeamHomePageBody({
     () => isInitialDynastySchedulePlanning(saveState, phase),
     [saveState, phase],
   )
-  const needsCrossRegionPickUi = Boolean(schedulePlanningInfo && !crossRegionReady)
+  const isMultiplayerLeague = useMemo(() => isMultiplayerLeagueSave(saveState), [saveState])
+  // Multiplayer coaches never pick opening (or mid-league) schedules — commissioner advances the shared calendar.
+  const needsCrossRegionPickUi = Boolean(
+    schedulePlanningInfo && !crossRegionReady && !leagueAdvanceLocked && !isMultiplayerLeague,
+  )
 
   const scrollToSchedulePlanning = useCallback(() => {
     document.getElementById('schedplan-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -1779,10 +1784,14 @@ function TeamHomePageBody({
   const [crossRegionSyncing, setCrossRegionSyncing] = useState(false)
   const playoffsComplete = phase === 'playoffs' && Boolean(saveState?.playoffs?.completed)
   const needsCrossRegionSync =
-    phase === 'season_summary' ||
-    phase === 'schedule_planning' ||
-    playoffsComplete ||
-    (phase === 'preseason' && Array.isArray(saveState?.weeks) && saveState.weeks.length > 0 && !saveState?.cross_region_picks)
+    !isMultiplayerLeague &&
+    (phase === 'season_summary' ||
+      phase === 'schedule_planning' ||
+      playoffsComplete ||
+      (phase === 'preseason' &&
+        Array.isArray(saveState?.weeks) &&
+        saveState.weeks.length > 0 &&
+        !saveState?.cross_region_picks))
 
   useEffect(() => {
     if (!needsCrossRegionSync || !onSaveState) return
@@ -5206,11 +5215,14 @@ function TeamHomePageBody({
               winterAllocationInvalid ||
               (phase === 'offseason' && offseasonCurrentStage === 'Improvements' && improvementsBudget.invalid) ||
               (isHomeGameThemesStage && !homeGameThemesConfirmed) ||
-              (phase === 'season_summary' &&
+              (!isMultiplayerLeague &&
+                phase === 'season_summary' &&
                 effectiveCrossRegionSlots > 0 &&
                 (!schedulePlanningInfo || !crossRegionReady)) ||
-              (phase === 'schedule_planning' && (!schedulePlanningInfo || !crossRegionReady)) ||
-              (crossRegionSyncing && !crossRegionReady)
+              (!isMultiplayerLeague &&
+                phase === 'schedule_planning' &&
+                (!schedulePlanningInfo || !crossRegionReady)) ||
+              (!isMultiplayerLeague && crossRegionSyncing && !crossRegionReady)
             }
             onClick={async () => {
               try {
@@ -5554,7 +5566,15 @@ function TeamHomePageBody({
                   onOpenTeamHistory={() => setStateMenu('Team History')}
                 />
               )}
-              {schedulePlanningInfo ? (
+              {isMultiplayerLeague && phase === 'schedule_planning' ? (
+                <div className="teamhome-preseason-panelA teamhome-preseason-panelA--compact teamhome-schedplan-fallback">
+                  <div className="teamhome-preseason-title">Waiting on commissioner</div>
+                  <div className="teamhome-preseason-sub">
+                    Out-of-region schedules are set for the whole league by the commissioner. Submit your prep on the
+                    League Hub when the next stage opens.
+                  </div>
+                </div>
+              ) : schedulePlanningInfo && needsCrossRegionPickUi ? (
                 <SchedulePlanningPanel
                   apiBase={apiBase}
                   headers={headers}
@@ -5565,7 +5585,7 @@ function TeamHomePageBody({
                   selections={crossRegionSelections}
                   onSelectionsChange={setCrossRegionSelections}
                 />
-              ) : phase === 'schedule_planning' ? (
+              ) : phase === 'schedule_planning' && !isMultiplayerLeague ? (
                 <div className="teamhome-preseason-panelA teamhome-preseason-panelA--compact teamhome-schedplan-fallback">
                   <div className="teamhome-preseason-title">Non-region selection</div>
                   <div className="teamhome-preseason-sub">

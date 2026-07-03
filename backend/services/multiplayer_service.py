@@ -596,11 +596,13 @@ def _merge_coach_state_into_canonical(
             if key in incoming:
                 out[key] = copy.deepcopy(incoming[key])
 
+    out["multiplayer_league"] = True
     mp = out.get("multiplayer") if isinstance(out.get("multiplayer"), dict) else {}
     mp = dict(mp)
     inc_mp = incoming.get("multiplayer") if isinstance(incoming.get("multiplayer"), dict) else {}
     if inc_mp.get("league_id"):
         mp["league_id"] = inc_mp["league_id"]
+    mp["multiplayer_league"] = True
     out["multiplayer"] = mp
     return out
 
@@ -634,14 +636,32 @@ def get_league_commish_game_bundle(league_id: str, user_id: str) -> Dict[str, An
 
     league_row = _verify_commish_game_access(league_id, user_id)
     save_dir = str(league_row.get("save_dir") or "")
-    state = copy.deepcopy(_load_state(save_dir))
+    from backend.services.league_service import ensure_multiplayer_opening_schedule
+
+    canonical = _load_state(save_dir)
+    canonical["multiplayer_league"] = True
+    mp_meta = canonical.get("multiplayer") if isinstance(canonical.get("multiplayer"), dict) else {}
+    mp_meta = dict(mp_meta)
+    mp_meta["league_id"] = league_id
+    canonical["multiplayer"] = mp_meta
+    if ensure_multiplayer_opening_schedule(canonical):
+        _save_state(save_dir, canonical)
+        with db() as conn:
+            conn.execute(
+                "UPDATE leagues SET state_version=state_version+1, updated_at=? WHERE id=?",
+                (_now(), league_id),
+            )
+
+    state = copy.deepcopy(canonical)
     acting = _commissioner_acting_team(league_id, user_id, state)
     if acting:
         state["user_team"] = acting
+    state["multiplayer_league"] = True
     state["multiplayer"] = {
         "league_id": league_id,
         "commish_mode": True,
         "team_name": acting or None,
+        "multiplayer_league": True,
     }
 
     league_history: Dict[str, Any] = {"seasons": []}
@@ -726,7 +746,23 @@ def get_league_game_bundle(league_id: str, user_id: str, team_name: str) -> Dict
 
     league_row = _verify_team_game_access(league_id, user_id, team_name)
     save_dir = str(league_row.get("save_dir") or "")
-    state = copy.deepcopy(_load_state(save_dir))
+    from backend.services.league_service import ensure_multiplayer_opening_schedule
+
+    canonical = _load_state(save_dir)
+    canonical["multiplayer_league"] = True
+    mp_meta = canonical.get("multiplayer") if isinstance(canonical.get("multiplayer"), dict) else {}
+    mp_meta = dict(mp_meta)
+    mp_meta["league_id"] = league_id
+    canonical["multiplayer"] = mp_meta
+    if ensure_multiplayer_opening_schedule(canonical):
+        _save_state(save_dir, canonical)
+        with db() as conn:
+            conn.execute(
+                "UPDATE leagues SET state_version=state_version+1, updated_at=? WHERE id=?",
+                (_now(), league_id),
+            )
+
+    state = copy.deepcopy(canonical)
     state["user_team"] = team_name
     mp_names = state.get("multiplayer_coach_names")
     if isinstance(mp_names, dict) and mp_names.get(team_name):
@@ -739,7 +775,8 @@ def get_league_game_bundle(league_id: str, user_id: str, team_name: str) -> Dict
                 if nm:
                     state["user_coach_name"] = nm
                 break
-    state["multiplayer"] = {"league_id": league_id, "team_name": team_name}
+    state["multiplayer"] = {"league_id": league_id, "team_name": team_name, "multiplayer_league": True}
+    state["multiplayer_league"] = True
 
     apply_coach_gameplan_privacy_for_team(state, team_name)
 
@@ -1617,6 +1654,16 @@ def create_admin_league(
     # Remove bootstrap index row
     with db() as conn:
         conn.execute("DELETE FROM saves WHERE id=?", (save_id,))
+
+    # Multiplayer: no opening schedule picker — auto-build the shared calendar and start preseason.
+    from backend.services.league_service import ensure_multiplayer_opening_schedule
+
+    state = _load_state(save_dir)
+    state["multiplayer_league"] = True
+    state["multiplayer"] = {"league_id": league_id}
+    state["user_team"] = user_team
+    ensure_multiplayer_opening_schedule(state)
+    _save_state(save_dir, state)
 
     now = _now()
     commish_id = resolve_commissioner_user_id(

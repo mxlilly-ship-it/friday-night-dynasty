@@ -8295,6 +8295,11 @@ def _ensure_schedule_planning_info_on_state(state: Dict[str, Any], teams: Dict[s
 
 def _repair_missing_cross_region_schedule_planning(state: Dict[str, Any]) -> bool:
     """Send saves that skipped out-of-region picks back to schedule planning."""
+    # Multiplayer: opening schedule is shared and auto-built; never bounce one coach
+    # into the single-player schedule picker (that rebuilds weeks out of order).
+    if is_multiplayer_league_state(state):
+        return ensure_multiplayer_opening_schedule(state)
+
     phase = str(state.get("season_phase") or "").strip().lower()
     teams = {
         t["name"]: team_from_dict(t)
@@ -8401,25 +8406,93 @@ def _apply_schedule_planning_picks_and_enter_offseason(
     _sync_user_cross_region_slot_count(state)
 
 
-def advance_schedule_planning_league_state(
-    state: Dict[str, Any],
-    *,
-    league_history: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
-    """Multiplayer: auto-fill cross-region picks for every team, then build the season schedule."""
+def is_multiplayer_league_state(state: Dict[str, Any]) -> bool:
+    """True for shared online leagues (no per-coach opening schedule picker)."""
+    if not isinstance(state, dict):
+        return False
+    if state.get("multiplayer_league"):
+        return True
+    mp = state.get("multiplayer")
+    return isinstance(mp, dict) and bool(mp.get("league_id"))
+
+
+def _auto_fill_all_cross_region_picks(state: Dict[str, Any]) -> None:
+    """Fill out-of-region slots for every team and build the shared week board."""
     from systems.schedule_planning import auto_random_picks, picks_dict_for_state
 
-    phase_s = str(state.get("season_phase") or "").strip().lower()
-    if phase_s != "schedule_planning":
-        raise ValueError("save is not in schedule_planning")
-
-    teams = {t["name"]: team_from_dict(t) for t in state.get("teams", []) if isinstance(t, dict) and t.get("name")}
+    teams = {
+        t["name"]: team_from_dict(t)
+        for t in (state.get("teams") or [])
+        if isinstance(t, dict) and t.get("name")
+    }
     merged_picks: Dict[str, Any] = dict(state.get("cross_region_picks") or {})
     for team_name in teams:
         if _schedule_planning_info_for_user(teams, team_name):
             merged_picks.update(picks_dict_for_state(team_name, auto_random_picks(teams, team_name)))
     state["cross_region_picks"] = merged_picks
     _build_season_schedule_into_state(state, teams)
+    state.pop("schedule_planning_info", None)
+    _sync_user_cross_region_slot_count(state)
+
+
+def ensure_multiplayer_opening_schedule(state: Dict[str, Any]) -> bool:
+    """
+    Multiplayer leagues never use the single-player opening schedule picker.
+    Auto-build the shared schedule and start in preseason when needed.
+    Returns True when state was mutated.
+    """
+    if not is_multiplayer_league_state(state):
+        return False
+    state["multiplayer_league"] = True
+    phase = str(state.get("season_phase") or "").strip().lower()
+    weeks = state.get("weeks")
+    has_weeks = isinstance(weeks, list) and len(weeks) > 0
+    # Opening dynasty only: schedule_planning before any season has been played.
+    played = False
+    if has_weeks:
+        for wk in weeks:
+            if not isinstance(wk, list):
+                continue
+            for g in wk:
+                if isinstance(g, dict) and g.get("played"):
+                    played = True
+                    break
+            if played:
+                break
+    if phase == "schedule_planning" and not played:
+        _auto_fill_all_cross_region_picks(state)
+        state["season_phase"] = "preseason"
+        state["preseason_stages"] = state.get("preseason_stages") or list(PRESEASON_STAGES)
+        state["preseason_stage_index"] = int(state.get("preseason_stage_index") or 0)
+        state["current_week"] = int(state.get("current_week") or 1)
+        _assign_scrimmage_opponents_for_state(state)
+        return True
+    if phase == "preseason" and not has_weeks:
+        teams = {
+            t["name"]: team_from_dict(t)
+            for t in (state.get("teams") or [])
+            if isinstance(t, dict) and t.get("name")
+        }
+        user_team = str(state.get("user_team") or "").strip()
+        if user_team and _schedule_planning_info_for_user(teams, user_team):
+            _auto_fill_all_cross_region_picks(state)
+            _assign_scrimmage_opponents_for_state(state)
+            return True
+    return False
+
+
+def advance_schedule_planning_league_state(
+    state: Dict[str, Any],
+    *,
+    league_history: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Multiplayer: auto-fill cross-region picks for every team, then build the season schedule."""
+    phase_s = str(state.get("season_phase") or "").strip().lower()
+    if phase_s != "schedule_planning":
+        raise ValueError("save is not in schedule_planning")
+
+    teams = {t["name"]: team_from_dict(t) for t in state.get("teams", []) if isinstance(t, dict) and t.get("name")}
+    _auto_fill_all_cross_region_picks(state)
 
     already_in_offseason = isinstance(state.get("offseason_graduation_report"), dict)
     pending = state.pop("pending_offseason_transition", None)

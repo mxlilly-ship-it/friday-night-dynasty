@@ -96,8 +96,18 @@ export function saveHasPlayedRegularSeasonGames(saveState: any): boolean {
   return false
 }
 
+/** True for shared online leagues (opening schedule is auto-built, not per-coach). */
+export function isMultiplayerLeagueSave(saveState: any): boolean {
+  if (!saveState || typeof saveState !== 'object') return false
+  if (saveState.multiplayer_league) return true
+  const mp = saveState.multiplayer
+  return Boolean(mp && typeof mp === 'object' && (mp.league_id || mp.multiplayer_league))
+}
+
 /** Dynasty start: schedule planning before the first regular-season game. */
 export function isInitialDynastySchedulePlanning(saveState: any, phase: string): boolean {
+  // Multiplayer leagues never use the single-player opening schedule picker.
+  if (isMultiplayerLeagueSave(saveState)) return false
   if (String(phase || '').trim().toLowerCase() !== 'schedule_planning') return false
   if (saveState?.cross_region_picks) return false
   return !saveHasPlayedRegularSeasonGames(saveState)
