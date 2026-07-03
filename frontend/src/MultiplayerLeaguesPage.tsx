@@ -29,6 +29,8 @@ export default function MultiplayerLeaguesPage({
 }: MultiplayerLeaguesPageProps) {
   const [leagues, setLeagues] = useState<LeagueListItem[]>([])
   const [isPlatformOwner, setIsPlatformOwner] = useState(false)
+  const [platformOwnerConfigured, setPlatformOwnerConfigured] = useState(false)
+  const [accountEmail, setAccountEmail] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -41,6 +43,8 @@ export default function MultiplayerLeaguesPage({
         if (!cancelled) {
           setLeagues(data.leagues)
           setIsPlatformOwner(data.is_platform_owner)
+          setPlatformOwnerConfigured(Boolean(data.platform_owner_configured))
+          setAccountEmail(data.account_email ?? '')
         }
       })
       .catch((e: unknown) => {
@@ -89,6 +93,28 @@ export default function MultiplayerLeaguesPage({
               <button type="button" className="ldash-action-btn ldash-action-btn--gold" onClick={onCreateLeague}>
                 Create new league
               </button>
+            </div>
+          </div>
+        ) : null}
+
+        {!loading && !isPlatformOwner ? (
+          <div className="ldash-panel" style={{ marginBottom: 16 }}>
+            <div className="ldash-panel-body">
+              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                {!platformOwnerConfigured ? (
+                  <>
+                    Platform admin is not enabled on this server. In Railway Variables, set{' '}
+                    <code style={{ color: 'var(--gold-bright)' }}>FND_PLATFORM_OWNER_EMAILS=mxlilly@gmail.com</code>{' '}
+                    and redeploy. Signed in as{' '}
+                    <strong style={{ color: 'var(--text-primary)' }}>{accountEmail || 'unknown'}</strong>.
+                  </>
+                ) : (
+                  <>
+                    Signed in as <strong style={{ color: 'var(--text-primary)' }}>{accountEmail || 'unknown'}</strong>.
+                    That account is not in <code style={{ color: 'var(--gold-bright)' }}>FND_PLATFORM_OWNER_EMAILS</code>.
+                  </>
+                )}
+              </p>
             </div>
           </div>
         ) : null}

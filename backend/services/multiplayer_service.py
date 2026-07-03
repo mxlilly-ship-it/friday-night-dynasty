@@ -56,12 +56,21 @@ def _user_email(user_id: str) -> str:
     return str(row["email"] or row["username"] or "").strip()
 
 
-def is_platform_owner_user(user_id: str) -> bool:
+def account_identity_for_user(user_id: str) -> Dict[str, Any]:
+    """Email/username used for platform-owner checks (for diagnostics)."""
     with db() as conn:
         row = conn.execute("SELECT email, username FROM users WHERE id=?", (user_id,)).fetchone()
     if not row:
-        return False
-    for field in (row["email"], row["username"]):
+        return {"email": "", "username": ""}
+    return {
+        "email": str(row["email"] or "").strip(),
+        "username": str(row["username"] or "").strip(),
+    }
+
+
+def is_platform_owner_user(user_id: str) -> bool:
+    identity = account_identity_for_user(user_id)
+    for field in (identity.get("email"), identity.get("username")):
         if is_platform_owner_email(str(field or "")):
             return True
     return False

@@ -94,6 +94,8 @@ export type LeagueChatMessage = {
 export type LeagueMineResponse = {
   leagues: LeagueListItem[]
   is_platform_owner: boolean
+  platform_owner_configured?: boolean
+  account_email?: string
 }
 
 export type CommishMember = {
@@ -155,6 +157,8 @@ export async function fetchMyLeagues(
   return {
     leagues: data.leagues ?? [],
     is_platform_owner: Boolean(data.is_platform_owner),
+    platform_owner_configured: Boolean(data.platform_owner_configured),
+    account_email: data.account_email ? String(data.account_email) : '',
   }
 }
 

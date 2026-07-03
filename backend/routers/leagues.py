@@ -17,6 +17,7 @@ from backend.services.multiplayer_service import (
     create_admin_league,
     get_league_commish_game_bundle,
     get_league_game_bundle,
+    account_identity_for_user,
     invite_user_to_league,
     is_platform_owner_user,
     list_league_chat_messages,
@@ -105,12 +106,18 @@ class ChatMessageBody(BaseModel):
 
 @router.get("/mine", response_model=Dict[str, Any])
 def list_my_leagues_route(user=Depends(require_entitled)):
+    from backend.platform_config import platform_owner_emails_configured
+
     user_id = user["user_id"]
     sync_pending_invites_for_user(user_id)
     leagues = list_leagues_for_user(user_id)
+    identity = account_identity_for_user(user_id)
+    account_email = identity.get("email") or identity.get("username") or ""
     return {
         "leagues": leagues,
         "is_platform_owner": is_platform_owner_user(user_id),
+        "platform_owner_configured": platform_owner_emails_configured(),
+        "account_email": account_email,
     }
 
 
