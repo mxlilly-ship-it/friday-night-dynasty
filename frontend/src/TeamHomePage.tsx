@@ -319,6 +319,15 @@ type Props = {
   onImportJerseysToBundle?: (jerseys: import('./saveBundle').SaveBundle['jerseys']) => Promise<void>
   /** API saves: reload league_history.json when opening Team History. */
   onRefreshDynasty?: () => void | Promise<void>
+  /** Multiplayer coach: league calendar advances on commish sim only. */
+  leagueAdvanceLocked?: boolean
+  /** Multiplayer coach: submit/unsubmit from My dynasty. */
+  onSubmitWeek?: () => void | Promise<void>
+  onUnsubmitWeek?: () => void | Promise<void>
+  weekSubmitted?: boolean
+  canUnsubmitWeek?: boolean
+  submitWeekBusy?: boolean
+  onReturnToLeagueHub?: () => void
 }
 
 type TeamHomePageBodyProps = Props & {
@@ -1689,6 +1698,13 @@ function TeamHomePageBody({
   jerseyVersion,
   setJerseyVersion,
   onOpenSettings,
+  leagueAdvanceLocked = false,
+  onSubmitWeek,
+  onUnsubmitWeek,
+  weekSubmitted = false,
+  canUnsubmitWeek = true,
+  submitWeekBusy = false,
+  onReturnToLeagueHub,
 }: TeamHomePageBodyProps) {
   void backupReminderFrequency
   void onBackupReminderFrequencyChange
@@ -5363,6 +5379,42 @@ function TeamHomePageBody({
                   ? 'Continue'
                   : 'Continue'}
           </button>
+          {leagueAdvanceLocked && onReturnToLeagueHub ? (
+            <button
+              type="button"
+              className="teamhome-select"
+              onClick={onReturnToLeagueHub}
+              title="Back to League Hub"
+            >
+              League Hub
+            </button>
+          ) : null}
+          {leagueAdvanceLocked && onSubmitWeek && !weekSubmitted ? (
+            <button
+              type="button"
+              className="teamhome-select"
+              disabled={submitWeekBusy}
+              onClick={() => void onSubmitWeek()}
+              title="Submit your prep for this week"
+            >
+              {submitWeekBusy ? 'Submitting…' : 'Submit week'}
+            </button>
+          ) : null}
+          {leagueAdvanceLocked && onUnsubmitWeek && weekSubmitted ? (
+            <button
+              type="button"
+              className="teamhome-select"
+              disabled={submitWeekBusy || canUnsubmitWeek === false}
+              onClick={() => void onUnsubmitWeek()}
+              title={
+                canUnsubmitWeek === false
+                  ? 'Locked — too close to the advance deadline'
+                  : 'Unsubmit so you can keep prepping'
+              }
+            >
+              {submitWeekBusy ? '…' : 'Unsubmit'}
+            </button>
+          ) : null}
           <button type="button" className="teamhome-select" onClick={onOpenSettings} title="Settings">
             Settings
           </button>
@@ -6101,6 +6153,7 @@ function TeamHomePageBody({
                       type="button"
                       className="teamhome-action-btn"
                       disabled={
+                        leagueAdvanceLocked ||
                         !saveId ||
                         Boolean(saveState?.playoffs?.completed) ||
                         anyPlayoffGamesStarted(saveState)
@@ -6121,7 +6174,7 @@ function TeamHomePageBody({
                     <button
                       type="button"
                       className="teamhome-action-btn"
-                      disabled={!saveId || !saveState?.playoffs?.completed}
+                      disabled={leagueAdvanceLocked || !saveId || !saveState?.playoffs?.completed}
                       onClick={async () => {
                         try {
                           await onSimWeek({ seasonFinish: true })
@@ -8112,6 +8165,13 @@ function TeamHomePageBody({
             playingWeek={playingWeek}
             simmingWeek={simmingWeek}
             simMultipleCount={simMultipleCount}
+            leagueAdvanceLocked={leagueAdvanceLocked}
+            onSubmitWeek={onSubmitWeek}
+            onUnsubmitWeek={onUnsubmitWeek}
+            weekSubmitted={weekSubmitted}
+            canUnsubmitWeek={canUnsubmitWeek}
+            submitWeekBusy={submitWeekBusy}
+            onReturnToLeagueHub={onReturnToLeagueHub}
             onPlayGame={async () => {
               if (!canStartCoachPlay) return
               setPlayingWeek(true)
@@ -8160,7 +8220,10 @@ function TeamHomePageBody({
                 setPlayingWeek(false)
               }
             }}
-            onSimGame={async () => {
+            onSimGame={
+              leagueAdvanceLocked
+                ? undefined
+                : async () => {
               setSimmingWeek(true)
               try {
                 await onSimWeek()
@@ -8170,7 +8233,10 @@ function TeamHomePageBody({
                 setSimmingWeek(false)
               }
             }}
-            onSimMultiple={async (n) => {
+            onSimMultiple={
+              leagueAdvanceLocked
+                ? undefined
+                : async (n) => {
               setSimMultipleCount(n)
               try {
                 for (let i = 0; i < n; i++) {

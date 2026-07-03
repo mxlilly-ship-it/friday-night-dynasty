@@ -16,9 +16,39 @@ export function isBrowserSaveId(saveId: string): boolean {
   return saveId === '__local__' || saveId.startsWith('b_')
 }
 
+export function isMultiplayerSaveId(saveId: string): boolean {
+  return saveId.startsWith('mp:')
+}
+
+export function isMultiplayerCommishSaveId(saveId: string): boolean {
+  return saveId.startsWith('mp:') && saveId.endsWith(':commish')
+}
+
+export function multiplayerSaveId(leagueId: string, teamName: string): string {
+  return `mp:${leagueId}:${encodeURIComponent(teamName)}`
+}
+
+export function multiplayerCommishSaveId(leagueId: string): string {
+  return `mp:${leagueId}:commish`
+}
+
+export function parseMultiplayerSaveId(saveId: string): { leagueId: string; teamName: string; commishMode: boolean } | null {
+  if (!saveId.startsWith('mp:')) return null
+  const rest = saveId.slice(3)
+  const idx = rest.indexOf(':')
+  if (idx < 1) return null
+  const leagueId = rest.slice(0, idx)
+  const teamName = decodeURIComponent(rest.slice(idx + 1))
+  return {
+    leagueId,
+    teamName,
+    commishMode: teamName === 'commish',
+  }
+}
+
 /** Browser saves and unauthenticated sessions use stateless /sim/* routes. */
 export function shouldUseSimApi(saveId: string, headers: Record<string, string>): boolean {
-  return isBrowserSaveId(saveId) || !headers?.Authorization
+  return isBrowserSaveId(saveId) || isMultiplayerSaveId(saveId) || !headers?.Authorization
 }
 
 export function createBrowserSaveId(): string {

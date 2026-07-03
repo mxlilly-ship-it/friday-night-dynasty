@@ -12,7 +12,11 @@ import {
   deleteBrowserSave,
   getBrowserSave,
   isBrowserSaveId,
+  isMultiplayerSaveId,
   listBrowserSaves,
+  multiplayerCommishSaveId,
+  multiplayerSaveId,
+  parseMultiplayerSaveId,
   putBrowserSave,
   readLatestAutosave,
   writeLatestAutosave,
@@ -33,6 +37,32 @@ import ScreenshotsGallery from './ScreenshotsGallery'
 import SupportContactModal from './SupportContactModal'
 import { getOrCreateDeviceId } from './deviceId.js'
 import { confirmCheckoutSession, createCheckoutSession, fetchBillingStatus, parseApiError, syncBillingAccess as syncBillingAccessApi, type BillingStatus } from './billing'
+import MultiplayerLeaguesPage from './MultiplayerLeaguesPage'
+import LeagueDashboardPage from './LeagueDashboardPage'
+import CommishDashboardPage from './CommishDashboardPage'
+import {
+  assignTeamByEmail,
+  commishSimWeek,
+  fetchCommishDashboard,
+  fetchLeagueCommishGame,
+  fetchLeagueDashboard,
+  fetchLeagueGame,
+  inviteToLeague,
+  postLeagueChat,
+  removeLeagueMember,
+  resetMemberPin,
+  revokeLeagueInvite,
+  saveLeagueCommishGame,
+  saveLeagueGame,
+  submitLeagueWeek,
+  unsubmitLeagueWeek,
+  updateCommishSettings,
+  vacateTeamMember,
+  verifyTeamPin,
+  type CommishDashboardData,
+  type LeagueDashboardData,
+  type LeagueListItem,
+} from './multiplayer'
 
 /** Stable reference so child effects do not re-run when logged out (browser saves). */
 const EMPTY_AUTH_HEADERS: Record<string, string> = Object.freeze({})
@@ -91,7 +121,17 @@ function preseasonStructurallyComplete(state: any): boolean {
 }
 
 type SaveListItem = { save_id: string; save_name: string; updated_at: number }
-type Screen = 'title' | 'load' | 'new' | 'purchase' | 'playing'
+type Screen =
+  | 'title'
+  | 'load'
+  | 'new'
+  | 'purchase'
+  | 'playing'
+  | 'multiplayer'
+  | 'multiplayer_create'
+  | 'multiplayer_coach_setup'
+  | 'league_dashboard'
+  | 'commish_dashboard'
 type BackupReminderFrequency = 'none' | '3_weeks' | '6_weeks' | 'stage'
 type CloudSaveListItem = { save_id: string; save_name: string; updated_at: number }
 
@@ -129,6 +169,23 @@ export default function App({ devNoFirebase = false }: AppProps) {
   const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null)
   const [billingChecking, setBillingChecking] = useState(false)
   const [billingBusy, setBillingBusy] = useState(false)
+  const [mpDashboard, setMpDashboard] = useState<LeagueDashboardData | null>(null)
+  const [mpCommishDashboard, setMpCommishDashboard] = useState<CommishDashboardData | null>(null)
+  const [mpPendingLeague, setMpPendingLeague] = useState<LeagueListItem | null>(null)
+  const [mpPinTeam, setMpPinTeam] = useState<string | null>(null)
+  const [mpPinInput, setMpPinInput] = useState('')
+  const [mpPinBusy, setMpPinBusy] = useState(false)
+  const [mpShowTeamPicker, setMpShowTeamPicker] = useState(false)
+  const [mpCoachSetupTeam, setMpCoachSetupTeam] = useState<string | null>(null)
+  const [mpGameContext, setMpGameContext] = useState<{
+    leagueId: string
+    teamName?: string
+    commishMode?: boolean
+  } | null>(null)
+  const [mpCoachDashBusy, setMpCoachDashBusy] = useState(false)
+  const [mpSubmitBusy, setMpSubmitBusy] = useState(false)
+  const [mpCommishConsoleBusy, setMpCommishConsoleBusy] = useState(false)
+  const [mpCommishSimBusy, setMpCommishSimBusy] = useState(false)
   const [autosaveEnabled, setAutosaveEnabled] = useState<boolean>(() => {
     const raw = localStorage.getItem('fnd_autosave_enabled')
     return raw == null ? true : raw === 'true'
@@ -142,7 +199,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
   const [showBackupPrompt, setShowBackupPrompt] = useState(false)
   const [backupPromptReason, setBackupPromptReason] = useState('')
   const [showTrialPurchaseModal, setShowTrialPurchaseModal] = useState(false)
-  const inLocalRuntime = Boolean(localBundle) && isBrowserSaveId(saveId)
+  const inLocalRuntime = Boolean(localBundle) && (isBrowserSaveId(saveId) || isMultiplayerSaveId(saveId))
   const needsBillingPurchase = Boolean(
     billingStatus?.billing_required && !billingStatus?.entitled && !billingStatus?.trial_available,
   )
@@ -159,6 +216,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
   const saveStateRef = useRef<any>(null)
   saveStateRef.current = saveState
   const scheduleBrowserPersistRef = useRef<(() => void) | null>(null)
+  const persistCurrentBrowserSaveRef = useRef<(() => Promise<void>) | null>(null)
 
   /** Apply API simulation payload immediately (ref + React state) so back-to-back simWeek() calls stay in sync. */
   const applySimulationState = useCallback(
@@ -221,11 +279,23 @@ export default function App({ devNoFirebase = false }: AppProps) {
     }
   }, [localBundle, dynastyLeagueHistory])
 
+  useEffect(() => {
+    scheduleBrowserPersistRef.current = () => {
+      if (!localBundle || !saveId) return
+      void persistCurrentBrowserSaveRef.current?.()
+    }
+  }, [localBundle, saveId])
+
+  const headers = useMemo((): Record<string, string> => {
+    if (!token) return EMPTY_AUTH_HEADERS
+    return { Authorization: `Bearer ${token}` }
+  }, [token])
+
   const persistCurrentBrowserSave = useCallback(async () => {
     if (!localBundle) return
     const live = saveStateRef.current
     if (!live) return
-    let id = saveId.startsWith('b_') ? saveId : createBrowserSaveId()
+    let id = saveId.startsWith('b_') || isMultiplayerSaveId(saveId) ? saveId : createBrowserSaveId()
     if (saveId === '__local__' || !saveId) {
       setSaveId(id)
     }
@@ -236,19 +306,23 @@ export default function App({ devNoFirebase = false }: AppProps) {
       updatedAt: Date.now(),
       bundle: { ...localBundle, state: live },
     })
-  }, [saveId, localBundle])
+    const mpCtx = isMultiplayerSaveId(id) ? parseMultiplayerSaveId(id) : null
+    if (mpCtx && token) {
+      try {
+        if (mpCtx.commishMode) {
+          await saveLeagueCommishGame(API_BASE, headers, mpCtx.leagueId, live as Record<string, unknown>)
+        } else {
+          await saveLeagueGame(API_BASE, headers, mpCtx.leagueId, mpCtx.teamName, live as Record<string, unknown>)
+        }
+      } catch {
+        /* server sync best-effort */
+      }
+    }
+  }, [saveId, localBundle, token, headers])
 
   useEffect(() => {
-    scheduleBrowserPersistRef.current = () => {
-      if (!localBundle || !saveId) return
-      void persistCurrentBrowserSave()
-    }
-  }, [localBundle, saveId, persistCurrentBrowserSave])
-
-  const headers = useMemo((): Record<string, string> => {
-    if (!token) return EMPTY_AUTH_HEADERS
-    return { Authorization: `Bearer ${token}` }
-  }, [token])
+    persistCurrentBrowserSaveRef.current = persistCurrentBrowserSave
+  }, [persistCurrentBrowserSave])
 
   const importLogosToBundle = useCallback(
     async (newLogos: SaveBundle['logos']) => {
@@ -1182,6 +1256,87 @@ export default function App({ devNoFirebase = false }: AppProps) {
     const live = saveStateRef.current
     const livePhase = String(live?.season_phase ?? '').toLowerCase()
     const uiPhase = deriveUiPhaseFromSave(live, localBundle?.leagueHistory ?? dynastyLeagueHistory)
+    const mpCoachCtx =
+      mpGameContext && !mpGameContext.commishMode && mpGameContext.teamName ? mpGameContext : null
+    const MP_ADVANCE_MSG =
+      'Only the commissioner can advance the league. Finish your prep, then submit your week on the League Hub.'
+
+    function mpOffseasonIsAdvanceAck(body: Record<string, unknown> | undefined): boolean {
+      if (!body) return false
+      return Boolean(
+        body.winter_training_ack_results ||
+          body.spring_ball_ack_results ||
+          body.transfer_stage_1_ack_results ||
+          body.transfer_stage_2_ack_results ||
+          body.seven_on_seven_ack_results,
+      )
+    }
+
+    function isMpCoachPrepOpts(): boolean {
+      if (!opts) return false
+      if (opts.playoffsSim || opts.seasonFinish) return false
+      if (opts.offseasonBody && mpOffseasonIsAdvanceAck(opts.offseasonBody as Record<string, unknown>)) return false
+      return Boolean(
+        opts.playbook ||
+          opts.gamePlan ||
+          opts.depthChart ||
+          opts.positionChanges !== undefined ||
+          opts.goals ||
+          opts.homeGameThemes ||
+          opts.homeGameThemesAck ||
+          opts.forcePreseasonAdvance ||
+          opts.offseasonBody,
+      )
+    }
+
+    function buildMpCoachPrep(): Record<string, unknown> {
+      const prep: Record<string, unknown> = {}
+      if (opts?.playbook) {
+        prep.offensive_playbook = opts.playbook.offensive_playbook
+        prep.defensive_playbook = opts.playbook.defensive_playbook
+      }
+      if (opts?.gamePlan) prep.game_plan = opts.gamePlan
+      if (opts?.depthChart) prep.depth_chart = opts.depthChart
+      if (opts?.positionChanges !== undefined) prep.position_changes = opts.positionChanges
+      if (opts?.goals) prep.goals = opts.goals
+      if (opts?.homeGameThemes) prep.home_game_themes = opts.homeGameThemes
+      if (opts?.homeGameThemesAck) prep.home_game_themes_ack = true
+      if (opts?.forcePreseasonAdvance) prep.scrimmage_simulate = true
+      if (opts?.offseasonBody) Object.assign(prep, opts.offseasonBody)
+      return prep
+    }
+
+    if (mpCoachCtx) {
+      if (opts?.seasonFinish || opts?.playoffsSim) {
+        setError(MP_ADVANCE_MSG)
+        return false
+      }
+      if (!isMpCoachPrepOpts()) {
+        setError(MP_ADVANCE_MSG)
+        return false
+      }
+      try {
+        const q = `?team_name=${encodeURIComponent(mpCoachCtx.teamName!)}`
+        const r = await fetch(`${API_BASE}/leagues/${mpCoachCtx.leagueId}/coach-prep${q}`, {
+          method: 'POST',
+          headers: { ...(await getAuthHeaders()), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prep: buildMpCoachPrep() }),
+        })
+        if (!r.ok) {
+          if (await handleTrialOrApiError(r)) return false
+          setError(await formatApiErrorBody(r))
+          return false
+        }
+        const data = await r.json()
+        if (data?.state) {
+          applySimulationState(data.state, data)
+        }
+        return true
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : 'Could not save prep')
+        return false
+      }
+    }
 
     if (localBundle) {
       // Stateless mode: send current bundle state to the API and receive updated state (and updated history/records/recaps).
@@ -1439,8 +1594,13 @@ export default function App({ devNoFirebase = false }: AppProps) {
     await startCheckout()
   }
 
-  const titleNavRef = useRef({ onNewSaveClick, onLoadSaveClick, onPurchaseClick })
-  titleNavRef.current = { onNewSaveClick, onLoadSaveClick, onPurchaseClick }
+  const titleNavRef = useRef({
+    onNewSaveClick,
+    onLoadSaveClick,
+    onPurchaseClick,
+    onMultiplayerClick: () => setScreen('multiplayer'),
+  })
+  titleNavRef.current = { onNewSaveClick, onLoadSaveClick, onPurchaseClick, onMultiplayerClick }
 
   useEffect(() => {
     if (screen !== 'title') setShowScreenshotsGallery(false)
@@ -1454,6 +1614,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
       if (d.action === 'new') void titleNavRef.current.onNewSaveClick()
       else if (d.action === 'load') void titleNavRef.current.onLoadSaveClick()
       else if (d.action === 'purchase') void titleNavRef.current.onPurchaseClick()
+      else if (d.action === 'multiplayer') void titleNavRef.current.onMultiplayerClick()
       else if (d.action === 'screenshots') setShowScreenshotsGallery(true)
       else if (d.action === 'support') setShowSupportContact(true)
     }
@@ -1634,13 +1795,737 @@ export default function App({ devNoFirebase = false }: AppProps) {
   function goTitle() {
     setScreen('title')
     setError('')
+    setMpDashboard(null)
+    setMpCommishDashboard(null)
+    setMpPendingLeague(null)
+    setMpPinTeam(null)
+    setMpPinInput('')
+    setMpShowTeamPicker(false)
+    setMpCoachSetupTeam(null)
+    setMpGameContext(null)
   }
 
-  /* ——— Playing: league dashboard (same data as before) ——— */
+  function teamNeedsCoachSetup(league: LeagueListItem, teamName: string): boolean {
+    const row = league.teams.find((t) => t.team_name === teamName)
+    return Boolean(row && row.coach_setup_complete === false)
+  }
+
+  function beginTeamAccess(league: LeagueListItem, teamName: string) {
+    setMpPendingLeague(league)
+    if (teamNeedsCoachSetup(league, teamName)) {
+      setMpCoachSetupTeam(teamName)
+      setScreen('multiplayer_coach_setup')
+      return
+    }
+    setMpPinTeam(teamName)
+    setMpPinInput('')
+  }
+
+  async function loadLeagueDashboard(leagueId: string, teamName: string | null) {
+    if (!token) return
+    const data = await fetchLeagueDashboard(API_BASE, headers, leagueId, teamName ?? undefined)
+    setMpDashboard(data)
+    setMpCommishDashboard(null)
+    setScreen('league_dashboard')
+    setError('')
+  }
+
+  async function loadCommishDashboard(leagueId: string) {
+    if (!token) return
+    const data = await fetchCommishDashboard(API_BASE, headers, leagueId)
+    setMpCommishDashboard(data)
+    setMpDashboard(null)
+    setScreen('commish_dashboard')
+    setError('')
+  }
+
+  async function onMultiplayerSubmitWeek() {
+    const leagueId = mpDashboard?.league_id ?? mpGameContext?.leagueId
+    const teamName = mpDashboard?.acting_team_name ?? mpGameContext?.teamName
+    if (!leagueId || !teamName || mpGameContext?.commishMode) return
+    setMpSubmitBusy(true)
+    setError('')
+    try {
+      if (mpGameContext && saveStateRef.current && token) {
+        await saveLeagueGame(API_BASE, headers, leagueId, teamName, saveStateRef.current)
+      }
+      await submitLeagueWeek(API_BASE, headers, leagueId, teamName)
+      const dash = await fetchLeagueDashboard(API_BASE, headers, leagueId, teamName)
+      setMpDashboard(dash)
+      setSuccessMessage('Week submitted. Waiting for the commissioner to advance the league.')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Submit failed')
+    } finally {
+      setMpSubmitBusy(false)
+    }
+  }
+
+  async function onMultiplayerUnsubmitWeek() {
+    const leagueId = mpDashboard?.league_id ?? mpGameContext?.leagueId
+    const teamName = mpDashboard?.acting_team_name ?? mpGameContext?.teamName
+    if (!leagueId || !teamName || mpGameContext?.commishMode) return
+    setMpSubmitBusy(true)
+    setError('')
+    try {
+      await unsubmitLeagueWeek(API_BASE, headers, leagueId, teamName)
+      const dash = await fetchLeagueDashboard(API_BASE, headers, leagueId, teamName)
+      setMpDashboard(dash)
+      setSuccessMessage('Week unsubmitted — you can keep prepping.')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Unsubmit failed')
+    } finally {
+      setMpSubmitBusy(false)
+    }
+  }
+
+  async function openMultiplayerDynasty() {
+    if (!mpDashboard?.league_id || !mpDashboard.acting_team_name) return
+    const leagueId = mpDashboard.league_id
+    const teamName = mpDashboard.acting_team_name
+    setMpCoachDashBusy(true)
+    setError('')
+    try {
+      const data = await fetchLeagueGame(API_BASE, headers, leagueId, teamName)
+      let state = data.state
+      try {
+        const r = await fetch(`${API_BASE}/sim/hydrate-inbox`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state }),
+        })
+        if (r.ok) {
+          const hydrated = await r.json()
+          if (hydrated?.state) state = hydrated.state
+        }
+      } catch {
+        /* offline */
+      }
+      try {
+        const r2 = await fetch(`${API_BASE}/sim/sync-state`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state }),
+        })
+        if (r2.ok) {
+          const synced = await r2.json()
+          if (synced?.state) state = synced.state
+        }
+      } catch {
+        /* offline */
+      }
+      try {
+        await enrichSaveStateFromLeagueJson(state, API_BASE)
+      } catch {
+        /* optional */
+      }
+      const bundle: SaveBundle = {
+        state,
+        leagueHistory: data.league_history ?? { seasons: [] },
+        records: data.records ?? {},
+        logos: {},
+        stadiums: {},
+        helmets: {},
+        jerseys: {},
+        seasonRecaps: {},
+      }
+      const id = multiplayerSaveId(leagueId, teamName)
+      const saveName = String(state?.save_name ?? mpDashboard.league_name ?? 'League').trim() || 'League'
+      await putBrowserSave({ id, saveName, updatedAt: Date.now(), bundle })
+      setMpGameContext({ leagueId, teamName })
+      setLocalBundle(bundle)
+      setSaveId(id)
+      setSaveState(state)
+      setDynastyLeagueHistory(
+        bundle.leagueHistory && typeof bundle.leagueHistory === 'object'
+          ? bundle.leagueHistory
+          : { seasons: [] },
+      )
+      setScreen('playing')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Could not open dynasty')
+    } finally {
+      setMpCoachDashBusy(false)
+    }
+  }
+
+  async function openMultiplayerCommishConsole() {
+    const leagueId = mpCommishDashboard?.league_id ?? mpDashboard?.league_id
+    if (!leagueId) return
+    setMpCommishConsoleBusy(true)
+    setError('')
+    try {
+      const data = await fetchLeagueCommishGame(API_BASE, headers, leagueId)
+      let state = data.state
+      try {
+        const r = await fetch(`${API_BASE}/sim/hydrate-inbox`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state }),
+        })
+        if (r.ok) {
+          const hydrated = await r.json()
+          if (hydrated?.state) state = hydrated.state
+        }
+      } catch {
+        /* offline */
+      }
+      try {
+        const r2 = await fetch(`${API_BASE}/sim/sync-state`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state }),
+        })
+        if (r2.ok) {
+          const synced = await r2.json()
+          if (synced?.state) state = synced.state
+        }
+      } catch {
+        /* offline */
+      }
+      try {
+        await enrichSaveStateFromLeagueJson(state, API_BASE)
+      } catch {
+        /* optional */
+      }
+      const bundle: SaveBundle = {
+        state,
+        leagueHistory: data.league_history ?? { seasons: [] },
+        records: data.records ?? {},
+        logos: {},
+        stadiums: {},
+        helmets: {},
+        jerseys: {},
+        seasonRecaps: {},
+      }
+      const id = multiplayerCommishSaveId(leagueId)
+      const saveName = `${(mpCommishDashboard?.league_name ?? mpDashboard?.league_name ?? 'League')} (Commissioner)`.trim()
+      await putBrowserSave({ id, saveName, updatedAt: Date.now(), bundle })
+      setMpGameContext({ leagueId, commishMode: true })
+      setLocalBundle(bundle)
+      setSaveId(id)
+      setSaveState(state)
+      setDynastyLeagueHistory(
+        bundle.leagueHistory && typeof bundle.leagueHistory === 'object'
+          ? bundle.leagueHistory
+          : { seasons: [] },
+      )
+      setScreen('playing')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Could not open commissioner console')
+    } finally {
+      setMpCommishConsoleBusy(false)
+    }
+  }
+
+  async function returnToLeagueDashboard() {
+    setError('')
+    const ctx =
+      mpGameContext ??
+      (mpDashboard?.league_id
+        ? {
+            leagueId: mpDashboard.league_id,
+            teamName: mpDashboard.acting_team_name ?? undefined,
+            commishMode: false,
+          }
+        : null)
+    if (ctx && saveStateRef.current && token) {
+      try {
+        if (ctx.commishMode) {
+          await saveLeagueCommishGame(API_BASE, headers, ctx.leagueId, saveStateRef.current)
+        } else if (ctx.teamName) {
+          await saveLeagueGame(API_BASE, headers, ctx.leagueId, ctx.teamName, saveStateRef.current)
+        }
+      } catch {
+        /* best-effort */
+      }
+    }
+    if (ctx) {
+      try {
+        if (ctx.commishMode) {
+          await loadCommishDashboard(ctx.leagueId)
+        } else {
+          await loadLeagueDashboard(ctx.leagueId, ctx.teamName ?? null)
+        }
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : 'Failed to return to league dashboard')
+        setScreen('multiplayer')
+      }
+      setMpGameContext(null)
+      return
+    }
+    setScreen('multiplayer')
+  }
+
+  function onMultiplayerClick() {
+    setError('')
+    if (!token) {
+      setScreen('multiplayer')
+      return
+    }
+    void validateSession(token).then((ok) => {
+      if (!ok) {
+        expireSession()
+        setScreen('multiplayer')
+        return
+      }
+      setScreen('multiplayer')
+    })
+  }
+
+  function onOpenMultiplayerLeague(league: LeagueListItem) {
+    setMpPendingLeague(league)
+    setMpPinInput('')
+    if (league.can_run_league || league.is_commissioner || league.is_platform_owner_view) {
+      void loadCommishDashboard(league.league_id).catch((e: unknown) =>
+        setError(e instanceof Error ? e.message : 'Failed to open commissioner dashboard'),
+      )
+      return
+    }
+    const assignedTeams = league.teams.map((t) => t.team_name).filter((n): n is string => Boolean(n))
+    if (assignedTeams.length === 0) {
+      setError('Waiting for the commissioner to assign your team.')
+      return
+    }
+    if (assignedTeams.length === 1) {
+      beginTeamAccess(league, assignedTeams[0])
+      return
+    }
+    setMpShowTeamPicker(true)
+  }
+
+  async function onConfirmTeamPin() {
+    if (!mpPendingLeague || !mpPinTeam) return
+    setMpPinBusy(true)
+    setError('')
+    try {
+      const ok = await verifyTeamPin(API_BASE, headers, mpPendingLeague.league_id, mpPinTeam, mpPinInput.trim())
+      if (!ok) {
+        setError('Invalid PIN. Check with your commissioner.')
+        return
+      }
+      setMpPinTeam(null)
+      setMpPinInput('')
+      await loadLeagueDashboard(mpPendingLeague.league_id, mpPinTeam)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'PIN verification failed')
+    } finally {
+      setMpPinBusy(false)
+    }
+  }
+
+  function onOpenLeagueOverview() {
+    if (!mpPendingLeague) return
+    setMpShowTeamPicker(false)
+    void loadLeagueDashboard(mpPendingLeague.league_id, null).catch((e: unknown) =>
+      setError(e instanceof Error ? e.message : 'Failed to open league'),
+    )
+  }
+
+  function onPickTeamForPin(teamName: string) {
+    setMpShowTeamPicker(false)
+    if (!mpPendingLeague) return
+    beginTeamAccess(mpPendingLeague, teamName)
+  }
+
+  /* ——— Multiplayer: coach profile setup (first invite / team assignment) ——— */
+  if (screen === 'multiplayer_coach_setup' && mpPendingLeague && mpCoachSetupTeam && token) {
+    return (
+      <>
+        <NewSaveFlow
+          apiBase={API_BASE}
+          headers={headers}
+          getAuthHeaders={getAuthHeaders}
+          mode="multiplayer_coach"
+          leagueId={mpPendingLeague.league_id}
+          fixedTeamName={mpCoachSetupTeam}
+          defaultCoachName={username}
+          onBack={() => {
+            setScreen('multiplayer')
+            setMpCoachSetupTeam(null)
+          }}
+          onError={setError}
+          onSessionExpired={() => expireSession()}
+          onCreated={() => {}}
+          onCoachSetupComplete={() => {
+            const teamName = mpCoachSetupTeam
+            setMpPendingLeague({
+              ...mpPendingLeague,
+              teams: mpPendingLeague.teams.map((t) =>
+                t.team_name === teamName ? { ...t, coach_setup_complete: true } : t,
+              ),
+            })
+            setMpCoachSetupTeam(null)
+            setScreen('multiplayer')
+            setMpPinTeam(teamName)
+            setMpPinInput('')
+            setSuccessMessage('Coach profile saved. Enter your team PIN to continue.')
+          }}
+        />
+        {error ? (
+          <p className="fnd-error" style={{ maxWidth: 760, margin: '1rem auto' }}>
+            {error}
+          </p>
+        ) : null}
+      </>
+    )
+  }
+
+  /* ——— Multiplayer: create league (same wizard as new dynasty) ——— */
+  if (screen === 'multiplayer_create' && token) {
+    return (
+      <>
+        <NewSaveFlow
+          apiBase={API_BASE}
+          headers={headers}
+          getAuthHeaders={getAuthHeaders}
+          mode="multiplayer_admin"
+          defaultCoachName={username}
+          onBack={() => setScreen('multiplayer')}
+          onError={setError}
+          onSessionExpired={() => expireSession()}
+          onCreated={() => {}}
+          onLeagueCreated={(_leagueId, _logos, extras) => {
+            const pin = extras?.commissioner_pin
+            const commishEmail = extras?.commissioner_email
+            const selfCommish = !commishEmail || commishEmail === username.trim()
+            setSuccessMessage(
+              pin
+                ? selfCommish
+                  ? `League created. Your commissioner team PIN is ${pin} — save it; you will need it each visit.`
+                  : `League created. Commissioner ${commishEmail} — share their team PIN: ${pin}`
+                : 'League created.',
+            )
+            setScreen('multiplayer')
+          }}
+        />
+        {error ? (
+          <p className="fnd-error" style={{ maxWidth: 760, margin: '1rem auto' }}>
+            {error}
+          </p>
+        ) : null}
+        {successMessage ? (
+          <p style={{ maxWidth: 760, margin: '1rem auto', color: '#86efac' }}>{successMessage}</p>
+        ) : null}
+      </>
+    )
+  }
+
+  /* ——— Multiplayer: league list + league dashboard ——— */
+  if (screen === 'multiplayer') {
+    return (
+      <>
+        <MultiplayerLeaguesPage
+          apiBase={API_BASE}
+          headers={token ? headers : EMPTY_AUTH_HEADERS}
+          onBack={goTitle}
+          onOpenLeague={onOpenMultiplayerLeague}
+          onCreateLeague={() => setScreen('multiplayer_create')}
+        />
+        {successMessage ? (
+          <div className="fnd-success" style={{ maxWidth: 720, margin: '12px auto 0', padding: '0 32px' }}>
+            {successMessage}
+          </div>
+        ) : null}
+        {error ? (
+          <p className="fnd-error" style={{ maxWidth: 720, margin: '12px auto 0', padding: '0 32px' }}>
+            {error}
+          </p>
+        ) : null}
+        {!token ? (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.65)',
+              zIndex: 10000,
+              display: 'grid',
+              placeItems: 'center',
+              padding: '1rem',
+            }}
+          >
+            <div className="fnd-panel" style={{ width: 'min(420px, 100%)', margin: 0 }}>
+              <h2 style={{ marginTop: 0 }}>Sign in for multiplayer</h2>
+              {devNoFirebase ? (
+                <>
+                  <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
+                    Local dev mode: enter your admin email as the coach name (e.g. <strong style={{ color: '#d0d4dc' }}>mxlilly@gmail.com</strong>).
+                  </p>
+                  <div className="fnd-login-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+                    <input
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="Coach name / admin email"
+                      onKeyDown={(e) => e.key === 'Enter' && void onContinueLoad()}
+                    />
+                    <button type="button" disabled={authBusy} onClick={() => void onContinueLoad()}>
+                      {authBusy ? 'Please wait…' : 'Continue'}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
+                    Log in with the email your commissioner invited. Purchase is required to join a league.
+                  </p>
+                  <div className="fnd-login-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+                    <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" />
+                    <input
+                      type="password"
+                      autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Password"
+                    />
+                    <button type="button" disabled={authBusy} onClick={() => void onContinueLoad()}>
+                      {authBusy ? 'Please wait…' : 'Log in'}
+                    </button>
+                  </div>
+                </>
+              )}
+              <button type="button" className="fnd-back" style={{ marginTop: 12 }} onClick={goTitle}>
+                ← Back
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {mpShowTeamPicker && mpPendingLeague ? (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.65)',
+              zIndex: 10000,
+              display: 'grid',
+              placeItems: 'center',
+              padding: '1rem',
+            }}
+          >
+            <div className="fnd-panel" style={{ width: 'min(420px, 100%)', margin: 0 }}>
+              <h2 style={{ marginTop: 0 }}>Select team</h2>
+              <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
+                Choose which school you are coaching in {mpPendingLeague.name}.
+              </p>
+              {mpPendingLeague.is_commissioner ? (
+                <button type="button" className="fnd-title-btn" style={{ maxWidth: '100%', marginBottom: 10 }} onClick={onOpenLeagueOverview}>
+                  League dashboard (commissioner)
+                </button>
+              ) : null}
+              {mpPendingLeague.teams
+                .map((t) => t.team_name)
+                .filter((n): n is string => Boolean(n))
+                .map((team) => (
+                  <button
+                    key={team}
+                    type="button"
+                    className="fnd-save-row"
+                    style={{ width: '100%', marginBottom: 8 }}
+                    onClick={() => onPickTeamForPin(team)}
+                  >
+                    <strong>{team}</strong>
+                  </button>
+                ))}
+              <button type="button" className="fnd-back" onClick={() => setMpShowTeamPicker(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {mpPinTeam && mpPendingLeague ? (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.65)',
+              zIndex: 10001,
+              display: 'grid',
+              placeItems: 'center',
+              padding: '1rem',
+            }}
+          >
+            <div className="fnd-panel" style={{ width: 'min(420px, 100%)', margin: 0 }}>
+              <h2 style={{ marginTop: 0 }}>Team PIN</h2>
+              <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
+                Enter the 6-digit PIN for <strong style={{ color: '#d0d4dc' }}>{mpPinTeam}</strong>.
+              </p>
+              <input
+                type="password"
+                inputMode="numeric"
+                maxLength={6}
+                value={mpPinInput}
+                onChange={(e) => setMpPinInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="••••••"
+                style={{ width: '100%', marginBottom: 12, letterSpacing: '0.35em', fontSize: '1.25rem', textAlign: 'center' }}
+              />
+              <button
+                type="button"
+                className="fnd-title-btn"
+                style={{ maxWidth: '100%' }}
+                disabled={mpPinBusy || mpPinInput.length !== 6}
+                onClick={() => void onConfirmTeamPin()}
+              >
+                {mpPinBusy ? 'Verifying…' : 'Enter league'}
+              </button>
+              <button
+                type="button"
+                className="fnd-back"
+                style={{ marginTop: 12 }}
+                onClick={() => {
+                  setMpPinTeam(null)
+                  setMpPinInput('')
+                }}
+              >
+                ← Back
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {error ? (
+          <div className="fnd-error" style={{ position: 'fixed', bottom: 16, left: 16, right: 16, zIndex: 9999 }}>
+            {error}
+          </div>
+        ) : null}
+      </>
+    )
+  }
+
+  if (screen === 'commish_dashboard' && mpCommishDashboard) {
+    const selfEmail = username.trim().toLowerCase()
+    const coachTeam =
+      mpCommishDashboard.members.find(
+        (m) => m.team_name && m.email.trim().toLowerCase() === selfEmail,
+      )?.team_name ?? null
+    const leagueForCoachAccess: LeagueListItem =
+      mpPendingLeague ??
+      ({
+        league_id: mpCommishDashboard.league_id,
+        name: mpCommishDashboard.league_name,
+        status: 'active',
+        is_commissioner: true,
+        can_run_league: true,
+        teams: mpCommishDashboard.members
+          .filter((m) => m.team_name)
+          .map((m) => ({
+            team_name: m.team_name,
+            status: m.status,
+            control_mode: m.control_mode,
+            role: m.role,
+            coach_setup_complete: m.coach_setup_complete,
+          })),
+        updated_at: Date.now(),
+      } satisfies LeagueListItem)
+    return (
+      <>
+        <CommishDashboardPage
+          data={mpCommishDashboard}
+          onBack={() => {
+            setMpCommishDashboard(null)
+            setScreen('multiplayer')
+          }}
+          onRefresh={async () => {
+            const fresh = await fetchCommishDashboard(API_BASE, headers, mpCommishDashboard.league_id)
+            setMpCommishDashboard(fresh)
+          }}
+          onOpenRunLeague={() => void openMultiplayerCommishConsole()}
+          runLeagueBusy={mpCommishConsoleBusy}
+          onSimWeek={async () => {
+            setMpCommishSimBusy(true)
+            try {
+              const res = await commishSimWeek(API_BASE, headers, mpCommishDashboard.league_id)
+              return res.message
+            } finally {
+              setMpCommishSimBusy(false)
+            }
+          }}
+          simWeekBusy={mpCommishSimBusy}
+          onInvite={async (email) => {
+            return inviteToLeague(API_BASE, headers, mpCommishDashboard.league_id, email)
+          }}
+          onAssign={async (email, teamName) => {
+            const res = await assignTeamByEmail(API_BASE, headers, mpCommishDashboard.league_id, email, teamName)
+            return res.pin
+          }}
+          onResetPin={async (userId) => {
+            const res = await resetMemberPin(API_BASE, headers, mpCommishDashboard.league_id, userId)
+            return res.pin
+          }}
+          onSaveSettings={async (patch) => {
+            await updateCommishSettings(API_BASE, headers, mpCommishDashboard.league_id, patch)
+          }}
+          onVacate={async (userId) => {
+            await vacateTeamMember(API_BASE, headers, mpCommishDashboard.league_id, userId)
+          }}
+          onRemove={async (userId) => {
+            await removeLeagueMember(API_BASE, headers, mpCommishDashboard.league_id, userId)
+          }}
+          onRevokeInvite={async (inviteId) => {
+            await revokeLeagueInvite(API_BASE, headers, mpCommishDashboard.league_id, inviteId)
+          }}
+          hasCoachTeam={Boolean(coachTeam)}
+          onOpenLeagueHub={
+            coachTeam
+              ? () => {
+                  setMpPendingLeague(leagueForCoachAccess)
+                  beginTeamAccess(leagueForCoachAccess, coachTeam)
+                  setScreen('multiplayer')
+                }
+              : undefined
+          }
+        />
+        {error ? (
+          <div className="fnd-error" style={{ position: 'fixed', bottom: 16, left: 16, right: 16, zIndex: 9999 }}>
+            {error}
+          </div>
+        ) : null}
+      </>
+    )
+  }
+
+  if (screen === 'league_dashboard' && mpDashboard) {
+    const showSubmitControls = Boolean(mpDashboard.acting_team_name)
+    return (
+      <>
+        <LeagueDashboardPage
+          data={mpDashboard}
+          onBack={() => {
+            setMpDashboard(null)
+            setScreen('multiplayer')
+          }}
+          onOpenCoachDashboard={() => void openMultiplayerDynasty()}
+          coachDashBusy={mpCoachDashBusy}
+          onOpenCommishConsole={mpDashboard.can_run_league ? undefined : () => void openMultiplayerCommishConsole()}
+          commishConsoleBusy={mpCommishConsoleBusy}
+          onSubmitWeek={showSubmitControls ? () => void onMultiplayerSubmitWeek() : undefined}
+          onUnsubmitWeek={showSubmitControls ? () => void onMultiplayerUnsubmitWeek() : undefined}
+          submitBusy={mpSubmitBusy}
+          onSendChat={async (body) =>
+            postLeagueChat(
+              API_BASE,
+              headers,
+              mpDashboard.league_id,
+              body,
+              mpDashboard.acting_team_name,
+            )
+          }
+        />
+        {error ? (
+          <div className="fnd-error" style={{ position: 'fixed', bottom: 16, left: 16, right: 16, zIndex: 9999 }}>
+            {error}
+          </div>
+        ) : null}
+      </>
+    )
+  }
+
+  /* ——— Playing: coach dashboard (single-player / local) ——— */
   if (screen === 'playing' && localBundle && saveState) {
     return (
       <>
         <div style={{ position: 'fixed', top: 12, right: 12, zIndex: 9999, display: 'flex', gap: 8, flexWrap: 'wrap', maxWidth: 'min(100vw - 24px, 520px)', justifyContent: 'flex-end' }}>
+          {mpGameContext ? (
+            <button type="button" className="teamhome-select" onClick={() => void returnToLeagueDashboard()}>
+              ← {mpGameContext.commishMode ? 'Commish dashboard' : 'League dashboard'}
+            </button>
+          ) : null}
           <button type="button" className="teamhome-select" onClick={() => setAutosaveEnabled((v) => !v)} title="Toggle browser autosave">
             Autosave: {autosaveEnabled ? 'On' : 'Off'}
           </button>
@@ -1676,6 +2561,25 @@ export default function App({ devNoFirebase = false }: AppProps) {
               onImportHelmetsToBundle={localBundle ? importHelmetsToBundle : undefined}
               onImportJerseysToBundle={localBundle ? importJerseysToBundle : undefined}
               onRefreshDynasty={inLocalRuntime ? undefined : refreshDynastyFromServer}
+              leagueAdvanceLocked={Boolean(mpGameContext && !mpGameContext.commishMode)}
+              onSubmitWeek={
+                mpGameContext && !mpGameContext.commishMode
+                  ? () => void onMultiplayerSubmitWeek()
+                  : undefined
+              }
+              onUnsubmitWeek={
+                mpGameContext && !mpGameContext.commishMode
+                  ? () => void onMultiplayerUnsubmitWeek()
+                  : undefined
+              }
+              weekSubmitted={Boolean(mpDashboard?.your_status?.submitted)}
+              canUnsubmitWeek={mpDashboard?.your_status?.can_unsubmit !== false}
+              submitWeekBusy={mpSubmitBusy}
+              onReturnToLeagueHub={
+                mpGameContext && !mpGameContext.commishMode
+                  ? () => void returnToLeagueDashboard()
+                  : undefined
+              }
           />
         </LocalAssetsProvider>
         {showBackupPrompt ? (
@@ -1809,7 +2713,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
           <iframe
             className="fnd-title-iframe"
             title="Friday Night Dynasty"
-            src={`${import.meta.env.BASE_URL}fnd_homepage.html?v=20260630a`}
+            src={`${import.meta.env.BASE_URL}fnd_homepage.html?v=20260630b`}
           />
           <button
             type="button"

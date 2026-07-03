@@ -45,9 +45,14 @@ def dev_login(username: str) -> Tuple[str, str]:
                 conn.execute("UPDATE tokens SET user_id=? WHERE user_id=?", (user_id, old_id))
                 conn.execute("DELETE FROM users WHERE id=?", (old_id,))
             conn.execute(
-                "INSERT OR IGNORE INTO users (id, username) VALUES (?,?)",
-                (user_id, username),
+                "INSERT OR IGNORE INTO users (id, username, email) VALUES (?,?,?)",
+                (user_id, username, username if "@" in username else None),
             )
+            if "@" in username:
+                conn.execute(
+                    "UPDATE users SET email=? WHERE id=? AND (email IS NULL OR email='')",
+                    (username, user_id),
+                )
 
         token = str(uuid.uuid4())
         conn.execute(

@@ -1,0 +1,868 @@
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Rajdhani:wght@500;600;700&family=Source+Sans+3:wght@400;500;600&display=swap');
+
+.ldash-root {
+  --bg-deep: #0d1117;
+  --bg-panel: #151920;
+  --bg-panel-raised: #1a1c22;
+  --bg-card: #1c2028;
+  --border-subtle: #2a2f38;
+  --border-strong: #3a4150;
+  --gold: #d4af6a;
+  --gold-bright: #f0c876;
+  --gold-dim: #8a7248;
+  --blue: #5b8fd9;
+  --blue-bright: #7aa8ec;
+  --blue-dim: #3d5a82;
+  --text-primary: #eceef1;
+  --text-secondary: #9aa2b1;
+  --text-tertiary: #656d7c;
+  --green-status: #5fb87a;
+  --red-status: #d9645b;
+  --amber-status: #d9a35b;
+
+  min-height: 100vh;
+  background: var(--bg-deep);
+  background-image:
+    radial-gradient(ellipse at top left, rgba(91, 143, 217, 0.06), transparent 50%),
+    radial-gradient(ellipse at bottom right, rgba(212, 175, 106, 0.05), transparent 50%);
+  color: var(--text-primary);
+  font-family: 'Source Sans 3', sans-serif;
+}
+
+.ldash-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 32px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-subtle);
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.ldash-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ldash-back-btn,
+.ldash-action-btn {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  border-radius: 6px;
+  padding: 8px 14px;
+  cursor: pointer;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+}
+
+.ldash-action-btn--gold {
+  background: var(--gold);
+  color: var(--bg-deep);
+  border-color: var(--gold-dim);
+}
+
+.ldash-action-btn--commish {
+  border-color: rgba(91, 143, 217, 0.45);
+  color: var(--blue-bright);
+}
+
+.ldash-league-identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.ldash-league-crest {
+  width: 42px;
+  height: 42px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--gold-dim), var(--gold));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  color: var(--bg-deep);
+  font-size: 16px;
+}
+
+.ldash-league-name {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 20px;
+  color: var(--text-primary);
+}
+
+.ldash-league-sub {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+}
+
+.ldash-commish-badge {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--blue-bright);
+  border: 1px solid rgba(91, 143, 217, 0.35);
+  padding: 3px 8px;
+  border-radius: 4px;
+  margin-top: 4px;
+  display: inline-block;
+}
+
+.ldash-week-status {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.ldash-week-badge {
+  font-family: 'Oswald', sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--gold-bright);
+  background: rgba(212, 175, 106, 0.08);
+  border: 1px solid rgba(212, 175, 106, 0.3);
+  padding: 6px 16px;
+  border-radius: 4px;
+}
+
+.ldash-countdown-block {
+  text-align: right;
+}
+
+.ldash-countdown-label {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-tertiary);
+}
+
+.ldash-countdown-value {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--amber-status);
+}
+
+.ldash-grid {
+  display: grid;
+  grid-template-columns: 340px 1fr 320px;
+  gap: 20px;
+  padding: 24px 32px;
+  align-items: start;
+}
+
+.ldash-column {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.ldash-panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ldash-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-panel-raised);
+}
+
+.ldash-panel-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--text-secondary);
+}
+
+.ldash-panel-title .accent {
+  color: var(--gold-bright);
+}
+
+.ldash-panel-body {
+  padding: 16px 18px;
+}
+
+.ldash-progress-track {
+  height: 6px;
+  background: var(--bg-card);
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 10px 0 6px;
+}
+
+.ldash-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold-dim), var(--gold-bright));
+  border-radius: 3px;
+  transition: width 0.25s ease;
+}
+
+.ldash-progress-caption {
+  display: flex;
+  justify-content: space-between;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.ldash-your-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(95, 184, 122, 0.08);
+  border: 1px solid rgba(95, 184, 122, 0.3);
+  border-radius: 6px;
+  margin-bottom: 14px;
+}
+
+.ldash-your-status.pending {
+  background: rgba(217, 163, 91, 0.08);
+  border-color: rgba(217, 163, 91, 0.3);
+}
+
+.ldash-status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--green-status);
+  flex-shrink: 0;
+}
+
+.ldash-your-status.pending .ldash-status-dot {
+  background: var(--amber-status);
+}
+
+.ldash-your-status-text {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.ldash-your-status-sub {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.ldash-div-group {
+  margin-bottom: 12px;
+}
+
+.ldash-div-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  padding: 8px 10px;
+  border-radius: 5px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  width: 100%;
+  text-align: left;
+  color: inherit;
+}
+
+.ldash-div-header.expanded {
+  border-color: var(--blue-dim);
+  background: rgba(91, 143, 217, 0.06);
+}
+
+.ldash-div-name {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ldash-div-name .chevron {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.ldash-div-header.expanded .chevron {
+  color: var(--blue-bright);
+}
+
+.ldash-div-count {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.ldash-div-count.complete {
+  color: var(--green-status);
+}
+
+.ldash-div-teams {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 4px 2px;
+}
+
+.ldash-team-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.ldash-team-chip.in {
+  border-color: rgba(95, 184, 122, 0.4);
+}
+
+.ldash-team-chip .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green-status);
+}
+
+.ldash-team-chip.out .dot {
+  background: var(--text-tertiary);
+}
+
+.ldash-team-chip.out {
+  opacity: 0.55;
+}
+
+.ldash-featured-game {
+  background: linear-gradient(180deg, var(--bg-panel-raised), var(--bg-panel));
+  border: 1px solid var(--gold-dim);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ldash-featured-label {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--bg-deep);
+  background: var(--gold-bright);
+  padding: 5px 18px;
+}
+
+.ldash-matchup {
+  padding: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ldash-team-side {
+  text-align: center;
+  flex: 1;
+}
+
+.ldash-team-mark {
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  margin: 0 auto 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--bg-deep);
+}
+
+.ldash-team-mark.home {
+  background: linear-gradient(135deg, var(--blue-dim), var(--blue-bright));
+}
+
+.ldash-team-mark.away {
+  background: linear-gradient(135deg, var(--gold-dim), var(--gold-bright));
+}
+
+.ldash-team-side-name {
+  font-family: 'Oswald', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ldash-team-side-record {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.ldash-matchup-vs {
+  font-family: 'Oswald', sans-serif;
+  font-size: 13px;
+  color: var(--text-tertiary);
+  padding: 0 14px;
+}
+
+.ldash-matchup-meta {
+  display: flex;
+  justify-content: space-between;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  border-top: 1px solid var(--border-subtle);
+  padding: 12px 18px 16px;
+  margin: 0;
+}
+
+.ldash-matchup-meta .tag {
+  color: var(--blue-bright);
+  font-weight: 600;
+}
+
+.ldash-chat-panel {
+  display: flex;
+  flex-direction: column;
+  height: 780px;
+}
+
+.ldash-chat-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ldash-chat-system {
+  padding: 8px 12px;
+  background: rgba(212, 175, 106, 0.06);
+  border-left: 2px solid var(--gold-dim);
+  border-radius: 4px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 12px;
+  color: var(--gold-bright);
+}
+
+.ldash-chat-placeholder {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  line-height: 1.5;
+}
+
+.ldash-chat-input-row {
+  display: flex;
+  gap: 10px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-panel-raised);
+}
+
+.ldash-chat-input {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 10px 14px;
+  color: var(--text-primary);
+  font-family: 'Source Sans 3', sans-serif;
+  font-size: 13.5px;
+}
+
+.ldash-chat-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ldash-chat-send {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  background: var(--gold);
+  color: var(--bg-deep);
+  border: none;
+  border-radius: 6px;
+  padding: 0 20px;
+  cursor: pointer;
+}
+
+.ldash-chat-send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ldash-toggle-row {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  background: var(--bg-card);
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+.ldash-toggle-btn {
+  flex: 1;
+  text-align: center;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 6px 0;
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+}
+
+.ldash-toggle-btn.active {
+  background: var(--bg-panel-raised);
+  color: var(--gold-bright);
+}
+
+.ldash-standings-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ldash-standings-table th {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-tertiary);
+  text-align: left;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.ldash-standings-table td {
+  padding: 7px 6px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 13px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid rgba(42, 47, 56, 0.5);
+}
+
+.ldash-standings-table tr.you td {
+  color: var(--gold-bright);
+  font-weight: 700;
+}
+
+.ldash-standings-table td.rank {
+  color: var(--text-tertiary);
+  width: 20px;
+}
+
+.ldash-standings-table td.rec {
+  text-align: right;
+  color: var(--text-primary);
+}
+
+.ldash-activity-item {
+  display: flex;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(42, 47, 56, 0.5);
+}
+
+.ldash-activity-item:last-child {
+  border-bottom: none;
+}
+
+.ldash-activity-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-card);
+}
+
+.ldash-activity-text {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.ldash-activity-time {
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+.ldash-slate-section {
+  padding: 0 32px 40px;
+}
+
+.ldash-slate-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ldash-slate-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ldash-slate-title .accent {
+  color: var(--gold-bright);
+}
+
+.ldash-slate-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ldash-filter-chip {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 5px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.ldash-filter-chip.active {
+  background: rgba(91, 143, 217, 0.12);
+  border-color: var(--blue-dim);
+  color: var(--blue-bright);
+}
+
+.ldash-slate-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.ldash-slate-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+  padding: 14px;
+}
+
+.ldash-slate-card.notable {
+  border-color: var(--gold-dim);
+}
+
+.ldash-slate-div-tag {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-tertiary);
+  margin-bottom: 8px;
+}
+
+.ldash-slate-div-tag .notable-star {
+  color: var(--gold-bright);
+}
+
+.ldash-slate-matchup {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ldash-slate-team {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ldash-slate-mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  font-size: 10px;
+  color: var(--bg-deep);
+  background: linear-gradient(135deg, var(--blue-dim), var(--blue-bright));
+}
+
+.ldash-slate-mark.g2 {
+  background: linear-gradient(135deg, var(--gold-dim), var(--gold-bright));
+}
+
+.ldash-slate-team-name {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ldash-slate-vs {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  text-align: center;
+  padding: 6px 0;
+}
+
+.ldash-loading,
+.ldash-error {
+  padding: 48px 32px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 1300px) and (min-width: 951px) {
+  .ldash-grid {
+    grid-template-columns: 280px 1fr 260px;
+    gap: 14px;
+    padding: 20px;
+  }
+
+  .ldash-slate-section {
+    padding: 0 20px 40px;
+  }
+}
+
+@media (max-width: 950px) {
+  .ldash-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ldash-chat-panel {
+    height: 500px;
+  }
+
+  .ldash-slate-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.ldash-list-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.ldash-list-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  background: rgba(90, 98, 112, 0.35);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.ldash-list-badge--ok {
+  background: rgba(95, 184, 122, 0.16);
+  color: #8fd4a3;
+  border-color: rgba(95, 184, 122, 0.35);
+}
+
+.ldash-list-badge--turn {
+  background: rgba(212, 175, 106, 0.16);
+  color: var(--gold-bright);
+  border-color: rgba(212, 175, 106, 0.4);
+}
+
+.ldash-list-badge--role {
+  background: rgba(91, 143, 217, 0.16);
+  color: var(--blue-bright);
+  border-color: rgba(91, 143, 217, 0.35);
+}
+
+.ldash-list-badge--wait {
+  background: rgba(217, 163, 91, 0.14);
+  color: var(--amber-status);
+  border-color: rgba(217, 163, 91, 0.35);
+}
+
+.ldash-chat-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 10px;
+}
+
+.ldash-chat-msg--you .ldash-chat-msg-body {
+  background: rgba(91, 143, 217, 0.18);
+  border-color: rgba(91, 143, 217, 0.35);
+}
+
+.ldash-chat-msg-meta {
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+}
+
+.ldash-chat-msg-body {
+  align-self: flex-start;
+  max-width: 92%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.ldash-chat-msg--you .ldash-chat-msg-body {
+  align-self: flex-end;
+}
+
+.ldash-chat-input:not(:disabled) {
+  opacity: 1;
+  cursor: text;
+}
+
+.ldash-chat-send:not(:disabled) {
+  opacity: 1;
+  cursor: pointer;
+}

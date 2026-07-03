@@ -42,9 +42,16 @@ type Props = {
   playingWeek: boolean
   simmingWeek: boolean
   simMultipleCount: number
+  leagueAdvanceLocked?: boolean
+  onSubmitWeek?: () => void | Promise<void>
+  onUnsubmitWeek?: () => void | Promise<void>
+  weekSubmitted?: boolean
+  canUnsubmitWeek?: boolean
+  submitWeekBusy?: boolean
+  onReturnToLeagueHub?: () => void
   onPlayGame: () => void
-  onSimGame: () => void
-  onSimMultiple: (weeks: number) => void
+  onSimGame?: () => void
+  onSimMultiple?: (weeks: number) => void
   onOpenOffGameplan: () => void
   onOpenDefGameplan: () => void
   onOpenScouting: () => void
@@ -83,6 +90,13 @@ export default function InSeasonDashboard({
   playingWeek,
   simmingWeek,
   simMultipleCount,
+  leagueAdvanceLocked = false,
+  onSubmitWeek,
+  onUnsubmitWeek,
+  weekSubmitted = false,
+  canUnsubmitWeek = true,
+  submitWeekBusy = false,
+  onReturnToLeagueHub,
   onPlayGame,
   onSimGame,
   onSimMultiple,
@@ -149,6 +163,35 @@ export default function InSeasonDashboard({
         <div className="isdash-week-pill">
           Regular Season · <span className="isdash-week-num">Week {currentWeek}</span>
         </div>
+        {leagueAdvanceLocked ? (
+          <div className="isdash-mp-notice" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+            <span>
+              {weekSubmitted
+                ? 'Submitted — waiting for the commissioner to advance the league.'
+                : 'League advances when your commissioner sims the week. Submit when your prep is ready.'}
+            </span>
+            {onSubmitWeek && !weekSubmitted ? (
+              <button type="button" className="isdash-btn" disabled={submitWeekBusy} onClick={() => void onSubmitWeek()}>
+                {submitWeekBusy ? 'Submitting…' : 'Submit week'}
+              </button>
+            ) : null}
+            {onUnsubmitWeek && weekSubmitted ? (
+              <button
+                type="button"
+                className="isdash-btn"
+                disabled={submitWeekBusy || canUnsubmitWeek === false}
+                onClick={() => void onUnsubmitWeek()}
+              >
+                Unsubmit
+              </button>
+            ) : null}
+            {onReturnToLeagueHub ? (
+              <button type="button" className="isdash-btn" onClick={onReturnToLeagueHub}>
+                League Hub
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         <div className="isdash-subline">
           {userTeam} · Class {userClass}
           {userRegion !== '—' ? ` · ${userRegion} Region` : ''}
@@ -231,14 +274,16 @@ export default function InSeasonDashboard({
               >
                 {playingWeek ? 'Loading…' : '▶ Play Game'}
               </button>
-              <button
-                type="button"
-                className="isdash-btn isdash-btn-sim"
-                disabled={!canContinue || simmingWeek}
-                onClick={onSimGame}
-              >
-                {simmingWeek ? 'Simming…' : '⏩ Sim Game'}
-              </button>
+              {!leagueAdvanceLocked && onSimGame ? (
+                <button
+                  type="button"
+                  className="isdash-btn isdash-btn-sim"
+                  disabled={!canContinue || simmingWeek}
+                  onClick={onSimGame}
+                >
+                  {simmingWeek ? 'Simming…' : '⏩ Sim Game'}
+                </button>
+              ) : null}
               <button type="button" className="isdash-btn isdash-btn-gameplan" onClick={onOpenOffGameplan}>
                 📋 OFF Gameplan
               </button>
@@ -249,6 +294,7 @@ export default function InSeasonDashboard({
                 🔍 Scouting Report
               </button>
             </div>
+            {!leagueAdvanceLocked && onSimMultiple ? (
             <div className="isdash-sim-multi">
               <span className="isdash-sim-label">Sim Multiple</span>
               <div className="isdash-sim-chips">
@@ -269,6 +315,7 @@ export default function InSeasonDashboard({
               </div>
               <span style={{ fontSize: 11, color: '#444' }}>games</span>
             </div>
+            ) : null}
           </section>
 
           <section>

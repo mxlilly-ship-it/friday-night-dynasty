@@ -3,7 +3,7 @@ import sqlite3
 from contextlib import contextmanager
 from typing import Iterator, List, Optional
 
-from backend.data_paths import saves_base_dir, sqlite_db_path
+from backend.data_paths import saves_base_dir, sqlite_db_path, leagues_base_dir
 from systems.win_path_io import extended_abs_path, makedirs_with_path_fallback, windows_file_arg_error
 
 
@@ -43,6 +43,11 @@ def init_db() -> None:
         makedirs_with_path_fallback(os.path.abspath(os.path.normpath(saves_dir)))
     except OSError:
         os.makedirs(saves_dir, exist_ok=True)
+    leagues_dir = leagues_base_dir()
+    try:
+        makedirs_with_path_fallback(os.path.abspath(os.path.normpath(leagues_dir)))
+    except OSError:
+        os.makedirs(leagues_dir, exist_ok=True)
     with _connect_sqlite() as conn:
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute(
@@ -105,6 +110,135 @@ def init_db() -> None:
         _migrate_users_firebase(conn)
         _migrate_users_billing(conn)
         _migrate_support_tickets(conn)
+        _migrate_multiplayer_leagues(conn)
+        _migrate_league_members_coach_setup(conn)
+
+
+def _migrate_multiplayer_leagues(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS leagues (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          save_dir TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'active',
+          created_by_user_id TEXT NOT NULL,
+          commissioner_user_id TEXT,
+          timezone TEXT NOT NULL DEFAULT 'America/New_York',
+          advance_mode TEXT NOT NULL DEFAULT 'manual',
+          advance_deadline_dow INTEGER,
+          advance_deadline_time_local TEXT,
+          submit_lockout_minutes INTEGER NOT NULL DEFAULT 5,
+          rules_json TEXT NOT NULL DEFAULT '{}',
+          state_version INTEGER NOT NULL DEFAULT 0,
+          sim_job_status TEXT NOT NULL DEFAULT 'idle',
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          FOREIGN KEY(created_by_user_id) REFERENCES users(id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS league_members (
+          id TEXT PRIMARY KEY,
+          league_id TEXT NOT NULL,
+          user_id TEXT NOT NULL,
+          team_name TEXT,
+          role TEXT NOT NULL DEFAULT 'coach',
+          status TEXT NOT NULL DEFAULT 'unassigned',
+          control_mode TEXT NOT NULL DEFAULT 'human',
+          pin_hash TEXT,
+          pin_updated_at INTEGER,
+          joined_at INTEGER NOT NULL,
+          FOREIGN KEY(league_id) REFERENCES leagues(id),
+          FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_league_members_league ON league_members(league_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_league_members_user ON league_members(user_id)"
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS league_invites (
+          id TEXT PRIMARY KEY,
+          league_id TEXT NOT NULL,
+          email TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending',
+          created_by_user_id TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          expires_at INTEGER,
+          FOREIGN KEY(league_id) REFERENCES leagues(id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS league_submit_status (
+          league_id TEXT NOT NULL,
+          user_id TEXT NOT NULL,
+          team_name TEXT NOT NULL,
+          stage_key TEXT NOT NULL,
+          submitted_at INTEGER NOT NULL,
+          PRIMARY KEY (league_id, user_id, team_name, stage_key)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS league_activity_log (
+          id TEXT PRIMARY KEY,
+          league_id TEXT NOT NULL,
+          actor_user_id TEXT,
+          action TEXT NOT NULL,
+          detail_json TEXT,
+          created_at INTEGER NOT NULL,
+          FOREIGN KEY(league_id) REFERENCES leagues(id)
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_league_activity_league ON league_activity_log(league_id, created_at DESC)"
+    )
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(leagues)").fetchall()}
+    if "last_auto_advance_at" not in cols:
+        conn.execute("ALTER TABLE leagues ADD COLUMN last_auto_advance_at INTEGER")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS league_chat_messages (
+          id TEXT PRIMARY KEY,
+          league_id TEXT NOT NULL,
+          user_id TEXT NOT NULL,
+          team_name TEXT,
+          display_name TEXT NOT NULL,
+          body TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          FOREIGN KEY(league_id) REFERENCES leagues(id),
+          FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_league_chat_league ON league_chat_messages(league_id, created_at DESC)"
+    )
+
+
+def _migrate_league_members_coach_setup(conn: sqlite3.Connection) -> None:
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(league_members)").fetchall()}
+    if "coach_setup_complete" not in cols:
+        conn.execute(
+            "ALTER TABLE league_members ADD COLUMN coach_setup_complete INTEGER NOT NULL DEFAULT 0"
+        )
+        conn.execute(
+            """
+            UPDATE league_members SET coach_setup_complete=1
+            WHERE status='active' AND team_name IS NOT NULL AND team_name != ''
+            """
+        )
 
 
 def _migrate_support_tickets(conn: sqlite3.Connection) -> None:

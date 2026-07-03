@@ -4253,6 +4253,27 @@ def _coach_gameplan_v2_matchup_key(state: Dict[str, Any]) -> Optional[str]:
     return f"week:{wk_idx + 1}:{gi}:{home} vs {away}"
 
 
+def _coach_gameplan_v2_key_for_user_team(key: str, user_team: str) -> bool:
+    """True when a stored matchup key belongs to the user's team (incl. bye keys)."""
+    key = str(key or "").strip()
+    user_team = str(user_team or "").strip()
+    if not key or not user_team:
+        return False
+    if key.startswith("bye:week:"):
+        parts = key.split(":")
+        return len(parts) >= 4 and parts[3] == user_team
+    matchup = ""
+    if key.startswith("week:"):
+        parts = key.split(":", 3)
+        matchup = parts[3] if len(parts) > 3 else ""
+    elif key.startswith("playoff:"):
+        matchup = key.split(":", 1)[1] if ":" in key else ""
+    if matchup and " vs " in matchup:
+        home, away = matchup.split(" vs ", 1)
+        return user_team in (home.strip(), away.strip())
+    return False
+
+
 def _normalize_offense_gameplan_library(state: Dict[str, Any]) -> List[Dict[str, Any]]:
     """User-imported offensive plans stored on the dynasty save."""
     raw = state.get("offense_gameplan_library")
@@ -4442,9 +4463,12 @@ def _carried_side_plan(state: Dict[str, Any], side: str, categories: List[str]) 
             return direct
 
     store = state.get("coach_gameplans_v2") if isinstance(state.get("coach_gameplans_v2"), dict) else {}
+    user_team = str(state.get("user_team") or "").strip()
     best_plan: Optional[Dict[str, Any]] = None
     best_ts = -1
-    for entry in store.values():
+    for key, entry in store.items():
+        if user_team and not _coach_gameplan_v2_key_for_user_team(str(key), user_team):
+            continue
         if not isinstance(entry, dict):
             continue
         plan = entry.get(side)
@@ -5462,8 +5486,17 @@ def sim_week(user_id: str, save_id: str) -> Dict[str, Any]:
 # -------------------------
 
 
-def sim_week_state(state: Dict[str, Any]) -> Dict[str, Any]:
-    """In-memory variant of sim_week: mutates and returns state (no disk I/O)."""
+def sim_week_state(
+    state: Dict[str, Any],
+    *,
+    mp_human_teams: Optional[set[str]] = None,
+    mp_submitted_teams: Optional[set[str]] = None,
+) -> Dict[str, Any]:
+    """In-memory variant of sim_week: mutates and returns state (no disk I/O).
+
+    When mp_human_teams / mp_submitted_teams are set (commissioner advance), human teams
+  that did not submit are simmed with CPU autofill gameplans instead of saved prep.
+    """
     phase_s = str(state.get("season_phase") or "").strip().lower()
     stages_pre = state.get("preseason_stages") or []
     pre_i = int(state.get("preseason_stage_index", 0))
@@ -5521,25 +5554,62 @@ def sim_week_state(state: Dict[str, Any]) -> Dict[str, Any]:
         game_lines: List[str] = []
         play_lines: List[str] = []
 
-        user_team = state.get("user_team")
-        restore_attrs: Optional[Tuple[Any, Any]] = None
-        if user_team and user_team in teams and (home == user_team or away == user_team):
-            try:
-                entry = _resolved_matchup_gameplan_entry(state)
-                coach = getattr(teams[user_team], "coach", None)
-                if coach is not None and isinstance(entry, dict) and entry:
-                    prev_off = getattr(coach, "game_plan_v2_offense", None)
-                    prev_def = getattr(coach, "game_plan_v2_defense", None)
-                    prev_4th = getattr(coach, "fourth_down_go_for_it_max_ytg", None)
-                    restore_attrs = (prev_off, prev_def, prev_4th)
-                    _apply_gameplan_entry_to_coach(coach, entry)
-            except Exception:
-                restore_attrs = None
+        mp_mode = mp_human_teams is not None and mp_submitted_teams is not None
+        human_teams = mp_human_teams or set()
+        submitted_teams = mp_submitted_teams or set()
+        coach_restores: List[Tuple[str, Tuple[Any, Any, Any]]] = []
 
-        try:
-            attach_cpu_coach_packages_for_game(teams[home], teams[away], user_team=user_team)
-        except Exception:
-            pass
+        if mp_mode:
+            store = state.get("coach_gameplans_v2") if isinstance(state.get("coach_gameplans_v2"), dict) else {}
+            gp_key = f"week:{wk_idx + 1}:{gi}:{home} vs {away}"
+            entry = store.get(gp_key) if isinstance(store.get(gp_key), dict) else {}
+            for team_name in (home, away):
+                if team_name not in human_teams or team_name not in submitted_teams:
+                    continue
+                if team_name not in teams:
+                    continue
+                coach = getattr(teams[team_name], "coach", None)
+                if coach is None or not entry:
+                    continue
+                prev_off = getattr(coach, "game_plan_v2_offense", None)
+                prev_def = getattr(coach, "game_plan_v2_defense", None)
+                prev_4th = getattr(coach, "fourth_down_go_for_it_max_ytg", None)
+                try:
+                    _apply_gameplan_entry_to_coach(coach, entry)
+                    coach_restores.append((team_name, (prev_off, prev_def, prev_4th)))
+                except Exception:
+                    pass
+            cpu_teams = {
+                t
+                for t in (home, away)
+                if t not in human_teams or t not in submitted_teams
+            }
+            try:
+                attach_cpu_coach_packages_for_game(
+                    teams[home], teams[away], cpu_teams=cpu_teams if cpu_teams else {home, away}
+                )
+            except Exception:
+                pass
+        else:
+            user_team = state.get("user_team")
+            restore_attrs: Optional[Tuple[Any, Any, Any]] = None
+            if user_team and user_team in teams and (home == user_team or away == user_team):
+                try:
+                    entry = _resolved_matchup_gameplan_entry(state)
+                    coach = getattr(teams[user_team], "coach", None)
+                    if coach is not None and isinstance(entry, dict) and entry:
+                        prev_off = getattr(coach, "game_plan_v2_offense", None)
+                        prev_def = getattr(coach, "game_plan_v2_defense", None)
+                        prev_4th = getattr(coach, "fourth_down_go_for_it_max_ytg", None)
+                        restore_attrs = (prev_off, prev_def, prev_4th)
+                        _apply_gameplan_entry_to_coach(coach, entry)
+                except Exception:
+                    restore_attrs = None
+
+            try:
+                attach_cpu_coach_packages_for_game(teams[home], teams[away], user_team=user_team)
+            except Exception:
+                pass
 
         stats_map = run_game_silent(
             teams[home],
@@ -5553,15 +5623,27 @@ def sim_week_state(state: Dict[str, Any]) -> Dict[str, Any]:
             game_log_lines=play_lines,
         )
 
-        if restore_attrs is not None and user_team and user_team in teams:
-            try:
-                coach = getattr(teams[user_team], "coach", None)
-                if coach is not None:
-                    coach.game_plan_v2_offense = restore_attrs[0]
-                    coach.game_plan_v2_defense = restore_attrs[1]
-                    coach.fourth_down_go_for_it_max_ytg = restore_attrs[2]
-            except Exception:
-                pass
+        if mp_mode:
+            for team_name, (prev_off, prev_def, prev_4th) in coach_restores:
+                try:
+                    coach = getattr(teams.get(team_name), "coach", None)
+                    if coach is not None:
+                        coach.game_plan_v2_offense = prev_off
+                        coach.game_plan_v2_defense = prev_def
+                        coach.fourth_down_go_for_it_max_ytg = prev_4th
+                except Exception:
+                    pass
+        else:
+            user_team = state.get("user_team")
+            if restore_attrs is not None and user_team and user_team in teams:
+                try:
+                    coach = getattr(teams[user_team], "coach", None)
+                    if coach is not None:
+                        coach.game_plan_v2_offense = restore_attrs[0]
+                        coach.game_plan_v2_defense = restore_attrs[1]
+                        coach.fourth_down_go_for_it_max_ytg = restore_attrs[2]
+                except Exception:
+                    pass
 
         hs = as_ = 0
         ot = False
@@ -5793,6 +5875,126 @@ def _maybe_assign_preseason_scrimmage_opponents_on_advance(
         ]
     else:
         state["preseason_scrimmage_opponents"] = []
+
+
+_OFFSEASON_ADVANCE_ACK_KEYS = frozenset(
+    {
+        "winter_training_ack_results",
+        "spring_ball_ack_results",
+        "transfer_stage_1_ack_results",
+        "transfer_stage_2_ack_results",
+        "seven_on_seven_ack_results",
+    }
+)
+
+
+def apply_coach_prep_state(state: Dict[str, Any], playbook: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Apply user-team prep for the current league stage without advancing league calendar."""
+    playbook = playbook if isinstance(playbook, dict) else {}
+    phase_s = str(state.get("season_phase") or "").strip().lower()
+    teams = {t["name"]: team_from_dict(t) for t in state.get("teams", []) if isinstance(t, dict) and t.get("name")}
+    user_team_name = state.get("user_team")
+    team_names = list(teams.keys())
+
+    if phase_s == "preseason":
+        state["preseason_stages"] = state.get("preseason_stages") or list(PRESEASON_STAGES)
+        stages = state["preseason_stages"]
+        idx = int(state.get("preseason_stage_index", 0))
+        if idx >= len(stages):
+            state["teams"] = [team_to_dict(t) for t in teams.values()]
+            return state
+        current_stage = stages[idx]
+        if current_stage == "Playbook Select" and playbook:
+            _apply_user_preseason_playbook_payload(state, teams, playbook)
+        game_plan = playbook.get("game_plan") if isinstance(playbook, dict) else None
+        if current_stage == "Play Selection":
+            if user_team_name and user_team_name in teams:
+                ut = teams[user_team_name]
+                if game_plan:
+                    off_sel = game_plan.get("offensive") or {}
+                    def_sel = game_plan.get("defensive") or {}
+                    off_stored, def_stored = normalize_game_plan_payload_for_storage(off_sel, def_sel)
+                    ut.season_offensive_play_selection = off_stored
+                    ut.season_defensive_play_selection = def_stored
+            for t in teams.values():
+                try:
+                    run_play_selection_results_for_team(t)
+                except Exception:
+                    pass
+        elif current_stage == "Position changes":
+            _apply_preseason_position_changes_stage(state, teams, playbook)
+        elif current_stage == "Set Depth Chart":
+            depth_chart = playbook.get("depth_chart") if isinstance(playbook, dict) else None
+            if depth_chart and isinstance(depth_chart, dict) and user_team_name and user_team_name in teams:
+                ut = teams[user_team_name]
+                ut.depth_chart_order = {
+                    k: [str(n) for n in v] if isinstance(v, list) else []
+                    for k, v in depth_chart.items()
+                    if isinstance(k, str) and k.strip()
+                }
+        elif current_stage == "Set Goals":
+            goals = playbook.get("goals") if isinstance(playbook, dict) else None
+            if goals and isinstance(goals, dict):
+                win_goal = goals.get("win_goal")
+                stage_goal = goals.get("stage_goal")
+                if win_goal is not None:
+                    STAGE_GOALS = [
+                        "Just to have fun",
+                        "Winning Season",
+                        "Playoffs",
+                        "Semifinal",
+                        "State Championship",
+                        "Title Winner",
+                    ]
+                    win_goal = max(0, min(10, int(win_goal)))
+                    stage_goal = str(stage_goal or "Winning Season")
+                    if stage_goal not in STAGE_GOALS:
+                        stage_goal = "Winning Season"
+                    state["season_goals"] = {"win_goal": win_goal, "stage_goal": stage_goal}
+        elif current_stage in ("Scrimmage 1", "Scrimmage 2"):
+            if playbook.get("scrimmage_simulate"):
+                _ensure_scrimmage_opponents(state, team_names, user_team_name)
+                _apply_preseason_scrimmage_stage(state, teams, team_names, current_stage)
+        elif current_stage == "Home Game Themes":
+            _apply_home_game_themes_from_playbook(
+                state,
+                team_names,
+                user_team_name,
+                playbook if isinstance(playbook, dict) else {},
+            )
+    elif phase_s == "regular":
+        depth_chart = playbook.get("depth_chart") if isinstance(playbook, dict) else None
+        if depth_chart and isinstance(depth_chart, dict):
+            state = update_depth_chart_in_state(state, depth_chart)
+            teams = {t["name"]: team_from_dict(t) for t in state.get("teams", []) if isinstance(t, dict) and t.get("name")}
+    elif phase_s == "offseason":
+        body = playbook.get("offseason") if isinstance(playbook.get("offseason"), dict) else playbook
+        if not isinstance(body, dict):
+            body = {}
+        if any(body.get(k) for k in _OFFSEASON_ADVANCE_ACK_KEYS):
+            raise ValueError("That step advances the league — wait for your commissioner to sim.")
+        idx_before = int(state.get("offseason_stage_index", 0))
+        phase_before = str(state.get("season_phase") or "")
+        snap = copy.deepcopy(state)
+        try:
+            advance_offseason_state(state, body, league_history={"seasons": []})
+        except ValueError:
+            raise
+        except Exception as exc:
+            state.clear()
+            state.update(snap)
+            raise ValueError(str(exc)) from exc
+        idx_after = int(state.get("offseason_stage_index", 0))
+        phase_after = str(state.get("season_phase") or "")
+        if idx_after != idx_before or phase_after != phase_before:
+            state.clear()
+            state.update(snap)
+            raise ValueError("That action would advance the league — only the commissioner can do that.")
+        state["teams"] = [team_to_dict(t) for t in teams.values()]
+        return state
+
+    state["teams"] = [team_to_dict(t) for t in teams.values()]
+    return state
 
 
 def advance_preseason_state(state: Dict[str, Any], playbook: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -8197,6 +8399,57 @@ def _apply_schedule_planning_picks_and_enter_offseason(
     _assign_scrimmage_opponents_for_state(state)
     state.pop("schedule_planning_info", None)
     _sync_user_cross_region_slot_count(state)
+
+
+def advance_schedule_planning_league_state(
+    state: Dict[str, Any],
+    *,
+    league_history: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Multiplayer: auto-fill cross-region picks for every team, then build the season schedule."""
+    from systems.schedule_planning import auto_random_picks, picks_dict_for_state
+
+    phase_s = str(state.get("season_phase") or "").strip().lower()
+    if phase_s != "schedule_planning":
+        raise ValueError("save is not in schedule_planning")
+
+    teams = {t["name"]: team_from_dict(t) for t in state.get("teams", []) if isinstance(t, dict) and t.get("name")}
+    merged_picks: Dict[str, Any] = dict(state.get("cross_region_picks") or {})
+    for team_name in teams:
+        if _schedule_planning_info_for_user(teams, team_name):
+            merged_picks.update(picks_dict_for_state(team_name, auto_random_picks(teams, team_name)))
+    state["cross_region_picks"] = merged_picks
+    _build_season_schedule_into_state(state, teams)
+
+    already_in_offseason = isinstance(state.get("offseason_graduation_report"), dict)
+    pending = state.pop("pending_offseason_transition", None)
+    lh = league_history if isinstance(league_history, dict) else {"seasons": []}
+    if isinstance(pending, dict):
+        team_names = list(teams.keys())
+        standings = pending.get("standings") or state.get("standings") or {}
+        _finish_season_apply_offseason_transition(
+            state,
+            teams,
+            team_names,
+            standings,
+            str(pending.get("champion") or ""),
+            list(pending.get("br_flat_fin") or []),
+            int(pending.get("year_num") or state.get("current_year") or 1),
+            lh,
+            defer_schedule=False,
+        )
+        state["season_phase"] = "offseason"
+    elif already_in_offseason:
+        state["season_phase"] = "offseason"
+    else:
+        state["season_phase"] = "preseason"
+        state["preseason_stages"] = state.get("preseason_stages") or list(PRESEASON_STAGES)
+        state["preseason_stage_index"] = int(state.get("preseason_stage_index") or 0)
+    _assign_scrimmage_opponents_for_state(state)
+    state.pop("schedule_planning_info", None)
+    _sync_user_cross_region_slot_count(state)
+    state["teams"] = [team_to_dict(t) for t in teams.values()]
+    return state
 
 
 def _apply_season_summary_offseason_begin(

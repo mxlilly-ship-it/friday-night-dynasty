@@ -283,6 +283,9 @@
         <button class="game-btn" id="btn-load" onclick="loadGame()">
           <span class="fill"></span>Load
         </button>
+        <button class="game-btn" id="btn-multiplayer" onclick="startMultiplayer()">
+          <span class="fill"></span>Multiplayer
+        </button>
         <button class="game-btn game-btn--wide" id="btn-screenshots" onclick="showScreenshots()">
           <span class="fill"></span>Screenshots
         </button>
@@ -316,6 +319,7 @@
 
     function startNew() { fndPost('new'); }
     function loadGame() { fndPost('load'); }
+    function startMultiplayer() { fndPost('multiplayer'); }
     function showScreenshots() { fndPost('screenshots'); }
     function showSupport() { fndPost('support'); }
     function startPurchase() { fndPost('purchase'); }

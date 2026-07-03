@@ -39,6 +39,11 @@ def saves_base_dir() -> str:
     return os.path.join(data_root(), "saves")
 
 
+def leagues_base_dir() -> str:
+    """Shared multiplayer league save folders."""
+    return os.path.join(data_root(), "leagues")
+
+
 def default_logos_dir() -> str:
     """Built-in crest images shipped with the league (data/logos/)."""
     return os.path.join(_PROJECT_ROOT, "data", "logos")

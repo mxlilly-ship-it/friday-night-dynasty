@@ -25,7 +25,10 @@ import {
 } from './coachDevelopment'
 import { EMPTY_COACHING_LOADOUT, computeLoadoutEquipCost, normalizeLoadout, type CoachingCardLoadout } from './coachingCards'
 
-const STEPS = ['Save slot', 'Coach', 'Attributes', 'Your school'] as const
+const STEPS_FULL = ['Save slot', 'Coach', 'Attributes', 'Your school'] as const
+const STEPS_COACH = ['Coach', 'Attributes'] as const
+
+export type NewSaveFlowMode = 'singleplayer' | 'multiplayer_admin' | 'multiplayer_coach'
 
 const MAX_IMAGE_FILES = 200
 const MAX_LOGO_BYTES = 5 * 1024 * 1024
@@ -55,6 +58,15 @@ type Props = {
   onError: (msg: string) => void
   onSessionExpired?: () => void
   defaultCoachName?: string
+  mode?: NewSaveFlowMode
+  leagueId?: string
+  fixedTeamName?: string
+  onLeagueCreated?: (
+    leagueId: string,
+    logos?: SaveBundle['logos'],
+    extras?: { commissioner_pin?: string; commissioner_email?: string },
+  ) => void
+  onCoachSetupComplete?: () => void
 }
 
 type SkillsState = typeof DEFAULT_SKILLS
@@ -72,9 +84,20 @@ export function NewSaveFlow({
   onError,
   onSessionExpired,
   defaultCoachName,
+  mode = 'singleplayer',
+  leagueId,
+  fixedTeamName,
+  onLeagueCreated,
+  onCoachSetupComplete,
 }: Props) {
-  const [step, setStep] = useState(0)
-  const [saveName, setSaveName] = useState('My Dynasty')
+  const isMpAdmin = mode === 'multiplayer_admin'
+  const isMpCoach = mode === 'multiplayer_coach'
+  const firstStep = isMpCoach ? 1 : 0
+  const lastStep = isMpCoach ? 2 : 3
+  const stepLabels = isMpCoach ? STEPS_COACH : STEPS_FULL
+
+  const [step, setStep] = useState(firstStep)
+  const [saveName, setSaveName] = useState(isMpAdmin ? 'My Multiplayer League' : 'My Dynasty')
   const [startYear, setStartYear] = useState<number>(2026)
   const [presetId, setPresetId] = useState('balanced')
   const [coachName, setCoachName] = useState(defaultCoachName?.trim() || 'Coach')
@@ -104,6 +127,10 @@ export function NewSaveFlow({
   const [showCustomLeagueHelp, setShowCustomLeagueHelp] = useState(false)
   const [coachingCardsLoadout, setCoachingCardsLoadout] = useState<CoachingCardLoadout>(() => ({ ...EMPTY_COACHING_LOADOUT }))
   const [hardcoreNoCards, setHardcoreNoCards] = useState(false)
+  const defaultAdminEmail = defaultCoachName?.includes('@') ? defaultCoachName.trim() : ''
+  const [commishIsSelf, setCommishIsSelf] = useState(true)
+  const [commissionerEmail, setCommissionerEmail] = useState(defaultAdminEmail)
+  const [commissionerLookupStatus, setCommissionerLookupStatus] = useState<'idle' | 'ok' | 'missing' | 'checking'>('idle')
 
   const setLogoFolderInputEl = useCallback((el: HTMLInputElement | null) => {
     logoFolderInputRef.current = el
@@ -248,6 +275,48 @@ export function NewSaveFlow({
     }
   }, [apiBase, onError])
 
+  const loadLeagueSchools = useCallback(async () => {
+    if (!leagueId) return
+    setLoadingTeams(true)
+    onError('')
+    try {
+      const auth = getAuthHeaders ? await getAuthHeaders() : headers
+      const r = await fetch(`${apiBase}/leagues/${leagueId}/schools`, {
+        headers: auth,
+        credentials: 'include',
+      })
+      if (!r.ok) {
+        onError(await r.text())
+        return
+      }
+      const data = (await r.json()) as { teams?: TeamJsonRow[] }
+      setTeamsData({ teams: data.teams ?? [] })
+      if (fixedTeamName) setUserTeam(fixedTeamName)
+    } catch (e: unknown) {
+      onError(e instanceof Error ? e.message : 'Could not load league schools')
+    } finally {
+      setLoadingTeams(false)
+    }
+  }, [apiBase, fixedTeamName, getAuthHeaders, headers, leagueId, onError])
+
+  const lookupCommissionerEmail = useCallback(async () => {
+    const email = commissionerEmail.trim()
+    if (!email || commishIsSelf) {
+      setCommissionerLookupStatus('idle')
+      return
+    }
+    setCommissionerLookupStatus('checking')
+    try {
+      const auth = getAuthHeaders ? await getAuthHeaders() : headers
+      const r = await fetch(`${apiBase}/leagues/admin/users/lookup?email=${encodeURIComponent(email)}`, {
+        headers: auth,
+      })
+      setCommissionerLookupStatus(r.ok ? 'ok' : 'missing')
+    } catch {
+      setCommissionerLookupStatus('missing')
+    }
+  }, [apiBase, commishIsSelf, commissionerEmail, getAuthHeaders, headers])
+
   const loadPlaybooksData = useCallback(async () => {
     const offFallback = { ...(OFFENSIVE_PLAYBOOK_TO_FORMATIONS as Record<string, string[]>) }
     const defFallback = { ...(DEFENSIVE_PLAYBOOK_TO_FORMATIONS as Record<string, string[]>) }
@@ -294,7 +363,13 @@ export function NewSaveFlow({
   }, [apiBase])
 
   useEffect(() => {
-    if (!teamsData && !loadingTeams && teamSource === 'default') loadTeamsData()
+    if (isMpCoach) {
+      if (fixedTeamName) setUserTeam(fixedTeamName)
+      if (leagueId) void loadLeagueSchools()
+      return
+    }
+    if (!teamsData && !loadingTeams && teamSource === 'default') void loadTeamsData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount load only
   }, [])
 
   useEffect(() => {
@@ -323,11 +398,42 @@ export function NewSaveFlow({
     }))
   }, [presetId])
 
-  const goNext = () => {
+  const goNext = async () => {
     if (step === 0) {
       if (!saveName.trim()) {
         onError('Enter a save name.')
         return
+      }
+      if (isMpAdmin && !commishIsSelf) {
+        const em = commissionerEmail.trim()
+        if (!em || !em.includes('@')) {
+          onError('Enter a valid commissioner email.')
+          return
+        }
+        if (commissionerLookupStatus === 'missing') {
+          onError('No FND account found for that email. They must sign in once before you appoint them.')
+          return
+        }
+        if (commissionerLookupStatus !== 'ok') {
+          setCommissionerLookupStatus('checking')
+          try {
+            const auth = getAuthHeaders ? await getAuthHeaders() : headers
+            const r = await fetch(
+              `${apiBase}/leagues/admin/users/lookup?email=${encodeURIComponent(em)}`,
+              { headers: auth },
+            )
+            if (!r.ok) {
+              setCommissionerLookupStatus('missing')
+              onError('No FND account found for that email. They must sign in once before you appoint them.')
+              return
+            }
+            setCommissionerLookupStatus('ok')
+          } catch {
+            setCommissionerLookupStatus('missing')
+            onError('Could not verify commissioner account.')
+            return
+          }
+        }
       }
       if (!Number.isFinite(startYear) || startYear < 1900) {
         onError('Start year must be 1900 or later.')
@@ -359,7 +465,14 @@ export function NewSaveFlow({
   }
 
   const canGoNext = (() => {
-    if (step === 0) return Boolean(saveName.trim())
+    if (step === 0) {
+      if (!saveName.trim()) return false
+      if (isMpAdmin && !commishIsSelf) {
+        const em = commissionerEmail.trim()
+        return Boolean(em && em.includes('@'))
+      }
+      return true
+    }
     if (step === 1) return Boolean(coachName.trim()) && coachAge >= 21 && coachAge <= 75
     if (step === 2) return true
     return false
@@ -367,7 +480,7 @@ export function NewSaveFlow({
 
   const goPrev = () => {
     onError('')
-    if (step > 0) setStep(step - 1)
+    if (step > firstStep) setStep(step - 1)
     else onBack()
   }
 
@@ -423,8 +536,12 @@ export function NewSaveFlow({
   )
 
   async function createSave() {
-    if (!userTeam) {
+    if (!isMpCoach && !userTeam) {
       onError('Select a school.')
+      return
+    }
+    if (isMpCoach && !fixedTeamName) {
+      onError('Team not assigned.')
       return
     }
     setCreating(true)
@@ -435,6 +552,104 @@ export function NewSaveFlow({
         onSessionExpired?.()
         return
       }
+
+      if (isMpCoach && leagueId && fixedTeamName) {
+        const r = await fetch(
+          `${apiBase}/leagues/${leagueId}/teams/${encodeURIComponent(fixedTeamName)}/coach-setup`,
+          {
+            method: 'POST',
+            headers: { ...auth, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ coach_config: coachConfig }),
+          },
+        )
+        if (!r.ok) {
+          if (r.status === 401) {
+            onSessionExpired?.()
+            return
+          }
+          try {
+            const maybe = await r.json()
+            onError(typeof maybe?.detail === 'string' ? maybe.detail : JSON.stringify(maybe))
+          } catch {
+            onError(await r.text())
+          }
+          return
+        }
+        onCoachSetupComplete?.()
+        return
+      }
+
+      if (isMpAdmin) {
+        const r = await fetch(`${apiBase}/leagues/admin/leagues`, {
+          method: 'POST',
+          headers: { ...auth, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: saveName.trim(),
+            user_team: userTeam,
+            coach_config: coachConfig,
+            start_year: startYear,
+            teams_data: teamSource === 'upload' ? teamsData : undefined,
+            allow_user_coach_firing: allowCoachFiring,
+            transfers_disabled: disableTransfers,
+            ...(commishIsSelf ? {} : { commissioner_email: commissionerEmail.trim() }),
+          }),
+        })
+        if (!r.ok) {
+          if (r.status === 401) {
+            onSessionExpired?.()
+            return
+          }
+          try {
+            const maybe = await r.json()
+            onError(typeof maybe?.detail === 'string' ? maybe.detail : JSON.stringify(maybe))
+          } catch {
+            onError(await r.text())
+          }
+          return
+        }
+        const created = (await r.json()) as {
+          league_id?: string
+          commissioner_pin?: string
+          commissioner_email?: string
+        }
+        if (!created?.league_id) {
+          onError('League created but no id returned.')
+          return
+        }
+        const toUpload = logoRows.filter((row) => row.team.trim())
+        let logosBundle: SaveBundle['logos'] | undefined
+        if (toUpload.length > 0) {
+          logosBundle = {}
+          for (const { file, team } of toUpload) {
+            if (file.size > MAX_LOGO_BYTES) {
+              onError(`${file.name} is too large (max 5 MB).`)
+              return
+            }
+            const form = new FormData()
+            form.append('logo', file, file.name)
+            const up = await fetch(
+              `${apiBase}/leagues/${created.league_id}/logos/${encodeURIComponent(team.trim())}`,
+              { method: 'POST', headers: auth.Authorization ? { Authorization: auth.Authorization } : {}, body: form },
+            )
+            if (!up.ok) {
+              onError(`Logo upload failed for ${team}`)
+              return
+            }
+            const buf = new Uint8Array(await file.arrayBuffer())
+            logosBundle[team] = {
+              filename: file.name,
+              data: buf,
+              mime: file.type?.startsWith('image/') ? file.type : guessMime(file.name),
+            }
+          }
+        }
+        onLeagueCreated?.(created.league_id, logosBundle, {
+          commissioner_pin: created.commissioner_pin,
+          commissioner_email: created.commissioner_email,
+        })
+        return
+      }
+
       const r = await fetch(`${apiBase}/saves`, {
         method: 'POST',
         headers: { ...auth, 'Content-Type': 'application/json' },
@@ -542,24 +757,29 @@ export function NewSaveFlow({
 
   return (
     <div className="newsave-root fnd-panel" style={{ maxWidth: 760 }}>
-      <button type="button" className="fnd-back" onClick={step === 0 ? onBack : goPrev}>
-        {step === 0 ? '← Back' : '← Previous'}
+      <button type="button" className="fnd-back" onClick={step === firstStep ? onBack : goPrev}>
+        {step === firstStep ? '← Back' : '← Previous'}
       </button>
 
       <div className="newsave-steps">
-        {STEPS.map((label, i) => (
-          <span key={label} className={i === step ? 'active' : i < step ? 'done' : ''}>
+        {stepLabels.map((label, i) => (
+          <span key={label} className={i + firstStep === step ? 'active' : i + firstStep < step ? 'done' : ''}>
             {i + 1}. {label}
           </span>
         ))}
       </div>
 
-      {step === 0 && (
+      {step === 0 && !isMpCoach && (
         <>
           <h2 className="newsave-h3">
-            Dynasty save slot<span className="newsave-footnote-mark">*</span>
+            {isMpAdmin ? 'League setup' : 'Dynasty save slot'}
+            <span className="newsave-footnote-mark">*</span>
           </h2>
-          <p className="newsave-sub">Name this save file. You can run multiple dynasties under the same coach login.</p>
+          <p className="newsave-sub">
+            {isMpAdmin
+              ? 'Name this multiplayer league and choose your team dataset (default or custom JSON).'
+              : 'Name this save file. You can run multiple dynasties under the same coach login.'}
+          </p>
           <input
             className="newsave-input"
             value={saveName}
@@ -567,6 +787,83 @@ export function NewSaveFlow({
             placeholder="e.g. Year 1 — Martinsburg"
             autoFocus
           />
+          {isMpAdmin ? (
+            <div style={{ marginTop: 16 }}>
+              <div className="newsave-sub" style={{ marginBottom: 8 }}>
+                Commissioner
+              </div>
+              <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 10, cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="commish-mode"
+                  checked={commishIsSelf}
+                  onChange={() => {
+                    setCommishIsSelf(true)
+                    setCommissionerLookupStatus('idle')
+                    onError('')
+                  }}
+                  style={{ marginTop: 3 }}
+                />
+                <span>
+                  <strong>I am the commissioner</strong>
+                  <span className="newsave-sub" style={{ display: 'block', marginTop: 4 }}>
+                    You will run the league and coach the school you pick below.
+                  </span>
+                </span>
+              </label>
+              <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="commish-mode"
+                  checked={!commishIsSelf}
+                  onChange={() => {
+                    setCommishIsSelf(false)
+                    setCommissionerLookupStatus('idle')
+                    onError('')
+                  }}
+                  style={{ marginTop: 3 }}
+                />
+                <span style={{ flex: 1 }}>
+                  <strong>Appoint someone else</strong>
+                  <span className="newsave-sub" style={{ display: 'block', marginTop: 4 }}>
+                    They must have signed in to FND at least once. You still set up their school and coach profile
+                    below.
+                  </span>
+                  {!commishIsSelf ? (
+                    <>
+                      <input
+                        className="newsave-input"
+                        type="email"
+                        value={commissionerEmail}
+                        onChange={(e) => {
+                          setCommissionerEmail(e.target.value)
+                          setCommissionerLookupStatus('idle')
+                        }}
+                        onBlur={() => void lookupCommissionerEmail()}
+                        placeholder="commissioner@email.com"
+                        style={{ marginTop: 8, marginBottom: 0 }}
+                      />
+                      {commissionerLookupStatus === 'checking' ? (
+                        <span className="newsave-sub" style={{ display: 'block', marginTop: 6 }}>
+                          Checking account…
+                        </span>
+                      ) : null}
+                      {commissionerLookupStatus === 'ok' ? (
+                        <span className="newsave-sub" style={{ display: 'block', marginTop: 6, color: '#86efac' }}>
+                          Account found — ready to appoint.
+                        </span>
+                      ) : null}
+                      {commissionerLookupStatus === 'missing' ? (
+                        <span className="newsave-sub" style={{ display: 'block', marginTop: 6, color: '#f87171' }}>
+                          No account found. Ask them to sign in once, then try again.
+                        </span>
+                      ) : null}
+                    </>
+                  ) : null}
+                </span>
+              </label>
+            </div>
+          ) : null}
           <div className="newsave-help-row">
             <button
               type="button"
@@ -812,9 +1109,16 @@ export function NewSaveFlow({
       {step === 1 && (
         <>
           <h2 className="newsave-h3">Coach profile</h2>
-          <p className="newsave-sub">
-            Pick an archetype (you can tune skills next), your name and age, and your offensive and defensive playbooks.
-          </p>
+          {isMpCoach && fixedTeamName ? (
+            <p className="newsave-sub">
+              Build your head coach for <strong>{fixedTeamName}</strong> — same steps as starting a new dynasty.
+            </p>
+          ) : (
+            <p className="newsave-sub">
+              Pick an archetype (you can tune skills next), your name and age, and your offensive and defensive
+              playbooks.
+            </p>
+          )}
           <div className="newsave-presets">
             {COACH_PRESETS.map((p) => (
               <button
@@ -964,10 +1268,23 @@ export function NewSaveFlow({
               </option>
             ))}
           </select>
+          {isMpCoach ? (
+            <div className="newsave-summary" style={{ marginTop: '1.25rem' }}>
+              <strong>Your school</strong>
+              <br />
+              You are coaching <strong>{fixedTeamName || userTeam || '—'}</strong> in this league.
+              <br />
+              Coach: <strong>{coachName.trim() || '—'}</strong> (age {coachAge}) ·{' '}
+              {COACH_PRESETS.find((p) => p.id === presetId)?.title}
+              <br />
+              Playbooks: <strong>{skills.offensive_formation || '—'}</strong> (off) ·{' '}
+              <strong>{skills.defensive_formation || '—'}</strong> (def)
+            </div>
+          ) : null}
         </>
       )}
 
-      {step === 3 && (
+      {step === 3 && !isMpCoach && (
         <>
           <h2 className="newsave-h3">Choose your school</h2>
           <p className="newsave-sub">
@@ -1047,6 +1364,13 @@ export function NewSaveFlow({
             <br />
             Save: <strong>{saveName.trim() || '—'}</strong>
             <br />
+            {isMpAdmin ? (
+              <>
+                Commissioner:{' '}
+                <strong>{commishIsSelf ? 'You' : commissionerEmail.trim() || '—'}</strong>
+                <br />
+              </>
+            ) : null}
             Coach: <strong>{coachName.trim() || '—'}</strong> (age {coachAge}) · {COACH_PRESETS.find((p) => p.id === presetId)?.title}
             <br />
             Playbooks: <strong>{skills.offensive_formation || '—'}</strong> (off) ·{' '}
@@ -1073,10 +1397,10 @@ export function NewSaveFlow({
 
       <div className="newsave-nav">
         <button type="button" className="fnd-back" onClick={goPrev} style={{ marginBottom: 0 }}>
-          {step === 0 ? 'Main menu' : 'Back'}
+          {step === firstStep ? 'Main menu' : 'Back'}
         </button>
-        {step < 3 ? (
-          <button type="button" className="fnd-title-btn" onClick={goNext} disabled={!canGoNext}>
+        {step < lastStep ? (
+          <button type="button" className="fnd-title-btn" onClick={() => void goNext()} disabled={!canGoNext}>
             Next
           </button>
         ) : (
@@ -1084,9 +1408,21 @@ export function NewSaveFlow({
             type="button"
             className="fnd-title-btn"
             onClick={createSave}
-            disabled={creating || !userTeam || !coachName.trim() || coachAge < 21 || coachAge > 75}
+            disabled={
+              creating ||
+              (!isMpCoach && !userTeam) ||
+              !coachName.trim() ||
+              coachAge < 21 ||
+              coachAge > 75
+            }
           >
-            {creating ? 'Creating…' : 'Create dynasty'}
+            {creating
+              ? 'Creating…'
+              : isMpAdmin
+                ? 'Create league'
+                : isMpCoach
+                  ? 'Finish coach profile'
+                  : 'Create dynasty'}
           </button>
         )}
       </div>

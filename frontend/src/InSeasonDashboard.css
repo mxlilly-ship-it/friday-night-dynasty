@@ -39,6 +39,18 @@
   color: #555;
 }
 
+.isdash-mp-notice {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #d4af6a;
+  background: rgba(212, 175, 106, 0.1);
+  border: 1px solid rgba(212, 175, 106, 0.35);
+  max-width: 520px;
+}
+
 .isdash-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
