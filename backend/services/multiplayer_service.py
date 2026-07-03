@@ -294,6 +294,8 @@ def apply_member_coach_setup(
     coach_dict = target.get("coach") if isinstance(target.get("coach"), dict) else {}
     coach = coach_from_dict(coach_dict)
     apply_coach_config_dict(coach, coach_config)
+    # League creation locks CPU teams' playbooks for the current year; human coaches must be able to pick.
+    coach.last_preferred_playbook_change_year = 0
     target["coach"] = coach_to_dict(coach)
 
     coach_name = str(coach_config.get("name") or coach.name or "").strip()
@@ -737,6 +739,35 @@ def _verify_team_game_access(league_id: str, user_id: str, team_name: str) -> Di
     return league_row
 
 
+def _unlock_human_playbooks_during_select(state: Dict[str, Any], team_name: str) -> bool:
+    """Clear CPU playbook locks so human coaches can choose schemes in Playbook Select."""
+    phase = str(state.get("season_phase") or "").strip().lower()
+    if phase != "preseason":
+        return False
+    stages = state.get("preseason_stages") or []
+    idx = int(state.get("preseason_stage_index") or 0)
+    if not isinstance(stages, list) or idx < 0 or idx >= len(stages):
+        return False
+    if str(stages[idx]) != "Playbook Select":
+        return False
+    team_name = str(team_name or "").strip()
+    if not team_name:
+        return False
+    for row in state.get("teams") or []:
+        if not isinstance(row, dict) or str(row.get("name") or "") != team_name:
+            continue
+        coach = row.get("coach") if isinstance(row.get("coach"), dict) else None
+        if not coach:
+            return False
+        last = int(coach.get("last_preferred_playbook_change_year") or 0)
+        if last <= 0:
+            return False
+        coach["last_preferred_playbook_change_year"] = 0
+        row["coach"] = coach
+        return True
+    return False
+
+
 def get_league_game_bundle(league_id: str, user_id: str, team_name: str) -> Dict[str, Any]:
     """Load league save scoped to the coach's team (same shape as GET /saves/{id})."""
     import copy
@@ -754,7 +785,10 @@ def get_league_game_bundle(league_id: str, user_id: str, team_name: str) -> Dict
     mp_meta = dict(mp_meta)
     mp_meta["league_id"] = league_id
     canonical["multiplayer"] = mp_meta
-    if ensure_multiplayer_opening_schedule(canonical):
+    changed = ensure_multiplayer_opening_schedule(canonical)
+    if _unlock_human_playbooks_during_select(canonical, team_name):
+        changed = True
+    if changed:
         _save_state(save_dir, canonical)
         with db() as conn:
             conn.execute(

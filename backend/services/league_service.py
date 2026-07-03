@@ -5906,6 +5906,11 @@ def apply_coach_prep_state(state: Dict[str, Any], playbook: Optional[Dict[str, A
         current_stage = stages[idx]
         if current_stage == "Playbook Select" and playbook:
             _apply_user_preseason_playbook_payload(state, teams, playbook)
+            # Multiplayer: keep playbooks editable until the commissioner advances this stage.
+            if is_multiplayer_league_state(state) and user_team_name and user_team_name in teams:
+                coach = teams[user_team_name].coach
+                if coach is not None:
+                    coach.last_preferred_playbook_change_year = 0
         game_plan = playbook.get("game_plan") if isinstance(playbook, dict) else None
         if current_stage == "Play Selection":
             if user_team_name and user_team_name in teams:
