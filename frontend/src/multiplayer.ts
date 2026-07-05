@@ -150,11 +150,34 @@ export type AssignTeamResult = {
   user_id?: string
 }
 
+/** Retry brief Railway restarts (502/503/504) during deploys. */
+export async function fetchWithRetry(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  const retryStatuses = new Set([502, 503, 504])
+  let last: Response | undefined
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const r = await fetchWithRetry(input, init)
+      last = r
+      if (r.ok || !retryStatuses.has(r.status)) return r
+    } catch (e) {
+      if (attempt >= 3) throw e
+    }
+    if (attempt < 3) {
+      await new Promise((resolve) => window.setTimeout(resolve, 600 * (attempt + 1)))
+    }
+  }
+  if (last) return last
+  throw new Error('Server unavailable')
+}
+
 export async function fetchMyLeagues(
   apiBase: string,
   headers: Record<string, string>,
 ): Promise<LeagueMineResponse> {
-  const r = await fetch(`${apiBase}/leagues/mine`, { headers })
+  const r = await fetchWithRetry(`${apiBase}/leagues/mine`, { headers })
   if (!r.ok) throw new Error(await r.text())
   const data = (await r.json()) as LeagueMineResponse
   return {
@@ -172,7 +195,7 @@ export async function fetchLeagueDashboard(
   teamName?: string,
 ): Promise<LeagueDashboardData> {
   const q = teamName ? `?team_name=${encodeURIComponent(teamName)}` : ''
-  const r = await fetch(`${apiBase}/leagues/${leagueId}/dashboard${q}`, { headers })
+  const r = await fetchWithRetry(`${apiBase}/leagues/${leagueId}/dashboard${q}`, { headers })
   if (!r.ok) throw new Error(await r.text())
   return (await r.json()) as LeagueDashboardData
 }
@@ -184,7 +207,7 @@ export async function submitLeagueWeek(
   teamName: string,
 ): Promise<void> {
   const q = `?team_name=${encodeURIComponent(teamName)}`
-  const r = await fetch(`${apiBase}/leagues/${leagueId}/submit${q}`, {
+  const r = await fetchWithRetry(`${apiBase}/leagues/${leagueId}/submit${q}`, {
     method: 'POST',
     headers: { ...headers, 'Content-Type': 'application/json' },
   })
@@ -198,7 +221,7 @@ export async function unsubmitLeagueWeek(
   teamName: string,
 ): Promise<void> {
   const q = `?team_name=${encodeURIComponent(teamName)}`
-  const r = await fetch(`${apiBase}/leagues/${leagueId}/submit${q}`, {
+  const r = await fetchWithRetry(`${apiBase}/leagues/${leagueId}/submit${q}`, {
     method: 'DELETE',
     headers: { ...headers, 'Content-Type': 'application/json' },
   })
@@ -212,7 +235,7 @@ export async function verifyTeamPin(
   teamName: string,
   pin: string,
 ): Promise<boolean> {
-  const r = await fetch(`${apiBase}/leagues/${leagueId}/teams/${encodeURIComponent(teamName)}/verify-pin`, {
+  const r = await fetchWithRetry(`${apiBase}/leagues/${leagueId}/teams/${encodeURIComponent(teamName)}/verify-pin`, {
     method: 'POST',
     headers: { ...headers, 'Content-Type': 'application/json' },
     body: JSON.stringify({ pin }),
@@ -236,7 +259,7 @@ export async function fetchLeagueGame(
   teamName: string,
 ): Promise<LeagueGameBundle> {
   const q = `?team_name=${encodeURIComponent(teamName)}`
-  const r = await fetch(`${apiBase}/leagues/${leagueId}/game${q}`, { headers })
+  const r = await fetchWithRetry(`${apiBase}/leagues/${leagueId}/game${q}`, { headers })
   if (!r.ok) throw new Error(await r.text())
   return (await r.json()) as LeagueGameBundle
 }
@@ -249,7 +272,7 @@ export async function saveLeagueGame(
   state: Record<string, unknown>,
 ): Promise<void> {
   const q = `?team_name=${encodeURIComponent(teamName)}`
-  const r = await fetch(`${apiBase}/leagues/${leagueId}/game${q}`, {
+  const r = await fetchWithRetry(`${apiBase}/leagues/${leagueId}/game${q}`, {
     method: 'PUT',
     headers: { ...headers, 'Content-Type': 'application/json' },
     body: JSON.stringify({ state }),
@@ -262,7 +285,7 @@ export async function fetchLeagueCommishGame(
   headers: Record<string, string>,
   leagueId: string,
 ): Promise<LeagueGameBundle> {
-  const r = await fetch(`${apiBase}/leagues/${leagueId}/commish/game`, { headers })
+  const r = await fetchWithRetry(`${apiBase}/leagues/${leagueId}/commish/game`, { headers })
   if (!r.ok) throw new Error(await r.text())
   return (await r.json()) as LeagueGameBundle
 }
@@ -273,7 +296,7 @@ export async function saveLeagueCommishGame(
   leagueId: string,
   state: Record<string, unknown>,
 ): Promise<void> {
-  const r = await fetch(`${apiBase}/leagues/${leagueId}/commish/game`, {
+  const r = await fetchWithRetry(`${apiBase}/leagues/${leagueId}/commish/game`, {
     method: 'PUT',
     headers: { ...headers, 'Content-Type': 'application/json' },
     body: JSON.stringify({ state }),
@@ -286,7 +309,7 @@ export async function fetchCommishDashboard(
   headers: Record<string, string>,
   leagueId: string,
 ): Promise<CommishDashboardData> {
-  const r = await fetch(`${apiBase}/leagues/${leagueId}/commish/dashboard`, { headers })
+  const r = await fetchWithRetry(`${apiBase}/leagues/${leagueId}/commish/dashboard`, { headers })
   if (!r.ok) throw new Error(await r.text())
   return (await r.json()) as CommishDashboardData
 }
@@ -296,7 +319,7 @@ export async function deleteAdminLeague(
   headers: Record<string, string>,
   leagueId: string,
 ): Promise<{ ok: boolean; league_id: string; name: string; status?: string }> {
-  const r = await fetch(`${apiBase}/leagues/admin/leagues/${encodeURIComponent(leagueId)}`, {
+  const r = await fetchWithRetry(`${apiBase}/leagues/admin/leagues/${encodeURIComponent(leagueId)}`, {
     method: 'DELETE',
     headers: { ...headers, 'Content-Type': 'application/json' },
   })
@@ -316,7 +339,7 @@ export async function fetchDeletedLeagues(
   apiBase: string,
   headers: Record<string, string>,
 ): Promise<DeletedLeagueListItem[]> {
-  const r = await fetch(`${apiBase}/leagues/admin/leagues/deleted`, { headers })
+  const r = await fetchWithRetry(`${apiBase}/leagues/admin/leagues/deleted`, { headers })
   if (!r.ok) throw new Error(await r.text())
   const data = (await r.json()) as { leagues?: DeletedLeagueListItem[] }
   return data.leagues ?? []
@@ -327,7 +350,7 @@ export async function restoreAdminLeague(
   headers: Record<string, string>,
   leagueId: string,
 ): Promise<{ ok: boolean; league_id: string; name: string }> {
-  const r = await fetch(
+  const r = await fetchWithRetry(
     `${apiBase}/leagues/admin/leagues/${encodeURIComponent(leagueId)}/restore`,
     { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' } },
   )
@@ -340,7 +363,7 @@ export async function permanentDeleteAdminLeague(
   headers: Record<string, string>,
   leagueId: string,
 ): Promise<{ ok: boolean; league_id: string; name: string; permanently_deleted?: boolean }> {
-  const r = await fetch(
+  const r = await fetchWithRetry(
     `${apiBase}/leagues/admin/leagues/${encodeURIComponent(leagueId)}/permanent`,
     { method: 'DELETE', headers: { ...headers, 'Content-Type': 'application/json' } },
   )
@@ -359,7 +382,7 @@ export async function inviteToLeague(
   leagueId: string,
   email: string,
 ): Promise<{ email_sent?: boolean }> {
-  const r = await fetch(`${apiBase}/leagues/${leagueId}/invites`, {
+  const r = await fetchWithRetry(`${apiBase}/leagues/${leagueId}/invites`, {
     method: 'POST',
     headers: { ...headers, 'Content-Type': 'application/json' },
     body: JSON.stringify({ email }),
@@ -373,7 +396,7 @@ export async function fetchLeagueChat(
   headers: Record<string, string>,
   leagueId: string,
 ): Promise<LeagueChatMessage[]> {
-  const r = await fetch(`${apiBase}/leagues/${leagueId}/chat`, { headers })
+  const r = await fetchWithRetry(`${apiBase}/leagues/${leagueId}/chat`, { headers })
   if (!r.ok) throw new Error(await r.text())
   const data = (await r.json()) as { messages?: LeagueChatMessage[] }
   return data.messages ?? []
@@ -386,7 +409,7 @@ export async function postLeagueChat(
   body: string,
   teamName?: string | null,
 ): Promise<LeagueChatMessage> {
-  const r = await fetch(`${apiBase}/leagues/${leagueId}/chat`, {
+  const r = await fetchWithRetry(`${apiBase}/leagues/${leagueId}/chat`, {
     method: 'POST',
     headers: { ...headers, 'Content-Type': 'application/json' },
     body: JSON.stringify({ body, team_name: teamName || undefined }),
@@ -402,7 +425,7 @@ export async function assignTeamByEmail(
   email: string,
   teamName: string,
 ): Promise<AssignTeamResult> {
-  const r = await fetch(`${apiBase}/leagues/${leagueId}/members/assign-by-email`, {
+  const r = await fetchWithRetry(`${apiBase}/leagues/${leagueId}/members/assign-by-email`, {
     method: 'POST',
     headers: { ...headers, 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, team_name: teamName }),
@@ -417,7 +440,7 @@ export async function resetMemberPin(
   leagueId: string,
   userId: string,
 ): Promise<AssignTeamResult> {
-  const r = await fetch(`${apiBase}/leagues/${leagueId}/members/${encodeURIComponent(userId)}/reset-pin`, {
+  const r = await fetchWithRetry(`${apiBase}/leagues/${leagueId}/members/${encodeURIComponent(userId)}/reset-pin`, {
     method: 'POST',
     headers: { ...headers, 'Content-Type': 'application/json' },
     body: JSON.stringify({}),
@@ -440,7 +463,7 @@ export async function updateCommishSettings(
   leagueId: string,
   patch: CommishSettingsPatch,
 ): Promise<CommishSettingsPatch> {
-  const r = await fetch(`${apiBase}/leagues/${leagueId}/commish/settings`, {
+  const r = await fetchWithRetry(`${apiBase}/leagues/${leagueId}/commish/settings`, {
     method: 'PATCH',
     headers: { ...headers, 'Content-Type': 'application/json' },
     body: JSON.stringify(patch),
@@ -454,7 +477,7 @@ export async function commishSimWeek(
   headers: Record<string, string>,
   leagueId: string,
 ): Promise<{ ok: boolean; message: string; season_phase: string; current_week: number }> {
-  const r = await fetch(`${apiBase}/leagues/${leagueId}/commish/sim-week`, {
+  const r = await fetchWithRetry(`${apiBase}/leagues/${leagueId}/commish/sim-week`, {
     method: 'POST',
     headers: { ...headers, 'Content-Type': 'application/json' },
   })
@@ -468,7 +491,7 @@ export async function vacateTeamMember(
   leagueId: string,
   userId: string,
 ): Promise<void> {
-  const r = await fetch(
+  const r = await fetchWithRetry(
     `${apiBase}/leagues/${leagueId}/members/${encodeURIComponent(userId)}/vacate`,
     { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' } },
   )
@@ -481,7 +504,7 @@ export async function removeLeagueMember(
   leagueId: string,
   userId: string,
 ): Promise<void> {
-  const r = await fetch(`${apiBase}/leagues/${leagueId}/members/${encodeURIComponent(userId)}`, {
+  const r = await fetchWithRetry(`${apiBase}/leagues/${leagueId}/members/${encodeURIComponent(userId)}`, {
     method: 'DELETE',
     headers: { ...headers, 'Content-Type': 'application/json' },
   })
@@ -494,7 +517,7 @@ export async function revokeLeagueInvite(
   leagueId: string,
   inviteId: string,
 ): Promise<void> {
-  const r = await fetch(`${apiBase}/leagues/${leagueId}/invites/${encodeURIComponent(inviteId)}`, {
+  const r = await fetchWithRetry(`${apiBase}/leagues/${leagueId}/invites/${encodeURIComponent(inviteId)}`, {
     method: 'DELETE',
     headers: { ...headers, 'Content-Type': 'application/json' },
   })

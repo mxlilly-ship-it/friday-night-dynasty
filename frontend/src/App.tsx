@@ -45,6 +45,7 @@ import {
   fetchCommishDashboard,
   fetchLeagueDashboard,
   fetchLeagueGame,
+  fetchWithRetry,
   inviteToLeague,
   postLeagueChat,
   removeLeagueMember,
@@ -77,6 +78,9 @@ const STALE_SESSION_MSG =
   'Your session expired after a server update. Sign in again with your email and password.'
 
 async function formatApiErrorBody(r: Response): Promise<string> {
+  if (r.status === 502 || r.status === 503 || r.status === 504) {
+    return 'Server is restarting (usually after an update). Wait a moment and try again.'
+  }
   const raw = await r.text()
   const fallback = `Request failed (${r.status})`
   try {
@@ -1314,7 +1318,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
       }
       try {
         const q = `?team_name=${encodeURIComponent(mpCoachCtx.teamName!)}`
-        const r = await fetch(`${API_BASE}/leagues/${mpCoachCtx.leagueId}/coach-prep${q}`, {
+        const r = await fetchWithRetry(`${API_BASE}/leagues/${mpCoachCtx.leagueId}/coach-prep${q}`, {
           method: 'POST',
           headers: { ...(await getAuthHeaders()), 'Content-Type': 'application/json' },
           body: JSON.stringify({ prep: buildMpCoachPrep() }),
