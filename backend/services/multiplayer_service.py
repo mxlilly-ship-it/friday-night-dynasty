@@ -2033,15 +2033,28 @@ def assign_team_to_member(
             (league_id, target_user_id),
         ).fetchone()
         if existing:
-            conn.execute(
-                """
-                UPDATE league_members
-                SET team_name=?, status='active', pin_hash=?, pin_updated_at=?,
-                    control_mode='human', coach_setup_complete=0
-                WHERE league_id=? AND user_id=? AND status != 'removed'
-                """,
-                (team_name, _hash_pin(pin_value), now, league_id, target_user_id),
-            )
+            prev_team = str(existing["team_name"] or "").strip()
+            reset_setup = prev_team != team_name
+            if reset_setup:
+                conn.execute(
+                    """
+                    UPDATE league_members
+                    SET team_name=?, status='active', pin_hash=?, pin_updated_at=?,
+                        control_mode='human', coach_setup_complete=0
+                    WHERE league_id=? AND user_id=? AND status != 'removed'
+                    """,
+                    (team_name, _hash_pin(pin_value), now, league_id, target_user_id),
+                )
+            else:
+                conn.execute(
+                    """
+                    UPDATE league_members
+                    SET team_name=?, status='active', pin_hash=?, pin_updated_at=?,
+                        control_mode='human'
+                    WHERE league_id=? AND user_id=? AND status != 'removed'
+                    """,
+                    (team_name, _hash_pin(pin_value), now, league_id, target_user_id),
+                )
         else:
             conn.execute(
                 """
@@ -2097,6 +2110,9 @@ def reset_member_pin(
     pin: Optional[str] = None,
 ) -> Dict[str, Any]:
     _require_commish_write(league_id, actor_user_id)
+    pin_value = (pin or generate_team_pin()).strip()
+    if not re.fullmatch(r"\d{6}", pin_value):
+        raise ValueError("PIN must be 6 digits")
     with db() as conn:
         row = conn.execute(
             """
@@ -2105,15 +2121,19 @@ def reset_member_pin(
             """,
             (league_id, target_user_id),
         ).fetchone()
-    if not row or not row["team_name"]:
-        raise ValueError("member has no assigned team")
-    return assign_team_to_member(
-        league_id,
-        actor_user_id,
-        target_user_id,
-        str(row["team_name"]),
-        pin=pin,
-    )
+        if not row or not row["team_name"]:
+            raise ValueError("member has no assigned team")
+        team_name = str(row["team_name"])
+        now = _now()
+        conn.execute(
+            """
+            UPDATE league_members
+            SET pin_hash=?, pin_updated_at=?
+            WHERE league_id=? AND user_id=? AND status='active'
+            """,
+            (_hash_pin(pin_value), now, league_id, target_user_id),
+        )
+    return {"team_name": team_name, "pin": pin_value, "user_id": target_user_id}
 
 
 def update_league_settings(
