@@ -18,7 +18,13 @@ from backend.data_paths import leagues_base_dir
 from backend.platform_config import is_platform_owner_email
 from backend.storage.db import db
 from systems.save_system import coach_from_dict, coach_to_dict
-from systems.win_path_io import open_text_with_path_fallback
+from systems.win_path_io import (
+    isfile_any,
+    makedirs_with_path_fallback,
+    open_text_with_path_fallback,
+    os_replace_with_path_fallback,
+    unlink_if_exists_any,
+)
 
 LEAGUE_SAVE_FILENAME = "league_save.json"
 
@@ -129,16 +135,83 @@ def _stage_key_from_state(state: Dict[str, Any]) -> str:
     return f"{phase}:stage"
 
 
+def _read_league_save_json(path: str) -> Dict[str, Any]:
+    """Load league_save.json with brief retry and .bak fallback (avoids mid-write empty reads)."""
+    bak_path = f"{path}.bak"
+    paths = [path]
+    if isfile_any(bak_path):
+        paths.append(bak_path)
+    last_err: Optional[BaseException] = None
+    for attempt in range(5):
+        for candidate in paths:
+            if not isfile_any(candidate):
+                continue
+            try:
+                with open_text_with_path_fallback(candidate, "r") as f:
+                    raw = f.read()
+                if not raw.strip():
+                    last_err = ValueError("league save file is empty")
+                    continue
+                data = json.loads(raw)
+                if not isinstance(data, dict):
+                    last_err = ValueError("league save root must be an object")
+                    continue
+                return data
+            except json.JSONDecodeError as exc:
+                last_err = exc
+            except OSError as exc:
+                last_err = exc
+        if attempt < 4:
+            time.sleep(0.05 * (attempt + 1))
+    if last_err:
+        raise ValueError(f"Could not read league save: {last_err}") from last_err
+    raise ValueError("league save file missing")
+
+
 def _load_state(save_dir: str) -> Dict[str, Any]:
     path = _league_save_path(save_dir)
-    with open_text_with_path_fallback(path, "r") as f:
-        return json.load(f)
+    return _read_league_save_json(path)
 
 
 def _save_state(save_dir: str, state: Dict[str, Any]) -> None:
     path = _league_save_path(save_dir)
-    with open_text_with_path_fallback(path, "w") as f:
-        json.dump(state, f, indent=2)
+    try:
+        makedirs_with_path_fallback(os.path.abspath(os.path.normpath(save_dir)))
+    except OSError:
+        try:
+            os.makedirs(save_dir, exist_ok=True)
+        except OSError:
+            pass
+    payload = json.dumps(state, indent=2, ensure_ascii=False)
+    bak_path = f"{path}.bak"
+    try:
+        if isfile_any(path):
+            with open_text_with_path_fallback(path, "r") as f:
+                current = f.read()
+            if current.strip():
+                with open_text_with_path_fallback(bak_path, "w") as f:
+                    f.write(current)
+    except OSError:
+        pass
+    tmp_plain = f"{path}.tmp.{uuid.uuid4().hex}"
+    try:
+        with open_text_with_path_fallback(tmp_plain, "w") as f:
+            f.write(payload)
+        os_replace_with_path_fallback(tmp_plain, path)
+    except OSError as err:
+        try:
+            with open_text_with_path_fallback(path, "w") as f:
+                f.write(payload)
+            try:
+                unlink_if_exists_any(tmp_plain)
+            except OSError:
+                pass
+        except OSError:
+            try:
+                unlink_if_exists_any(tmp_plain)
+            except OSError:
+                pass
+            raise err
 
 
 def sync_pending_invites_for_user(user_id: str) -> None:
