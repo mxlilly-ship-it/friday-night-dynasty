@@ -159,7 +159,7 @@ export async function fetchWithRetry(
   let last: Response | undefined
   for (let attempt = 0; attempt < 4; attempt++) {
     try {
-      const r = await fetchWithRetry(input, init)
+      const r = await fetch(input, init)
       last = r
       if (r.ok || !retryStatuses.has(r.status)) return r
     } catch (e) {
