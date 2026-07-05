@@ -27,6 +27,8 @@ type Props = {
   opponents?: ScrimmageOpponent[]
   onSimulate?: () => Promise<void>
   onPlay?: () => Promise<void>
+  /** Multiplayer: commissioner sims scrimmages on league advance. */
+  commissionerSimulates?: boolean
 }
 
 function scrimmageStageName(s: ScrimmageResult): string {
@@ -39,7 +41,14 @@ function scrimmageIsComplete(s: ScrimmageResult): boolean {
   return s.completed === true
 }
 
-export default function ScrimmagePanel({ currentStage, scrimmages, opponents = [], onSimulate, onPlay }: Props) {
+export default function ScrimmagePanel({
+  currentStage,
+  scrimmages,
+  opponents = [],
+  onSimulate,
+  onPlay,
+  commissionerSimulates = false,
+}: Props) {
   const [simulating, setSimulating] = useState(false)
   const [playing, setPlaying] = useState(false)
   // Prefer the latest entry for this stage (avoids a stale first entry blocking the UI after re-sim / sync issues).
@@ -109,49 +118,58 @@ export default function ScrimmagePanel({ currentStage, scrimmages, opponents = [
       ) : null}
 
       {!isCompleted ? (
-        <div className="teamhome-scrimmage-options" style={{ marginTop: 12 }}>
-          <div className="teamhome-scrimmage-options-label">Choose how to play:</div>
-          <div className="teamhome-scrimmage-buttons">
-            <button
-              type="button"
-              className="teamhome-scrimmage-btn teamhome-scrimmage-btn-play"
-              disabled={playing || !onPlay}
-              onClick={async () => {
-                if (!onPlay) return
-                setPlaying(true)
-                try {
-                  await onPlay()
-                } finally {
-                  setPlaying(false)
-                }
-              }}
-            >
-              {playing ? 'Loading…' : 'Play the Scrimmage'}
-            </button>
-            <button
-              type="button"
-              className="teamhome-scrimmage-btn teamhome-scrimmage-btn-sim"
-              disabled={simulating || !onSimulate}
-              onClick={async () => {
-                if (!onSimulate) return
-                setSimulating(true)
-                try {
-                  await onSimulate()
-                } finally {
-                  setSimulating(false)
-                }
-              }}
-            >
-              {simulating ? 'Simulating… (may take 30–60 sec)' : 'Simulate the Scrimmage'}
-            </button>
+        commissionerSimulates ? (
+          <div className="teamhome-preseason-stage" style={{ marginTop: 12 }}>
+            Your commissioner will simulate this scrimmage when the league advances. Finish any prep, then submit your
+            week on the League Hub.
           </div>
-          <div className="teamhome-scrimmage-coming-soon">
-            <em>Play the Scrimmage</em> lets you coach the game play-by-play.
+        ) : (
+          <div className="teamhome-scrimmage-options" style={{ marginTop: 12 }}>
+            <div className="teamhome-scrimmage-options-label">Choose how to play:</div>
+            <div className="teamhome-scrimmage-buttons">
+              <button
+                type="button"
+                className="teamhome-scrimmage-btn teamhome-scrimmage-btn-play"
+                disabled={playing || !onPlay}
+                onClick={async () => {
+                  if (!onPlay) return
+                  setPlaying(true)
+                  try {
+                    await onPlay()
+                  } finally {
+                    setPlaying(false)
+                  }
+                }}
+              >
+                {playing ? 'Loading…' : 'Play the Scrimmage'}
+              </button>
+              <button
+                type="button"
+                className="teamhome-scrimmage-btn teamhome-scrimmage-btn-sim"
+                disabled={simulating || !onSimulate}
+                onClick={async () => {
+                  if (!onSimulate) return
+                  setSimulating(true)
+                  try {
+                    await onSimulate()
+                  } finally {
+                    setSimulating(false)
+                  }
+                }}
+              >
+                {simulating ? 'Simulating… (may take 30–60 sec)' : 'Simulate the Scrimmage'}
+              </button>
+            </div>
+            <div className="teamhome-scrimmage-coming-soon">
+              <em>Play the Scrimmage</em> lets you coach the game play-by-play.
+            </div>
           </div>
-        </div>
+        )
       ) : (
         <div className="teamhome-preseason-stage" style={{ marginTop: 12 }}>
-          Click Continue to advance.
+          {commissionerSimulates
+            ? 'Scrimmage complete. Submit your week on the League Hub when prep is done.'
+            : 'Click Continue to advance.'}
         </div>
       )}
     </div>

@@ -17,6 +17,7 @@ from backend.services.multiplayer_service import (
     create_admin_league,
     delete_admin_league,
     list_deleted_leagues_for_admin,
+    permanently_delete_admin_league,
     restore_admin_league,
     get_league_commish_game_bundle,
     get_league_game_bundle,
@@ -453,6 +454,18 @@ def admin_restore_league_route(league_id: str, user=Depends(require_entitled)):
         raise HTTPException(status_code=403, detail=str(e)) from e
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@router.delete("/admin/leagues/{league_id}/permanent", response_model=Dict[str, Any])
+def admin_permanent_delete_league_route(league_id: str, user=Depends(require_entitled)):
+    if not is_platform_owner_user(user["user_id"]):
+        raise HTTPException(status_code=403, detail="Platform owner only")
+    try:
+        return permanently_delete_admin_league(user["user_id"], league_id)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.post("/{league_id}/invites", response_model=Dict[str, Any])

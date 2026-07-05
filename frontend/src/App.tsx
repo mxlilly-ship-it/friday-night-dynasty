@@ -1278,7 +1278,6 @@ export default function App({ devNoFirebase = false }: AppProps) {
           opts.goals ||
           opts.homeGameThemes ||
           opts.homeGameThemesAck ||
-          opts.forcePreseasonAdvance ||
           opts.offseasonBody,
       )
     }
@@ -1295,7 +1294,6 @@ export default function App({ devNoFirebase = false }: AppProps) {
       if (opts?.goals) prep.goals = opts.goals
       if (opts?.homeGameThemes) prep.home_game_themes = opts.homeGameThemes
       if (opts?.homeGameThemesAck) prep.home_game_themes_ack = true
-      if (opts?.forcePreseasonAdvance) prep.scrimmage_simulate = true
       if (opts?.offseasonBody) Object.assign(prep, opts.offseasonBody)
       return prep
     }

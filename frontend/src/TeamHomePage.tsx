@@ -4073,7 +4073,13 @@ function TeamHomePageBody({
   const isScrimmageStage = phase === 'preseason' && (preseasonCurrentStage === 'Scrimmage 1' || preseasonCurrentStage === 'Scrimmage 2')
   const isHomeGameThemesStage = phase === 'preseason' && preseasonCurrentStage === 'Home Game Themes'
   const isSetGoalsStage = phase === 'preseason' && preseasonCurrentStage === 'Set Goals'
-  const homeGameThemesConfirmed = Boolean(saveState?.home_game_themes_user_confirmed)
+  const homeGameThemesConfirmed = useMemo(() => {
+    if (isMultiplayerLeague) {
+      const byTeam = saveState?.home_game_themes_confirmed_teams
+      return Boolean(byTeam && typeof byTeam === 'object' && byTeam[userTeam])
+    }
+    return Boolean(saveState?.home_game_themes_user_confirmed)
+  }, [isMultiplayerLeague, saveState?.home_game_themes_confirmed_teams, saveState?.home_game_themes_user_confirmed, userTeam])
   const [confirmingHomeThemes, setConfirmingHomeThemes] = useState(false)
   const isCoachingCarouselApplyStage =
     phase === 'offseason' &&
@@ -5963,6 +5969,7 @@ function TeamHomePageBody({
                     userTeam={userTeam}
                     confirmed={homeGameThemesConfirmed}
                     confirming={confirmingHomeThemes}
+                    commissionerAdvances={isMultiplayerLeague && leagueAdvanceLocked}
                     onConfirm={async (selections) => {
                       setConfirmingHomeThemes(true)
                       try {
@@ -6039,10 +6046,18 @@ function TeamHomePageBody({
                   currentStage={preseasonCurrentStage}
                   scrimmages={saveState?.preseason_scrimmages ?? []}
                   opponents={saveState?.preseason_scrimmage_opponents ?? []}
-                  onSimulate={async () => {
-                    await onSimWeek({ forcePreseasonAdvance: true })
-                  }}
-                  onPlay={async () => {
+                  commissionerSimulates={isMultiplayerLeague}
+                  onSimulate={
+                    isMultiplayerLeague
+                      ? undefined
+                      : async () => {
+                          await onSimWeek({ forcePreseasonAdvance: true })
+                        }
+                  }
+                  onPlay={
+                    isMultiplayerLeague
+                      ? undefined
+                      : async () => {
                     if (!saveId) return
                     const scrimIdx = preseasonCurrentStage === 'Scrimmage 1' ? 0 : 1
                     const r = isLocalBundle
@@ -6071,7 +6086,8 @@ function TeamHomePageBody({
                       gameContext: 'scrimmage',
                       scrimmageStage: preseasonCurrentStage,
                     })
-                  }}
+                  }
+                  }
                 />
               ) : (
                 <div className="teamhome-preseason-panelA teamhome-preseason-panelA--placeholder">

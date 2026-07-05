@@ -7,6 +7,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 import time
 import uuid
 from datetime import datetime, timedelta
@@ -573,12 +574,45 @@ def _merge_coach_state_into_canonical(
     if str(incoming.get("user_team") or "") == team_name:
         if isinstance(incoming.get("season_goals"), dict):
             out["season_goals"] = copy.deepcopy(incoming["season_goals"])
-        for key in (
-            "preseason_scrimmages",
-            "preseason_scrimmage_opponents",
-        ):
-            if key in incoming:
-                out[key] = copy.deepcopy(incoming[key])
+        from backend.services.league_service import is_multiplayer_league_state
+
+        if is_multiplayer_league_state(out):
+            slice_ = out.get("multiplayer_scrimmage_by_team")
+            if not isinstance(slice_, dict):
+                slice_ = {}
+                out["multiplayer_scrimmage_by_team"] = slice_
+            team_slice = slice_.get(team_name)
+            if not isinstance(team_slice, dict):
+                team_slice = {}
+                slice_[team_name] = team_slice
+            if "preseason_scrimmage_opponents" in incoming:
+                team_slice["opponents"] = copy.deepcopy(incoming["preseason_scrimmage_opponents"])
+            if "preseason_scrimmages" in incoming:
+                team_slice["scrimmages"] = copy.deepcopy(incoming["preseason_scrimmages"])
+            inc_themes = incoming.get("home_game_themes")
+            if isinstance(inc_themes, dict) and team_name in inc_themes:
+                theme_store = out.get("home_game_themes")
+                if not isinstance(theme_store, dict):
+                    theme_store = {}
+                    out["home_game_themes"] = theme_store
+                theme_store[team_name] = copy.deepcopy(inc_themes[team_name])
+            inc_confirmed = incoming.get("home_game_themes_confirmed_teams")
+            if isinstance(inc_confirmed, dict) and team_name in inc_confirmed:
+                confirmed_store = out.get("home_game_themes_confirmed_teams")
+                if not isinstance(confirmed_store, dict):
+                    confirmed_store = {}
+                    out["home_game_themes_confirmed_teams"] = confirmed_store
+                confirmed_store[team_name] = inc_confirmed[team_name]
+            from backend.services.league_service import repair_multiplayer_scrimmage_storage
+
+            repair_multiplayer_scrimmage_storage(out)
+        else:
+            for key in (
+                "preseason_scrimmages",
+                "preseason_scrimmage_opponents",
+            ):
+                if key in incoming:
+                    out[key] = copy.deepcopy(incoming[key])
 
     inc_names = incoming.get("multiplayer_coach_names")
     if isinstance(inc_names, dict):
@@ -645,7 +679,7 @@ def get_league_commish_game_bundle(league_id: str, user_id: str) -> Dict[str, An
 
     league_row = _verify_commish_game_access(league_id, user_id)
     save_dir = str(league_row.get("save_dir") or "")
-    from backend.services.league_service import ensure_multiplayer_opening_schedule
+    from backend.services.league_service import ensure_multiplayer_opening_schedule, repair_multiplayer_scrimmage_storage
 
     canonical = _load_state(save_dir)
     canonical["multiplayer_league"] = True
@@ -653,7 +687,10 @@ def get_league_commish_game_bundle(league_id: str, user_id: str) -> Dict[str, An
     mp_meta = dict(mp_meta)
     mp_meta["league_id"] = league_id
     canonical["multiplayer"] = mp_meta
-    if ensure_multiplayer_opening_schedule(canonical):
+    commish_changed = ensure_multiplayer_opening_schedule(canonical)
+    if repair_multiplayer_scrimmage_storage(canonical):
+        commish_changed = True
+    if commish_changed:
         _save_state(save_dir, canonical)
         with db() as conn:
             conn.execute(
@@ -785,7 +822,15 @@ def get_league_game_bundle(league_id: str, user_id: str, team_name: str) -> Dict
 
     league_row = _verify_team_game_access(league_id, user_id, team_name)
     save_dir = str(league_row.get("save_dir") or "")
-    from backend.services.league_service import ensure_multiplayer_opening_schedule
+    from backend.services.league_service import (
+        PRESEASON_STAGES,
+        _ensure_mp_team_scrimmage_opponents,
+        ensure_multiplayer_opening_schedule,
+        hydrate_mp_team_scrimmage_view,
+        is_multiplayer_league_state,
+        persist_mp_team_scrimmage_slice,
+        repair_multiplayer_scrimmage_storage,
+    )
 
     canonical = _load_state(save_dir)
     canonical["multiplayer_league"] = True
@@ -794,6 +839,8 @@ def get_league_game_bundle(league_id: str, user_id: str, team_name: str) -> Dict
     mp_meta["league_id"] = league_id
     canonical["multiplayer"] = mp_meta
     changed = ensure_multiplayer_opening_schedule(canonical)
+    if repair_multiplayer_scrimmage_storage(canonical):
+        changed = True
     if _unlock_human_playbooks_during_select(canonical, team_name):
         changed = True
     if changed:
@@ -819,6 +866,40 @@ def get_league_game_bundle(league_id: str, user_id: str, team_name: str) -> Dict
                 break
     state["multiplayer"] = {"league_id": league_id, "team_name": team_name, "multiplayer_league": True}
     state["multiplayer_league"] = True
+
+    hydrate_mp_team_scrimmage_view(state, team_name)
+    confirmed_teams = state.get("home_game_themes_confirmed_teams")
+    if isinstance(confirmed_teams, dict):
+        state["home_game_themes_user_confirmed"] = bool(confirmed_teams.get(team_name))
+    else:
+        state["home_game_themes_user_confirmed"] = False
+    if is_multiplayer_league_state(state):
+        phase = str(state.get("season_phase") or "").strip().lower()
+        if phase == "preseason":
+            stages = state.get("preseason_stages") or list(PRESEASON_STAGES)
+            idx = int(state.get("preseason_stage_index", 0))
+            if idx < len(stages) and stages[idx] in ("Scrimmage 1", "Scrimmage 2"):
+                team_names = [
+                    str(t.get("name") or "")
+                    for t in (state.get("teams") or [])
+                    if isinstance(t, dict) and t.get("name")
+                ]
+                if _ensure_mp_team_scrimmage_opponents(state, team_name, team_names):
+                    merged = copy.deepcopy(canonical)
+                    persist_mp_team_scrimmage_slice(state, team_name)
+                    persist_mp_team_scrimmage_slice(merged, team_name)
+                    merged["multiplayer_league"] = True
+                    mp_meta2 = merged.get("multiplayer") if isinstance(merged.get("multiplayer"), dict) else {}
+                    mp_meta2 = dict(mp_meta2)
+                    mp_meta2["league_id"] = league_id
+                    merged["multiplayer"] = mp_meta2
+                    _save_state(save_dir, merged)
+                    canonical = merged
+                    with db() as conn:
+                        conn.execute(
+                            "UPDATE leagues SET state_version=state_version+1, updated_at=? WHERE id=?",
+                            (_now(), league_id),
+                        )
 
     apply_coach_gameplan_privacy_for_team(state, team_name)
 
@@ -1882,6 +1963,29 @@ def list_deleted_leagues_for_admin(owner_user_id: str) -> List[Dict[str, Any]]:
     ]
 
 
+def permanently_delete_admin_league(owner_user_id: str, league_id: str) -> Dict[str, Any]:
+    """Platform owner permanently removes an archived league and its save files."""
+    if not is_platform_owner_user(owner_user_id):
+        raise PermissionError("only platform owner can permanently delete leagues")
+    league_row = _load_league_row(league_id)
+    if not league_row:
+        raise ValueError("league not found")
+    if str(league_row.get("status") or "") != "deleted":
+        raise ValueError("only archived leagues can be permanently deleted — archive it first")
+    league_name = str(league_row.get("name") or league_id)
+    save_dir = str(league_row.get("save_dir") or "").strip()
+    with db() as conn:
+        conn.execute("DELETE FROM league_submit_status WHERE league_id=?", (league_id,))
+        conn.execute("DELETE FROM league_activity_log WHERE league_id=?", (league_id,))
+        conn.execute("DELETE FROM league_chat_messages WHERE league_id=?", (league_id,))
+        conn.execute("DELETE FROM league_invites WHERE league_id=?", (league_id,))
+        conn.execute("DELETE FROM league_members WHERE league_id=?", (league_id,))
+        conn.execute("DELETE FROM leagues WHERE id=?", (league_id,))
+    if save_dir and os.path.isdir(save_dir):
+        shutil.rmtree(save_dir, ignore_errors=False)
+    return {"ok": True, "league_id": league_id, "name": league_name, "permanently_deleted": True}
+
+
 def assign_team_to_member(
     league_id: str,
     actor_user_id: str,
@@ -2131,6 +2235,25 @@ def commish_advance_league(league_id: str, user_id: str) -> Dict[str, Any]:
     state.pop("user_team", None)
 
     if phase == "preseason":
+        from backend.services.league_service import (
+            PRESEASON_STAGES,
+            is_multiplayer_league_state,
+            simulate_multiplayer_preseason_scrimmage_stage,
+        )
+
+        stages = state.get("preseason_stages") or list(PRESEASON_STAGES)
+        idx = int(state.get("preseason_stage_index", 0))
+        if (
+            is_multiplayer_league_state(state)
+            and idx < len(stages)
+            and stages[idx] in ("Scrimmage 1", "Scrimmage 2")
+        ):
+            human_teams = [
+                str(m["team_name"])
+                for m in _human_teams(league_id)
+                if m.get("team_name")
+            ]
+            simulate_multiplayer_preseason_scrimmage_stage(state, human_teams, stages[idx])
         out = advance_preseason_state(state, {})
         state = out.get("state") if isinstance(out, dict) and isinstance(out.get("state"), dict) else state
         action_label = "Preseason advanced"
@@ -2151,6 +2274,9 @@ def commish_advance_league(league_id: str, user_id: str) -> Dict[str, Any]:
     else:
         raise ValueError(f"Cannot advance league from season_phase={phase!r}")
 
+    from backend.services.league_service import repair_multiplayer_scrimmage_storage
+
+    repair_multiplayer_scrimmage_storage(state)
     _save_state(save_dir, state)
     now = _now()
     with db() as conn:

@@ -335,6 +335,24 @@ export async function restoreAdminLeague(
   return (await r.json()) as { ok: boolean; league_id: string; name: string }
 }
 
+export async function permanentDeleteAdminLeague(
+  apiBase: string,
+  headers: Record<string, string>,
+  leagueId: string,
+): Promise<{ ok: boolean; league_id: string; name: string; permanently_deleted?: boolean }> {
+  const r = await fetch(
+    `${apiBase}/leagues/admin/leagues/${encodeURIComponent(leagueId)}/permanent`,
+    { method: 'DELETE', headers: { ...headers, 'Content-Type': 'application/json' } },
+  )
+  if (!r.ok) throw new Error(await r.text())
+  return (await r.json()) as {
+    ok: boolean
+    league_id: string
+    name: string
+    permanently_deleted?: boolean
+  }
+}
+
 export async function inviteToLeague(
   apiBase: string,
   headers: Record<string, string>,

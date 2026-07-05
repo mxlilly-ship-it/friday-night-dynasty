@@ -1,4 +1,5 @@
 import copy
+import json
 import logging
 import os
 import random
@@ -1474,14 +1475,42 @@ def _apply_home_game_themes_from_playbook(
     from systems.home_game_themes import apply_user_home_game_themes, assign_ai_home_game_themes
 
     ut = str(user_team_name or "").strip()
+    mp = is_multiplayer_league_state(state)
     raw = playbook.get("home_game_themes")
     if ut:
         if isinstance(raw, list):
-            apply_user_home_game_themes(state, ut, raw)
+            apply_user_home_game_themes(state, ut, raw, set_global_confirmed=not mp)
+            if mp:
+                confirmed = state.get("home_game_themes_confirmed_teams")
+                if not isinstance(confirmed, dict):
+                    confirmed = {}
+                confirmed[ut] = True
+                state["home_game_themes_confirmed_teams"] = confirmed
+                state.pop("home_game_themes_user_confirmed", None)
         elif bool(playbook.get("home_game_themes_ack")):
-            state["home_game_themes_user_confirmed"] = True
+            if mp:
+                confirmed = state.get("home_game_themes_confirmed_teams")
+                if not isinstance(confirmed, dict):
+                    confirmed = {}
+                confirmed[ut] = True
+                state["home_game_themes_confirmed_teams"] = confirmed
+            else:
+                state["home_game_themes_user_confirmed"] = True
+    if mp:
+        return
     seed = int(state.get("current_year", 1) or 1) * 7919 + hash(ut) % 100_000
     assign_ai_home_game_themes(state, team_names, ut or None, rng=random.Random(seed))
+
+
+def finalize_multiplayer_home_game_themes(state: Dict[str, Any], team_names: List[str]) -> None:
+    """Commissioner advance: CPU themes for schools without human picks."""
+    from systems.home_game_themes import assign_ai_home_game_themes
+
+    if not is_multiplayer_league_state(state):
+        return
+    seed = int(state.get("current_year", 1) or 1) * 7919 + len(team_names)
+    assign_ai_home_game_themes(state, team_names, user_team=None, rng=random.Random(seed))
+    state.pop("home_game_themes_user_confirmed", None)
 
 
 def _apply_preseason_position_changes_stage(
@@ -3261,6 +3290,45 @@ def delete_save(user_id: str, save_id: str) -> None:
             shutil.rmtree(d, ignore_errors=True)
 
 
+def build_scrimmage_opponents_for_team(
+    team_name: str,
+    team_names: List[str],
+    weeks: Any,
+    *,
+    exclude_opponents: Optional[set[str]] = None,
+) -> List[Dict[str, Any]]:
+    """Pick two scrimmage opponents for one team (non-conference, not on regular-season schedule)."""
+    if not team_name or team_name not in team_names:
+        return []
+    blocked = set(exclude_opponents or set())
+    scheduled_opponents = set()
+    for wk in weeks or []:
+        for g in wk or []:
+            if isinstance(g, dict):
+                h, a = g.get("home"), g.get("away")
+                if h == team_name and a:
+                    scheduled_opponents.add(a)
+                elif a == team_name and h:
+                    scheduled_opponents.add(h)
+    eligible = [t for t in team_names if t != team_name and t not in scheduled_opponents]
+    if not eligible:
+        eligible = [t for t in team_names if t != team_name]
+    preferred = [t for t in eligible if t not in blocked]
+    pick_from = preferred if len(preferred) >= 2 else (preferred if preferred else eligible)
+    if len(pick_from) >= 2:
+        chosen = random.sample(pick_from, 2)
+        return [
+            {"opponent": chosen[0], "user_home": random.random() < 0.5},
+            {"opponent": chosen[1], "user_home": random.random() < 0.5},
+        ]
+    if len(pick_from) == 1:
+        return [
+            {"opponent": pick_from[0], "user_home": random.random() < 0.5},
+            {"opponent": pick_from[0], "user_home": random.random() >= 0.5},
+        ]
+    return []
+
+
 def _ensure_scrimmage_opponents(state: Dict[str, Any], team_names: List[str], user_team_name: str) -> bool:
     """Ensure preseason_scrimmage_opponents is set when at Scrimmage 1/2. Returns True if state was modified."""
     if state.get("preseason_scrimmage_opponents"):
@@ -3273,31 +3341,11 @@ def _ensure_scrimmage_opponents(state: Dict[str, Any], team_names: List[str], us
         return False
     if not user_team_name or user_team_name not in team_names:
         return False
-    scheduled_opponents = set()
-    for wk in state.get("weeks") or []:
-        for g in wk or []:
-            if isinstance(g, dict):
-                h, a = g.get("home"), g.get("away")
-                if h == user_team_name and a:
-                    scheduled_opponents.add(a)
-                elif a == user_team_name and h:
-                    scheduled_opponents.add(h)
-    eligible = [t for t in team_names if t != user_team_name and t not in scheduled_opponents]
-    if not eligible:
-        eligible = [t for t in team_names if t != user_team_name]
-    if len(eligible) >= 2:
-        chosen = random.sample(eligible, 2)
-        state["preseason_scrimmage_opponents"] = [
-            {"opponent": chosen[0], "user_home": random.random() < 0.5},
-            {"opponent": chosen[1], "user_home": random.random() < 0.5},
-        ]
-    elif len(eligible) == 1:
-        state["preseason_scrimmage_opponents"] = [
-            {"opponent": eligible[0], "user_home": random.random() < 0.5},
-            {"opponent": eligible[0], "user_home": random.random() >= 0.5},
-        ]
-    else:
-        state["preseason_scrimmage_opponents"] = []
+    state["preseason_scrimmage_opponents"] = build_scrimmage_opponents_for_team(
+        user_team_name,
+        team_names,
+        state.get("weeks"),
+    )
     return True
 
 
@@ -5958,8 +6006,14 @@ def apply_coach_prep_state(state: Dict[str, Any], playbook: Optional[Dict[str, A
                     state["season_goals"] = {"win_goal": win_goal, "stage_goal": stage_goal}
         elif current_stage in ("Scrimmage 1", "Scrimmage 2"):
             if playbook.get("scrimmage_simulate"):
+                if is_multiplayer_league_state(state):
+                    raise ValueError(
+                        "Scrimmage is simulated by the commissioner when the league advances."
+                    )
                 _ensure_scrimmage_opponents(state, team_names, user_team_name)
                 _apply_preseason_scrimmage_stage(state, teams, team_names, current_stage)
+            elif is_multiplayer_league_state(state) and user_team_name:
+                _ensure_mp_team_scrimmage_opponents(state, user_team_name, team_names)
         elif current_stage == "Home Game Themes":
             _apply_home_game_themes_from_playbook(
                 state,
@@ -6127,7 +6181,10 @@ def advance_preseason_state(state: Dict[str, Any], playbook: Optional[Dict[str, 
         else:
             state["season_goals"] = state.get("season_goals") or {"win_goal": 6, "stage_goal": "Winning Season"}
     elif current_stage in ("Scrimmage 1", "Scrimmage 2"):
-        _apply_preseason_scrimmage_stage(state, teams, team_names, current_stage)
+        if is_multiplayer_league_state(state) and not user_team_name:
+            pass
+        else:
+            _apply_preseason_scrimmage_stage(state, teams, team_names, current_stage)
     elif current_stage == "Home Game Themes":
         _apply_home_game_themes_from_playbook(
             state,
@@ -6135,9 +6192,20 @@ def advance_preseason_state(state: Dict[str, Any], playbook: Optional[Dict[str, 
             user_team_name,
             playbook if isinstance(playbook, dict) else {},
         )
-        if not bool((playbook or {}).get("home_game_themes_ack")):
-            state["teams"] = [team_to_dict(t) for t in teams.values()]
-            return {"state": state, "phase_completed": None}
+        mp = is_multiplayer_league_state(state)
+        commish_advance = mp and not user_team_name
+        if commish_advance:
+            finalize_multiplayer_home_game_themes(state, team_names)
+        if not commish_advance and not bool((playbook or {}).get("home_game_themes_ack")):
+            if mp:
+                ut = str(user_team_name or "").strip()
+                confirmed = state.get("home_game_themes_confirmed_teams") or {}
+                if not (isinstance(confirmed, dict) and confirmed.get(ut)):
+                    state["teams"] = [team_to_dict(t) for t in teams.values()]
+                    return {"state": state, "phase_completed": None}
+            else:
+                state["teams"] = [team_to_dict(t) for t in teams.values()]
+                return {"state": state, "phase_completed": None}
     # --- End: core stage effects ---
 
     state["teams"] = [team_to_dict(t) for t in teams.values()]
@@ -7135,6 +7203,8 @@ def start_coach_game(
 ) -> Dict[str, Any]:
     """Start a coach-playable game. Returns game_id and matchup info."""
     state, save_dir = load_state(user_id, save_id)
+    if context == "scrimmage" and is_multiplayer_league_state(state):
+        raise ValueError("Scrimmage is simulated by the commissioner when the league advances.")
     teams = {t["name"]: team_from_dict(t) for t in state.get("teams", [])}
     team_names = list(teams.keys())
     user_team_name = state.get("user_team")
@@ -7206,6 +7276,8 @@ def start_coach_game(
 
 def start_coach_game_state(state: Dict[str, Any], context: str, scrimmage_index: Optional[int] = 0) -> Dict[str, Any]:
     """Stateless start_coach_game: returns matchup + serialized game (no DB)."""
+    if context == "scrimmage" and is_multiplayer_league_state(state):
+        raise ValueError("Scrimmage is simulated by the commissioner when the league advances.")
     teams = {t["name"]: team_from_dict(t) for t in state.get("teams", [])}
     user_team_name = state.get("user_team")
     if not user_team_name or user_team_name not in teams:
@@ -8411,6 +8483,210 @@ def _apply_schedule_planning_picks_and_enter_offseason(
     _sync_user_cross_region_slot_count(state)
 
 
+def _mp_scrimmage_by_team(state: Dict[str, Any]) -> Dict[str, Any]:
+    raw = state.get("multiplayer_scrimmage_by_team")
+    if not isinstance(raw, dict):
+        raw = {}
+        state["multiplayer_scrimmage_by_team"] = raw
+    return raw
+
+
+def _mp_team_scrimmage_slice(state: Dict[str, Any], team_name: str) -> Dict[str, Any]:
+    by_team = _mp_scrimmage_by_team(state)
+    slice_ = by_team.get(team_name)
+    if not isinstance(slice_, dict):
+        slice_ = {}
+        by_team[team_name] = slice_
+    return slice_
+
+
+def hydrate_mp_team_scrimmage_view(state: Dict[str, Any], team_name: str) -> None:
+    """Expose one coach's scrimmage opponents/results on the working save view."""
+    state.pop("preseason_scrimmage_opponents", None)
+    state.pop("preseason_scrimmages", None)
+    slice_ = (_mp_scrimmage_by_team(state).get(team_name) or {}) if team_name else {}
+    if isinstance(slice_, dict):
+        if slice_.get("opponents"):
+            state["preseason_scrimmage_opponents"] = copy.deepcopy(slice_["opponents"])
+        if slice_.get("scrimmages"):
+            state["preseason_scrimmages"] = copy.deepcopy(slice_["scrimmages"])
+
+
+def _mp_scrimmage_slot_taken_opponents(state: Dict[str, Any], scrim_idx: int, *, skip_team: str = "") -> set[str]:
+    """Opponents already assigned to other teams for one scrimmage slot."""
+    taken: set[str] = set()
+    for team, slice_ in _mp_scrimmage_by_team(state).items():
+        if team == skip_team or not isinstance(slice_, dict):
+            continue
+        opponents = slice_.get("opponents") or []
+        if scrim_idx < len(opponents) and isinstance(opponents[scrim_idx], dict):
+            opp = str(opponents[scrim_idx].get("opponent") or "").strip()
+            if opp:
+                taken.add(opp)
+    return taken
+
+
+def repair_multiplayer_scrimmage_storage(state: Dict[str, Any]) -> bool:
+    """
+    Multiplayer scrimmages are per-team only. Remove legacy league-wide fields that
+    caused every coach to see the same matchup.
+    """
+    if not is_multiplayer_league_state(state):
+        return False
+    changed = False
+    legacy_opponents = state.get("preseason_scrimmage_opponents")
+    legacy_scrimmages = state.get("preseason_scrimmages")
+    owner = str(state.get("user_team") or "").strip()
+    if legacy_opponents or legacy_scrimmages:
+        if owner:
+            slice_ = _mp_team_scrimmage_slice(state, owner)
+            if legacy_opponents and not slice_.get("opponents"):
+                slice_["opponents"] = copy.deepcopy(legacy_opponents)
+            if legacy_scrimmages and not slice_.get("scrimmages"):
+                slice_["scrimmages"] = copy.deepcopy(legacy_scrimmages)
+        changed = True
+    if state.pop("preseason_scrimmage_opponents", None) is not None:
+        changed = True
+    if state.pop("preseason_scrimmages", None) is not None:
+        changed = True
+    if _dedupe_mp_scrimmage_opponents(state):
+        changed = True
+    return changed
+
+
+def _dedupe_mp_scrimmage_opponents(state: Dict[str, Any]) -> bool:
+    """If two teams share identical scrimmage opponent lists, re-pick for the duplicate."""
+    team_names = [
+        str(t.get("name") or "")
+        for t in (state.get("teams") or [])
+        if isinstance(t, dict) and t.get("name")
+    ]
+    if not team_names:
+        return False
+    by_team = _mp_scrimmage_by_team(state)
+    seen: Dict[str, str] = {}
+    changed = False
+    for team_name, slice_ in list(by_team.items()):
+        if not isinstance(slice_, dict):
+            continue
+        opponents = slice_.get("opponents")
+        if not opponents:
+            continue
+        signature = json.dumps(opponents, sort_keys=True)
+        other = seen.get(signature)
+        if other and other != team_name:
+            exclude = _mp_scrimmage_slot_taken_opponents(state, 0, skip_team=team_name)
+            exclude |= _mp_scrimmage_slot_taken_opponents(state, 1, skip_team=team_name)
+            slice_["opponents"] = build_scrimmage_opponents_for_team(
+                team_name,
+                team_names,
+                state.get("weeks"),
+                exclude_opponents=exclude,
+            )
+            if slice_.get("scrimmages"):
+                slice_["scrimmages"] = []
+            changed = True
+        else:
+            seen[signature] = team_name
+    return changed
+
+
+def persist_mp_team_scrimmage_slice(state: Dict[str, Any], team_name: str) -> None:
+    """Persist one coach's scrimmage data into the shared league save."""
+    if not team_name:
+        return
+    slice_ = _mp_team_scrimmage_slice(state, team_name)
+    if state.get("preseason_scrimmage_opponents") is not None:
+        slice_["opponents"] = copy.deepcopy(state.get("preseason_scrimmage_opponents") or [])
+    if state.get("preseason_scrimmages") is not None:
+        slice_["scrimmages"] = copy.deepcopy(state.get("preseason_scrimmages") or [])
+
+
+def _ensure_mp_team_scrimmage_opponents(
+    state: Dict[str, Any],
+    team_name: str,
+    team_names: List[str],
+) -> bool:
+    """Ensure a multiplayer coach has scrimmage opponents assigned (per-team store)."""
+    slice_ = _mp_team_scrimmage_slice(state, team_name)
+    if slice_.get("opponents"):
+        hydrate_mp_team_scrimmage_view(state, team_name)
+        return False
+    exclude = _mp_scrimmage_slot_taken_opponents(state, 0, skip_team=team_name)
+    exclude |= _mp_scrimmage_slot_taken_opponents(state, 1, skip_team=team_name)
+    opponents = build_scrimmage_opponents_for_team(
+        team_name,
+        team_names,
+        state.get("weeks"),
+        exclude_opponents=exclude,
+    )
+    slice_["opponents"] = opponents
+    if "scrimmages" not in slice_:
+        slice_["scrimmages"] = []
+    hydrate_mp_team_scrimmage_view(state, team_name)
+    return True
+
+
+def _scrimmage_stage_completed(scrimmages: List[Any], stage_name: str) -> bool:
+    for row in scrimmages or []:
+        if not isinstance(row, dict):
+            continue
+        name = str(row.get("name") or row.get("stage") or "")
+        if name != stage_name:
+            continue
+        if row.get("completed") is False:
+            continue
+        if row.get("played") is True or row.get("completed") is True:
+            return True
+    return False
+
+
+def simulate_multiplayer_preseason_scrimmage_stage(
+    state: Dict[str, Any],
+    human_team_names: List[str],
+    current_stage: str,
+) -> None:
+    """Commissioner advance: CPU-sim scrimmages for every human coach at this stage."""
+    if current_stage not in ("Scrimmage 1", "Scrimmage 2"):
+        return
+    teams = {
+        t["name"]: team_from_dict(t)
+        for t in (state.get("teams") or [])
+        if isinstance(t, dict) and t.get("name")
+    }
+    team_names = list(teams.keys())
+    by_team = _mp_scrimmage_by_team(state)
+    scrim_idx = 0 if current_stage == "Scrimmage 1" else 1
+    for team_name in human_team_names:
+        if team_name not in teams:
+            continue
+        slice_ = _mp_team_scrimmage_slice(state, team_name)
+        scrimmages = list(slice_.get("scrimmages") or [])
+        if _scrimmage_stage_completed(scrimmages, current_stage):
+            continue
+        opponents = slice_.get("opponents")
+        if not opponents:
+            exclude = _mp_scrimmage_slot_taken_opponents(state, scrim_idx, skip_team=team_name)
+            opponents = build_scrimmage_opponents_for_team(
+                team_name,
+                team_names,
+                state.get("weeks"),
+                exclude_opponents=exclude,
+            )
+            slice_["opponents"] = opponents
+        work_state: Dict[str, Any] = {
+            "user_team": team_name,
+            "preseason_scrimmage_opponents": copy.deepcopy(opponents),
+            "preseason_scrimmages": copy.deepcopy(scrimmages),
+            "weeks": state.get("weeks"),
+        }
+        _apply_preseason_scrimmage_stage(work_state, teams, team_names, current_stage)
+        slice_["opponents"] = copy.deepcopy(work_state.get("preseason_scrimmage_opponents") or opponents)
+        slice_["scrimmages"] = copy.deepcopy(work_state.get("preseason_scrimmages") or scrimmages)
+        by_team[team_name] = slice_
+    repair_multiplayer_scrimmage_storage(state)
+
+
 def is_multiplayer_league_state(state: Dict[str, Any]) -> bool:
     """True for shared online leagues (no per-coach opening schedule picker)."""
     if not isinstance(state, dict):
@@ -8470,7 +8746,7 @@ def ensure_multiplayer_opening_schedule(state: Dict[str, Any]) -> bool:
         state["preseason_stages"] = state.get("preseason_stages") or list(PRESEASON_STAGES)
         state["preseason_stage_index"] = int(state.get("preseason_stage_index") or 0)
         state["current_week"] = int(state.get("current_week") or 1)
-        _assign_scrimmage_opponents_for_state(state)
+        repair_multiplayer_scrimmage_storage(state)
         return True
     if phase == "preseason" and not has_weeks:
         teams = {
@@ -8481,7 +8757,7 @@ def ensure_multiplayer_opening_schedule(state: Dict[str, Any]) -> bool:
         user_team = str(state.get("user_team") or "").strip()
         if user_team and _schedule_planning_info_for_user(teams, user_team):
             _auto_fill_all_cross_region_picks(state)
-            _assign_scrimmage_opponents_for_state(state)
+            repair_multiplayer_scrimmage_storage(state)
             return True
     return False
 
@@ -8523,7 +8799,10 @@ def advance_schedule_planning_league_state(
         state["season_phase"] = "preseason"
         state["preseason_stages"] = state.get("preseason_stages") or list(PRESEASON_STAGES)
         state["preseason_stage_index"] = int(state.get("preseason_stage_index") or 0)
-    _assign_scrimmage_opponents_for_state(state)
+    if is_multiplayer_league_state(state):
+        repair_multiplayer_scrimmage_storage(state)
+    else:
+        _assign_scrimmage_opponents_for_state(state)
     state.pop("schedule_planning_info", None)
     _sync_user_cross_region_slot_count(state)
     state["teams"] = [team_to_dict(t) for t in teams.values()]

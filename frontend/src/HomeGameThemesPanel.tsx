@@ -19,6 +19,7 @@ type Props = {
   userTeam: string
   confirmed: boolean
   confirming: boolean
+  commissionerAdvances?: boolean
   onConfirm: (selections: HomeThemeSelection[]) => Promise<void>
 }
 
@@ -30,6 +31,7 @@ export default function HomeGameThemesPanel({
   userTeam,
   confirmed,
   confirming,
+  commissionerAdvances = false,
   onConfirm,
 }: Props) {
   const homeGames = useMemo(() => listUserHomeGames(saveState, userTeam), [saveState, userTeam])
@@ -143,7 +145,9 @@ export default function HomeGameThemesPanel({
       </button>
       {confirmed ? (
         <p className="teamhome-small teamhome-goals-hint" style={{ marginTop: 8 }}>
-          Themes saved — use <strong>Continue</strong> above to move to goal selection.
+          {commissionerAdvances
+            ? 'Themes saved — submit your week on the League Hub. The commissioner will advance the league when everyone is ready.'
+            : 'Themes saved — use Continue above to move to goal selection.'}
         </p>
       ) : null}
     </div>

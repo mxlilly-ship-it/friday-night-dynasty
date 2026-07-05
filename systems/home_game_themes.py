@@ -209,6 +209,8 @@ def apply_user_home_game_themes(
     state: Dict[str, Any],
     user_team: str,
     selections: Any,
+    *,
+    set_global_confirmed: bool = True,
 ) -> None:
     """Validate and persist user home-game theme picks."""
     ut = str(user_team or "").strip()
@@ -244,7 +246,8 @@ def apply_user_home_game_themes(
                 continue
             team_map[slot] = {"theme_id": tid, "reward_choice": choice}
     store[ut] = team_map
-    state["home_game_themes_user_confirmed"] = True
+    if set_global_confirmed:
+        state["home_game_themes_user_confirmed"] = True
 
 
 def assign_ai_home_game_themes(
