@@ -37,6 +37,14 @@ class _SpaNoCacheMiddleware(BaseHTTPMiddleware):
 def create_app() -> FastAPI:
     app = FastAPI(title="Friday Night Dynasty API")
 
+    @app.on_event("startup")
+    def _startup_persistence_check() -> None:
+        from backend.data_paths import warn_if_ephemeral_production_data
+        from backend.storage.db import init_db
+
+        warn_if_ephemeral_production_data()
+        init_db()
+
     @app.exception_handler(OSError)
     async def _oserror_handler(_request: Request, exc: OSError) -> JSONResponse:
         """Surface errno / winerror in API JSON so Windows file issues are diagnosable from the browser."""
@@ -214,7 +222,7 @@ def create_app() -> FastAPI:
     @app.get("/health")
     def health():
         """Quick check that API is running."""
-        from backend.data_paths import data_root, saves_base_dir, sqlite_db_path
+        from backend.data_paths import persistence_health, warn_if_ephemeral_production_data
         from backend.firebase_public_config import (
             firebase_configured,
             firebase_env_keys_in_process,
@@ -224,12 +232,11 @@ def create_app() -> FastAPI:
         from backend.billing_config import billing_checkout_configured, billing_required
         from backend.platform_config import platform_owner_emails_configured
 
+        warn_if_ephemeral_production_data()
+        pdata = persistence_health()
         label = os.environ.get("FND_BUILD_LABEL", "").strip()
         disable_raw = os.environ.get("FND_DISABLE_WEEK_SIM_EMAILS")
         disable_val = disable_raw.strip() if isinstance(disable_raw, str) and disable_raw.strip() else None
-        data_dir = data_root()
-        db_path = sqlite_db_path()
-        saves_dir = saves_base_dir()
         return {
             "ok": True,
             "pid": os.getpid(),
@@ -239,12 +246,7 @@ def create_app() -> FastAPI:
             "hint": "Dev UI (npm run dev) proxies /api to port 8000. Run: python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000 --reload. Single-server mode: python run_game.py (port 8001).",
             "coach_week_sim_emails_enabled": _coach_sim_emails_enabled(),
             "fnd_disable_week_sim_emails": disable_val,
-            "data_root": data_dir,
-            "persistent_data": bool(os.environ.get("FND_DATA_DIR", "").strip()),
-            "sqlite_db": db_path,
-            "sqlite_db_exists": os.path.isfile(db_path),
-            "saves_dir": saves_dir,
-            "saves_dir_exists": os.path.isdir(saves_dir),
+            **pdata,
             "firebase_configured": firebase_configured(),
             "firebase_env_set": firebase_env_status(),
             "firebase_env_keys_in_process": firebase_env_keys_in_process(),

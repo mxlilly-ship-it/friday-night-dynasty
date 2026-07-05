@@ -22,5 +22,8 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 COPY . .
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
+# Never ship a developer SQLite snapshot in the image (causes deploys to reset league data).
+RUN rm -f backend/dynasty.sqlite3 backend/dynasty.sqlite3-wal backend/dynasty.sqlite3-shm
+
 EXPOSE 8080
 CMD ["sh", "-c", "python -m uvicorn backend.app:app --host 0.0.0.0 --port ${PORT:-8080}"]
