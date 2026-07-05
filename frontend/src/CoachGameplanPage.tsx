@@ -274,6 +274,25 @@ function parsePlanCsv(side: Side, csvText: string, basePlan?: Plan | null): Plan
   return plan
 }
 
+function extractImportedPlanGrid(side: Side, raw: unknown): Plan {
+  if (!raw || typeof raw !== 'object') {
+    throw new Error('JSON does not look like a gameplan.')
+  }
+  const j = raw as Record<string, unknown>
+  const packageKey = side === 'offense' ? 'offense_package' : 'defense_package'
+  let candidate: unknown = j[side] ?? j[packageKey] ?? j
+  if (candidate && typeof candidate === 'object') {
+    const obj = candidate as Record<string, unknown>
+    if (obj.grid && typeof obj.grid === 'object') {
+      candidate = obj.grid
+    }
+  }
+  if (!candidate || typeof candidate !== 'object') {
+    throw new Error('JSON does not look like a gameplan grid.')
+  }
+  return candidate as Plan
+}
+
 export default function CoachGameplanPage({
   apiBase,
   headers,
@@ -538,16 +557,13 @@ export default function CoachGameplanPage({
     let nextPlan: Plan | null = null
 
     if (name.endsWith('.json') || file.type === 'application/json') {
-      let j: any
+      let j: unknown
       try {
         j = JSON.parse(text)
       } catch {
         throw new Error('Invalid JSON.')
       }
-      // Accept either a raw plan OR a wrapper { offense, defense } export.
-      const candidate = j?.[side] ?? j
-      if (!candidate || typeof candidate !== 'object') throw new Error('JSON does not look like a gameplan.')
-      nextPlan = candidate as Plan
+      nextPlan = extractImportedPlanGrid(side, j)
     } else if (name.endsWith('.csv') || file.type.includes('csv') || file.type === 'text/plain') {
       nextPlan = parsePlanCsv(side, text, plan)
     } else {

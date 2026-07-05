@@ -559,6 +559,26 @@ def _persist_team_gameplan_prefs(
         canonical.pop(key, None)
 
 
+def _sync_team_gameplan_prefs_from_working_state(state: Dict[str, Any], team_name: str) -> None:
+    """Persist per-coach gameplan libraries/carry prefs before privacy filtering."""
+    import copy
+
+    team_name = str(team_name or "").strip()
+    if not team_name or str(state.get("user_team") or "") != team_name:
+        return
+    prefs_root = state.get("multiplayer_team_gameplan_prefs")
+    if not isinstance(prefs_root, dict):
+        prefs_root = {}
+    team_prefs = prefs_root.get(team_name)
+    if not isinstance(team_prefs, dict):
+        team_prefs = {}
+    for key in _TEAM_GAMEPLAN_PREF_KEYS:
+        if key in state:
+            team_prefs[key] = copy.deepcopy(state[key])
+    prefs_root[team_name] = team_prefs
+    state["multiplayer_team_gameplan_prefs"] = prefs_root
+
+
 def apply_coach_gameplan_privacy_for_team(state: Dict[str, Any], team_name: str) -> Dict[str, Any]:
     """
     Strip other coaches' gameplans from a working copy sent to one human coach.
@@ -577,16 +597,16 @@ def apply_coach_gameplan_privacy_for_team(state: Dict[str, Any], team_name: str)
     team_prefs = prefs_root.get(team_name)
     if not isinstance(team_prefs, dict):
         team_prefs = {}
-        store = state.get("coach_gameplans_v2")
-        only_mine = (
-            all(_gameplan_v2_key_belongs_to_team(str(k), team_name) for k in store)
-            if isinstance(store, dict) and store
-            else True
-        )
-        if only_mine:
-            for key in _TEAM_GAMEPLAN_PREF_KEYS:
-                if key in state:
-                    team_prefs[key] = copy.deepcopy(state[key])
+    store = state.get("coach_gameplans_v2")
+    only_mine = (
+        all(_gameplan_v2_key_belongs_to_team(str(k), team_name) for k in store)
+        if isinstance(store, dict) and store
+        else True
+    )
+    if only_mine:
+        for key in _TEAM_GAMEPLAN_PREF_KEYS:
+            if key in state:
+                team_prefs[key] = copy.deepcopy(state[key])
 
     for key in _TEAM_GAMEPLAN_PREF_KEYS:
         if key in team_prefs:

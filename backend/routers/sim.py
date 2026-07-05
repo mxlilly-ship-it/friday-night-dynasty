@@ -236,7 +236,10 @@ def sim_depth_chart_route(payload: SimDepthChartRequest = Body(...)):
 def sim_coach_gameplan_route(payload: SimCoachGameplanRequest = Body(...)):
     """OFF/DEF coach gameplan (v2) for browser/local saves (no auth)."""
     try:
-        from backend.services.multiplayer_service import apply_coach_gameplan_privacy_for_team
+        from backend.services.multiplayer_service import (
+            _sync_team_gameplan_prefs_from_working_state,
+            apply_coach_gameplan_privacy_for_team,
+        )
 
         mp = payload.state.get("multiplayer") if isinstance(payload.state.get("multiplayer"), dict) else {}
         mp_team = str(mp.get("team_name") or "").strip()
@@ -281,6 +284,7 @@ def sim_coach_gameplan_route(payload: SimCoachGameplanRequest = Body(...)):
         else:
             result = get_coach_gameplan_v2_from_state(payload.state)
         if mp_team and not mp_commish:
+            _sync_team_gameplan_prefs_from_working_state(payload.state, mp_team)
             apply_coach_gameplan_privacy_for_team(payload.state, mp_team)
         return {**result, "state": payload.state}
     except Exception as e:
