@@ -579,6 +579,45 @@ def _sync_team_gameplan_prefs_from_working_state(state: Dict[str, Any], team_nam
     state["multiplayer_team_gameplan_prefs"] = prefs_root
 
 
+def _materialize_mp_carried_gameplans_for_league(state: Dict[str, Any], league_id: str) -> bool:
+    """After a league week advances, pre-build carried gameplans for each human coach."""
+    import copy
+
+    from backend.services.league_service import _materialize_carried_gameplan_for_current_week
+
+    phase = str(state.get("season_phase") or "").strip().lower()
+    if phase not in ("regular", "playoffs"):
+        return False
+    changed = False
+    prefs_root = state.get("multiplayer_team_gameplan_prefs")
+    if not isinstance(prefs_root, dict):
+        prefs_root = {}
+    for member in _human_teams(league_id):
+        team = str(member.get("team_name") or "").strip()
+        if not team:
+            continue
+        working = copy.deepcopy(state)
+        working["user_team"] = team
+        apply_coach_gameplan_privacy_for_team(working, team)
+        if _materialize_carried_gameplan_for_current_week(working):
+            state["coach_gameplans_v2"] = _merge_coach_gameplans_v2_for_team(
+                state.get("coach_gameplans_v2"),
+                working.get("coach_gameplans_v2"),
+                team,
+            )
+            changed = True
+        _sync_team_gameplan_prefs_from_working_state(working, team)
+        wr = working.get("multiplayer_team_gameplan_prefs")
+        if isinstance(wr, dict) and isinstance(wr.get(team), dict):
+            prefs_root[team] = wr[team]
+            changed = True
+    if changed:
+        state["multiplayer_team_gameplan_prefs"] = prefs_root
+        for key in _TEAM_GAMEPLAN_PREF_KEYS:
+            state.pop(key, None)
+    return changed
+
+
 def apply_coach_gameplan_privacy_for_team(state: Dict[str, Any], team_name: str) -> Dict[str, Any]:
     """
     Strip other coaches' gameplans from a working copy sent to one human coach.
@@ -995,6 +1034,24 @@ def get_league_game_bundle(league_id: str, user_id: str, team_name: str) -> Dict
                         )
 
     apply_coach_gameplan_privacy_for_team(state, team_name)
+    from backend.services.league_service import _materialize_carried_gameplan_for_current_week
+
+    materialized = _materialize_carried_gameplan_for_current_week(state)
+    if materialized:
+        _sync_team_gameplan_prefs_from_working_state(state, team_name)
+        merged = _merge_coach_state_into_canonical(canonical, state, team_name)
+        _save_state(save_dir, merged)
+        canonical = merged
+        with db() as conn:
+            conn.execute(
+                "UPDATE leagues SET state_version=state_version+1, updated_at=? WHERE id=?",
+                (_now(), league_id),
+            )
+        state = copy.deepcopy(merged)
+        state["user_team"] = team_name
+        state["multiplayer"] = {"league_id": league_id, "team_name": team_name, "multiplayer_league": True}
+        state["multiplayer_league"] = True
+        apply_coach_gameplan_privacy_for_team(state, team_name)
 
     league_history: Dict[str, Any] = {"seasons": []}
     records: Dict[str, Any] = {}
@@ -1032,6 +1089,8 @@ def save_league_game_state(
     league_row = _verify_team_game_access(league_id, user_id, team_name)
     save_dir = str(league_row.get("save_dir") or "")
     incoming = copy.deepcopy(state) if isinstance(state, dict) else {}
+    incoming["user_team"] = team_name
+    _sync_team_gameplan_prefs_from_working_state(incoming, team_name)
     apply_coach_gameplan_privacy_for_team(incoming, team_name)
     canonical = _load_state(save_dir)
     merged = _merge_coach_state_into_canonical(canonical, incoming, team_name)
@@ -2390,6 +2449,7 @@ def commish_advance_league(league_id: str, user_id: str) -> Dict[str, Any]:
     from backend.services.league_service import repair_multiplayer_scrimmage_storage
 
     repair_multiplayer_scrimmage_storage(state)
+    _materialize_mp_carried_gameplans_for_league(state, league_id)
     _save_state(save_dir, state)
     now = _now()
     with db() as conn:
