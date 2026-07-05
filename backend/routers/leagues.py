@@ -113,8 +113,11 @@ def list_my_leagues_route(user=Depends(require_entitled)):
     from backend.platform_config import platform_owner_emails_configured
 
     user_id = user["user_id"]
-    sync_pending_invites_for_user(user_id)
-    leagues = list_leagues_for_user(user_id)
+    try:
+        sync_pending_invites_for_user(user_id)
+        leagues = list_leagues_for_user(user_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not load leagues: {e}") from e
     identity = account_identity_for_user(user_id)
     account_email = identity.get("email") or identity.get("username") or ""
     return {

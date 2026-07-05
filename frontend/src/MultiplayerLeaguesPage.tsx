@@ -47,42 +47,39 @@ export default function MultiplayerLeaguesPage({
   const [flash, setFlash] = useState('')
 
   const reload = useCallback(async () => {
-    const data = await fetchMyLeagues(apiBase, headers)
-    setLeagues(data.leagues)
-    setIsPlatformOwner(data.is_platform_owner)
-    setPlatformOwnerConfigured(Boolean(data.platform_owner_configured))
-    setAccountEmail(data.account_email ?? '')
-    if (data.is_platform_owner) {
-      try {
-        const archived = await fetchDeletedLeagues(apiBase, headers)
-        setDeletedLeagues(archived)
-        setSelectedArchivedId((prev) =>
-          prev && archived.some((l) => l.league_id === prev) ? prev : archived[0]?.league_id ?? '',
-        )
-      } catch {
+    setLoading(true)
+    setError('')
+    try {
+      const data = await fetchMyLeagues(apiBase, headers)
+      setLeagues(data.leagues)
+      setIsPlatformOwner(data.is_platform_owner)
+      setPlatformOwnerConfigured(Boolean(data.platform_owner_configured))
+      setAccountEmail(data.account_email ?? '')
+      setLoading(false)
+      if (data.is_platform_owner) {
+        void fetchDeletedLeagues(apiBase, headers)
+          .then((archived) => {
+            setDeletedLeagues(archived)
+            setSelectedArchivedId((prev) =>
+              prev && archived.some((l) => l.league_id === prev) ? prev : archived[0]?.league_id ?? '',
+            )
+          })
+          .catch(() => {
+            setDeletedLeagues([])
+            setSelectedArchivedId('')
+          })
+      } else {
         setDeletedLeagues([])
         setSelectedArchivedId('')
       }
-    } else {
-      setDeletedLeagues([])
-      setSelectedArchivedId('')
+    } catch (e: unknown) {
+      setLoading(false)
+      setError(e instanceof Error ? e.message : 'Failed to load leagues')
     }
   }, [apiBase, headers])
 
   useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError('')
     void reload()
-      .catch((e: unknown) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load leagues')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
   }, [reload])
 
   async function onDeleteLeague(league: LeagueListItem) {
@@ -167,7 +164,14 @@ export default function MultiplayerLeaguesPage({
 
       <div style={{ padding: '24px 32px', maxWidth: 720 }}>
         {loading ? <p className="ldash-loading">Loading leagues…</p> : null}
-        {error ? <p className="ldash-error">{error}</p> : null}
+        {error ? (
+          <p className="ldash-error">
+            {error}{' '}
+            <button type="button" className="ldash-back-btn" style={{ marginLeft: 8 }} onClick={() => void reload()}>
+              Retry
+            </button>
+          </p>
+        ) : null}
         {flash ? (
           <p style={{ margin: '0 0 12px', color: 'var(--green-status)', fontSize: '0.9rem' }}>{flash}</p>
         ) : null}

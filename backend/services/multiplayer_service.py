@@ -1456,6 +1456,7 @@ def list_leagues_for_user(user_id: str) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
     for item in row_payloads:
         badges: List[str] = []
+        teams = item["teams"]
         if item["is_platform_owner_view"] and not item["can_run_league"]:
             badges.append("Admin")
         if item["is_commissioner"]:
@@ -1463,47 +1464,9 @@ def list_leagues_for_user(user_id: str) -> List[Dict[str, Any]]:
         submitted = False
         your_turn = False
         week_label = None
-        teams = item["teams"]
         if teams:
-            try:
-                state = _load_state_for_list(item["save_dir"]) if item["save_dir"] else {}
-                stage_key = _stage_key_from_state(state) if state else ""
-                submitted_set = (
-                    _submitted_teams(item["league_id"], stage_key) if stage_key else set()
-                )
-                phase = str(state.get("season_phase") or "regular").strip().lower()
-                current_week = int(state.get("current_week", 1) or 1)
-                weeks = state.get("weeks") or []
-                total_weeks = len(weeks) if isinstance(weeks, list) and weeks else 12
-                week_label = f"Week {current_week}"
-                if phase == "regular":
-                    week_label = f"Week {current_week} of {total_weeks}"
-                elif phase == "preseason":
-                    week_label = "Preseason"
-                elif phase == "offseason":
-                    week_label = "Offseason"
-                elif phase == "playoffs":
-                    week_label = "Playoffs"
-                elif phase == "schedule_planning":
-                    week_label = "Schedule planning"
-                team_names = [str(t["team_name"]) for t in teams if t.get("team_name")]
-                submitted = all(t in submitted_set for t in team_names) if team_names else False
-                your_turn = any(
-                    t not in submitted_set
-                    and any(
-                        str(m.get("team_name") or "") == t and m.get("coach_setup_complete")
-                        for m in teams
-                    )
-                    for t in team_names
-                )
-                if submitted:
-                    badges.append("Submitted")
-                elif your_turn:
-                    badges.append("Your turn")
-                elif any(not t.get("coach_setup_complete") for t in teams):
-                    badges.append("Setup needed")
-            except Exception:
-                pass
+            if any(not t.get("coach_setup_complete") for t in teams):
+                badges.append("Setup needed")
         elif item.get("unassigned"):
             badges.append("Awaiting team")
         out.append(
