@@ -168,6 +168,22 @@ def _read_league_save_json(path: str) -> Dict[str, Any]:
     raise ValueError("league save file missing")
 
 
+def _load_state_for_list(save_dir: str) -> Dict[str, Any]:
+    """Best-effort league save read for league list badges (no long retry loop)."""
+    path = _league_save_path(save_dir)
+    if not isfile_any(path):
+        return {}
+    try:
+        with open_text_with_path_fallback(path, "r") as f:
+            raw = f.read()
+        if not raw.strip():
+            return {}
+        data = json.loads(raw)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
 def _load_state(save_dir: str) -> Dict[str, Any]:
     path = _league_save_path(save_dir)
     return _read_league_save_json(path)
@@ -1200,9 +1216,6 @@ def _format_countdown(deadline_iso: Optional[str]) -> Optional[str]:
         return None
 
 
-        return None
-
-
 def _most_recent_advance_deadline(league_row: Dict[str, Any]) -> Optional[datetime]:
     """Most recent scheduled auto-advance instant (may be in the past)."""
     if str(league_row.get("advance_mode") or "manual").lower() != "auto":
@@ -1453,7 +1466,7 @@ def list_leagues_for_user(user_id: str) -> List[Dict[str, Any]]:
         teams = item["teams"]
         if teams:
             try:
-                state = _load_state(item["save_dir"]) if item["save_dir"] else {}
+                state = _load_state_for_list(item["save_dir"]) if item["save_dir"] else {}
                 stage_key = _stage_key_from_state(state) if state else ""
                 submitted_set = (
                     _submitted_teams(item["league_id"], stage_key) if stage_key else set()
@@ -1509,8 +1522,6 @@ def list_leagues_for_user(user_id: str) -> List[Dict[str, Any]]:
                 "week_label": week_label,
             }
         )
-    commish_ids = [str(x["league_id"]) for x in out if x.get("can_run_league")]
-    run_auto_advance_for_league_ids(commish_ids)
     return out
 
 

@@ -177,14 +177,25 @@ export async function fetchMyLeagues(
   apiBase: string,
   headers: Record<string, string>,
 ): Promise<LeagueMineResponse> {
-  const r = await fetchWithRetry(`${apiBase}/leagues/mine`, { headers })
-  if (!r.ok) throw new Error(await r.text())
-  const data = (await r.json()) as LeagueMineResponse
-  return {
-    leagues: data.leagues ?? [],
-    is_platform_owner: Boolean(data.is_platform_owner),
-    platform_owner_configured: Boolean(data.platform_owner_configured),
-    account_email: data.account_email ? String(data.account_email) : '',
+  const ctrl = new AbortController()
+  const timer = window.setTimeout(() => ctrl.abort(), 45000)
+  try {
+    const r = await fetchWithRetry(`${apiBase}/leagues/mine`, { headers, signal: ctrl.signal })
+    if (!r.ok) throw new Error(await r.text())
+    const data = (await r.json()) as LeagueMineResponse
+    return {
+      leagues: data.leagues ?? [],
+      is_platform_owner: Boolean(data.is_platform_owner),
+      platform_owner_configured: Boolean(data.platform_owner_configured),
+      account_email: data.account_email ? String(data.account_email) : '',
+    }
+  } catch (e: unknown) {
+    if (e instanceof DOMException && e.name === 'AbortError') {
+      throw new Error('Loading leagues timed out. The server may be busy — refresh in a moment.')
+    }
+    throw e
+  } finally {
+    window.clearTimeout(timer)
   }
 }
 
