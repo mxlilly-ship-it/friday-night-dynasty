@@ -190,6 +190,8 @@ def _load_state(save_dir: str) -> Dict[str, Any]:
 
 
 def _save_state(save_dir: str, state: Dict[str, Any]) -> None:
+    from systems.game_stats import season_stats_map_from_jsonable, season_stats_map_to_jsonable
+
     path = _league_save_path(save_dir)
     try:
         makedirs_with_path_fallback(os.path.abspath(os.path.normpath(save_dir)))
@@ -198,6 +200,11 @@ def _save_state(save_dir: str, state: Dict[str, Any]) -> None:
             os.makedirs(save_dir, exist_ok=True)
         except OSError:
             pass
+    raw_ps = state.get("playoff_season_player_stats")
+    if raw_ps:
+        state["playoff_season_player_stats"] = season_stats_map_to_jsonable(
+            season_stats_map_from_jsonable(raw_ps)
+        )
     payload = json.dumps(state, indent=2, ensure_ascii=False)
     bak_path = f"{path}.bak"
     try:

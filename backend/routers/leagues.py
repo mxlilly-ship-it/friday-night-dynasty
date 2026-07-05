@@ -200,6 +200,8 @@ def commish_sim_week_route(league_id: str, user=Depends(require_entitled)):
         raise HTTPException(status_code=403, detail=str(e)) from e
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not advance league: {e}") from e
 
 
 @router.get("/{league_id}/commish/game", response_model=Dict[str, Any])

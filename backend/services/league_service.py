@@ -8037,7 +8037,7 @@ def _advance_playoff_one_round_state(state: Dict[str, Any]) -> Dict[str, Any]:
     if playoffs.get("completed"):
         _sync_playoff_top_level_champion_runner(playoffs)
     state["standings"] = standings
-    state["playoff_season_player_stats"] = sp
+    state["playoff_season_player_stats"] = season_stats_map_to_jsonable(sp)
     return state
 
 
