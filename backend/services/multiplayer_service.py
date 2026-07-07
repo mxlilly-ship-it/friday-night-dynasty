@@ -2465,7 +2465,18 @@ def commish_advance_league(
         )
         save_league_history(league_history, league_history_path(save_dir))
     elif phase == "offseason":
-        state = advance_offseason_state(state, {}, league_history=league_history)
+        from backend.services.league_service import _bulk_cpu_offseason_advance_body, advance_offseason_state
+
+        idx_before = int(state.get("offseason_stage_index", 0) or 0)
+        # Commissioner sim uses bulk CPU bodies and may need two passes for
+        # simulate-then-review stages (winter, spring, transfers, 7-on-7).
+        for _ in range(5):
+            body = _bulk_cpu_offseason_advance_body(state)
+            state = advance_offseason_state(state, body, league_history=league_history)
+            idx_after = int(state.get("offseason_stage_index", 0) or 0)
+            phase_after = str(state.get("season_phase") or "").strip().lower()
+            if idx_after != idx_before or phase_after != "offseason":
+                break
         action_label = "Offseason advanced"
     elif phase == "schedule_planning":
         from backend.services.league_service import advance_schedule_planning_league_state
