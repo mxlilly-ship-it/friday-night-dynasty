@@ -2366,12 +2366,17 @@ def commish_advance_league(league_id: str, user_id: str) -> Dict[str, Any]:
     """Sim/advance one league step (commissioner)."""
     from backend.services.league_service import (
         _advance_playoff_one_round_state,
+        _maybe_coach_playoff_round_emails,
+        _playoffs_global_completed,
         advance_offseason_state,
         advance_preseason_state,
+        finalize_season_to_summary_for_save_dir,
+        finish_season_state,
         sim_week_state,
     )
-    from systems.league_history import load_league_history
-    from systems.save_system import league_history_path
+    from systems.league_history import load_league_history, save_league_history
+    from systems.records_system import load_records, save_records
+    from systems.save_system import league_history_path, records_path
 
     league_row = _verify_commish_game_access(league_id, user_id)
     save_dir = str(league_row.get("save_dir") or "")
@@ -2414,8 +2419,35 @@ def commish_advance_league(league_id: str, user_id: str) -> Dict[str, Any]:
         state = sim_week_state(state, mp_human_teams=mp_human, mp_submitted_teams=mp_submitted)
         action_label = f"Week {int(state.get('current_week', 1))} simulated"
     elif phase == "playoffs":
-        state = _advance_playoff_one_round_state(state)
-        action_label = "Playoff round advanced"
+        playoffs_now = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else {}
+        if _playoffs_global_completed(playoffs_now):
+            state = finalize_season_to_summary_for_save_dir(state, save_dir)
+            action_label = "Season archived — season summary"
+        else:
+            state = _advance_playoff_one_round_state(state)
+            _maybe_coach_playoff_round_emails(state)
+            playoffs_after = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else {}
+            if _playoffs_global_completed(playoffs_after):
+                state = finalize_season_to_summary_for_save_dir(state, save_dir)
+                action_label = "Championship complete — season summary"
+            else:
+                action_label = "Playoff round advanced"
+    elif phase == "season_summary":
+        records = load_records(records_path(save_dir))
+        out = finish_season_state(state, league_history, records, begin_offseason=True)
+        state = out.get("state") if isinstance(out.get("state"), dict) else state
+        if isinstance(out.get("league_history"), dict):
+            league_history = out["league_history"]
+            save_league_history(league_history, league_history_path(save_dir))
+        if isinstance(out.get("records"), dict):
+            save_records(out["records"], records_path(save_dir))
+        phase_after = str(state.get("season_phase") or "").strip().lower()
+        if phase_after == "schedule_planning":
+            action_label = "Schedule planning — confirm cross-region games in Run league"
+        elif phase_after == "offseason":
+            action_label = "Offseason begun"
+        else:
+            action_label = "Season summary advanced"
     elif phase == "offseason":
         state = advance_offseason_state(state, {}, league_history=league_history)
         action_label = "Offseason advanced"

@@ -3728,6 +3728,42 @@ def _repair_playoffs_complete_to_season_summary(state: Dict[str, Any], save_dir:
         return False
 
 
+def finalize_season_to_summary_for_save_dir(state: Dict[str, Any], save_dir: str) -> Dict[str, Any]:
+    """Archive a playoffs-complete season on disk and enter season_summary (multiplayer commish)."""
+    phase_s = str(state.get("season_phase") or "").strip().lower()
+    if phase_s != "playoffs":
+        return state
+    playoffs = state.get("playoffs")
+    if not isinstance(playoffs, dict) or not _playoffs_global_completed(playoffs):
+        return state
+    _sync_playoff_top_level_champion_runner(playoffs)
+    if not _repair_playoffs_complete_to_season_summary(state, save_dir):
+        raise ValueError(
+            "Playoffs are complete but the season could not be archived. "
+            "Open Run league and use Finish season, or try Sim week again after a refresh."
+        )
+    teams = {
+        t["name"]: team_from_dict(t)
+        for t in (state.get("teams") or [])
+        if isinstance(t, dict) and t.get("name")
+    }
+    team_names = list(teams.keys())
+    year_num = int(state.get("current_year", 1) or 1)
+    if teams and int(state.get("program_funding_awarded_year") or 0) != year_num:
+        standings = state.get("standings") or {}
+        _award_program_funding_for_all_teams(teams, standings, current_year=year_num)
+        state["program_funding_awarded_year"] = year_num
+        state["teams"] = [team_to_dict(t) for t in teams.values()]
+    if team_names:
+        try:
+            from systems.home_game_themes import compute_league_home_theme_summaries
+
+            state["home_theme_season_rewards"] = compute_league_home_theme_summaries(state, team_names)
+        except Exception:
+            pass
+    return state
+
+
 def _sync_derived_save_fields(state: Dict[str, Any], save_dir: str) -> bool:
     """Migrate TP fields, repair missing archives, and apply prestige from history. Returns True if state changed."""
     changed = False
