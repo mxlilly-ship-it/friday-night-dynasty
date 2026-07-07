@@ -2743,7 +2743,8 @@ def advance_offseason(
 
     new_idx = int(state["offseason_stage_index"])
     if new_idx >= len(stages):
-        check_trial_before_year2_preseason(user_id)
+        if not is_multiplayer_league_state(state):
+            check_trial_before_year2_preseason(user_id)
         teams2 = {t["name"]: team_from_dict(t) for t in state.get("teams", [])}
         _finalize_offseason_to_preseason(state, teams2)
         state["teams"] = [team_to_dict(t) for t in teams2.values()]
@@ -6540,7 +6541,8 @@ def advance_offseason_state(
     state["teams"] = [team_to_dict(t) for t in teams.values()]
     new_idx = int(state["offseason_stage_index"])
     if new_idx >= len(stages):
-        check_trial_before_year2_preseason(user_id)
+        if not is_multiplayer_league_state(state):
+            check_trial_before_year2_preseason(user_id)
         teams2 = {t["name"]: team_from_dict(t) for t in state.get("teams", [])}
         _finalize_offseason_to_preseason(state, teams2)
         state["teams"] = [team_to_dict(t) for t in teams2.values()]

@@ -2497,7 +2497,12 @@ def commish_advance_league(
         # simulate-then-review stages (winter, spring, transfers, 7-on-7).
         for _ in range(5):
             body = _bulk_cpu_offseason_advance_body(state)
-            state = advance_offseason_state(state, body, league_history=league_history)
+            state = advance_offseason_state(
+                state,
+                body,
+                league_history=league_history,
+                user_id=user_id,
+            )
             idx_after = int(state.get("offseason_stage_index", 0) or 0)
             phase_after = str(state.get("season_phase") or "").strip().lower()
             if idx_after != idx_before or phase_after != "offseason":
