@@ -744,6 +744,19 @@ def _merge_coach_state_into_canonical(
                 team_slice["opponents"] = copy.deepcopy(incoming["preseason_scrimmage_opponents"])
             if "preseason_scrimmages" in incoming:
                 team_slice["scrimmages"] = copy.deepcopy(incoming["preseason_scrimmages"])
+            inc_7on7 = incoming.get("offseason_7on7_results")
+            if isinstance(inc_7on7, dict):
+                by_7 = out.get("multiplayer_7on7_by_team")
+                if not isinstance(by_7, dict):
+                    by_7 = {}
+                    out["multiplayer_7on7_by_team"] = by_7
+                team_7 = by_7.get(team_name)
+                if not isinstance(team_7, dict):
+                    team_7 = {}
+                    by_7[team_name] = team_7
+                team_7["results"] = copy.deepcopy(inc_7on7)
+                if not team_7.get("tier") and inc_7on7.get("tier"):
+                    team_7["tier"] = str(inc_7on7.get("tier"))
             inc_themes = incoming.get("home_game_themes")
             if isinstance(inc_themes, dict) and team_name in inc_themes:
                 theme_store = out.get("home_game_themes")
@@ -758,9 +771,10 @@ def _merge_coach_state_into_canonical(
                     confirmed_store = {}
                     out["home_game_themes_confirmed_teams"] = confirmed_store
                 confirmed_store[team_name] = inc_confirmed[team_name]
-            from backend.services.league_service import repair_multiplayer_scrimmage_storage
+            from backend.services.league_service import repair_multiplayer_7on7_storage, repair_multiplayer_scrimmage_storage
 
             repair_multiplayer_scrimmage_storage(out)
+            repair_multiplayer_7on7_storage(out)
         else:
             for key in (
                 "preseason_scrimmages",
@@ -843,7 +857,11 @@ def get_league_commish_game_bundle(league_id: str, user_id: str) -> Dict[str, An
 
     league_row = _verify_commish_game_access(league_id, user_id)
     save_dir = str(league_row.get("save_dir") or "")
-    from backend.services.league_service import ensure_multiplayer_opening_schedule, repair_multiplayer_scrimmage_storage
+    from backend.services.league_service import (
+        ensure_multiplayer_opening_schedule,
+        repair_multiplayer_7on7_storage,
+        repair_multiplayer_scrimmage_storage,
+    )
 
     canonical = _load_state(save_dir)
     canonical["multiplayer_league"] = True
@@ -853,6 +871,8 @@ def get_league_commish_game_bundle(league_id: str, user_id: str) -> Dict[str, An
     canonical["multiplayer"] = mp_meta
     commish_changed = ensure_multiplayer_opening_schedule(canonical)
     if repair_multiplayer_scrimmage_storage(canonical):
+        commish_changed = True
+    if repair_multiplayer_7on7_storage(canonical):
         commish_changed = True
     if commish_changed:
         _save_state(save_dir, canonical)
@@ -995,8 +1015,10 @@ def get_league_game_bundle(league_id: str, user_id: str, team_name: str) -> Dict
         _ensure_mp_team_scrimmage_opponents,
         ensure_multiplayer_opening_schedule,
         hydrate_mp_team_scrimmage_view,
+        hydrate_mp_team_7on7_view,
         is_multiplayer_league_state,
         persist_mp_team_scrimmage_slice,
+        repair_multiplayer_7on7_storage,
         repair_multiplayer_scrimmage_storage,
     )
 
@@ -1008,6 +1030,8 @@ def get_league_game_bundle(league_id: str, user_id: str, team_name: str) -> Dict
     canonical["multiplayer"] = mp_meta
     changed = ensure_multiplayer_opening_schedule(canonical)
     if repair_multiplayer_scrimmage_storage(canonical):
+        changed = True
+    if repair_multiplayer_7on7_storage(canonical):
         changed = True
     if _unlock_human_playbooks_during_select(canonical, team_name):
         changed = True
@@ -1040,6 +1064,7 @@ def get_league_game_bundle(league_id: str, user_id: str, team_name: str) -> Dict
     _finalize_cross_region_schedule_state(state)
 
     hydrate_mp_team_scrimmage_view(state, team_name)
+    hydrate_mp_team_7on7_view(state, team_name)
     confirmed_teams = state.get("home_game_themes_confirmed_teams")
     if isinstance(confirmed_teams, dict):
         state["home_game_themes_user_confirmed"] = bool(confirmed_teams.get(team_name))
@@ -2487,9 +2512,10 @@ def commish_advance_league(
     else:
         raise ValueError(f"Cannot advance league from season_phase={phase!r}")
 
-    from backend.services.league_service import repair_multiplayer_scrimmage_storage
+    from backend.services.league_service import repair_multiplayer_7on7_storage, repair_multiplayer_scrimmage_storage
 
     repair_multiplayer_scrimmage_storage(state)
+    repair_multiplayer_7on7_storage(state)
     _materialize_mp_carried_gameplans_for_league(state, league_id)
     _save_state(save_dir, state)
     now = _now()

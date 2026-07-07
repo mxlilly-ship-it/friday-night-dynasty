@@ -2125,6 +2125,7 @@ def _finalize_offseason_to_preseason(state: Dict[str, Any], teams: Dict[str, Any
     state.pop("offseason_coach_dev_banks", None)
     state.pop("offseason_spring_ball_results", None)
     state.pop("offseason_7on7_results", None)
+    state.pop("multiplayer_7on7_by_team", None)
     state.pop("offseason_winter_training_results", None)
     state.pop("offseason_winter_history", None)
     state.pop("offseason_spring_history", None)
@@ -6465,22 +6466,26 @@ def advance_offseason_state(
                 state["teams"] = [team_to_dict(t) for t in teams.values()]
                 return state
     elif current == "7 on 7":
-        seven_results = state.get("offseason_7on7_results")
-        ack = bool(body.get("seven_on_seven_ack_results"))
-        tier_raw = body.get("seven_on_seven_tournament")
-        if isinstance(seven_results, dict) and ack:
-            state.pop("offseason_7on7_results", None)
-        elif isinstance(seven_results, dict) and not ack:
-            raise ValueError("Review 7-on-7 tournament results, then press Continue again to advance.")
-        else:
-            tier = str(tier_raw or "").strip().lower()
-            if tier not in VALID_TOURNAMENT_TIERS:
-                raise ValueError("Choose a 7-on-7 tournament (Area, Regional, or State), then press Continue.")
-            payload = run_seven_on_seven_tournament(teams, str(user_team_name or ""), tier)
-            state["offseason_7on7_results"] = payload
-            state["offseason_stage_index"] = idx
-            state["teams"] = [team_to_dict(t) for t in teams.values()]
+        mp_7on7 = _advance_multiplayer_seven_on_seven_stage(state, teams, body, idx=idx)
+        if mp_7on7 == "wait_review":
             return state
+        if mp_7on7 == "single_player":
+            seven_results = state.get("offseason_7on7_results")
+            ack = bool(body.get("seven_on_seven_ack_results"))
+            tier_raw = body.get("seven_on_seven_tournament")
+            if isinstance(seven_results, dict) and ack:
+                state.pop("offseason_7on7_results", None)
+            elif isinstance(seven_results, dict) and not ack:
+                raise ValueError("Review 7-on-7 tournament results, then press Continue again to advance.")
+            else:
+                tier = str(tier_raw or "").strip().lower()
+                if tier not in VALID_TOURNAMENT_TIERS:
+                    raise ValueError("Choose a 7-on-7 tournament (Area, Regional, or State), then press Continue.")
+                payload = run_seven_on_seven_tournament(teams, str(user_team_name or ""), tier)
+                state["offseason_7on7_results"] = payload
+                state["offseason_stage_index"] = idx
+                state["teams"] = [team_to_dict(t) for t in teams.values()]
+                return state
     elif current in ("Transfers III", "Graduation", "Freshman Class", "Schedule Release"):
         pass
     elif current == "Training Results":
@@ -8704,6 +8709,117 @@ def persist_mp_team_scrimmage_slice(state: Dict[str, Any], team_name: str) -> No
         slice_["opponents"] = copy.deepcopy(state.get("preseason_scrimmage_opponents") or [])
     if state.get("preseason_scrimmages") is not None:
         slice_["scrimmages"] = copy.deepcopy(state.get("preseason_scrimmages") or [])
+
+
+def _mp_7on7_by_team(state: Dict[str, Any]) -> Dict[str, Any]:
+    raw = state.get("multiplayer_7on7_by_team")
+    if not isinstance(raw, dict):
+        raw = {}
+        state["multiplayer_7on7_by_team"] = raw
+    return raw
+
+
+def hydrate_mp_team_7on7_view(state: Dict[str, Any], team_name: str) -> None:
+    """Expose one coach's 7-on-7 tournament results on the working save view."""
+    state.pop("offseason_7on7_results", None)
+    if not team_name:
+        return
+    slice_ = _mp_7on7_by_team(state).get(team_name)
+    if isinstance(slice_, dict) and isinstance(slice_.get("results"), dict):
+        state["offseason_7on7_results"] = copy.deepcopy(slice_["results"])
+
+
+def _run_mp_seven_on_seven_for_team(
+    state: Dict[str, Any],
+    teams: Dict[str, Any],
+    team_name: str,
+    tier: str,
+) -> Dict[str, Any]:
+    tier_key = str(tier or "regional").strip().lower()
+    if tier_key not in VALID_TOURNAMENT_TIERS:
+        tier_key = "regional"
+    payload = run_seven_on_seven_tournament(teams, team_name, tier_key)
+    _mp_7on7_by_team(state)[team_name] = {"tier": tier_key, "results": payload}
+    return payload
+
+
+def _run_mp_seven_on_seven_for_all_teams(
+    state: Dict[str, Any],
+    teams: Dict[str, Any],
+    *,
+    default_tier: str = "regional",
+) -> None:
+    by_team = _mp_7on7_by_team(state)
+    for name in teams:
+        slice_ = by_team.get(name)
+        if isinstance(slice_, dict) and isinstance(slice_.get("results"), dict):
+            continue
+        _run_mp_seven_on_seven_for_team(state, teams, name, default_tier)
+
+
+def repair_multiplayer_7on7_storage(state: Dict[str, Any]) -> bool:
+    """Move legacy league-wide 7-on-7 results into per-team storage for multiplayer."""
+    if not is_multiplayer_league_state(state):
+        return False
+    changed = False
+    legacy = state.get("offseason_7on7_results")
+    owner = str(state.get("user_team") or "").strip()
+    if isinstance(legacy, dict) and owner:
+        slice_ = _mp_7on7_by_team(state).get(owner)
+        if not isinstance(slice_, dict) or not slice_.get("results"):
+            _mp_7on7_by_team(state)[owner] = {
+                "tier": str(legacy.get("tier") or "regional"),
+                "results": copy.deepcopy(legacy),
+            }
+            changed = True
+    if state.pop("offseason_7on7_results", None) is not None:
+        changed = True
+    return changed
+
+
+def _advance_multiplayer_seven_on_seven_stage(
+    state: Dict[str, Any],
+    teams: Dict[str, Any],
+    body: Dict[str, Any],
+    *,
+    idx: int,
+) -> str:
+    """
+    Multiplayer 7-on-7: coaches run/review per team; commissioner sim fills every team.
+    Returns 'wait_review', 'complete', or 'single_player' (fall through to SP logic).
+    """
+    if not is_multiplayer_league_state(state):
+        return "single_player"
+
+    seven_results = state.get("offseason_7on7_results")
+    ack = bool(body.get("seven_on_seven_ack_results"))
+    tier_raw = body.get("seven_on_seven_tournament")
+    user_team_name = str(state.get("user_team") or "").strip()
+
+    if user_team_name and user_team_name in teams:
+        if isinstance(seven_results, dict) and ack:
+            state.pop("offseason_7on7_results", None)
+            return "complete"
+        if isinstance(seven_results, dict) and not ack:
+            raise ValueError("Review 7-on-7 tournament results, then press Continue again to advance.")
+        tier = str(tier_raw or "regional").strip().lower()
+        if tier not in VALID_TOURNAMENT_TIERS:
+            raise ValueError("Choose a 7-on-7 tournament (Area, Regional, or State), then press Continue.")
+        payload = _run_mp_seven_on_seven_for_team(state, teams, user_team_name, tier)
+        state["offseason_7on7_results"] = copy.deepcopy(payload)
+        state["offseason_stage_index"] = idx
+        state["teams"] = [team_to_dict(t) for t in teams.values()]
+        return "wait_review"
+
+    # Commissioner / league-wide advance (no user_team on canonical save).
+    if isinstance(seven_results, dict) and ack:
+        state.pop("offseason_7on7_results", None)
+    elif isinstance(seven_results, dict) and not ack:
+        state.pop("offseason_7on7_results", None)
+    tier = str(tier_raw or "regional").strip().lower()
+    _run_mp_seven_on_seven_for_all_teams(state, teams, default_tier=tier)
+    state.pop("offseason_7on7_results", None)
+    return "complete"
 
 
 def _ensure_mp_team_scrimmage_opponents(
