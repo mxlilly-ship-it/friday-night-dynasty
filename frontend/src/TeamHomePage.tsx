@@ -338,6 +338,8 @@ type Props = {
   ) => void
   onReturnToLeagueHub?: () => void
 }
+
+type TeamHomePageBodyProps = Props & {
   logoVersion: number
   setLogoVersion: (n: number) => void
   stadiumVersion: number
@@ -1863,7 +1865,8 @@ function TeamHomePageBody({
   }, [phase])
   useEffect(() => {
     if ((phase !== 'schedule_planning' && phase !== 'season_summary') || !schedulePlanningInfo) return
-    const saved = crossRegionSelectionsFromSaved(saveState, userTeam, schedulePlanningInfo)
+    const team = saveState?.user_team ?? ''
+    const saved = crossRegionSelectionsFromSaved(saveState, team, schedulePlanningInfo)
     setCrossRegionSelections((prev) => {
       const next = { ...prev }
       let changed = false
@@ -1886,7 +1889,7 @@ function TeamHomePageBody({
       }
       return changed ? next : prev
     })
-  }, [phase, schedulePlanningInfo, saveId, saveState?.cross_region_picks, userTeam])
+  }, [phase, schedulePlanningInfo, saveId, saveState?.cross_region_picks, saveState?.user_team])
   useEffect(() => {
     setLeagueHistYearPick(null)
   }, [saveId])
