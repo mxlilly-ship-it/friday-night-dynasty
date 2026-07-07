@@ -487,10 +487,12 @@ export async function commishSimWeek(
   apiBase: string,
   headers: Record<string, string>,
   leagueId: string,
+  body?: { cross_region_picks?: { slot_index: number; opponent: string; user_home: boolean }[] },
 ): Promise<{ ok: boolean; message: string; season_phase: string; current_week: number }> {
   const r = await fetchWithRetry(`${apiBase}/leagues/${leagueId}/commish/sim-week`, {
     method: 'POST',
     headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body ?? {}),
   })
   if (!r.ok) throw new Error(await r.text())
   return (await r.json()) as { ok: boolean; message: string; season_phase: string; current_week: number }

@@ -2362,7 +2362,12 @@ def apply_league_coach_prep(
     return get_league_game_bundle(league_id, user_id, team_name)
 
 
-def commish_advance_league(league_id: str, user_id: str) -> Dict[str, Any]:
+def commish_advance_league(
+    league_id: str,
+    user_id: str,
+    *,
+    cross_region_picks: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
     """Sim/advance one league step (commissioner)."""
     from backend.services.league_service import (
         _advance_playoff_one_round_state,
@@ -2434,7 +2439,13 @@ def commish_advance_league(league_id: str, user_id: str) -> Dict[str, Any]:
                 action_label = "Playoff round advanced"
     elif phase == "season_summary":
         records = load_records(records_path(save_dir))
-        out = finish_season_state(state, league_history, records, begin_offseason=True)
+        out = finish_season_state(
+            state,
+            league_history,
+            records,
+            begin_offseason=True,
+            cross_region_picks=cross_region_picks,
+        )
         state = out.get("state") if isinstance(out.get("state"), dict) else state
         if isinstance(out.get("league_history"), dict):
             league_history = out["league_history"]
@@ -2452,10 +2463,25 @@ def commish_advance_league(league_id: str, user_id: str) -> Dict[str, Any]:
         state = advance_offseason_state(state, {}, league_history=league_history)
         action_label = "Offseason advanced"
     elif phase == "schedule_planning":
-        from backend.services.league_service import advance_schedule_planning_league_state
+        from backend.services.league_service import (
+            advance_schedule_planning_league_state,
+            _apply_schedule_planning_picks_and_enter_offseason,
+        )
+        from systems.save_system import team_from_dict
 
-        state = advance_schedule_planning_league_state(state, league_history=league_history)
-        action_label = "Schedule planning completed (auto picks)"
+        if cross_region_picks:
+            teams = {
+                t["name"]: team_from_dict(t)
+                for t in (state.get("teams") or [])
+                if isinstance(t, dict) and t.get("name")
+            }
+            _apply_schedule_planning_picks_and_enter_offseason(
+                state, teams, cross_region_picks, league_history=league_history
+            )
+            action_label = "Cross-region schedule confirmed"
+        else:
+            state = advance_schedule_planning_league_state(state, league_history=league_history)
+            action_label = "Schedule planning completed (auto picks)"
     else:
         raise ValueError(f"Cannot advance league from season_phase={phase!r}")
 

@@ -31,6 +31,8 @@ type CommishDashboardPageProps = {
   onOpenLeagueHub?: () => void
   onOpenMyDynasty?: () => void
   myDynastyBusy?: boolean
+  onOpenRunLeague?: () => void
+  runLeagueBusy?: boolean
   onSubmitWeek?: () => void
   onUnsubmitWeek?: () => void
   submitBusy?: boolean
@@ -53,6 +55,8 @@ export default function CommishDashboardPage({
   onOpenLeagueHub,
   onOpenMyDynasty,
   myDynastyBusy = false,
+  onOpenRunLeague,
+  runLeagueBusy = false,
   onSubmitWeek,
   onUnsubmitWeek,
   submitBusy = false,
@@ -125,6 +129,16 @@ export default function CommishDashboardPage({
           {showCoachActions && onOpenLeagueHub ? (
             <button type="button" className="cdash-btn cdash-btn--blue" onClick={onOpenLeagueHub}>
               League hub
+            </button>
+          ) : null}
+          {onOpenRunLeague ? (
+            <button
+              type="button"
+              className="cdash-btn cdash-btn--gold"
+              disabled={runLeagueBusy}
+              onClick={onOpenRunLeague}
+            >
+              {runLeagueBusy ? 'Opening…' : 'Run league'}
             </button>
           ) : null}
           {showCoachActions && onOpenMyDynasty ? (

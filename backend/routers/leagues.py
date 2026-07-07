@@ -1,7 +1,7 @@
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
 from backend.deps import require_entitled
@@ -192,10 +192,19 @@ def commish_settings_route(
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
+class CommishSimWeekBody(BaseModel):
+  cross_region_picks: Optional[List[Dict[str, Any]]] = None
+
+
 @router.post("/{league_id}/commish/sim-week", response_model=Dict[str, Any])
-def commish_sim_week_route(league_id: str, user=Depends(require_entitled)):
+def commish_sim_week_route(
+    league_id: str,
+    body: Optional[CommishSimWeekBody] = Body(None),
+    user=Depends(require_entitled),
+):
     try:
-        return commish_advance_league(league_id, user["user_id"])
+        picks = body.cross_region_picks if body else None
+        return commish_advance_league(league_id, user["user_id"], cross_region_picks=picks)
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e)) from e
     except ValueError as e:

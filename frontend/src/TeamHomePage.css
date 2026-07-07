@@ -549,6 +549,8 @@
 .teamhome-top-group-teamnav,
 .teamhome-top-group-league {
   min-width: 0;
+  position: relative;
+  z-index: 5;
 }
 
 .teamhome-select-teamnav,
@@ -557,6 +559,12 @@
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
+  position: relative;
+  z-index: 6;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-appearance: menulist;
+  appearance: auto;
 }
 
 .teamhome-select-league {
@@ -3557,6 +3565,16 @@ td .teamhome-roster-name--profile {
 }
 .season-summary-bracket-toolbar .teamhome-playoffs-bracket-header {
   margin: 0;
+  position: relative;
+  z-index: 4;
+}
+.season-summary-bracket-selectors select,
+.season-summary-bracket-selectors .teamhome-select {
+  min-height: 34px;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-appearance: menulist;
+  appearance: auto;
 }
 .season-summary-goals-grid {
   display: grid;

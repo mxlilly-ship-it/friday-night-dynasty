@@ -85,6 +85,7 @@ import {
 import SeasonSummaryPanel from './SeasonSummaryPanel'
 import HomeGameThemesPanel from './HomeGameThemesPanel'
 import { themeLabelForGame } from './homeGameThemes'
+import { isMultiplayerCommishSaveId } from './browserSave'
 import type { HomeThemeSelection } from './homeGameThemes'
 import CoachInboxPanel from './CoachInboxPanel'
 import InSeasonDashboard from './InSeasonDashboard'
@@ -1769,9 +1770,11 @@ function TeamHomePageBody({
     [saveState, phase],
   )
   const isMultiplayerLeague = useMemo(() => isMultiplayerLeagueSave(saveState), [saveState])
-  // Multiplayer coaches never pick opening (or mid-league) schedules — commissioner advances the shared calendar.
+  const isCommishMpRun = isMultiplayerCommishSaveId(saveId)
+  const mpCanPickCrossRegion = !isMultiplayerLeague || isCommishMpRun
+  // Multiplayer coaches never pick opening (or mid-league) schedules — commissioner Run league only.
   const needsCrossRegionPickUi = Boolean(
-    schedulePlanningInfo && !crossRegionReady && !leagueAdvanceLocked && !isMultiplayerLeague,
+    schedulePlanningInfo && !crossRegionReady && !leagueAdvanceLocked && mpCanPickCrossRegion,
   )
 
   const scrollToSchedulePlanning = useCallback(() => {
@@ -1784,7 +1787,7 @@ function TeamHomePageBody({
   const [crossRegionSyncing, setCrossRegionSyncing] = useState(false)
   const playoffsComplete = phase === 'playoffs' && Boolean(saveState?.playoffs?.completed)
   const needsCrossRegionSync =
-    !isMultiplayerLeague &&
+    mpCanPickCrossRegion &&
     (phase === 'season_summary' ||
       phase === 'schedule_planning' ||
       playoffsComplete ||
@@ -5221,14 +5224,14 @@ function TeamHomePageBody({
               winterAllocationInvalid ||
               (phase === 'offseason' && offseasonCurrentStage === 'Improvements' && improvementsBudget.invalid) ||
               (isHomeGameThemesStage && !homeGameThemesConfirmed) ||
-              (!isMultiplayerLeague &&
+              (mpCanPickCrossRegion &&
                 phase === 'season_summary' &&
                 effectiveCrossRegionSlots > 0 &&
                 (!schedulePlanningInfo || !crossRegionReady)) ||
-              (!isMultiplayerLeague &&
+              (mpCanPickCrossRegion &&
                 phase === 'schedule_planning' &&
                 (!schedulePlanningInfo || !crossRegionReady)) ||
-              (!isMultiplayerLeague && crossRegionSyncing && !crossRegionReady)
+              (mpCanPickCrossRegion && crossRegionSyncing && !crossRegionReady)
             }
             onClick={async () => {
               try {
@@ -5572,7 +5575,7 @@ function TeamHomePageBody({
                   onOpenTeamHistory={() => setStateMenu('Team History')}
                 />
               )}
-              {isMultiplayerLeague && phase === 'schedule_planning' ? (
+              {isMultiplayerLeague && !isCommishMpRun && phase === 'schedule_planning' ? (
                 <div className="teamhome-preseason-panelA teamhome-preseason-panelA--compact teamhome-schedplan-fallback">
                   <div className="teamhome-preseason-title">Waiting on commissioner</div>
                   <div className="teamhome-preseason-sub">

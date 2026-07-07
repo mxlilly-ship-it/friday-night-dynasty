@@ -14,6 +14,7 @@ import {
   isBrowserSaveId,
   isMultiplayerSaveId,
   listBrowserSaves,
+  multiplayerCommishSaveId,
   multiplayerSaveId,
   parseMultiplayerSaveId,
   putBrowserSave,
@@ -43,11 +44,13 @@ import {
   assignTeamByEmail,
   commishSimWeek,
   fetchCommishDashboard,
+  fetchLeagueCommishGame,
   fetchLeagueDashboard,
   fetchLeagueGame,
   fetchWithRetry,
   inviteToLeague,
   postLeagueChat,
+  saveLeagueCommishGame,
   removeLeagueMember,
   resetMemberPin,
   revokeLeagueInvite,
@@ -307,7 +310,13 @@ export default function App({ devNoFirebase = false }: AppProps) {
       bundle: { ...localBundle, state: live },
     })
     const mpCtx = isMultiplayerSaveId(id) ? parseMultiplayerSaveId(id) : null
-    if (mpCtx && token && !mpCtx.commishMode && mpCtx.teamName) {
+    if (mpCtx && token && mpCtx.commishMode) {
+      try {
+        await saveLeagueCommishGame(API_BASE, headers, mpCtx.leagueId, live as Record<string, unknown>)
+      } catch {
+        /* server sync best-effort */
+      }
+    } else if (mpCtx && token && !mpCtx.commishMode && mpCtx.teamName) {
       try {
         await saveLeagueGame(API_BASE, headers, mpCtx.leagueId, mpCtx.teamName, live as Record<string, unknown>)
       } catch {
@@ -1252,13 +1261,62 @@ export default function App({ devNoFirebase = false }: AppProps) {
     const live = saveStateRef.current
     const livePhase = String(live?.season_phase ?? '').toLowerCase()
     const uiPhase = deriveUiPhaseFromSave(live, localBundle?.leagueHistory ?? dynastyLeagueHistory)
-    // Any multiplayer dynasty session is coach-prep only; league advance is dashboard-only.
+    const mpCommishCtx =
+      mpGameContext?.commishMode && mpGameContext.leagueId ? mpGameContext : null
     const mpCoachCtx =
-      mpGameContext?.leagueId && mpGameContext.teamName ? mpGameContext : null
-    const mpLeagueLocked = Boolean(mpGameContext?.leagueId)
+      mpGameContext?.leagueId && mpGameContext.teamName && !mpGameContext.commishMode
+        ? mpGameContext
+        : null
+    const mpLeagueLocked = Boolean(mpCoachCtx)
     const MP_ADVANCE_MSG =
-      'Advance the league from the Commissioner dashboard (Sim week). Finish your prep, then submit your week.'
+      'Advance the league from the Commissioner dashboard (Sim week), or use Run league as commissioner. Finish your prep, then submit your week.'
 
+    if (mpCommishCtx) {
+      try {
+        const body: { cross_region_picks?: { slot_index: number; opponent: string; user_home: boolean }[] } =
+          {}
+        if (opts?.crossRegionPicks?.length) body.cross_region_picks = opts.crossRegionPicks
+        await commishSimWeek(API_BASE, await getAuthHeaders(), mpCommishCtx.leagueId, body)
+        const fresh = await fetchLeagueCommishGame(API_BASE, await getAuthHeaders(), mpCommishCtx.leagueId)
+        let state = fresh.state
+        try {
+          const r = await fetch(`${API_BASE}/sim/sync-state`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ state }),
+          })
+          if (r.ok) {
+            const synced = await r.json()
+            if (synced?.state) state = synced.state
+          }
+        } catch {
+          /* offline */
+        }
+        applySimulationState(state, {
+          league_history: fresh.league_history,
+          records: fresh.records,
+        })
+        if (localBundle) {
+          setLocalBundle({
+            ...localBundle,
+            state,
+            leagueHistory: fresh.league_history ?? localBundle.leagueHistory,
+            records: fresh.records ?? localBundle.records,
+          })
+        }
+        setDynastyLeagueHistory(
+          fresh.league_history && typeof fresh.league_history === 'object'
+            ? fresh.league_history
+            : { seasons: [] },
+        )
+        return true
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : 'Could not advance league')
+        return false
+      }
+    }
+
+    // Any multiplayer coach session is coach-prep only; league advance is dashboard-only.
     function mpOffseasonIsAdvanceAck(body: Record<string, unknown> | undefined): boolean {
       if (!body) return false
       return Boolean(
@@ -2008,6 +2066,71 @@ export default function App({ devNoFirebase = false }: AppProps) {
     }
   }
 
+  async function openCommishLeague(leagueId?: string, leagueName?: string) {
+    const lid = leagueId ?? mpCommishDashboard?.league_id
+    const lname = leagueName ?? mpCommishDashboard?.league_name ?? 'League'
+    if (!lid || !token) return
+    setMpCoachDashBusy(true)
+    setError('')
+    try {
+      const data = await fetchLeagueCommishGame(API_BASE, headers, lid)
+      let state = data.state
+      try {
+        const r = await fetch(`${API_BASE}/sim/hydrate-inbox`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state }),
+        })
+        if (r.ok) {
+          const hydrated = await r.json()
+          if (hydrated?.state) state = hydrated.state
+        }
+      } catch {
+        /* offline */
+      }
+      try {
+        const r2 = await fetch(`${API_BASE}/sim/sync-state`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state }),
+        })
+        if (r2.ok) {
+          const synced = await r2.json()
+          if (synced?.state) state = synced.state
+        }
+      } catch {
+        /* offline */
+      }
+      const bundle: SaveBundle = {
+        state,
+        leagueHistory: data.league_history ?? { seasons: [] },
+        records: data.records ?? {},
+        logos: {},
+        stadiums: {},
+        helmets: {},
+        jerseys: {},
+        seasonRecaps: {},
+      }
+      const id = multiplayerCommishSaveId(lid)
+      const saveName = String(state?.save_name ?? lname).trim() || 'League'
+      await putBrowserSave({ id, saveName, updatedAt: Date.now(), bundle })
+      setMpGameContext({ leagueId: lid, commishMode: true })
+      setLocalBundle(bundle)
+      setSaveId(id)
+      setSaveState(state)
+      setDynastyLeagueHistory(
+        bundle.leagueHistory && typeof bundle.leagueHistory === 'object'
+          ? bundle.leagueHistory
+          : { seasons: [] },
+      )
+      setScreen('playing')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Could not open league console')
+    } finally {
+      setMpCoachDashBusy(false)
+    }
+  }
+
   async function returnToLeagueDashboard() {
     setError('')
     const ctx =
@@ -2019,16 +2142,21 @@ export default function App({ devNoFirebase = false }: AppProps) {
             commishMode: false,
           }
         : null)
-    if (ctx && saveStateRef.current && token && ctx.teamName) {
+    if (ctx) {
       try {
-        await saveLeagueGame(API_BASE, headers, ctx.leagueId, ctx.teamName, saveStateRef.current)
+        if (ctx.commishMode && saveStateRef.current) {
+          await saveLeagueCommishGame(API_BASE, headers, ctx.leagueId, saveStateRef.current)
+        } else if (ctx.teamName && saveStateRef.current) {
+          await saveLeagueGame(API_BASE, headers, ctx.leagueId, ctx.teamName, saveStateRef.current)
+        }
       } catch {
         /* best-effort */
       }
-    }
-    if (ctx) {
       try {
-        if (mpCommishDashboard?.league_id === ctx.leagueId && mpCommishDashboard.can_manage !== false) {
+        if (
+          ctx.commishMode ||
+          (mpCommishDashboard?.league_id === ctx.leagueId && mpCommishDashboard.can_manage !== false)
+        ) {
           await loadCommishDashboard(ctx.leagueId)
         } else {
           await loadLeagueDashboard(ctx.leagueId, ctx.teamName ?? null)
@@ -2460,6 +2588,12 @@ export default function App({ devNoFirebase = false }: AppProps) {
                   })
               : undefined
           }
+          onOpenRunLeague={
+            !mpCommishDashboard.is_read_only_admin && mpCommishDashboard.can_manage !== false
+              ? () => void openCommishLeague(mpCommishDashboard.league_id, mpCommishDashboard.league_name)
+              : undefined
+          }
+          runLeagueBusy={mpCoachDashBusy}
           myDynastyBusy={mpCoachDashBusy}
           onSubmitWeek={coachTeam ? () => void onMultiplayerSubmitWeek() : undefined}
           onUnsubmitWeek={coachTeam ? () => void onMultiplayerUnsubmitWeek() : undefined}
@@ -2512,23 +2646,25 @@ export default function App({ devNoFirebase = false }: AppProps) {
   if (screen === 'playing' && localBundle && saveState) {
     return (
       <>
-        <div style={{ position: 'fixed', top: 12, right: 12, zIndex: 9999, display: 'flex', gap: 8, flexWrap: 'wrap', maxWidth: 'min(100vw - 24px, 520px)', justifyContent: 'flex-end' }}>
+        <div style={{ position: 'fixed', top: 12, right: 12, zIndex: 9999, display: 'flex', gap: 8, flexWrap: 'wrap', maxWidth: 'min(100vw - 24px, 520px)', justifyContent: 'flex-end', pointerEvents: 'none' }}>
           {mpGameContext ? (
-            <button type="button" className="teamhome-select" onClick={() => void returnToLeagueDashboard()}>
+            <button type="button" className="teamhome-select" style={{ pointerEvents: 'auto' }} onClick={() => void returnToLeagueDashboard()}>
               ←{' '}
-              {mpCommishDashboard?.league_id === mpGameContext.leagueId &&
-              mpCommishDashboard.can_manage !== false
+              {mpGameContext.commishMode
                 ? 'Commish dashboard'
-                : 'League dashboard'}
+                : mpCommishDashboard?.league_id === mpGameContext.leagueId &&
+                    mpCommishDashboard.can_manage !== false
+                  ? 'Commish dashboard'
+                  : 'League dashboard'}
             </button>
           ) : null}
-          <button type="button" className="teamhome-select" onClick={() => setAutosaveEnabled((v) => !v)} title="Toggle browser autosave">
+          <button type="button" className="teamhome-select" style={{ pointerEvents: 'auto' }} onClick={() => setAutosaveEnabled((v) => !v)} title="Toggle browser autosave">
             Autosave: {autosaveEnabled ? 'On' : 'Off'}
           </button>
-          <button type="button" className="teamhome-select" onClick={() => void exportBackupZipFile()} title="Full save zip (state, history, records, logos)">
+          <button type="button" className="teamhome-select" style={{ pointerEvents: 'auto' }} onClick={() => void exportBackupZipFile()} title="Full save zip (state, history, records, logos)">
             Download backup (.zip)
           </button>
-          <button type="button" className="teamhome-select" onClick={() => void exportBackupJsonFile()} title="Lighter JSON backup">
+          <button type="button" className="teamhome-select" style={{ pointerEvents: 'auto' }} onClick={() => void exportBackupJsonFile()} title="Lighter JSON backup">
             Download backup (.json)
           </button>
         </div>
@@ -2557,7 +2693,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
               onImportHelmetsToBundle={localBundle ? importHelmetsToBundle : undefined}
               onImportJerseysToBundle={localBundle ? importJerseysToBundle : undefined}
               onRefreshDynasty={inLocalRuntime ? undefined : refreshDynastyFromServer}
-              leagueAdvanceLocked={Boolean(mpGameContext?.leagueId)}
+              leagueAdvanceLocked={Boolean(mpGameContext?.leagueId && !mpGameContext?.commishMode)}
               onSubmitWeek={
                 mpGameContext?.teamName ? () => void onMultiplayerSubmitWeek() : undefined
               }
