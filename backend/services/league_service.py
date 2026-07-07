@@ -6087,6 +6087,9 @@ def apply_coach_prep_state(state: Dict[str, Any], playbook: Optional[Dict[str, A
             raise ValueError("That action would advance the league — only the commissioner can do that.")
         state["teams"] = [team_to_dict(t) for t in teams.values()]
         return state
+    elif phase_s in ("season_summary", "schedule_planning"):
+        if playbook.get("cross_region_picks") is not None:
+            raise ValueError("Out-of-region schedules are set by the commissioner during season summary.")
 
     state["teams"] = [team_to_dict(t) for t in teams.values()]
     return state
@@ -8257,6 +8260,69 @@ def _build_season_schedule_into_state(state: Dict[str, Any], teams: Dict[str, An
     state["week_results"] = wr
 
 
+def _any_team_needs_cross_region_planning(teams: Dict[str, Any]) -> bool:
+    """True when any program in the league has out-of-region schedule slots."""
+    for name in teams:
+        if _schedule_planning_info_for_user(teams, name):
+            return True
+    return False
+
+
+def _human_teams_missing_cross_region_picks(
+    state: Dict[str, Any],
+    teams: Dict[str, Any],
+    human_teams: set[str],
+) -> List[str]:
+    """Human-controlled teams that still owe out-of-region picks."""
+    missing: List[str] = []
+    for team_name in sorted(human_teams):
+        if not _schedule_planning_info_for_user(teams, team_name):
+            continue
+        if not _user_cross_region_picks_complete(state, teams, team_name):
+            missing.append(team_name)
+    return missing
+
+
+def _merge_cross_region_picks_for_team(
+    state: Dict[str, Any],
+    teams: Dict[str, Any],
+    team_name: str,
+    cross_region_picks: Any,
+) -> None:
+    """Validate and merge one team's out-of-region picks into shared league state."""
+    from systems.schedule_planning import normalize_cross_region_picks, picks_dict_for_state
+
+    picks = normalize_cross_region_picks(teams, team_name, cross_region_picks)
+    merged: Dict[str, Any] = dict(state.get("cross_region_picks") or {})
+    merged.update(picks_dict_for_state(team_name, picks))
+    state["cross_region_picks"] = merged
+
+
+def _auto_fill_cross_region_picks_for_teams(
+    state: Dict[str, Any],
+    teams: Dict[str, Any],
+    *,
+    skip_teams: Optional[set[str]] = None,
+) -> None:
+    """Fill missing out-of-region slots (CPU teams only when skip_teams is human roster)."""
+    from systems.schedule_planning import auto_random_picks, picks_dict_for_state
+
+    skip = skip_teams or set()
+    merged_picks: Dict[str, Any] = dict(state.get("cross_region_picks") or {})
+    for team_name in teams:
+        if team_name in skip:
+            continue
+        if not _schedule_planning_info_for_user(teams, team_name):
+            continue
+        if _user_cross_region_picks_complete(state, teams, team_name):
+            continue
+        merged_picks.update(picks_dict_for_state(team_name, auto_random_picks(teams, team_name)))
+    state["cross_region_picks"] = merged_picks
+    _build_season_schedule_into_state(state, teams)
+    state.pop("schedule_planning_info", None)
+    _sync_user_cross_region_slot_count(state)
+
+
 def _user_cross_region_picks_complete(
     state: Dict[str, Any],
     teams: Dict[str, Any],
@@ -8488,7 +8554,9 @@ def _apply_schedule_planning_picks_and_enter_offseason(
     if not user_team:
         raise ValueError("No user team on save.")
     picks = normalize_cross_region_picks(teams, user_team, cross_region_picks)
-    state["cross_region_picks"] = picks_dict_for_state(user_team, picks)
+    merged: Dict[str, Any] = dict(state.get("cross_region_picks") or {})
+    merged.update(picks_dict_for_state(user_team, picks))
+    state["cross_region_picks"] = merged
     _build_season_schedule_into_state(state, teams)
 
     already_in_offseason = isinstance(state.get("offseason_graduation_report"), dict)
@@ -8735,21 +8803,12 @@ def is_multiplayer_league_state(state: Dict[str, Any]) -> bool:
 
 def _auto_fill_all_cross_region_picks(state: Dict[str, Any]) -> None:
     """Fill out-of-region slots for every team and build the shared week board."""
-    from systems.schedule_planning import auto_random_picks, picks_dict_for_state
-
     teams = {
         t["name"]: team_from_dict(t)
         for t in (state.get("teams") or [])
         if isinstance(t, dict) and t.get("name")
     }
-    merged_picks: Dict[str, Any] = dict(state.get("cross_region_picks") or {})
-    for team_name in teams:
-        if _schedule_planning_info_for_user(teams, team_name):
-            merged_picks.update(picks_dict_for_state(team_name, auto_random_picks(teams, team_name)))
-    state["cross_region_picks"] = merged_picks
-    _build_season_schedule_into_state(state, teams)
-    state.pop("schedule_planning_info", None)
-    _sync_user_cross_region_slot_count(state)
+    _auto_fill_cross_region_picks_for_teams(state, teams)
 
 
 def ensure_multiplayer_opening_schedule(state: Dict[str, Any]) -> bool:
@@ -8798,12 +8857,111 @@ def ensure_multiplayer_opening_schedule(state: Dict[str, Any]) -> bool:
     return False
 
 
+def advance_mp_season_summary_or_planning_state(
+    state: Dict[str, Any],
+    league_history: Dict[str, Any],
+    *,
+    human_teams: Optional[set[str]] = None,
+    cross_region_picks: Optional[Any] = None,
+    commish_team: str = "",
+) -> str:
+    """
+    Multiplayer end-of-year flow: each human coach picks out-of-region games (or the
+    commissioner sets them in Run league), then the commissioner advances the league.
+    """
+    phase_s = str(state.get("season_phase") or "").strip().lower()
+    if phase_s not in ("season_summary", "schedule_planning"):
+        raise ValueError(f"Cannot advance multiplayer season end from season_phase={phase_s!r}")
+
+    teams = {
+        t["name"]: team_from_dict(t)
+        for t in (state.get("teams") or [])
+        if isinstance(t, dict) and t.get("name")
+    }
+    team_names = list(teams.keys())
+    human = set(human_teams or [])
+
+    if not _any_team_needs_cross_region_planning(teams):
+        playoffs = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else {}
+        champion = str(playoffs.get("champion") or "")
+        br_flat = _recap_merged_bracket_results(state, _flatten_playoff_bracket_results(playoffs))
+        standings = state.get("standings") or {}
+        year_num = int(state.get("current_year", 1))
+        state.pop("cross_region_picks", None)
+        state.pop("user_team", None)
+        _finish_season_apply_offseason_transition(
+            state,
+            teams,
+            team_names,
+            standings,
+            champion,
+            br_flat,
+            year_num,
+            league_history,
+            defer_schedule=False,
+        )
+        state["season_phase"] = "offseason"
+        state["teams"] = [team_to_dict(t) for t in teams.values()]
+        return "Offseason begun"
+
+    missing_humans = _human_teams_missing_cross_region_picks(state, teams, human)
+
+    if missing_humans:
+        raise ValueError(
+            "Set out-of-region schedules for all human teams before advancing: "
+            + ", ".join(missing_humans)
+        )
+
+    _auto_fill_cross_region_picks_for_teams(state, teams, skip_teams=human)
+
+    pending = state.pop("pending_offseason_transition", None)
+    if not isinstance(pending, dict):
+        playoffs = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else {}
+        pending = {
+            "standings": state.get("standings") or {},
+            "champion": str(playoffs.get("champion") or ""),
+            "br_flat_fin": _recap_merged_bracket_results(state, _flatten_playoff_bracket_results(playoffs)),
+            "year_num": int(state.get("current_year", 1)),
+        }
+
+    already_in_offseason = isinstance(state.get("offseason_graduation_report"), dict)
+    standings = pending.get("standings") or state.get("standings") or {}
+    if isinstance(pending, dict):
+        _finish_season_apply_offseason_transition(
+            state,
+            teams,
+            team_names,
+            standings,
+            str(pending.get("champion") or ""),
+            list(pending.get("br_flat_fin") or []),
+            int(pending.get("year_num") or state.get("current_year") or 1),
+            league_history,
+            defer_schedule=False,
+        )
+        state["season_phase"] = "offseason"
+    elif already_in_offseason:
+        state["season_phase"] = "offseason"
+    else:
+        state["season_phase"] = "preseason"
+        state["preseason_stages"] = state.get("preseason_stages") or list(PRESEASON_STAGES)
+        state["preseason_stage_index"] = int(state.get("preseason_stage_index") or 0)
+
+    if is_multiplayer_league_state(state):
+        repair_multiplayer_scrimmage_storage(state)
+    else:
+        _assign_scrimmage_opponents_for_state(state)
+    state.pop("schedule_planning_info", None)
+    state.pop("user_team", None)
+    state["teams"] = [team_to_dict(t) for t in teams.values()]
+    return "Cross-region schedule confirmed — offseason begun"
+
+
 def advance_schedule_planning_league_state(
     state: Dict[str, Any],
     *,
     league_history: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Multiplayer: auto-fill cross-region picks for every team, then build the season schedule."""
+    """Multiplayer opening: auto-fill cross-region picks for every team, then build the season schedule."""
     phase_s = str(state.get("season_phase") or "").strip().lower()
     if phase_s != "schedule_planning":
         raise ValueError("save is not in schedule_planning")

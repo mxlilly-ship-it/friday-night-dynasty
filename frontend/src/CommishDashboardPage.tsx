@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import './CommishDashboardPage.css'
-import type { CommishDashboardData } from './multiplayer'
+import CommishCrossRegionPlanning from './CommishCrossRegionPlanning'
+import type { CommishCrossRegionPlanningData, CommishDashboardData } from './multiplayer'
 
 const DOW_OPTIONS = [
   { value: 0, label: 'Monday' },
@@ -13,9 +14,12 @@ const DOW_OPTIONS = [
 ]
 
 type CommishDashboardPageProps = {
+  apiBase: string
+  headers: Record<string, string>
   data: CommishDashboardData
   onBack: () => void
   onRefresh: () => Promise<void>
+  onCrossRegionPlanningChange?: (next: CommishCrossRegionPlanningData) => void
   onSimWeek: () => Promise<string>
   simWeekBusy?: boolean
   onInvite: (email: string) => Promise<{ email_sent?: boolean } | void>
@@ -43,9 +47,12 @@ type CommishDashboardPageProps = {
 }
 
 export default function CommishDashboardPage({
+  apiBase,
+  headers,
   data,
   onBack,
   onRefresh,
+  onCrossRegionPlanningChange,
   onSimWeek,
   simWeekBusy = false,
   onInvite,
@@ -242,6 +249,20 @@ export default function CommishDashboardPage({
         <div className="fnd-error" style={{ margin: '12px 32px 0' }}>
           {errorLocal}
         </div>
+      ) : null}
+
+      {data.cross_region_planning?.active ? (
+        <section className="cdash-panel cdash-panel--wide" style={{ margin: '0 32px 24px' }}>
+          <div className="cdash-panel-body">
+            <CommishCrossRegionPlanning
+              apiBase={apiBase}
+              headers={headers}
+              leagueId={data.league_id}
+              planning={data.cross_region_planning}
+              onPlanningChange={onCrossRegionPlanningChange}
+            />
+          </div>
+        </section>
       ) : null}
 
       <div className="cdash-grid">

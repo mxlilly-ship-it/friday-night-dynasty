@@ -11,6 +11,7 @@ from backend.services.multiplayer_service import (
     apply_member_coach_setup,
     assign_team_by_email,
     assign_team_to_member,
+    build_commish_cross_region_planning,
     build_commish_dashboard,
     build_league_dashboard,
     commish_advance_league,
@@ -32,6 +33,7 @@ from backend.services.multiplayer_service import (
     reset_member_pin,
     resolve_commissioner_user_id,
     revoke_league_invite,
+    save_commish_cross_region_picks,
     save_league_commish_game_state,
     save_league_game_state,
     submit_league_week,
@@ -194,6 +196,40 @@ def commish_settings_route(
 
 class CommishSimWeekBody(BaseModel):
   cross_region_picks: Optional[List[Dict[str, Any]]] = None
+
+
+class CommishCrossRegionPicksBody(BaseModel):
+    cross_region_picks: List[Dict[str, Any]]
+
+
+@router.get("/{league_id}/commish/cross-region-planning", response_model=Dict[str, Any])
+def commish_cross_region_planning_route(league_id: str, user=Depends(require_entitled)):
+    try:
+        return build_commish_cross_region_planning(league_id, user["user_id"])
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.put("/{league_id}/commish/cross-region-picks", response_model=Dict[str, Any])
+def commish_cross_region_picks_route(
+    league_id: str,
+    team_name: str,
+    body: CommishCrossRegionPicksBody,
+    user=Depends(require_entitled),
+):
+    try:
+        return save_commish_cross_region_picks(
+            league_id,
+            user["user_id"],
+            team_name,
+            body.cross_region_picks,
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.post("/{league_id}/commish/sim-week", response_model=Dict[str, Any])

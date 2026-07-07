@@ -44,6 +44,7 @@ import {
   assignTeamByEmail,
   commishSimWeek,
   fetchCommishDashboard,
+  fetchCommishCrossRegionPlanning,
   fetchLeagueCommishGame,
   fetchLeagueDashboard,
   fetchLeagueGame,
@@ -60,6 +61,7 @@ import {
   updateCommishSettings,
   vacateTeamMember,
   verifyTeamPin,
+  type CommishCrossRegionPlanningData,
   type CommishDashboardData,
   type LeagueDashboardData,
   type LeagueListItem,
@@ -189,6 +191,8 @@ export default function App({ devNoFirebase = false }: AppProps) {
   const [mpCoachDashBusy, setMpCoachDashBusy] = useState(false)
   const [mpSubmitBusy, setMpSubmitBusy] = useState(false)
   const [mpCommishSimBusy, setMpCommishSimBusy] = useState(false)
+  const [mpCommishCrossRegionPlanning, setMpCommishCrossRegionPlanning] =
+    useState<CommishCrossRegionPlanningData | null>(null)
   const [autosaveEnabled, setAutosaveEnabled] = useState<boolean>(() => {
     const raw = localStorage.getItem('fnd_autosave_enabled')
     return raw == null ? true : raw === 'true'
@@ -2113,6 +2117,13 @@ export default function App({ devNoFirebase = false }: AppProps) {
       }
       const id = multiplayerCommishSaveId(lid)
       const saveName = String(state?.save_name ?? lname).trim() || 'League'
+      let crossRegionPlanning: CommishCrossRegionPlanningData | null = null
+      try {
+        crossRegionPlanning = await fetchCommishCrossRegionPlanning(API_BASE, headers, lid)
+      } catch {
+        crossRegionPlanning = null
+      }
+      setMpCommishCrossRegionPlanning(crossRegionPlanning)
       await putBrowserSave({ id, saveName, updatedAt: Date.now(), bundle })
       setMpGameContext({ leagueId: lid, commishMode: true })
       setLocalBundle(bundle)
@@ -2166,6 +2177,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
         setScreen('multiplayer')
       }
       setMpGameContext(null)
+      setMpCommishCrossRegionPlanning(null)
       return
     }
     setScreen('multiplayer')
@@ -2527,7 +2539,12 @@ export default function App({ devNoFirebase = false }: AppProps) {
     return (
       <>
         <CommishDashboardPage
+          apiBase={API_BASE}
+          headers={headers}
           data={mpCommishDashboard}
+          onCrossRegionPlanningChange={(next) =>
+            setMpCommishDashboard((prev) => (prev ? { ...prev, cross_region_planning: next } : prev))
+          }
           onBack={() => {
             setMpCommishDashboard(null)
             setScreen('multiplayer')
@@ -2711,6 +2728,14 @@ export default function App({ devNoFirebase = false }: AppProps) {
               onReturnToLeagueHub={
                 mpGameContext?.leagueId ? () => void returnToLeagueDashboard() : undefined
               }
+              mpCommishLeagueId={
+                mpGameContext?.commishMode && mpGameContext.leagueId ? mpGameContext.leagueId : undefined
+              }
+              mpCommishCrossRegionPlanning={mpCommishCrossRegionPlanning ?? undefined}
+              onMpCommishCrossRegionPlanningChange={(next) => {
+                setMpCommishCrossRegionPlanning(next)
+                setMpCommishDashboard((prev) => (prev ? { ...prev, cross_region_planning: next } : prev))
+              }}
           />
         </LocalAssetsProvider>
         {showBackupPrompt ? (

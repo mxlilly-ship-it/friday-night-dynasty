@@ -794,6 +794,15 @@ def _merge_coach_state_into_canonical(
             if key in incoming:
                 out[key] = copy.deepcopy(incoming[key])
 
+    inc_picks = incoming.get("cross_region_picks")
+    if isinstance(inc_picks, dict) and team_name in inc_picks:
+        canon_picks = out.get("cross_region_picks")
+        if not isinstance(canon_picks, dict):
+            canon_picks = {}
+        canon_picks = copy.deepcopy(canon_picks)
+        canon_picks[team_name] = copy.deepcopy(inc_picks[team_name])
+        out["cross_region_picks"] = canon_picks
+
     out["multiplayer_league"] = True
     mp = out.get("multiplayer") if isinstance(out.get("multiplayer"), dict) else {}
     mp = dict(mp)
@@ -864,6 +873,10 @@ def get_league_commish_game_bundle(league_id: str, user_id: str) -> Dict[str, An
         "team_name": acting or None,
         "multiplayer_league": True,
     }
+
+    from backend.services.league_service import _finalize_cross_region_schedule_state
+
+    _finalize_cross_region_schedule_state(state)
 
     league_history: Dict[str, Any] = {"seasons": []}
     records: Dict[str, Any] = {}
@@ -1021,6 +1034,10 @@ def get_league_game_bundle(league_id: str, user_id: str, team_name: str) -> Dict
                 break
     state["multiplayer"] = {"league_id": league_id, "team_name": team_name, "multiplayer_league": True}
     state["multiplayer_league"] = True
+
+    from backend.services.league_service import _finalize_cross_region_schedule_state
+
+    _finalize_cross_region_schedule_state(state)
 
     hydrate_mp_team_scrimmage_view(state, team_name)
     confirmed_teams = state.get("home_game_themes_confirmed_teams")
@@ -2438,50 +2455,24 @@ def commish_advance_league(
             else:
                 action_label = "Playoff round advanced"
     elif phase == "season_summary":
-        records = load_records(records_path(save_dir))
-        out = finish_season_state(
+        from backend.services.league_service import advance_mp_season_summary_or_planning_state
+
+        human = {str(m["team_name"]) for m in _human_teams(league_id) if m.get("team_name")}
+        action_label = advance_mp_season_summary_or_planning_state(
             state,
             league_history,
-            records,
-            begin_offseason=True,
-            cross_region_picks=cross_region_picks,
+            human_teams=human,
         )
-        state = out.get("state") if isinstance(out.get("state"), dict) else state
-        if isinstance(out.get("league_history"), dict):
-            league_history = out["league_history"]
-            save_league_history(league_history, league_history_path(save_dir))
-        if isinstance(out.get("records"), dict):
-            save_records(out["records"], records_path(save_dir))
-        phase_after = str(state.get("season_phase") or "").strip().lower()
-        if phase_after == "schedule_planning":
-            action_label = "Schedule planning — confirm cross-region games in Run league"
-        elif phase_after == "offseason":
-            action_label = "Offseason begun"
-        else:
-            action_label = "Season summary advanced"
+        save_league_history(league_history, league_history_path(save_dir))
     elif phase == "offseason":
         state = advance_offseason_state(state, {}, league_history=league_history)
         action_label = "Offseason advanced"
     elif phase == "schedule_planning":
-        from backend.services.league_service import (
-            advance_schedule_planning_league_state,
-            _apply_schedule_planning_picks_and_enter_offseason,
-        )
-        from systems.save_system import team_from_dict
+        from backend.services.league_service import advance_schedule_planning_league_state
 
-        if cross_region_picks:
-            teams = {
-                t["name"]: team_from_dict(t)
-                for t in (state.get("teams") or [])
-                if isinstance(t, dict) and t.get("name")
-            }
-            _apply_schedule_planning_picks_and_enter_offseason(
-                state, teams, cross_region_picks, league_history=league_history
-            )
-            action_label = "Cross-region schedule confirmed"
-        else:
-            state = advance_schedule_planning_league_state(state, league_history=league_history)
-            action_label = "Schedule planning completed (auto picks)"
+        state = advance_schedule_planning_league_state(state, league_history=league_history)
+        save_league_history(league_history, league_history_path(save_dir))
+        action_label = "Schedule planning completed"
     else:
         raise ValueError(f"Cannot advance league from season_phase={phase!r}")
 
@@ -2541,6 +2532,162 @@ def commish_advance_league(
     }
 
 
+def _human_team_names_for_league(league_id: str) -> set[str]:
+    with db() as conn:
+        rows = conn.execute(
+            """
+            SELECT team_name FROM league_members
+            WHERE league_id=? AND status='active' AND team_name IS NOT NULL AND team_name != ''
+            """,
+            (league_id,),
+        ).fetchall()
+    return {str(r["team_name"]) for r in rows if r["team_name"]}
+
+
+def build_commish_cross_region_planning(
+    league_id: str,
+    user_id: str,
+) -> Dict[str, Any]:
+    """Out-of-region schedule picker data for human schools (commissioner only)."""
+    from backend.services.league_service import (
+        _any_team_needs_cross_region_planning,
+        _human_teams_missing_cross_region_picks,
+        _schedule_planning_info_for_user,
+        _user_cross_region_picks_complete,
+    )
+    from systems.save_system import team_from_dict
+    from systems.schedule_planning import parse_stored_pick
+
+    _verify_commish_view_access(league_id, user_id)
+    league_row = _load_league_row(league_id)
+    if not league_row:
+        raise ValueError("league not found")
+    save_dir = str(league_row.get("save_dir") or "")
+    state = _load_state(save_dir)
+    phase = str(state.get("season_phase") or "").strip().lower()
+    season_year = int(state.get("current_year", 1) or 1)
+    human = _human_team_names_for_league(league_id)
+    teams = {
+        t["name"]: team_from_dict(t)
+        for t in (state.get("teams") or [])
+        if isinstance(t, dict) and t.get("name")
+    }
+
+    inactive = phase != "season_summary"
+    if inactive or not _any_team_needs_cross_region_planning(teams):
+        return {
+            "active": False,
+            "season_year": season_year,
+            "teams": [],
+            "all_complete": True,
+            "missing_teams": [],
+        }
+
+    human_with_slots = sorted(
+        t for t in human if _schedule_planning_info_for_user(teams, t)
+    )
+    if not human_with_slots:
+        return {
+            "active": False,
+            "season_year": season_year,
+            "teams": [],
+            "all_complete": True,
+            "missing_teams": [],
+        }
+
+    picks_raw = state.get("cross_region_picks") if isinstance(state.get("cross_region_picks"), dict) else {}
+    team_rows: List[Dict[str, Any]] = []
+    for team_name in human_with_slots:
+        info = _schedule_planning_info_for_user(teams, team_name)
+        if not info:
+            continue
+        user_picks = picks_raw.get(team_name) if isinstance(picks_raw, dict) else {}
+        selections: List[Dict[str, Any]] = []
+        for slot in info.get("slots") or []:
+            if not isinstance(slot, dict):
+                continue
+            si = int(slot.get("slot_index", 0))
+            raw = None
+            if isinstance(user_picks, dict):
+                raw = user_picks.get(si)
+                if raw is None:
+                    raw = user_picks.get(str(si))
+            pick = parse_stored_pick(raw)
+            selections.append(
+                {
+                    "slot_index": si,
+                    "opponent": pick.opponent or "",
+                    "user_home": pick.user_home,
+                }
+            )
+        team_rows.append(
+            {
+                "team_name": team_name,
+                "picks_complete": _user_cross_region_picks_complete(state, teams, team_name),
+                "schedule_planning_info": info,
+                "selections": selections,
+            }
+        )
+
+    missing = _human_teams_missing_cross_region_picks(state, teams, human)
+    return {
+        "active": True,
+        "season_year": season_year,
+        "teams": team_rows,
+        "all_complete": len(missing) == 0,
+        "missing_teams": missing,
+    }
+
+
+def save_commish_cross_region_picks(
+    league_id: str,
+    user_id: str,
+    team_name: str,
+    cross_region_picks: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Commissioner sets one human school's out-of-region schedule during season summary."""
+    from backend.services.league_service import (
+        _merge_cross_region_picks_for_team,
+        _schedule_planning_info_for_user,
+    )
+    from systems.save_system import team_from_dict
+
+    _verify_commish_game_access(league_id, user_id)
+    team_name = str(team_name or "").strip()
+    if not team_name:
+        raise ValueError("team_name required")
+    human = _human_team_names_for_league(league_id)
+    if team_name not in human:
+        raise ValueError(f"{team_name} is not a human-controlled team in this league.")
+
+    league_row = _load_league_row(league_id) or {}
+    save_dir = str(league_row.get("save_dir") or "")
+    state = _load_state(save_dir)
+    phase = str(state.get("season_phase") or "").strip().lower()
+    if phase != "season_summary":
+        raise ValueError("Out-of-region schedules can only be set during season summary.")
+
+    teams = {
+        t["name"]: team_from_dict(t)
+        for t in (state.get("teams") or [])
+        if isinstance(t, dict) and t.get("name")
+    }
+    if not _schedule_planning_info_for_user(teams, team_name):
+        raise ValueError(f"{team_name} does not require out-of-region schedule picks.")
+
+    _merge_cross_region_picks_for_team(state, teams, team_name, cross_region_picks)
+    state.pop("user_team", None)
+    _save_state(save_dir, state)
+    now = _now()
+    with db() as conn:
+        conn.execute(
+            "UPDATE leagues SET state_version=state_version+1, updated_at=? WHERE id=?",
+            (now, league_id),
+        )
+    planning = build_commish_cross_region_planning(league_id, user_id)
+    return {"ok": True, "team_name": team_name, "cross_region_planning": planning}
+
+
 def build_commish_dashboard(league_id: str, user_id: str) -> Dict[str, Any]:
     league_row, read_only = _verify_commish_view_access(league_id, user_id)
     if not read_only:
@@ -2568,6 +2715,8 @@ def build_commish_dashboard(league_id: str, user_id: str) -> Dict[str, Any]:
         week_label = f"Offseason — {stages[idx] if idx < len(stages) else 'Complete'}"
     elif phase == "playoffs":
         week_label = "Playoffs"
+    elif phase == "season_summary":
+        week_label = "Season summary — set out-of-region schedules"
 
     with db() as conn:
         member_rows = conn.execute(
@@ -2684,6 +2833,7 @@ def build_commish_dashboard(league_id: str, user_id: str) -> Dict[str, Any]:
         "acting_team_name": acting_team,
         "coach_setup_complete": coach_setup_complete,
         "your_status": your_status,
+        "cross_region_planning": build_commish_cross_region_planning(league_id, user_id),
     }
 
 

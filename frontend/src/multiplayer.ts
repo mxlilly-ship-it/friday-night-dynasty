@@ -116,6 +116,19 @@ export type CommishPendingInvite = {
   created_at: number
 }
 
+export type CommishCrossRegionPlanningData = {
+  active: boolean
+  season_year: number
+  teams: {
+    team_name: string
+    picks_complete: boolean
+    schedule_planning_info: Record<string, unknown>
+    selections: { slot_index: number; opponent: string; user_home: boolean | null }[]
+  }[]
+  all_complete: boolean
+  missing_teams: string[]
+}
+
 export type CommishDashboardData = {
   league_id: string
   league_name: string
@@ -142,6 +155,7 @@ export type CommishDashboardData = {
   acting_team_name?: string | null
   coach_setup_complete?: boolean
   your_status?: { submitted: boolean; can_unsubmit?: boolean; label: string; sub_label: string }
+  cross_region_planning?: CommishCrossRegionPlanningData
 }
 
 export type AssignTeamResult = {
@@ -496,6 +510,37 @@ export async function commishSimWeek(
   })
   if (!r.ok) throw new Error(await r.text())
   return (await r.json()) as { ok: boolean; message: string; season_phase: string; current_week: number }
+}
+
+export async function fetchCommishCrossRegionPlanning(
+  apiBase: string,
+  headers: Record<string, string>,
+  leagueId: string,
+): Promise<CommishCrossRegionPlanningData> {
+  const r = await fetchWithRetry(`${apiBase}/leagues/${leagueId}/commish/cross-region-planning`, { headers })
+  if (!r.ok) throw new Error(await r.text())
+  return (await r.json()) as CommishCrossRegionPlanningData
+}
+
+export async function saveCommishCrossRegionPicks(
+  apiBase: string,
+  headers: Record<string, string>,
+  leagueId: string,
+  teamName: string,
+  crossRegionPicks: { slot_index: number; opponent: string; user_home: boolean }[],
+): Promise<{ ok: boolean; team_name: string; cross_region_planning: CommishCrossRegionPlanningData }> {
+  const q = `?team_name=${encodeURIComponent(teamName)}`
+  const r = await fetchWithRetry(`${apiBase}/leagues/${leagueId}/commish/cross-region-picks${q}`, {
+    method: 'PUT',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cross_region_picks: crossRegionPicks }),
+  })
+  if (!r.ok) throw new Error(await r.text())
+  return (await r.json()) as {
+    ok: boolean
+    team_name: string
+    cross_region_planning: CommishCrossRegionPlanningData
+  }
 }
 
 export async function vacateTeamMember(

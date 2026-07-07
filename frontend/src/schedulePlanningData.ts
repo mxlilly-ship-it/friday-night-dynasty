@@ -83,6 +83,31 @@ export function allSlotsFilled(info: SchedulePlanningInfo, selections: CrossRegi
   return info.slots.every((s) => Boolean(String(selections[s.slot_index]?.opponent ?? '').trim()))
 }
 
+/** Restore UI selections from per-team picks stored on the league save. */
+export function crossRegionSelectionsFromSaved(
+  saveState: any,
+  userTeam: string,
+  info: SchedulePlanningInfo | null,
+): CrossRegionSelections {
+  if (!info || !userTeam) return {}
+  const raw = saveState?.cross_region_picks
+  const userPicks = raw && typeof raw === 'object' ? raw[userTeam] : null
+  if (!userPicks || typeof userPicks !== 'object') return {}
+  const out: CrossRegionSelections = {}
+  for (const slot of info.slots) {
+    const rawSlot = userPicks[slot.slot_index] ?? userPicks[String(slot.slot_index)]
+    if (!rawSlot || typeof rawSlot !== 'object') continue
+    const opp = String((rawSlot as { opponent?: string }).opponent ?? '').trim()
+    if (!opp) continue
+    const uh = (rawSlot as { user_home?: boolean }).user_home
+    out[slot.slot_index] = {
+      opponent: opp,
+      userHome: uh != null ? Boolean(uh) : defaultUserHomeForSlot(slot.slot_index),
+    }
+  }
+  return out
+}
+
 /** True once any regular-season week result slot is marked played. */
 export function saveHasPlayedRegularSeasonGames(saveState: any): boolean {
   const weeks = saveState?.week_results

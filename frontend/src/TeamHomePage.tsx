@@ -85,14 +85,15 @@ import {
 import SeasonSummaryPanel from './SeasonSummaryPanel'
 import HomeGameThemesPanel from './HomeGameThemesPanel'
 import { themeLabelForGame } from './homeGameThemes'
-import { isMultiplayerCommishSaveId } from './browserSave'
 import type { HomeThemeSelection } from './homeGameThemes'
 import CoachInboxPanel from './CoachInboxPanel'
 import InSeasonDashboard from './InSeasonDashboard'
 import SchedulePlanningPanel, { SchedulePlanningScrollCallout } from './SchedulePlanningPanel'
+import CommishCrossRegionPlanning from './CommishCrossRegionPlanning'
 import {
   allSlotsFilled,
   buildCrossRegionPicksPayload,
+  crossRegionSelectionsFromSaved,
   crossRegionSlotCountFromSave,
   emptySlotSelection,
   isInitialDynastySchedulePlanning,
@@ -329,10 +330,14 @@ type Props = {
   weekSubmitted?: boolean
   canUnsubmitWeek?: boolean
   submitWeekBusy?: boolean
+  /** Multiplayer: commissioner sets human out-of-region schedules from Run league. */
+  mpCommishLeagueId?: string
+  mpCommishCrossRegionPlanning?: import('./multiplayer').CommishCrossRegionPlanningData
+  onMpCommishCrossRegionPlanningChange?: (
+    next: import('./multiplayer').CommishCrossRegionPlanningData,
+  ) => void
   onReturnToLeagueHub?: () => void
 }
-
-type TeamHomePageBodyProps = Props & {
   logoVersion: number
   setLogoVersion: (n: number) => void
   stadiumVersion: number
@@ -1707,6 +1712,9 @@ function TeamHomePageBody({
   canUnsubmitWeek = true,
   submitWeekBusy = false,
   onReturnToLeagueHub,
+  mpCommishLeagueId,
+  mpCommishCrossRegionPlanning,
+  onMpCommishCrossRegionPlanningChange,
 }: TeamHomePageBodyProps) {
   void backupReminderFrequency
   void onBackupReminderFrequencyChange
@@ -1770,11 +1778,12 @@ function TeamHomePageBody({
     [saveState, phase],
   )
   const isMultiplayerLeague = useMemo(() => isMultiplayerLeagueSave(saveState), [saveState])
-  const isCommishMpRun = isMultiplayerCommishSaveId(saveId)
-  const mpCanPickCrossRegion = !isMultiplayerLeague || isCommishMpRun
-  // Multiplayer coaches never pick opening (or mid-league) schedules — commissioner Run league only.
   const needsCrossRegionPickUi = Boolean(
-    schedulePlanningInfo && !crossRegionReady && !leagueAdvanceLocked && mpCanPickCrossRegion,
+    schedulePlanningInfo && !crossRegionReady && !leagueAdvanceLocked && !isMultiplayerLeague,
+  )
+
+  const commishCrossRegionBlocksAdvance = Boolean(
+    mpCommishLeagueId && mpCommishCrossRegionPlanning?.active && !mpCommishCrossRegionPlanning.all_complete,
   )
 
   const scrollToSchedulePlanning = useCallback(() => {
@@ -1787,14 +1796,13 @@ function TeamHomePageBody({
   const [crossRegionSyncing, setCrossRegionSyncing] = useState(false)
   const playoffsComplete = phase === 'playoffs' && Boolean(saveState?.playoffs?.completed)
   const needsCrossRegionSync =
-    mpCanPickCrossRegion &&
-    (phase === 'season_summary' ||
-      phase === 'schedule_planning' ||
-      playoffsComplete ||
-      (phase === 'preseason' &&
-        Array.isArray(saveState?.weeks) &&
-        saveState.weeks.length > 0 &&
-        !saveState?.cross_region_picks))
+    phase === 'season_summary' ||
+    phase === 'schedule_planning' ||
+    playoffsComplete ||
+    (phase === 'preseason' &&
+      Array.isArray(saveState?.weeks) &&
+      saveState.weeks.length > 0 &&
+      !saveState?.cross_region_picks)
 
   useEffect(() => {
     if (!needsCrossRegionSync || !onSaveState) return
@@ -1855,10 +1863,22 @@ function TeamHomePageBody({
   }, [phase])
   useEffect(() => {
     if ((phase !== 'schedule_planning' && phase !== 'season_summary') || !schedulePlanningInfo) return
+    const saved = crossRegionSelectionsFromSaved(saveState, userTeam, schedulePlanningInfo)
     setCrossRegionSelections((prev) => {
       const next = { ...prev }
       let changed = false
       for (const slot of schedulePlanningInfo.slots) {
+        const savedSel = saved[slot.slot_index]
+        if (savedSel?.opponent) {
+          if (
+            next[slot.slot_index]?.opponent !== savedSel.opponent ||
+            next[slot.slot_index]?.userHome !== savedSel.userHome
+          ) {
+            next[slot.slot_index] = savedSel
+            changed = true
+          }
+          continue
+        }
         if (next[slot.slot_index] === undefined) {
           next[slot.slot_index] = emptySlotSelection(slot.slot_index)
           changed = true
@@ -1866,7 +1886,7 @@ function TeamHomePageBody({
       }
       return changed ? next : prev
     })
-  }, [phase, schedulePlanningInfo, saveId])
+  }, [phase, schedulePlanningInfo, saveId, saveState?.cross_region_picks, userTeam])
   useEffect(() => {
     setLeagueHistYearPick(null)
   }, [saveId])
@@ -5224,14 +5244,13 @@ function TeamHomePageBody({
               winterAllocationInvalid ||
               (phase === 'offseason' && offseasonCurrentStage === 'Improvements' && improvementsBudget.invalid) ||
               (isHomeGameThemesStage && !homeGameThemesConfirmed) ||
-              (mpCanPickCrossRegion &&
+              (effectiveCrossRegionSlots > 0 &&
                 phase === 'season_summary' &&
-                effectiveCrossRegionSlots > 0 &&
                 (!schedulePlanningInfo || !crossRegionReady)) ||
-              (mpCanPickCrossRegion &&
-                phase === 'schedule_planning' &&
-                (!schedulePlanningInfo || !crossRegionReady)) ||
-              (mpCanPickCrossRegion && crossRegionSyncing && !crossRegionReady)
+              (phase === 'schedule_planning' && (!schedulePlanningInfo || !crossRegionReady)) ||
+              (crossRegionSyncing && !crossRegionReady && !isMultiplayerLeague) ||
+              commishCrossRegionBlocksAdvance ||
+              (isMultiplayerLeague && leagueAdvanceLocked && phase === 'season_summary')
             }
             onClick={async () => {
               try {
@@ -5324,7 +5343,7 @@ function TeamHomePageBody({
                 } else if (phase === 'season_summary') {
                   await onSimWeek({
                     seasonFinish: true,
-                    ...(effectiveCrossRegionSlots > 0 && schedulePlanningInfo
+                    ...(effectiveCrossRegionSlots > 0 && schedulePlanningInfo && !isMultiplayerLeague
                       ? {
                           crossRegionPicks: buildCrossRegionPicksPayload(
                             schedulePlanningInfo,
@@ -5360,7 +5379,9 @@ function TeamHomePageBody({
                   ? crossRegionReady
                     ? 'Confirm out-of-region opponents and continue to graduation'
                     : 'Choose an opponent for each out-of-region game'
-                  : 'Continue to graduation and offseason'
+                  : commishCrossRegionBlocksAdvance
+                    ? 'Save out-of-region schedules for every human school first'
+                    : 'Continue to graduation and offseason'
                 : phase === 'playoffs' && playoffsComplete
                 ? 'Playoffs complete — Continue to open season summary'
                 : phase === 'playoffs'
@@ -5397,7 +5418,9 @@ function TeamHomePageBody({
                 : phase === 'schedule_planning'
                   ? 'Confirm schedule'
                 : phase === 'season_summary'
-                  ? 'Continue'
+                  ? mpCommishLeagueId && mpCommishCrossRegionPlanning?.active
+                    ? 'Advance league'
+                    : 'Continue'
                   : 'Continue'}
           </button>
           {leagueAdvanceLocked && onReturnToLeagueHub ? (
@@ -5542,6 +5565,17 @@ function TeamHomePageBody({
             </div>
           ) : (
             <div className="teamhome-season-end-stack">
+              {mpCommishLeagueId && mpCommishCrossRegionPlanning?.active ? (
+                <CommishCrossRegionPlanning
+                  apiBase={apiBase}
+                  headers={headers}
+                  leagueId={mpCommishLeagueId}
+                  planning={mpCommishCrossRegionPlanning}
+                  logoVersion={logoVersion}
+                  compact
+                  onPlanningChange={onMpCommishCrossRegionPlanningChange}
+                />
+              ) : null}
               {needsCrossRegionPickUi ? (
                 <SchedulePlanningScrollCallout
                   slotCount={effectiveCrossRegionSlots || schedulePlanningInfo?.slot_count || 1}
@@ -5575,15 +5609,7 @@ function TeamHomePageBody({
                   onOpenTeamHistory={() => setStateMenu('Team History')}
                 />
               )}
-              {isMultiplayerLeague && !isCommishMpRun && phase === 'schedule_planning' ? (
-                <div className="teamhome-preseason-panelA teamhome-preseason-panelA--compact teamhome-schedplan-fallback">
-                  <div className="teamhome-preseason-title">Waiting on commissioner</div>
-                  <div className="teamhome-preseason-sub">
-                    Out-of-region schedules are set for the whole league by the commissioner. Submit your prep on the
-                    League Hub when the next stage opens.
-                  </div>
-                </div>
-              ) : schedulePlanningInfo && needsCrossRegionPickUi ? (
+              {schedulePlanningInfo && needsCrossRegionPickUi ? (
                 <SchedulePlanningPanel
                   apiBase={apiBase}
                   headers={headers}
@@ -5594,6 +5620,14 @@ function TeamHomePageBody({
                   selections={crossRegionSelections}
                   onSelectionsChange={setCrossRegionSelections}
                 />
+              ) : isMultiplayerLeague && leagueAdvanceLocked && phase === 'season_summary' && effectiveCrossRegionSlots > 0 ? (
+                <div className="teamhome-preseason-panelA teamhome-preseason-panelA--compact teamhome-schedplan-fallback">
+                  <div className="teamhome-preseason-title">Out-of-region schedules</div>
+                  <div className="teamhome-preseason-sub">
+                    Your commissioner sets non-region opponents for human schools during season summary. You will
+                    see the full schedule after the league advances.
+                  </div>
+                </div>
               ) : phase === 'schedule_planning' && !isMultiplayerLeague ? (
                 <div className="teamhome-preseason-panelA teamhome-preseason-panelA--compact teamhome-schedplan-fallback">
                   <div className="teamhome-preseason-title">Non-region selection</div>
