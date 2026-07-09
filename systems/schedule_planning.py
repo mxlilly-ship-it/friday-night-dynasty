@@ -425,9 +425,9 @@ def pair_two_regions_with_locks(
         if ha_counts is not None:
             record_home_away(games[-1][0], games[-1][1], ha_counts)
 
+    # Regions can be uneven (mixed pod sizes). In that case, pair what we can and leave the extras
+    # for the caller to gap-fill or handle via other cross-week logic.
     n = min(len(a_rem), len(b_rem))
-    if len(a_rem) != len(b_rem):
-        raise ValueError("Cross-region pairing could not balance remaining teams.")
     for i in range(n):
         t1 = a_rem[i]
         t2 = b_rem[(i + offset) % n] if n else b_rem[0]
