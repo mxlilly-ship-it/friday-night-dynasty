@@ -25,6 +25,7 @@ type CommishDashboardPageProps = {
   onInvite: (email: string) => Promise<{ email_sent?: boolean } | void>
   onAssign: (email: string, teamName: string) => Promise<string>
   onResetPin: (userId: string) => Promise<string>
+  onOpenDynastyAsTeam?: (teamName: string) => void
   onSaveSettings: (patch: {
     advance_mode: string
     advance_deadline_dow: number | null
@@ -35,8 +36,6 @@ type CommishDashboardPageProps = {
   onOpenLeagueHub?: () => void
   onOpenMyDynasty?: () => void
   myDynastyBusy?: boolean
-  onOpenRunLeague?: () => void
-  runLeagueBusy?: boolean
   onSubmitWeek?: () => void
   onUnsubmitWeek?: () => void
   submitBusy?: boolean
@@ -58,12 +57,11 @@ export default function CommishDashboardPage({
   onInvite,
   onAssign,
   onResetPin,
+  onOpenDynastyAsTeam,
   onSaveSettings,
   onOpenLeagueHub,
   onOpenMyDynasty,
   myDynastyBusy = false,
-  onOpenRunLeague,
-  runLeagueBusy = false,
   onSubmitWeek,
   onUnsubmitWeek,
   submitBusy = false,
@@ -76,9 +74,11 @@ export default function CommishDashboardPage({
   const coachTeam = data.acting_team_name || null
   const showCoachActions = Boolean(hasCoachTeam || coachTeam)
   const submitted = Boolean(data.your_status?.submitted)
+  const allTeams = (data.all_teams ?? []).filter(Boolean)
   const [inviteEmail, setInviteEmail] = useState('')
   const [assignEmail, setAssignEmail] = useState('')
   const [assignTeam, setAssignTeam] = useState(data.vacant_teams[0] ?? '')
+  const [viewAsTeam, setViewAsTeam] = useState(coachTeam ?? allTeams[0] ?? '')
   const [busy, setBusy] = useState('')
   const [flash, setFlash] = useState('')
   const [pinFlash, setPinFlash] = useState('')
@@ -98,10 +98,13 @@ export default function CommishDashboardPage({
     setDeadlineTime(data.settings.advance_deadline_time_local)
     setLockoutMinutes(String(data.settings.submit_lockout_minutes))
     setTimezone(data.settings.timezone)
+    if (!viewAsTeam) {
+      setViewAsTeam(data.acting_team_name || data.all_teams?.[0] || '')
+    }
     if (!assignTeam && data.vacant_teams.length) {
       setAssignTeam(data.vacant_teams[0])
     }
-  }, [data, assignTeam])
+  }, [data, assignTeam, viewAsTeam])
 
   async function runAction(key: string, fn: () => Promise<void>) {
     setBusy(key)
@@ -138,15 +141,25 @@ export default function CommishDashboardPage({
               League hub
             </button>
           ) : null}
-          {onOpenRunLeague ? (
-            <button
-              type="button"
-              className="cdash-btn cdash-btn--gold"
-              disabled={runLeagueBusy}
-              onClick={onOpenRunLeague}
+          {onOpenDynastyAsTeam && allTeams.length ? (
+            <select
+              className="cdash-select"
+              value={viewAsTeam}
+              onChange={(e) => {
+                const t = e.target.value
+                setViewAsTeam(t)
+                if (t) onOpenDynastyAsTeam(t)
+              }}
+              disabled={myDynastyBusy}
+              title="View/open the dynasty as a specific team"
+              style={{ maxWidth: 220 }}
             >
-              {runLeagueBusy ? 'Opening…' : 'Run league'}
-            </button>
+              {allTeams.map((t) => (
+                <option key={t} value={t}>
+                  View as: {t}
+                </option>
+              ))}
+            </select>
           ) : null}
           {showCoachActions && onOpenMyDynasty ? (
             <button

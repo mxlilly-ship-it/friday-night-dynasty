@@ -979,11 +979,15 @@ def attach_cpu_coach_packages_for_game(
     away_team: Any,
     *,
     user_team: Optional[str] = None,
+    cpu_teams: Optional[set[str]] = None,
 ) -> None:
     """Attach autofill weekly packages to non-user coaches before sim."""
     for team in (home_team, away_team):
         name = getattr(team, "name", "")
-        if user_team and name == user_team:
+        if cpu_teams is not None:
+            if name not in cpu_teams:
+                continue
+        elif user_team and name == user_team:
             continue
         coach = getattr(team, "coach", None)
         if coach is None:

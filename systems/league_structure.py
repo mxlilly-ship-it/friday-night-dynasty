@@ -786,39 +786,39 @@ def build_regular_season_weeks(
         return locks_for_cross_week(teams, state, cls, reg_a, reg_b, slot_index)
 
     def _locked_cross_games(state_obj: Optional[Dict[str, Any]]) -> set[Tuple[str, str]]:
-        """Oriented (home, away) edges from user cross-region schedule picks."""
-        from systems.schedule_planning import lock_for_pick, parse_stored_pick
+        """Oriented (home, away) edges from all cross-region schedule picks."""
+        from systems.schedule_planning import cross_region_pick_team_names, lock_for_pick, parse_stored_pick
 
         locked: set[Tuple[str, str]] = set()
         if not state_obj:
             return locked
-        user = str(state_obj.get("user_team") or "").strip()
-        if not user:
-            return locked
         picks_raw = state_obj.get("cross_region_picks") or {}
-        user_picks = picks_raw.get(user) if isinstance(picks_raw, dict) else None
-        if not isinstance(user_picks, dict):
+        if not isinstance(picks_raw, dict):
             return locked
-        for key, raw in user_picks.items():
-            pick = parse_stored_pick(raw)
-            if not pick.opponent:
+        for team_name in cross_region_pick_team_names(state_obj):
+            user_picks = picks_raw.get(team_name)
+            if not isinstance(user_picks, dict):
                 continue
-            try:
-                si = int(key)
-            except (TypeError, ValueError):
-                continue
-            try:
-                locked.add(
-                    lock_for_pick(
-                        teams,
-                        user,
-                        si,
-                        pick.opponent,
-                        user_home=pick.user_home,
+            for key, raw in user_picks.items():
+                pick = parse_stored_pick(raw)
+                if not pick.opponent:
+                    continue
+                try:
+                    si = int(key)
+                except (TypeError, ValueError):
+                    continue
+                try:
+                    locked.add(
+                        lock_for_pick(
+                            teams,
+                            team_name,
+                            si,
+                            pick.opponent,
+                            user_home=pick.user_home,
+                        )
                     )
-                )
-            except ValueError:
-                continue
+                except ValueError:
+                    continue
         return locked
 
     def _finalize_weeks(weeks: List[List[Tuple[str, str]]]) -> List[List[Tuple[str, str]]]:

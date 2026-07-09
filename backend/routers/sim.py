@@ -41,6 +41,30 @@ def _sim_finalize_state(state: Any) -> Any:
     if isinstance(state, dict):
         normalize_offseason_stages(state)
         _finalize_cross_region_schedule_state(state)
+        from backend.services.league_service import (
+            hydrate_mp_team_coach_dev_view,
+            hydrate_mp_team_improvements_bank_view,
+            hydrate_mp_team_inbox_view,
+            hydrate_mp_team_offseason_training_view,
+            is_multiplayer_league_state,
+            repair_multiplayer_coach_dev_storage,
+            repair_multiplayer_coach_inbox_storage,
+            repair_multiplayer_offseason_improvements_storage,
+            repair_multiplayer_offseason_training_storage,
+        )
+
+        if is_multiplayer_league_state(state):
+            repair_multiplayer_coach_inbox_storage(state)
+            repair_multiplayer_offseason_training_storage(state)
+            repair_multiplayer_offseason_improvements_storage(state)
+            repair_multiplayer_coach_dev_storage(state)
+            mp = state.get("multiplayer") if isinstance(state.get("multiplayer"), dict) else {}
+            team = str(mp.get("team_name") or state.get("user_team") or "").strip()
+            if team:
+                hydrate_mp_team_inbox_view(state, team)
+                hydrate_mp_team_offseason_training_view(state, team)
+                hydrate_mp_team_improvements_bank_view(state, team)
+                hydrate_mp_team_coach_dev_view(state, team)
     return state
 
 
@@ -411,8 +435,27 @@ def sim_hydrate_inbox_route(payload: SimStateRequest = Body(...)):
     """Ensure coach_inbox + starter mail exists for browser/local saves on load."""
     try:
         state = payload.state or {}
+        from backend.services.league_service import (
+            hydrate_mp_team_inbox_view,
+            is_multiplayer_league_state,
+            repair_multiplayer_coach_inbox_storage,
+        )
+
+        mp_team = ""
+        if is_multiplayer_league_state(state):
+            repair_multiplayer_coach_inbox_storage(state)
+            mp = state.get("multiplayer") if isinstance(state.get("multiplayer"), dict) else {}
+            mp_team = str(mp.get("team_name") or state.get("user_team") or "").strip()
+            if mp_team:
+                hydrate_mp_team_inbox_view(state, mp_team)
         ensure_coach_inbox(state)
         generate_week_checklist_email(state)
+        if mp_team:
+            from backend.services.league_service import persist_mp_team_inbox_slice
+
+            persist_mp_team_inbox_slice(state, mp_team)
+            state.pop("coach_inbox", None)
+            hydrate_mp_team_inbox_view(state, mp_team)
         _sim_finalize_state(state)
         return {"state": state}
     except Exception as e:
@@ -441,12 +484,30 @@ class SimCoachInboxPatchBody(BaseModel):
 def sim_patch_coach_inbox_route(body: SimCoachInboxPatchBody = Body(...)):
     """Mark read / resolve choice / delete for browser/local saves."""
     try:
+        state = body.state or {}
+        from backend.services.league_service import (
+            hydrate_mp_team_inbox_view,
+            is_multiplayer_league_state,
+            persist_mp_team_inbox_slice,
+            repair_multiplayer_coach_inbox_storage,
+        )
+
+        mp_team = ""
+        if is_multiplayer_league_state(state):
+            mp = state.get("multiplayer") if isinstance(state.get("multiplayer"), dict) else {}
+            mp_team = str(mp.get("team_name") or state.get("user_team") or "").strip()
+            if mp_team and not isinstance(state.get("coach_inbox"), dict):
+                hydrate_mp_team_inbox_view(state, mp_team)
         out = patch_coach_inbox_state(
-            body.state or {},
+            state,
             mark_read=body.mark_read,
             choose=body.choose,
             delete=body.delete,
         )
+        if mp_team:
+            persist_mp_team_inbox_slice(out, mp_team)
+            repair_multiplayer_coach_inbox_storage(out)
+            hydrate_mp_team_inbox_view(out, mp_team)
         return {"state": out}
     except Exception as e:
         raise HTTPException(status_code=400, detail=exception_detail(e, "Inbox update failed"))

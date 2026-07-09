@@ -48,6 +48,9 @@ type Props = {
   activeTab?: GameplanTab
   /** Grid editor slot when gameplan tab + grid mode. */
   gridSlot?: ReactNode
+  /** Import full gameplan JSON (grid, call sheet, usage, practice, etc.). */
+  onImportClick?: () => void
+  importDisabled?: boolean
 }
 
 export function computeDefTabWarnings(
@@ -387,6 +390,8 @@ export default function WeeklyGameplanSections({
   uiVariant = 'default',
   activeTab,
   gridSlot,
+  onImportClick,
+  importDisabled,
 }: Props) {
   const isTabbed = uiVariant === 'off-tabs' || uiVariant === 'def-tabs'
   const isDefTabs = uiVariant === 'def-tabs'
@@ -396,6 +401,19 @@ export default function WeeklyGameplanSections({
   const cs = pkg.callsheet as Record<string, string[] | string>
   const playCounts = countCallsheetPlayIds(cs as Record<string, unknown>)
   const halftimeResponses = side === 'offense' ? HALFTIME_RESPONSES_OFF : HALFTIME_RESPONSES_DEF
+
+  const renderImportButton = () =>
+    onImportClick ? (
+      <button
+        type="button"
+        className={`${tabPrefix}-btn`}
+        title="Import JSON (full gameplan) or CSV (grid only)"
+        onClick={onImportClick}
+        disabled={importDisabled || disabled}
+      >
+        Import gameplan
+      </button>
+    ) : null
 
   const setMode = (mode: GameplanMode) => onPkgChange({ ...pkg, gameplan_mode: mode })
 
@@ -1057,13 +1075,22 @@ export default function WeeklyGameplanSections({
       if (isDefTabs) {
         return (
           <div className="dgp-card">
+            {pkg.gameplan_mode === 'callsheet' ? (
+              <div className="dgp-card-head">
+                <h2>Call sheet</h2>
+                {renderImportButton()}
+              </div>
+            ) : null}
             {pkg.gameplan_mode === 'grid' ? gridSlot : renderCallsheet('def')}
           </div>
         )
       }
       return (
         <div className="ogp-card">
-          <h2>Gameplan mode</h2>
+          <div className="ogp-card-head">
+            <h2>Gameplan mode</h2>
+            {pkg.gameplan_mode === 'callsheet' ? renderImportButton() : null}
+          </div>
           <p className="ogp-helper">
             Choose how this week&apos;s offense is built. Grid drives percentages by situation; Call sheet installs specific plays for sim games.
           </p>
@@ -1119,7 +1146,10 @@ export default function WeeklyGameplanSections({
 
     return (
       <div className={`${tabPrefix}-card`}>
-        <h2>{meta.title}</h2>
+        <div className={`${tabPrefix}-card-head`}>
+          <h2>{meta.title}</h2>
+          {renderImportButton()}
+        </div>
         <p className={`${tabPrefix}-helper`}>{meta.helper}</p>
         {activeTab === 'usage' ? renderUsage() : null}
         {activeTab === 'practice' ? renderPractice() : null}

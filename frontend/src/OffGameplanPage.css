@@ -120,6 +120,18 @@
   color: var(--ogp-text);
 }
 
+.ogp-library-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.ogp-library-head .ogp-btn {
+  width: 100%;
+  justify-content: center;
+}
+
 .ogp-sidebar .ogp-helper {
   color: var(--ogp-text-faint);
   font-size: 12px;
@@ -268,6 +280,22 @@
   color: var(--ogp-text-faint);
   font-size: 12.5px;
   margin: 0 0 16px;
+}
+
+.ogp-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.ogp-card-head h2 {
+  margin: 0;
+}
+
+.ogp-card-head .ogp-btn {
+  flex-shrink: 0;
 }
 
 .ogp-row {

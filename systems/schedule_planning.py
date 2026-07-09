@@ -303,12 +303,35 @@ def align_4x7_slot0_bye_weeks(
     classification: str,
 ) -> Optional[int]:
     """
-    For 4x7x4 slot 0, rebuild the opponent pod schedule so the picked opponent shares
-    the user's bye week. Returns the opponent region index that was rebuilt, if any.
+    For 4x7x4 slot 0, rebuild opponent pod schedules so picked opponents share
+    each team's bye week. Returns the last opponent region index rebuilt, if any.
     """
     if not state:
         return None
-    user = str(state.get("user_team") or "").strip()
+    last_opp_ri: Optional[int] = None
+    for team_name in cross_region_pick_team_names(state):
+        opp_ri = _align_4x7_slot0_bye_week_for_team(
+            regs_list,
+            rr_weeks,
+            teams,
+            state,
+            classification,
+            team_name,
+        )
+        if opp_ri is not None:
+            last_opp_ri = opp_ri
+    return last_opp_ri
+
+
+def _align_4x7_slot0_bye_week_for_team(
+    regs_list: List[List[str]],
+    rr_weeks: List[List[List[Tuple[str, str]]]],
+    teams: Dict[str, "Team"],
+    state: Optional[Dict[str, Any]],
+    classification: str,
+    team_name: str,
+) -> Optional[int]:
+    user = str(team_name or "").strip()
     if not user or user not in teams:
         return None
     picks_raw = state.get("cross_region_picks") or {}
@@ -485,6 +508,24 @@ def picks_dict_for_state(user_team: str, picks: Dict[int, CrossRegionPick]) -> D
     }
 
 
+def cross_region_pick_team_names(state: Optional[Dict[str, Any]]) -> List[str]:
+    """Teams with stored out-of-region picks (multiplayer uses every entry; SP may set user_team)."""
+    if not state:
+        return []
+    picks_raw = state.get("cross_region_picks") or {}
+    if not isinstance(picks_raw, dict):
+        picks_raw = {}
+    names: List[str] = []
+    user = str(state.get("user_team") or "").strip()
+    if user:
+        names.append(user)
+    for tn in picks_raw:
+        s = str(tn).strip()
+        if s and s not in names:
+            names.append(s)
+    return names
+
+
 def lock_for_pick(
     teams: Dict[str, "Team"],
     user_team: str,
@@ -510,29 +551,48 @@ def locks_for_cross_week(
     region_b: str,
     slot_index: int,
 ) -> List[Tuple[str, str]]:
-    """Locks for one cross-region week between two regions (user pick only)."""
+    """Locks for one cross-region week between two regions (all stored picks in this slot)."""
     if not state:
         return []
-    user = str(state.get("user_team") or "").strip()
-    if not user:
-        return []
     picks_raw = state.get("cross_region_picks") or {}
-    user_picks = picks_raw.get(user) if isinstance(picks_raw, dict) else None
-    if not isinstance(user_picks, dict):
+    if not isinstance(picks_raw, dict):
         return []
-    raw = user_picks.get(slot_index) or user_picks.get(str(slot_index))
-    if not raw:
-        return []
-    pick = parse_stored_pick(raw)
-    if not pick.opponent:
-        return []
-    cls_u, user_reg = _team_class_region(teams, user)
-    cls_o, opp_reg = _team_class_region(teams, pick.opponent)
-    if cls_u != classification or cls_o != classification:
-        return []
-    if {user_reg, opp_reg} != {region_a, region_b}:
-        return []
-    return [lock_for_pick(teams, user, int(slot_index), pick.opponent, user_home=pick.user_home)]
+
+    locks: List[Tuple[str, str]] = []
+    seen: set[Tuple[str, str]] = set()
+    for team_name in cross_region_pick_team_names(state):
+        user_picks = picks_raw.get(team_name)
+        if not isinstance(user_picks, dict):
+            continue
+        raw = user_picks.get(slot_index) or user_picks.get(str(slot_index))
+        if not raw:
+            continue
+        pick = parse_stored_pick(raw)
+        if not pick.opponent:
+            continue
+        cls_u, user_reg = _team_class_region(teams, team_name)
+        cls_o, opp_reg = _team_class_region(teams, pick.opponent)
+        if cls_u != classification or cls_o != classification:
+            continue
+        if {user_reg, opp_reg} != {region_a, region_b}:
+            continue
+        try:
+            edge = lock_for_pick(
+                teams,
+                team_name,
+                int(slot_index),
+                pick.opponent,
+                user_home=pick.user_home,
+            )
+        except ValueError:
+            continue
+        key = (edge[0], edge[1])
+        rev = (edge[1], edge[0])
+        if key in seen or rev in seen:
+            continue
+        seen.add(key)
+        locks.append(edge)
+    return locks
 
 
 def auto_random_picks(teams: Dict[str, "Team"], user_team: str) -> Dict[int, CrossRegionPick]:

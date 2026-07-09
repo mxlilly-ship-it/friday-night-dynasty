@@ -683,6 +683,49 @@ def apply_coach_gameplan_privacy_for_team(state: Dict[str, Any], team_name: str)
     return state
 
 
+def _sync_mp_inbox_emails_for_human_teams(
+    state: Dict[str, Any],
+    league_id: str,
+    *,
+    completed_week: Optional[int] = None,
+    checklist_week: Optional[int] = None,
+    playoff_round: bool = False,
+) -> None:
+    """Generate inbox batches per human coach after commissioner league advance."""
+    import copy
+
+    from backend.services.league_service import (
+        _coach_sim_emails_enabled,
+        _mp_coach_inbox_by_team,
+        hydrate_mp_team_inbox_view,
+    )
+    from systems.coach_email_system import (
+        generate_playoff_round_emails,
+        generate_week_checklist_email,
+        generate_week_sim_emails,
+    )
+
+    if not _coach_sim_emails_enabled():
+        return
+    teams = {str(m["team_name"]) for m in _human_teams(league_id) if m.get("team_name")}
+    if not teams:
+        return
+    for team_name in sorted(teams):
+        temp = copy.deepcopy(state)
+        temp["user_team"] = team_name
+        hydrate_mp_team_inbox_view(temp, team_name)
+        if completed_week is not None:
+            generate_week_sim_emails(temp, completed_week=int(completed_week))
+        if checklist_week is not None:
+            generate_week_checklist_email(temp, week=int(checklist_week))
+        if playoff_round:
+            generate_playoff_round_emails(temp)
+        inbox = temp.get("coach_inbox")
+        if isinstance(inbox, dict):
+            _mp_coach_inbox_by_team(state)[team_name] = copy.deepcopy(inbox)
+    state.pop("coach_inbox", None)
+
+
 def _merge_coach_state_into_canonical(
     canonical: Dict[str, Any],
     incoming: Dict[str, Any],
@@ -724,7 +767,16 @@ def _merge_coach_state_into_canonical(
     _persist_team_gameplan_prefs(out, team_name, incoming)
 
     if isinstance(incoming.get("coach_inbox"), dict):
-        out["coach_inbox"] = copy.deepcopy(incoming["coach_inbox"])
+        from backend.services.league_service import (
+            _mp_coach_inbox_by_team,
+            is_multiplayer_league_state,
+        )
+
+        if is_multiplayer_league_state(out):
+            _mp_coach_inbox_by_team(out)[team_name] = copy.deepcopy(incoming["coach_inbox"])
+            out.pop("coach_inbox", None)
+        else:
+            out["coach_inbox"] = copy.deepcopy(incoming["coach_inbox"])
 
     if str(incoming.get("user_team") or "") == team_name:
         if isinstance(incoming.get("season_goals"), dict):
@@ -793,6 +845,34 @@ def _merge_coach_state_into_canonical(
             names[team_name] = inc_names[team_name]
         out["multiplayer_coach_names"] = names
 
+    if isinstance(incoming.get("offseason_improvements_bank"), dict):
+        from backend.services.league_service import (
+            _mp_offseason_improvements_bank_by_team,
+            is_multiplayer_league_state,
+        )
+
+        if is_multiplayer_league_state(out):
+            _mp_offseason_improvements_bank_by_team(out)[team_name] = copy.deepcopy(
+                incoming["offseason_improvements_bank"]
+            )
+            out.pop("offseason_improvements_bank", None)
+        else:
+            out["offseason_improvements_bank"] = copy.deepcopy(incoming["offseason_improvements_bank"])
+
+    if isinstance(incoming.get("offseason_coach_dev_bank"), dict):
+        from backend.services.league_service import is_multiplayer_league_state
+
+        if is_multiplayer_league_state(out):
+            banks = out.get("offseason_coach_dev_banks")
+            if not isinstance(banks, dict):
+                banks = {}
+            banks = copy.deepcopy(banks)
+            banks[team_name] = copy.deepcopy(incoming["offseason_coach_dev_bank"])
+            out["offseason_coach_dev_banks"] = banks
+            out.pop("offseason_coach_dev_bank", None)
+        else:
+            out["offseason_coach_dev_bank"] = copy.deepcopy(incoming["offseason_coach_dev_bank"])
+
     for bank_key in ("offseason_coach_dev_banks",):
         inc_bank = incoming.get(bank_key)
         if isinstance(inc_bank, dict) and team_name in inc_bank:
@@ -802,11 +882,6 @@ def _merge_coach_state_into_canonical(
             base_bank = copy.deepcopy(base_bank)
             base_bank[team_name] = copy.deepcopy(inc_bank[team_name])
             out[bank_key] = base_bank
-
-    if str(incoming.get("user_team") or "") == team_name:
-        for key in ("offseason_coach_dev_bank", "offseason_improvements_bank"):
-            if key in incoming:
-                out[key] = copy.deepcopy(incoming[key])
 
     inc_picks = incoming.get("cross_region_picks")
     if isinstance(inc_picks, dict) and team_name in inc_picks:
@@ -860,6 +935,10 @@ def get_league_commish_game_bundle(league_id: str, user_id: str) -> Dict[str, An
     from backend.services.league_service import (
         ensure_multiplayer_opening_schedule,
         repair_multiplayer_7on7_storage,
+        repair_multiplayer_coach_inbox_storage,
+        repair_multiplayer_offseason_training_storage,
+        repair_multiplayer_offseason_improvements_storage,
+        repair_multiplayer_coach_dev_storage,
         repair_multiplayer_scrimmage_storage,
     )
 
@@ -873,6 +952,18 @@ def get_league_commish_game_bundle(league_id: str, user_id: str) -> Dict[str, An
     if repair_multiplayer_scrimmage_storage(canonical):
         commish_changed = True
     if repair_multiplayer_7on7_storage(canonical):
+        commish_changed = True
+    if repair_multiplayer_coach_inbox_storage(canonical):
+        commish_changed = True
+    if repair_multiplayer_offseason_training_storage(canonical):
+        commish_changed = True
+    if repair_multiplayer_offseason_improvements_storage(canonical):
+        commish_changed = True
+    if repair_multiplayer_coach_dev_storage(canonical):
+        commish_changed = True
+    from backend.services.league_service import _maybe_backfill_mp_offseason_improvements_banks
+
+    if _maybe_backfill_mp_offseason_improvements_banks(canonical, save_dir):
         commish_changed = True
     if commish_changed:
         _save_state(save_dir, canonical)
@@ -897,6 +988,21 @@ def get_league_commish_game_bundle(league_id: str, user_id: str) -> Dict[str, An
     from backend.services.league_service import _finalize_cross_region_schedule_state
 
     _finalize_cross_region_schedule_state(state)
+
+    if acting:
+        from backend.services.league_service import (
+            _maybe_generate_week_checklist_email,
+            hydrate_mp_team_coach_dev_view,
+            hydrate_mp_team_improvements_bank_view,
+            hydrate_mp_team_inbox_view,
+            hydrate_mp_team_offseason_training_view,
+        )
+
+        hydrate_mp_team_inbox_view(state, acting)
+        hydrate_mp_team_offseason_training_view(state, acting)
+        hydrate_mp_team_improvements_bank_view(state, acting)
+        hydrate_mp_team_coach_dev_view(state, acting)
+        _maybe_generate_week_checklist_email(state)
 
     league_history: Dict[str, Any] = {"seasons": []}
     records: Dict[str, Any] = {}
@@ -939,6 +1045,15 @@ def save_league_commish_game_state(
     mp["league_id"] = league_id
     mp["commish_mode"] = True
     incoming["multiplayer"] = mp
+    from backend.services.league_service import (
+        persist_mp_team_inbox_slice,
+        repair_multiplayer_coach_inbox_storage,
+    )
+
+    acting = str(incoming.get("user_team") or mp.get("team_name") or "").strip()
+    if acting and isinstance(incoming.get("coach_inbox"), dict):
+        persist_mp_team_inbox_slice(incoming, acting)
+    repair_multiplayer_coach_inbox_storage(incoming)
     _save_state(save_dir, incoming)
     now = _now()
     with db() as conn:
@@ -1013,12 +1128,21 @@ def get_league_game_bundle(league_id: str, user_id: str, team_name: str) -> Dict
     from backend.services.league_service import (
         PRESEASON_STAGES,
         _ensure_mp_team_scrimmage_opponents,
+        _maybe_generate_week_checklist_email,
         ensure_multiplayer_opening_schedule,
+        hydrate_mp_team_inbox_view,
+        hydrate_mp_team_coach_dev_view,
+        hydrate_mp_team_improvements_bank_view,
+        hydrate_mp_team_offseason_training_view,
         hydrate_mp_team_scrimmage_view,
         hydrate_mp_team_7on7_view,
         is_multiplayer_league_state,
         persist_mp_team_scrimmage_slice,
         repair_multiplayer_7on7_storage,
+        repair_multiplayer_coach_inbox_storage,
+        repair_multiplayer_offseason_training_storage,
+        repair_multiplayer_offseason_improvements_storage,
+        repair_multiplayer_coach_dev_storage,
         repair_multiplayer_scrimmage_storage,
     )
 
@@ -1032,6 +1156,18 @@ def get_league_game_bundle(league_id: str, user_id: str, team_name: str) -> Dict
     if repair_multiplayer_scrimmage_storage(canonical):
         changed = True
     if repair_multiplayer_7on7_storage(canonical):
+        changed = True
+    if repair_multiplayer_coach_inbox_storage(canonical):
+        changed = True
+    if repair_multiplayer_offseason_training_storage(canonical):
+        changed = True
+    if repair_multiplayer_offseason_improvements_storage(canonical):
+        changed = True
+    if repair_multiplayer_coach_dev_storage(canonical):
+        changed = True
+    from backend.services.league_service import _maybe_backfill_mp_offseason_improvements_banks
+
+    if _maybe_backfill_mp_offseason_improvements_banks(canonical, save_dir):
         changed = True
     if _unlock_human_playbooks_during_select(canonical, team_name):
         changed = True
@@ -1065,6 +1201,26 @@ def get_league_game_bundle(league_id: str, user_id: str, team_name: str) -> Dict
 
     hydrate_mp_team_scrimmage_view(state, team_name)
     hydrate_mp_team_7on7_view(state, team_name)
+    hydrate_mp_team_inbox_view(state, team_name)
+    hydrate_mp_team_offseason_training_view(state, team_name)
+    hydrate_mp_team_improvements_bank_view(state, team_name)
+    hydrate_mp_team_coach_dev_view(state, team_name)
+    inbox_before = len((state.get("coach_inbox") or {}).get("emails") or [])
+    _maybe_generate_week_checklist_email(state)
+    inbox_after = len((state.get("coach_inbox") or {}).get("emails") or [])
+    if inbox_after > inbox_before:
+        from backend.services.league_service import _mp_coach_inbox_by_team
+
+        merged = copy.deepcopy(canonical)
+        _mp_coach_inbox_by_team(merged)[team_name] = copy.deepcopy(state.get("coach_inbox") or {})
+        repair_multiplayer_coach_inbox_storage(merged)
+        _save_state(save_dir, merged)
+        canonical = merged
+        with db() as conn:
+            conn.execute(
+                "UPDATE leagues SET state_version=state_version+1, updated_at=? WHERE id=?",
+                (_now(), league_id),
+            )
     confirmed_teams = state.get("home_game_themes_confirmed_teams")
     if isinstance(confirmed_teams, dict):
         state["home_game_themes_user_confirmed"] = bool(confirmed_teams.get(team_name))
@@ -1155,6 +1311,15 @@ def save_league_game_state(
     save_dir = str(league_row.get("save_dir") or "")
     incoming = copy.deepcopy(state) if isinstance(state, dict) else {}
     incoming["user_team"] = team_name
+    from backend.services.league_service import (
+        persist_mp_team_coach_dev_slice,
+        persist_mp_team_improvements_bank_slice,
+        persist_mp_team_inbox_slice,
+    )
+
+    persist_mp_team_inbox_slice(incoming, team_name)
+    persist_mp_team_improvements_bank_slice(incoming, team_name)
+    persist_mp_team_coach_dev_slice(incoming, team_name)
     _sync_team_gameplan_prefs_from_working_state(incoming, team_name)
     apply_coach_gameplan_privacy_for_team(incoming, team_name)
     canonical = _load_state(save_dir)
@@ -2385,7 +2550,20 @@ def apply_league_coach_prep(
     canonical = _load_state(save_dir)
     working = copy.deepcopy(canonical)
     working["user_team"] = team_name
+    from backend.services.league_service import (
+        hydrate_mp_team_coach_dev_view,
+        hydrate_mp_team_improvements_bank_view,
+        is_multiplayer_league_state,
+        persist_mp_team_coach_dev_slice,
+        persist_mp_team_improvements_bank_slice,
+    )
+
+    if is_multiplayer_league_state(working):
+        hydrate_mp_team_improvements_bank_view(working, team_name)
+        hydrate_mp_team_coach_dev_view(working, team_name)
     working = apply_coach_prep_state(working, prep if isinstance(prep, dict) else {})
+    persist_mp_team_improvements_bank_slice(working, team_name)
+    persist_mp_team_coach_dev_slice(working, team_name)
     merged = _merge_coach_state_into_canonical(canonical, working, team_name)
     merged["user_team"] = team_name
     mp = merged.get("multiplayer")
@@ -2413,7 +2591,6 @@ def commish_advance_league(
     """Sim/advance one league step (commissioner)."""
     from backend.services.league_service import (
         _advance_playoff_one_round_state,
-        _maybe_coach_playoff_round_emails,
         _playoffs_global_completed,
         advance_offseason_state,
         advance_preseason_state,
@@ -2463,7 +2640,14 @@ def commish_advance_league(
         state = out.get("state") if isinstance(out, dict) and isinstance(out.get("state"), dict) else state
         action_label = "Preseason advanced"
     elif phase == "regular":
+        completed_week = int(state.get("current_week", 1))
         state = sim_week_state(state, mp_human_teams=mp_human, mp_submitted_teams=mp_submitted)
+        _sync_mp_inbox_emails_for_human_teams(
+            state,
+            league_id,
+            completed_week=completed_week,
+            checklist_week=int(state.get("current_week", 1)),
+        )
         action_label = f"Week {int(state.get('current_week', 1))} simulated"
     elif phase == "playoffs":
         playoffs_now = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else {}
@@ -2472,7 +2656,7 @@ def commish_advance_league(
             action_label = "Season archived — season summary"
         else:
             state = _advance_playoff_one_round_state(state)
-            _maybe_coach_playoff_round_emails(state)
+            _sync_mp_inbox_emails_for_human_teams(state, league_id, playoff_round=True)
             playoffs_after = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else {}
             if _playoffs_global_completed(playoffs_after):
                 state = finalize_season_to_summary_for_save_dir(state, save_dir)
@@ -2502,6 +2686,8 @@ def commish_advance_league(
                 body,
                 league_history=league_history,
                 user_id=user_id,
+                mp_human_teams=mp_human,
+                mp_submitted_teams=mp_submitted,
             )
             idx_after = int(state.get("offseason_stage_index", 0) or 0)
             phase_after = str(state.get("season_phase") or "").strip().lower()
@@ -2517,10 +2703,21 @@ def commish_advance_league(
     else:
         raise ValueError(f"Cannot advance league from season_phase={phase!r}")
 
-    from backend.services.league_service import repair_multiplayer_7on7_storage, repair_multiplayer_scrimmage_storage
+    from backend.services.league_service import (
+        repair_multiplayer_7on7_storage,
+        repair_multiplayer_coach_inbox_storage,
+        repair_multiplayer_offseason_training_storage,
+        repair_multiplayer_offseason_improvements_storage,
+        repair_multiplayer_coach_dev_storage,
+        repair_multiplayer_scrimmage_storage,
+    )
 
     repair_multiplayer_scrimmage_storage(state)
     repair_multiplayer_7on7_storage(state)
+    repair_multiplayer_coach_inbox_storage(state)
+    repair_multiplayer_offseason_training_storage(state)
+    repair_multiplayer_offseason_improvements_storage(state)
+    repair_multiplayer_coach_dev_storage(state)
     _materialize_mp_carried_gameplans_for_league(state, league_id)
     _save_state(save_dir, state)
     now = _now()

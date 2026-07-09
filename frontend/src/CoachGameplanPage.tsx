@@ -20,8 +20,15 @@ import {
   emptyPractice,
   buildSkillTargetPlayers,
   buildGameplanExportPayload,
+  parseGameplanImportJson,
+  remapImportedOffenseUsage,
+  type DefenseUsage,
+  type HalftimeSlot,
   type HalftimeTrigger,
   type InstalledPlay,
+  type OffenseUsage,
+  type ParsedGameplanImport,
+  type PracticeDay,
   type SidePackage,
   type TeamScript,
 } from './weeklyGameplanTypes'
@@ -274,23 +281,54 @@ function parsePlanCsv(side: Side, csvText: string, basePlan?: Plan | null): Plan
   return plan
 }
 
-function extractImportedPlanGrid(side: Side, raw: unknown): Plan {
-  if (!raw || typeof raw !== 'object') {
-    throw new Error('JSON does not look like a gameplan.')
+function mergeImportedSidePackage(
+  imported: Record<string, unknown>,
+  pkgSide: Side,
+  existing: SidePackage | null,
+  fallbackGrid?: Plan | null,
+): SidePackage {
+  const base = existing ?? makeDefaultSidePackage(pkgSide, fallbackGrid ?? undefined)
+  const mode =
+    imported.gameplan_mode === 'callsheet' || imported.gameplan_mode === 'grid'
+      ? imported.gameplan_mode
+      : base.gameplan_mode
+  const grid =
+    imported.grid && typeof imported.grid === 'object'
+      ? (imported.grid as Record<string, unknown>)
+      : base.grid
+  const callsheet =
+    imported.callsheet && typeof imported.callsheet === 'object'
+      ? (imported.callsheet as Record<string, unknown>)
+      : base.callsheet
+  let usage = base.usage
+  if (imported.usage && typeof imported.usage === 'object') {
+    usage =
+      pkgSide === 'offense'
+        ? { ...defaultOffenseUsage(), ...(imported.usage as OffenseUsage) }
+        : { ...defaultDefenseUsage(), ...(imported.usage as DefenseUsage) }
   }
-  const j = raw as Record<string, unknown>
-  const packageKey = side === 'offense' ? 'offense_package' : 'defense_package'
-  let candidate: unknown = j[side] ?? j[packageKey] ?? j
-  if (candidate && typeof candidate === 'object') {
-    const obj = candidate as Record<string, unknown>
-    if (obj.grid && typeof obj.grid === 'object') {
-      candidate = obj.grid
+  const practice =
+    imported.practice && typeof imported.practice === 'object'
+      ? (imported.practice as Record<string, PracticeDay>)
+      : base.practice
+  let halftime = base.halftime
+  if (imported.halftime && typeof imported.halftime === 'object') {
+    const ht = imported.halftime as { slots?: HalftimeSlot[] }
+    if (Array.isArray(ht.slots)) {
+      halftime = { slots: ht.slots }
     }
   }
-  if (!candidate || typeof candidate !== 'object') {
-    throw new Error('JSON does not look like a gameplan grid.')
+  return {
+    ...base,
+    version: Number(imported.version) || 1,
+    gameplan_mode: mode,
+    confirmed: false,
+    grid,
+    callsheet,
+    usage,
+    practice,
+    halftime,
   }
-  return candidate as Plan
 }
 
 export default function CoachGameplanPage({
@@ -345,7 +383,10 @@ export default function CoachGameplanPage({
     return buildSkillTargetPlayers(team)
   }, [saveState])
 
-  const sideLibrary = side === 'offense' ? offenseLibrary : defenseLibrary
+  const sideLibrary = useMemo((): GamePlanLibrary => {
+    const raw = side === 'offense' ? offenseLibrary : defenseLibrary
+    return raw ?? { presets: [], saved: [] }
+  }, [side, offenseLibrary, defenseLibrary])
 
   const saveStateRef = useRef(saveState)
   saveStateRef.current = saveState
@@ -375,8 +416,8 @@ export default function CoachGameplanPage({
       setMatchupKey(j.matchup_key ?? null)
       setOffense(j.offense as Plan)
       setDefense(j.defense as Plan)
-      setOffenseLibrary((j.offense_library as GamePlanLibrary | undefined) ?? null)
-      setDefenseLibrary((j.defense_library as GamePlanLibrary | undefined) ?? null)
+      setOffenseLibrary((j.offense_library as GamePlanLibrary | undefined) ?? { presets: [], saved: [] })
+      setDefenseLibrary((j.defense_library as GamePlanLibrary | undefined) ?? { presets: [], saved: [] })
       const offGrid = j.offense as Plan
       const defGrid = j.defense as Plan
       setOffensePackage((j.offense_package as SidePackage | undefined) ?? makeDefaultSidePackage('offense', offGrid))
@@ -502,12 +543,34 @@ export default function CoachGameplanPage({
     importInputRef.current?.click()
   }
 
-  const applyLibraryPlan = (source: Plan) => {
-    setPlan(structuredClone(source))
+  const applyGridPlanToEditor = (source: Plan) => {
+    const cloned = structuredClone(source)
+    setPlan(cloned)
+    setSidePackage((prev) =>
+      prev ? { ...prev, gameplan_mode: 'grid', grid: cloned as unknown as Record<string, unknown> } : prev,
+    )
     onError('')
   }
 
-  const persistImportedPlan = async (nextPlan: Plan, rawName: string) => {
+  const applyLibraryPlan = (source: Plan) => {
+    applyGridPlanToEditor(source)
+  }
+
+  const applyGameplanResponse = (j: Awaited<ReturnType<typeof saveCoachGameplan>>) => {
+    if (j.state) onSaveStateRef.current?.(j.state)
+    setMatchupKey(j.matchup_key ?? null)
+    setOffense(j.offense as Plan)
+    setDefense(j.defense as Plan)
+    setOffensePackage((j.offense_package as SidePackage | undefined) ?? offensePackage)
+    setDefensePackage((j.defense_package as SidePackage | undefined) ?? defensePackage)
+    setTeamScript({ ...defaultTeamScript(), ...((j.team_script as TeamScript | undefined) ?? {}) })
+    setOffenseLibrary((j.offense_library as GamePlanLibrary | undefined) ?? offenseLibrary)
+    setDefenseLibrary((j.defense_library as GamePlanLibrary | undefined) ?? defenseLibrary)
+    const wtw = j.week_to_week
+    setWeekToWeek(Boolean(side === 'offense' ? wtw?.offense : wtw?.defense))
+  }
+
+  const persistGridImportedPlan = async (nextPlan: Plan, rawName: string) => {
     if (!saveId) return
     const base = rawName.replace(/\.[^.]+$/, '').trim() || 'Imported plan'
     const name = window.prompt('Name this saved game plan:', base)?.trim() || base
@@ -518,13 +581,73 @@ export default function CoachGameplanPage({
           ? { add_offense_library: { name, plan: nextPlan } }
           : { add_defense_library: { name, plan: nextPlan } }
       const j = await saveCoachGameplan(apiBase ?? '', saveId, saveStateRef.current, headersRef.current, body)
-      if (j.state) onSaveStateRef.current?.(j.state)
-      setOffenseLibrary(j.offense_library ?? null)
-      setDefenseLibrary(j.defense_library ?? null)
-      setPlan(nextPlan)
+      applyGameplanResponse(j)
+      applyGridPlanToEditor(nextPlan)
       onError('')
     } catch (e: any) {
       onError(e?.message ?? 'Failed to save imported game plan')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const applyFullImportedGameplan = async (parsed: ParsedGameplanImport) => {
+    let nextOffPkg = offensePackage
+    let nextDefPkg = defensePackage
+    let nextScript = teamScript
+
+    if (parsed.teamScript) {
+      nextScript = { ...defaultTeamScript(), ...parsed.teamScript }
+      setTeamScript(nextScript)
+    }
+
+    if (parsed.offensePackage) {
+      nextOffPkg = mergeImportedSidePackage(parsed.offensePackage, 'offense', offensePackage, offense)
+      nextOffPkg = {
+        ...nextOffPkg,
+        usage: remapImportedOffenseUsage(nextOffPkg.usage as OffenseUsage, targetPlayers),
+      }
+      setOffensePackage(nextOffPkg)
+      if (nextOffPkg.grid) setOffense(nextOffPkg.grid as Plan)
+    }
+
+    if (parsed.defensePackage) {
+      nextDefPkg = mergeImportedSidePackage(parsed.defensePackage, 'defense', defensePackage, defense)
+      setDefensePackage(nextDefPkg)
+      if (nextDefPkg.grid) setDefense(nextDefPkg.grid as Plan)
+    }
+
+    const currentPkg = side === 'offense' ? nextOffPkg : nextDefPkg
+    if (currentPkg?.gameplan_mode === 'grid' && currentPkg.grid) {
+      const v = validateEntirePlan(currentPkg.grid as Plan)
+      if (!v.ok) throw new Error(v.msg)
+    }
+
+    if (!saveId) {
+      onError('')
+      return
+    }
+
+    setBusy(true)
+    try {
+      const body: Parameters<typeof saveCoachGameplan>[4] = { team_script: nextScript }
+      if (nextOffPkg) {
+        body.offense_package = nextOffPkg as unknown as Record<string, unknown>
+        if (nextOffPkg.gameplan_mode === 'grid' && nextOffPkg.grid) {
+          body.offense = nextOffPkg.grid as Record<string, unknown>
+        }
+      }
+      if (nextDefPkg) {
+        body.defense_package = nextDefPkg as unknown as Record<string, unknown>
+        if (nextDefPkg.gameplan_mode === 'grid' && nextDefPkg.grid) {
+          body.defense = nextDefPkg.grid as Record<string, unknown>
+        }
+      }
+      const j = await saveCoachGameplan(apiBase ?? '', saveId, saveStateRef.current, headersRef.current, body)
+      applyGameplanResponse(j)
+      onError('')
+    } catch (e: unknown) {
+      onError(e instanceof Error ? e.message : 'Failed to import gameplan')
     } finally {
       setBusy(false)
     }
@@ -541,8 +664,8 @@ export default function CoachGameplanPage({
           : { delete_defense_library_id: entryId }
       const j = await saveCoachGameplan(apiBase ?? '', saveId, saveStateRef.current, headersRef.current, body)
       if (j.state) onSaveStateRef.current?.(j.state)
-      setOffenseLibrary(j.offense_library ?? null)
-      setDefenseLibrary(j.defense_library ?? null)
+      setOffenseLibrary((j.offense_library as GamePlanLibrary | undefined) ?? { presets: [], saved: [] })
+      setDefenseLibrary((j.defense_library as GamePlanLibrary | undefined) ?? { presets: [], saved: [] })
       onError('')
     } catch (e: any) {
       onError(e?.message ?? 'Failed to delete saved game plan')
@@ -554,7 +677,14 @@ export default function CoachGameplanPage({
   const onImportFile = async (file: File) => {
     const name = (file.name || '').toLowerCase()
     const text = await file.text()
-    let nextPlan: Plan | null = null
+
+    if (name.endsWith('.csv') || file.type.includes('csv') || file.type === 'text/plain') {
+      const nextPlan = parsePlanCsv(side, text, plan)
+      const v = validateEntirePlan(nextPlan)
+      if (!v.ok) throw new Error(v.msg)
+      await persistGridImportedPlan(nextPlan, file.name || 'Imported plan')
+      return
+    }
 
     if (name.endsWith('.json') || file.type === 'application/json') {
       let j: unknown
@@ -563,16 +693,19 @@ export default function CoachGameplanPage({
       } catch {
         throw new Error('Invalid JSON.')
       }
-      nextPlan = extractImportedPlanGrid(side, j)
-    } else if (name.endsWith('.csv') || file.type.includes('csv') || file.type === 'text/plain') {
-      nextPlan = parsePlanCsv(side, text, plan)
-    } else {
-      throw new Error('Unsupported file type. Import a .json or .csv file.')
+      const parsed = parseGameplanImportJson(side, j)
+      if (parsed.format === 'grid_only' && parsed.gridOnly) {
+        const nextPlan = parsed.gridOnly as Plan
+        const v = validateEntirePlan(nextPlan)
+        if (!v.ok) throw new Error(v.msg)
+        await persistGridImportedPlan(nextPlan, file.name || 'Imported plan')
+        return
+      }
+      await applyFullImportedGameplan(parsed)
+      return
     }
 
-    const v = validateEntirePlan(nextPlan)
-    if (!v.ok) throw new Error(v.msg)
-    await persistImportedPlan(nextPlan, file.name || 'Imported plan')
+    throw new Error('Unsupported file type. Import a .json or .csv file.')
   }
 
   const onWeekToWeekChange = async (checked: boolean) => {
@@ -798,13 +931,16 @@ export default function CoachGameplanPage({
     </>
   )
 
-  const renderDefenseLibrary = () => {
-    if (!sideLibrary) return null
-    return (
+  const renderDefenseLibrary = () => (
       <aside className="dgp-sidebar">
-        <h3 className="dgp-head-font">Saved game plans</h3>
+        <div className="dgp-library-head">
+          <h3 className="dgp-head-font">Saved game plans</h3>
+          <button type="button" className="dgp-btn dgp-blue" onClick={onImportClick} disabled={busy}>
+            Import JSON/CSV
+          </button>
+        </div>
         <p className="dgp-helper">
-          Pick a plan to load into this week&apos;s editor, then Confirm. Library is grid-only — percentages only.
+          Import JSON exports (call sheet, usage, practice, and more) or grid CSV. Saved library entries are grid-only.
         </p>
         <div className="dgp-plan-group">
           <div className="dgp-group-label">Built-in presets</div>
@@ -859,7 +995,6 @@ export default function CoachGameplanPage({
         </div>
       </aside>
     )
-  }
 
   const renderDefenseFooter = (confirmLabel = 'Confirm') => (
     <div className="dgp-footer-bar">
@@ -880,6 +1015,15 @@ export default function CoachGameplanPage({
       <div className="dgp-spacer" />
       <button type="button" className="dgp-btn" onClick={() => void fetchPlan({ showLoading: true })} disabled={busy}>
         Reload
+      </button>
+      <button
+        type="button"
+        className="dgp-btn"
+        title="Import JSON (full gameplan) or CSV (grid only)"
+        onClick={onImportClick}
+        disabled={busy}
+      >
+        Import gameplan
       </button>
       <button
         type="button"
@@ -979,13 +1123,16 @@ export default function CoachGameplanPage({
     </>
   )
 
-  const renderOffenseLibrary = () => {
-    if (!sideLibrary) return null
-    return (
+  const renderOffenseLibrary = () => (
       <aside className="ogp-sidebar">
-        <h3 className="ogp-head-font">Saved game plans</h3>
+        <div className="ogp-library-head">
+          <h3 className="ogp-head-font">Saved game plans</h3>
+          <button type="button" className="ogp-btn ogp-blue" onClick={onImportClick} disabled={busy}>
+            Import JSON/CSV
+          </button>
+        </div>
         <p className="ogp-helper">
-          Pick a plan to load into this week&apos;s editor, then Confirm. Library is grid-only — percentages only.
+          Import JSON exports (call sheet, usage, practice, and more) or grid CSV. Saved library entries are grid-only.
         </p>
         <div className="ogp-plan-group">
           <div className="ogp-group-label">Built-in presets</div>
@@ -1040,7 +1187,6 @@ export default function CoachGameplanPage({
         </div>
       </aside>
     )
-  }
 
   const renderOffenseFooter = (confirmLabel = 'Confirm') => (
     <div className="ogp-footer-bar">
@@ -1061,6 +1207,15 @@ export default function CoachGameplanPage({
       <div className="ogp-spacer" />
       <button type="button" className="ogp-btn" onClick={() => void fetchPlan({ showLoading: true })} disabled={busy}>
         Reload
+      </button>
+      <button
+        type="button"
+        className="ogp-btn"
+        title="Import JSON (full gameplan) or CSV (grid only)"
+        onClick={onImportClick}
+        disabled={busy}
+      >
+        Import gameplan
       </button>
       <button
         type="button"
@@ -1157,6 +1312,8 @@ export default function CoachGameplanPage({
                   disabled={busy}
                   onPkgChange={(p) => setSidePackage(p)}
                   onScriptChange={setTeamScript}
+                  onImportClick={onImportClick}
+                  importDisabled={busy}
                   uiVariant="off-tabs"
                   activeTab={activeTab}
                 />
@@ -1171,6 +1328,8 @@ export default function CoachGameplanPage({
                   disabled={busy || !gameplanAvailable}
                   onPkgChange={(p) => setSidePackage(p)}
                   onScriptChange={setTeamScript}
+                  onImportClick={onImportClick}
+                  importDisabled={busy}
                   uiVariant="off-tabs"
                   activeTab="gameplan"
                   gridSlot={sidePackage.gameplan_mode === 'grid' ? renderOffenseGridEditor() : null}
@@ -1186,6 +1345,8 @@ export default function CoachGameplanPage({
                   disabled={busy || !gameplanAvailable}
                   onPkgChange={(p) => setSidePackage(p)}
                   onScriptChange={setTeamScript}
+                  onImportClick={onImportClick}
+                  importDisabled={busy}
                   uiVariant="off-tabs"
                   activeTab={activeTab}
                 />
@@ -1290,6 +1451,8 @@ export default function CoachGameplanPage({
                   disabled={busy}
                   onPkgChange={(p) => setSidePackage(p)}
                   onScriptChange={setTeamScript}
+                  onImportClick={onImportClick}
+                  importDisabled={busy}
                   uiVariant="def-tabs"
                   activeTab={activeTab}
                   hideModeToggle
@@ -1305,6 +1468,8 @@ export default function CoachGameplanPage({
                   disabled={busy || !gameplanAvailable}
                   onPkgChange={(p) => setSidePackage(p)}
                   onScriptChange={setTeamScript}
+                  onImportClick={onImportClick}
+                  importDisabled={busy}
                   uiVariant="def-tabs"
                   activeTab="gameplan"
                   hideModeToggle
@@ -1321,6 +1486,8 @@ export default function CoachGameplanPage({
                   disabled={busy || !gameplanAvailable}
                   onPkgChange={(p) => setSidePackage(p)}
                   onScriptChange={setTeamScript}
+                  onImportClick={onImportClick}
+                  importDisabled={busy}
                   uiVariant="def-tabs"
                   activeTab={activeTab}
                   hideModeToggle

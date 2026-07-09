@@ -341,3 +341,107 @@ export function buildGameplanExportPayload(
     team_script: teamScript,
   }
 }
+
+export type ParsedGameplanImport = {
+  format: 'full_export' | 'side_package' | 'grid_only'
+  offensePackage: Record<string, unknown> | null
+  defensePackage: Record<string, unknown> | null
+  teamScript: Partial<TeamScript> | null
+  gridOnly: Record<string, unknown> | null
+}
+
+function isSidePackageLike(raw: unknown): raw is Record<string, unknown> {
+  if (!raw || typeof raw !== 'object') return false
+  const o = raw as Record<string, unknown>
+  return (
+    'gameplan_mode' in o ||
+    'callsheet' in o ||
+    'usage' in o ||
+    'practice' in o ||
+    'halftime' in o ||
+    ('grid' in o && !('offense_package' in o) && !('defense_package' in o))
+  )
+}
+
+function extractGridCandidate(side: 'offense' | 'defense', raw: Record<string, unknown>): Record<string, unknown> | null {
+  const packageKey = side === 'offense' ? 'offense_package' : 'defense_package'
+  let candidate: unknown = raw[side] ?? raw[packageKey] ?? raw
+  if (candidate && typeof candidate === 'object') {
+    const obj = candidate as Record<string, unknown>
+    if (obj.grid && typeof obj.grid === 'object') {
+      candidate = obj.grid
+    }
+  }
+  if (!candidate || typeof candidate !== 'object') return null
+  return candidate as Record<string, unknown>
+}
+
+/** Parse exported JSON or legacy grid JSON for coach gameplan import. */
+export function parseGameplanImportJson(side: 'offense' | 'defense', raw: unknown): ParsedGameplanImport {
+  if (!raw || typeof raw !== 'object') {
+    throw new Error('JSON does not look like a gameplan.')
+  }
+  const j = raw as Record<string, unknown>
+  const offenseRaw = j.offense_package
+  const defenseRaw = j.defense_package
+  const teamScriptRaw = j.team_script
+  const hasFullExport = offenseRaw != null || defenseRaw != null || teamScriptRaw != null
+
+  if (hasFullExport) {
+    const offensePackage =
+      offenseRaw && typeof offenseRaw === 'object' ? (offenseRaw as Record<string, unknown>) : null
+    const defensePackage =
+      defenseRaw && typeof defenseRaw === 'object' ? (defenseRaw as Record<string, unknown>) : null
+    const teamScript =
+      teamScriptRaw && typeof teamScriptRaw === 'object' ? (teamScriptRaw as Partial<TeamScript>) : null
+    if (!offensePackage && !defensePackage) {
+      throw new Error('JSON export is missing offense_package and defense_package.')
+    }
+    return {
+      format: 'full_export',
+      offensePackage,
+      defensePackage,
+      teamScript,
+      gridOnly: null,
+    }
+  }
+
+  const packageKey = side === 'offense' ? 'offense_package' : 'defense_package'
+  const sideRaw = j[packageKey] ?? j[side] ?? j
+  if (isSidePackageLike(sideRaw)) {
+    return {
+      format: 'side_package',
+      offensePackage: side === 'offense' ? (sideRaw as Record<string, unknown>) : null,
+      defensePackage: side === 'defense' ? (sideRaw as Record<string, unknown>) : null,
+      teamScript: null,
+      gridOnly: null,
+    }
+  }
+
+  const gridOnly = extractGridCandidate(side, j)
+  if (!gridOnly) {
+    throw new Error('JSON does not look like a gameplan.')
+  }
+  return {
+    format: 'grid_only',
+    offensePackage: null,
+    defensePackage: null,
+    teamScript: null,
+    gridOnly,
+  }
+}
+
+/** Re-map exported pass targets onto the current roster when names match. */
+export function remapImportedOffenseUsage(usage: OffenseUsage, targetPlayers: SkillTargetPlayer[]): OffenseUsage {
+  const names = targetPlayers.map((p) => p.name)
+  const order = [...(usage.wr_target_order ?? [])]
+  const remapped = order.map((slot) => {
+    const s = String(slot ?? '').trim()
+    if (!s) return ''
+    if (names.includes(s)) return s
+    const hit = names.find((n) => n.toLowerCase() === s.toLowerCase())
+    return hit ?? ''
+  })
+  while (remapped.length < 5) remapped.push('')
+  return { ...usage, wr_target_order: remapped.slice(0, 5) }
+}

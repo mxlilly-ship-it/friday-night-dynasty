@@ -330,7 +330,7 @@ type Props = {
   weekSubmitted?: boolean
   canUnsubmitWeek?: boolean
   submitWeekBusy?: boolean
-  /** Multiplayer: commissioner sets human out-of-region schedules from Run league. */
+  /** Multiplayer: commissioner sets human out-of-region schedules on the commish dashboard. */
   mpCommishLeagueId?: string
   mpCommishCrossRegionPlanning?: import('./multiplayer').CommishCrossRegionPlanningData
   onMpCommishCrossRegionPlanningChange?: (
@@ -7907,6 +7907,12 @@ function TeamHomePageBody({
                       bank later this offseason. Click a player name for the full offseason growth report (winter,
                       spring, and training).
                     </div>
+                    {offseasonTrainingRowsRaw.length === 0 && isMultiplayerLeague ? (
+                      <p className="teamhome-preseason-sub" style={{ marginTop: 12, opacity: 0.92 }}>
+                        In multiplayer, the commissioner simulates this step. After advance, your growth table appears
+                        here (and on Freshman Class) when you open your dashboard.
+                      </p>
+                    ) : null}
                     {trainingEquipmentPreview.length > 0 ? (
                       <div className="teamhome-improvements-ledger" style={{ marginTop: 14, textAlign: 'left' }}>
                         <div className="teamhome-improvements-ledger-head">
@@ -8035,6 +8041,13 @@ function TeamHomePageBody({
                     <div className="teamhome-preseason-sub">
                       Full incoming class (year 9 / FR). These players were added when the new year started.
                     </div>
+                    {offseasonTrainingRowsRaw.length === 0 && isMultiplayerLeague ? (
+                      <p className="teamhome-preseason-sub" style={{ marginTop: 12, opacity: 0.92 }}>
+                        Offseason development already ran when the commissioner advanced the league. Your roster
+                        ratings include that growth; detailed before/after rows appear here once Training Results
+                        data is saved for your school (leagues advancing after this update).
+                      </p>
+                    ) : null}
                     {offseasonTrainingRowsRaw.length > 0 ? (
                       <div style={{ marginTop: 16 }}>
                         <div className="teamhome-preseason-title" style={{ fontSize: 15 }}>
