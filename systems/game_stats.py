@@ -38,6 +38,13 @@ class PlayerGameStats:
     sacks: int = 0
     tfl: int = 0
     interceptions: int = 0  # INT (defensive)
+    # Special teams
+    fg_made: int = 0
+    fg_att: int = 0
+    xp_made: int = 0
+    xp_att: int = 0
+    punts: int = 0
+    punt_yards: int = 0
 
 
 @dataclass
@@ -45,6 +52,7 @@ class PlayerSeasonStats:
     """Cumulative season stats for one player (same fields as PlayerGameStats)."""
     player_name: str = ""
     team_name: str = ""
+    position: str = ""
     pass_yds: int = 0
     pass_td: int = 0
     comp: int = 0
@@ -59,6 +67,20 @@ class PlayerSeasonStats:
     sacks: int = 0
     tfl: int = 0
     interceptions: int = 0
+    fg_made: int = 0
+    fg_att: int = 0
+    xp_made: int = 0
+    xp_att: int = 0
+    punts: int = 0
+    punt_yards: int = 0
+
+
+_EXTRA_STAT_FIELDS = ("fg_made", "fg_att", "xp_made", "xp_att", "punts", "punt_yards")
+
+
+def season_player_stable_key(team_name: str, player_name: str) -> int:
+    """Stable int key for season stats maps across save/load (name + team)."""
+    return hash((str(team_name), str(player_name))) & 0x7FFFFFFFFFFFFFFF
 
 
 def season_stats_map_to_jsonable(m: Dict[int, Any]) -> Dict[str, Any]:
@@ -103,6 +125,13 @@ def season_stats_map_from_jsonable(m: Any) -> Dict[int, PlayerSeasonStats]:
                 sacks=int(v.get("sacks", 0)),
                 tfl=int(v.get("tfl", 0)),
                 interceptions=int(v.get("interceptions", 0)),
+                position=str(v.get("position", "") or ""),
+                fg_made=int(v.get("fg_made", 0)),
+                fg_att=int(v.get("fg_att", 0)),
+                xp_made=int(v.get("xp_made", 0)),
+                xp_att=int(v.get("xp_att", 0)),
+                punts=int(v.get("punts", 0)),
+                punt_yards=int(v.get("punt_yards", 0)),
             )
     return out
 
@@ -131,6 +160,12 @@ def player_game_stats_map_to_json_list(stats_map: Dict[int, PlayerGameStats]) ->
                 "sacks": gs.sacks,
                 "tfl": gs.tfl,
                 "interceptions": gs.interceptions,
+                "fg_made": gs.fg_made,
+                "fg_att": gs.fg_att,
+                "xp_made": gs.xp_made,
+                "xp_att": gs.xp_att,
+                "punts": gs.punts,
+                "punt_yards": gs.punt_yards,
             }
         )
     return out
@@ -174,6 +209,12 @@ def player_game_stats_by_id_from_json(raw: Any) -> Dict[int, PlayerGameStats]:
             sacks=int(v.get("sacks", 0)),
             tfl=int(v.get("tfl", 0)),
             interceptions=int(v.get("interceptions", 0)),
+            fg_made=int(v.get("fg_made", 0)),
+            fg_att=int(v.get("fg_att", 0)),
+            xp_made=int(v.get("xp_made", 0)),
+            xp_att=int(v.get("xp_att", 0)),
+            punts=int(v.get("punts", 0)),
+            punt_yards=int(v.get("punt_yards", 0)),
         )
     return out
 
@@ -204,6 +245,161 @@ def merge_game_stats_into_season(
         s.sacks += gs.sacks
         s.tfl += gs.tfl
         s.interceptions += gs.interceptions
+        for fld in _EXTRA_STAT_FIELDS:
+            setattr(s, fld, getattr(s, fld) + getattr(gs, fld))
+
+
+def _absorb_stat_row_into_season(
+    season_stats_map: Dict[int, PlayerSeasonStats],
+    row: Dict[str, Any],
+    *,
+    position: str = "",
+) -> None:
+    """Merge one week_results / JSON player stat row into season totals."""
+    player_name = str(row.get("player_name") or row.get("name") or "").strip()
+    team_name = str(row.get("team_name") or row.get("team") or "").strip()
+    if not player_name or not team_name:
+        return
+    key = season_player_stable_key(team_name, player_name)
+    if key not in season_stats_map:
+        season_stats_map[key] = PlayerSeasonStats(player_name=player_name, team_name=team_name)
+    s = season_stats_map[key]
+    if position and not s.position:
+        s.position = position
+    s.pass_yds += int(row.get("pass_yds", 0) or 0)
+    s.pass_td += int(row.get("pass_td", 0) or 0)
+    s.comp += int(row.get("comp", 0) or 0)
+    s.att += int(row.get("att", 0) or 0)
+    s.int_thrown += int(row.get("int_thrown", 0) or 0)
+    s.rush_yds += int(row.get("rush_yds", 0) or 0)
+    s.rush_td += int(row.get("rush_td", 0) or 0)
+    s.rec += int(row.get("rec", 0) or 0)
+    s.rec_yds += int(row.get("rec_yds", 0) or 0)
+    s.rec_td += int(row.get("rec_td", 0) or 0)
+    s.tackles += int(row.get("tackles", 0) or 0)
+    s.sacks += int(row.get("sacks", 0) or 0)
+    s.tfl += int(row.get("tfl", 0) or 0)
+    s.interceptions += int(row.get("interceptions", 0) or 0)
+    for fld in _EXTRA_STAT_FIELDS:
+        setattr(s, fld, getattr(s, fld) + int(row.get(fld, 0) or 0))
+
+
+def rebuild_season_player_stats_from_state(state: Dict[str, Any]) -> Dict[int, PlayerSeasonStats]:
+    """
+    Full-season player stats from regular-season week_results plus playoff rollup.
+    Keys are stable per (team, player) so awards work after save/load.
+    """
+    roster_pos: Dict[Tuple[str, str], str] = {}
+    for t in state.get("teams") or []:
+        if not isinstance(t, dict):
+            continue
+        team_name = str(t.get("name") or "").strip()
+        if not team_name:
+            continue
+        for p in t.get("roster") or []:
+            if not isinstance(p, dict):
+                continue
+            pname = str(p.get("name") or "").strip()
+            if pname:
+                roster_pos[(team_name, pname)] = str(p.get("position") or "").strip()
+
+    out: Dict[int, PlayerSeasonStats] = {}
+    for wk in state.get("week_results") or []:
+        for g in wk or []:
+            if not isinstance(g, dict) or not g.get("played"):
+                continue
+            for row in g.get("player_stats") or []:
+                if not isinstance(row, dict):
+                    continue
+                pn = str(row.get("player_name") or row.get("name") or "").strip()
+                tn = str(row.get("team_name") or row.get("team") or "").strip()
+                pos = roster_pos.get((tn, pn), "")
+                _absorb_stat_row_into_season(out, row, position=pos)
+
+    playoff = season_stats_map_from_jsonable(state.get("playoff_season_player_stats") or {})
+    for ps in playoff.values():
+        key = season_player_stable_key(ps.team_name, ps.player_name)
+        if key not in out:
+            out[key] = PlayerSeasonStats(
+                player_name=ps.player_name,
+                team_name=ps.team_name,
+                position=roster_pos.get((ps.team_name, ps.player_name), ps.position or ""),
+            )
+        dst = out[key]
+        if not dst.position:
+            dst.position = roster_pos.get((ps.team_name, ps.player_name), ps.position or "")
+        dst.pass_yds += ps.pass_yds
+        dst.pass_td += ps.pass_td
+        dst.comp += ps.comp
+        dst.att += ps.att
+        dst.int_thrown += ps.int_thrown
+        dst.rush_yds += ps.rush_yds
+        dst.rush_td += ps.rush_td
+        dst.rec += ps.rec
+        dst.rec_yds += ps.rec_yds
+        dst.rec_td += ps.rec_td
+        dst.tackles += ps.tackles
+        dst.sacks += ps.sacks
+        dst.tfl += ps.tfl
+        dst.interceptions += ps.interceptions
+        for fld in _EXTRA_STAT_FIELDS:
+            setattr(dst, fld, getattr(dst, fld) + getattr(ps, fld))
+
+    for s in out.values():
+        if not s.position:
+            s.position = roster_pos.get((s.team_name, s.player_name), "")
+
+    return out
+
+
+def record_pat(
+    stats_map: Dict[int, PlayerGameStats],
+    offense_team: "Team",
+    offense_dc: DepthChart,
+    pat_result: Dict[str, Any],
+) -> None:
+    """Attribute extra-point attempts to the kicker."""
+    if not pat_result.get("pat_kick"):
+        return
+    kicker = _pick_offense_player(offense_dc, "K", 0)
+    if kicker is None:
+        return
+    s = _get_or_create(stats_map, kicker, offense_team.name)
+    s.xp_att += 1
+    if pat_result.get("pat_success"):
+        s.xp_made += 1
+
+
+def record_special_teams(
+    stats_map: Dict[int, PlayerGameStats],
+    home_team: "Team",
+    away_team: "Team",
+    home_dc: DepthChart,
+    away_dc: DepthChart,
+    possession: str,
+    result: Dict[str, Any],
+) -> None:
+    """Attribute punts and field goals from silent-sim 4th-down decisions."""
+    if possession == "home":
+        off_team, off_dc = home_team, home_dc
+    else:
+        off_team, off_dc = away_team, away_dc
+    off_name = off_team.name
+
+    if result.get("field_goal"):
+        kicker = _pick_offense_player(off_dc, "K", 0)
+        if kicker is not None:
+            ks = _get_or_create(stats_map, kicker, off_name)
+            ks.fg_att += 1
+            if result.get("field_goal_good"):
+                ks.fg_made += 1
+    if result.get("punt"):
+        punter = _pick_offense_player(off_dc, "P", 0)
+        if punter is not None:
+            ps = _get_or_create(stats_map, punter, off_name)
+            dist = int(result.get("punt_distance") or 40)
+            ps.punts += 1
+            ps.punt_yards += dist
 
 
 def _get_or_create(stats_map: Dict[int, PlayerGameStats], player: "Player", team_name: str) -> PlayerGameStats:
