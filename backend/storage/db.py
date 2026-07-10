@@ -225,6 +225,77 @@ def _migrate_multiplayer_leagues(conn: sqlite3.Connection) -> None:
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_league_chat_league ON league_chat_messages(league_id, created_at DESC)"
     )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS league_join_requests (
+          id TEXT PRIMARY KEY,
+          league_id TEXT NOT NULL,
+          user_id TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending',
+          message TEXT,
+          created_at INTEGER NOT NULL,
+          resolved_at INTEGER,
+          resolved_by_user_id TEXT,
+          FOREIGN KEY(league_id) REFERENCES leagues(id),
+          FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_league_join_requests_league ON league_join_requests(league_id, status, created_at DESC)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_league_join_requests_user ON league_join_requests(user_id, status)"
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS league_start_requests (
+          id TEXT PRIMARY KEY,
+          user_id TEXT,
+          contact_email TEXT NOT NULL,
+          league_type TEXT NOT NULL,
+          estimated_players INTEGER NOT NULL,
+          state TEXT NOT NULL,
+          notes TEXT,
+          file_name TEXT,
+          file_path TEXT,
+          created_at INTEGER NOT NULL,
+          notified INTEGER NOT NULL DEFAULT 0,
+          FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_league_start_requests_created ON league_start_requests(created_at DESC)"
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS league_notification_settings (
+          league_id TEXT PRIMARY KEY,
+          email_week_advanced INTEGER NOT NULL DEFAULT 1,
+          email_advance_reminder_24h INTEGER NOT NULL DEFAULT 1,
+          email_advance_lockout INTEGER NOT NULL DEFAULT 1,
+          updated_at INTEGER NOT NULL,
+          FOREIGN KEY(league_id) REFERENCES leagues(id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS league_email_log (
+          id TEXT PRIMARY KEY,
+          league_id TEXT NOT NULL,
+          notification_type TEXT NOT NULL,
+          stage_key TEXT NOT NULL,
+          user_id TEXT NOT NULL,
+          sent_at INTEGER NOT NULL,
+          UNIQUE(league_id, notification_type, stage_key, user_id)
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_league_email_log_league ON league_email_log(league_id, sent_at DESC)"
+    )
 
 
 def _migrate_league_members_coach_setup(conn: sqlite3.Connection) -> None:

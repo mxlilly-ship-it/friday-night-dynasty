@@ -52,6 +52,9 @@ def dev_login_route(body: DevLoginRequest):
     if os.environ.get("FND_ALLOW_DEV_LOGIN", "").strip().lower() not in ("1", "true", "yes"):
         raise HTTPException(status_code=403, detail="Dev login is disabled on this server.")
     user_id, token = dev_login(body.username)
+    from backend.services.multiplayer_service import sync_pending_invites_for_user
+
+    sync_pending_invites_for_user(user_id)
     return DevLoginResponse(user_id=user_id, token=token)
 
 
@@ -80,6 +83,9 @@ def firebase_auth_route(body: FirebaseAuthRequest):
             body.device_id.strip(),
             body.device_label,
         )
+        from backend.services.multiplayer_service import sync_pending_invites_for_user
+
+        sync_pending_invites_for_user(user_id)
     except DeviceLimitError as e:
         raise HTTPException(
             status_code=403,

@@ -1,14 +1,15 @@
 import os
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, UploadFile
+from pydantic import BaseModel, Field, model_validator
 
 from backend.deps import require_entitled
 from backend.services.league_service import save_dir_team_logo
 from backend.services.multiplayer_service import (
     apply_league_coach_prep,
     apply_member_coach_setup,
+    approve_join_request,
     assign_team_by_email,
     assign_team_to_member,
     build_commish_cross_region_planning,
@@ -16,9 +17,12 @@ from backend.services.multiplayer_service import (
     build_league_dashboard,
     commish_advance_league,
     create_admin_league,
+    create_join_request,
     delete_admin_league,
+    list_browsable_leagues,
     list_deleted_leagues_for_admin,
     permanently_delete_admin_league,
+    reject_join_request,
     restore_admin_league,
     get_league_commish_game_bundle,
     get_league_game_bundle,
@@ -45,6 +49,8 @@ from backend.services.multiplayer_service import (
     _load_league_row,
 )
 from backend.storage.db import db
+from backend.storage.league_start_requests import create_league_start_request
+from backend.support_notify import notify_league_start_request, support_notify_configured
 
 
 router = APIRouter()
@@ -54,8 +60,8 @@ _LOGO_EXT = {".png": ".png", ".jpg": ".jpg", ".jpeg": ".jpeg", ".webp": ".webp"}
 
 class AdminCreateLeagueBody(BaseModel):
     name: str = Field(..., min_length=1, max_length=120)
-    user_team: str = Field(..., min_length=1)
-    coach_config: Dict[str, Any] = {}
+    user_team: Optional[str] = Field(None, min_length=1)
+    coach_config: Dict[str, Any] = Field(default_factory=dict)
     start_year: Optional[int] = None
     teams_data: Optional[Dict[str, Any]] = None
     allow_user_coach_firing: bool = False
@@ -63,6 +69,17 @@ class AdminCreateLeagueBody(BaseModel):
     commissioner_user_id: Optional[str] = None
     commissioner_email: Optional[str] = Field(None, min_length=3, max_length=200)
     timezone: str = "America/New_York"
+    defer_commish_setup: bool = False
+
+    @model_validator(mode="after")
+    def _require_team_unless_deferred(self) -> "AdminCreateLeagueBody":
+        if not self.defer_commish_setup and not str(self.user_team or "").strip():
+            raise ValueError("user_team required")
+        if self.defer_commish_setup and not (
+            str(self.commissioner_email or "").strip() or str(self.commissioner_user_id or "").strip()
+        ):
+            raise ValueError("commissioner email required when the commissioner will finish setup")
+        return self
 
 
 class VerifyPinBody(BaseModel):
@@ -91,6 +108,9 @@ class CommishSettingsBody(BaseModel):
     advance_deadline_time_local: Optional[str] = None
     submit_lockout_minutes: Optional[int] = Field(None, ge=0, le=120)
     timezone: Optional[str] = None
+    email_week_advanced: Optional[bool] = None
+    email_advance_reminder_24h: Optional[bool] = None
+    email_advance_lockout: Optional[bool] = None
 
 
 class CoachSetupBody(BaseModel):
@@ -103,6 +123,14 @@ class LeagueGameBody(BaseModel):
 
 class InviteBody(BaseModel):
     email: str = Field(..., min_length=3, max_length=200)
+
+
+class JoinRequestBody(BaseModel):
+    message: Optional[str] = Field(None, max_length=500)
+
+
+class ApproveJoinRequestBody(BaseModel):
+    team_name: Optional[str] = None
 
 
 class ChatMessageBody(BaseModel):
@@ -127,6 +155,78 @@ def list_my_leagues_route(user=Depends(require_entitled)):
         "is_platform_owner": is_platform_owner_user(user_id),
         "platform_owner_configured": platform_owner_emails_configured(),
         "account_email": account_email,
+    }
+
+
+@router.get("/browse", response_model=Dict[str, Any])
+def browse_leagues_route(user=Depends(require_entitled)):
+    try:
+        leagues = list_browsable_leagues(user["user_id"])
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not load leagues: {e}") from e
+    return {"leagues": leagues}
+
+
+@router.post("/start-requests", response_model=Dict[str, Any])
+async def league_start_request_route(
+    league_type: str = Form(...),
+    estimated_players: int = Form(...),
+    state: str = Form(...),
+    contact_email: Optional[str] = Form(None),
+    notes: Optional[str] = Form(None),
+    league_file: Optional[UploadFile] = File(None),
+    user=Depends(require_entitled),
+):
+    from backend.services.multiplayer_service import account_identity_for_user
+
+    user_id = user["user_id"]
+    email = (contact_email or "").strip().lower()
+    if not email:
+        identity = account_identity_for_user(user_id)
+        email = str(identity.get("email") or identity.get("username") or "").strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="A valid contact email is required.")
+
+    file_bytes: Optional[bytes] = None
+    file_name: Optional[str] = None
+    if league_file and league_file.filename:
+        file_name = league_file.filename
+        file_bytes = await league_file.read()
+
+    try:
+        request = create_league_start_request(
+            league_type=league_type,
+            estimated_players=estimated_players,
+            state=state,
+            contact_email=email,
+            user_id=user_id,
+            notes=notes,
+            file_bytes=file_bytes,
+            file_name=file_name,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    notified = notify_league_start_request(request)
+    if notified:
+        with db() as conn:
+            conn.execute(
+                "UPDATE league_start_requests SET notified=1 WHERE id=?",
+                (request["request_id"],),
+            )
+
+    if notified or support_notify_configured():
+        hint = "Request sent. We'll email you at {email} to follow up.".format(email=email)
+    else:
+        hint = (
+            f"Request received (ID {request['request_id'][:8]}). "
+            f"We'll follow up at {email}."
+        )
+    return {
+        "ok": True,
+        "request_id": request["request_id"],
+        "email_sent": notified,
+        "message": hint,
     }
 
 
@@ -187,6 +287,9 @@ def commish_settings_route(
             advance_deadline_time_local=body.advance_deadline_time_local,
             submit_lockout_minutes=body.submit_lockout_minutes,
             timezone=body.timezone,
+            email_week_advanced=body.email_week_advanced,
+            email_advance_reminder_24h=body.email_advance_reminder_24h,
+            email_advance_lockout=body.email_advance_lockout,
         )
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e)) from e
@@ -456,7 +559,7 @@ def admin_create_league_route(body: AdminCreateLeagueBody, user=Depends(require_
         return create_admin_league(
             user["user_id"],
             name=body.name,
-            user_team=body.user_team,
+            user_team=str(body.user_team or "").strip(),
             coach_config=body.coach_config,
             start_year=body.start_year,
             teams_data=body.teams_data,
@@ -465,6 +568,7 @@ def admin_create_league_route(body: AdminCreateLeagueBody, user=Depends(require_
             commissioner_user_id=body.commissioner_user_id,
             commissioner_email=body.commissioner_email,
             timezone=body.timezone,
+            defer_commish_setup=body.defer_commish_setup,
         )
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e)) from e
@@ -522,6 +626,52 @@ def admin_permanent_delete_league_route(league_id: str, user=Depends(require_ent
 def invite_to_league_route(league_id: str, body: InviteBody, user=Depends(require_entitled)):
     try:
         return invite_user_to_league(league_id, user["user_id"], body.email)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.post("/{league_id}/join-requests", response_model=Dict[str, Any])
+def create_join_request_route(
+    league_id: str,
+    body: JoinRequestBody,
+    user=Depends(require_entitled),
+):
+    try:
+        return create_join_request(league_id, user["user_id"], message=body.message)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.post("/{league_id}/join-requests/{request_id}/approve", response_model=Dict[str, Any])
+def approve_join_request_route(
+    league_id: str,
+    request_id: str,
+    body: ApproveJoinRequestBody,
+    user=Depends(require_entitled),
+):
+    try:
+        return approve_join_request(
+            league_id,
+            user["user_id"],
+            request_id,
+            team_name=body.team_name,
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.delete("/{league_id}/join-requests/{request_id}", response_model=Dict[str, Any])
+def reject_join_request_route(
+    league_id: str,
+    request_id: str,
+    user=Depends(require_entitled),
+):
+    try:
+        return reject_join_request(league_id, user["user_id"], request_id)
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e)) from e
     except ValueError as e:

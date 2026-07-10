@@ -13,11 +13,25 @@ export type LeagueListItem = {
   is_platform_owner_view?: boolean
   can_run_league?: boolean
   teams: LeagueListTeam[]
+  /** True when the user joined via invite but the commish has not assigned a team yet. */
+  unassigned?: boolean
   updated_at: number
   badges?: string[]
   submitted?: boolean
   your_turn?: boolean
   week_label?: string | null
+}
+
+/** Coach was invited and accepted, but no school has been assigned yet. */
+export function leagueAwaitingTeamAssignment(league: LeagueListItem): boolean {
+  if (league.unassigned) return true
+  if (league.is_commissioner || league.can_run_league) return false
+  const assigned = league.teams.map((t) => t.team_name).filter(Boolean)
+  return assigned.length === 0
+}
+
+export function leaguesAwaitingTeamAssignment(leagues: LeagueListItem[]): LeagueListItem[] {
+  return leagues.filter(leagueAwaitingTeamAssignment)
 }
 
 export type LeagueDashboardData = {
@@ -116,6 +130,23 @@ export type CommishPendingInvite = {
   created_at: number
 }
 
+export type CommishPendingJoinRequest = {
+  request_id: string
+  user_id: string
+  email: string
+  message?: string | null
+  created_at: number
+}
+
+export type BrowsableLeague = {
+  league_id: string
+  name: string
+  updated_at: number
+  vacant_teams: number
+  join_request_status?: string | null
+  join_request_id?: string | null
+}
+
 export type CommishCrossRegionPlanningData = {
   active: boolean
   season_year: number
@@ -144,9 +175,15 @@ export type CommishDashboardData = {
     timezone: string
     advance_deadline_iso: string | null
     countdown_value: string | null
+    notifications?: {
+      email_week_advanced: boolean
+      email_advance_reminder_24h: boolean
+      email_advance_lockout: boolean
+    }
   }
   members: CommishMember[]
   pending_invites: CommishPendingInvite[]
+  pending_join_requests: CommishPendingJoinRequest[]
   vacant_teams: string[]
   all_teams: string[]
   state_version: number
@@ -416,6 +453,66 @@ export async function inviteToLeague(
   return (await r.json()) as { email_sent?: boolean }
 }
 
+export async function fetchBrowsableLeagues(
+  apiBase: string,
+  headers: Record<string, string>,
+): Promise<BrowsableLeague[]> {
+  const r = await fetchWithRetry(`${apiBase}/leagues/browse`, { headers })
+  if (!r.ok) throw new Error(await r.text())
+  const data = (await r.json()) as { leagues?: BrowsableLeague[] }
+  return data.leagues ?? []
+}
+
+export async function requestToJoinLeague(
+  apiBase: string,
+  headers: Record<string, string>,
+  leagueId: string,
+  message?: string,
+): Promise<{ email_sent?: boolean }> {
+  const r = await fetchWithRetry(`${apiBase}/leagues/${leagueId}/join-requests`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: message?.trim() || undefined }),
+  })
+  if (!r.ok) throw new Error(await r.text())
+  return (await r.json()) as { email_sent?: boolean }
+}
+
+export async function approveJoinRequest(
+  apiBase: string,
+  headers: Record<string, string>,
+  leagueId: string,
+  requestId: string,
+  teamName?: string,
+): Promise<AssignTeamResult> {
+  const r = await fetchWithRetry(
+    `${apiBase}/leagues/${leagueId}/join-requests/${encodeURIComponent(requestId)}/approve`,
+    {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ team_name: teamName || undefined }),
+    },
+  )
+  if (!r.ok) throw new Error(await r.text())
+  return (await r.json()) as AssignTeamResult
+}
+
+export async function rejectJoinRequest(
+  apiBase: string,
+  headers: Record<string, string>,
+  leagueId: string,
+  requestId: string,
+): Promise<void> {
+  const r = await fetchWithRetry(
+    `${apiBase}/leagues/${leagueId}/join-requests/${encodeURIComponent(requestId)}`,
+    {
+      method: 'DELETE',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+    },
+  )
+  if (!r.ok) throw new Error(await r.text())
+}
+
 export async function fetchLeagueChat(
   apiBase: string,
   headers: Record<string, string>,
@@ -480,6 +577,9 @@ export type CommishSettingsPatch = {
   advance_deadline_time_local?: string
   submit_lockout_minutes?: number
   timezone?: string
+  email_week_advanced?: boolean
+  email_advance_reminder_24h?: boolean
+  email_advance_lockout?: boolean
 }
 
 export async function updateCommishSettings(

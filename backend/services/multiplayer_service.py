@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import re
 import secrets
@@ -25,6 +26,8 @@ from systems.win_path_io import (
     os_replace_with_path_fallback,
     unlink_if_exists_any,
 )
+
+logger = logging.getLogger(__name__)
 
 LEAGUE_SAVE_FILENAME = "league_save.json"
 
@@ -354,6 +357,288 @@ def invite_user_to_league(league_id: str, actor_user_id: str, email: str) -> Dic
         "status": "pending",
         "email_sent": email_sent,
     }
+
+
+def list_browsable_leagues(user_id: str) -> List[Dict[str, Any]]:
+    """Active leagues the user is not in, with vacant team counts and join-request state."""
+    with db() as conn:
+        rows = conn.execute(
+            """
+            SELECT l.id, l.name, l.updated_at, l.save_dir
+            FROM leagues l
+            WHERE l.status = 'active'
+              AND l.id NOT IN (
+                SELECT league_id FROM league_members
+                WHERE user_id = ? AND status != 'removed'
+              )
+            ORDER BY l.updated_at DESC
+            """,
+            (user_id,),
+        ).fetchall()
+        pending_rows = conn.execute(
+            """
+            SELECT id, league_id FROM league_join_requests
+            WHERE user_id=? AND status='pending'
+            """,
+            (user_id,),
+        ).fetchall()
+    pending_by_league = {str(r["league_id"]): str(r["id"]) for r in pending_rows}
+
+    out: List[Dict[str, Any]] = []
+    for r in rows:
+        league_id = str(r["id"])
+        save_dir = str(r["save_dir"] or "")
+        vacant = 0
+        try:
+            state = _load_state(save_dir)
+            teams_meta = _teams_meta_from_state(state)
+            all_teams = set(teams_meta.keys())
+            with db() as conn:
+                assigned = {
+                    str(row["team_name"])
+                    for row in conn.execute(
+                        """
+                        SELECT team_name FROM league_members
+                        WHERE league_id=? AND status='active' AND team_name IS NOT NULL
+                        """,
+                        (league_id,),
+                    ).fetchall()
+                    if row["team_name"]
+                }
+            vacant = len([t for t in all_teams if t not in assigned])
+        except Exception:
+            vacant = 0
+        pending_id = pending_by_league.get(league_id)
+        out.append(
+            {
+                "league_id": league_id,
+                "name": str(r["name"] or ""),
+                "updated_at": int(r["updated_at"] or 0),
+                "vacant_teams": vacant,
+                "join_request_status": "pending" if pending_id else None,
+                "join_request_id": pending_id,
+            }
+        )
+    return out
+
+
+def create_join_request(
+    league_id: str,
+    user_id: str,
+    message: Optional[str] = None,
+) -> Dict[str, Any]:
+    league_row = _load_league_row(league_id)
+    if not league_row:
+        raise ValueError("league not found")
+    if str(league_row.get("status") or "") != "active":
+        raise ValueError("this league is not accepting join requests")
+
+    clean_msg = (message or "").strip()[:500] or None
+    now = _now()
+    request_id = str(uuid.uuid4())
+    with db() as conn:
+        member = conn.execute(
+            """
+            SELECT 1 FROM league_members
+            WHERE league_id=? AND user_id=? AND status != 'removed'
+            """,
+            (league_id, user_id),
+        ).fetchone()
+        if member:
+            raise ValueError("you are already in this league")
+        pending = conn.execute(
+            """
+            SELECT id FROM league_join_requests
+            WHERE league_id=? AND user_id=? AND status='pending'
+            """,
+            (league_id, user_id),
+        ).fetchone()
+        if pending:
+            raise ValueError("you already have a pending join request for this league")
+        conn.execute(
+            """
+            INSERT INTO league_join_requests (
+              id, league_id, user_id, status, message, created_at
+            ) VALUES (?,?,?,?,?,?)
+            """,
+            (request_id, league_id, user_id, "pending", clean_msg, now),
+        )
+        requester_label = _user_email(user_id) or "A coach"
+        conn.execute(
+            """
+            INSERT INTO league_activity_log (id, league_id, actor_user_id, action, detail_json, created_at)
+            VALUES (?,?,?,?,?,?)
+            """,
+            (
+                str(uuid.uuid4()),
+                league_id,
+                user_id,
+                "join_request",
+                json.dumps({"text": f"{requester_label} requested to join", "icon": "🙋"}),
+                now,
+            ),
+        )
+
+    email_sent = False
+    commish_id = str(league_row.get("commissioner_user_id") or "").strip()
+    if commish_id:
+        commish_email = _user_email(commish_id)
+        if commish_email:
+            try:
+                from backend.email_notify import send_join_request_email_to_commish
+
+                requester_label = _user_email(user_id) or "A coach"
+                email_sent = send_join_request_email_to_commish(
+                    to_email=commish_email,
+                    league_name=str(league_row.get("name") or "League"),
+                    requester_label=requester_label,
+                    message=clean_msg,
+                )
+            except Exception:
+                email_sent = False
+
+    return {
+        "request_id": request_id,
+        "league_id": league_id,
+        "status": "pending",
+        "email_sent": email_sent,
+    }
+
+
+def approve_join_request(
+    league_id: str,
+    actor_user_id: str,
+    request_id: str,
+    *,
+    team_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    league_row = _require_commish_write(league_id, actor_user_id)
+    with db() as conn:
+        req = conn.execute(
+            """
+            SELECT id, user_id, status FROM league_join_requests
+            WHERE id=? AND league_id=?
+            """,
+            (request_id, league_id),
+        ).fetchone()
+        if not req or str(req["status"]) != "pending":
+            raise ValueError("join request not found or already resolved")
+        target_user_id = str(req["user_id"])
+
+    now = _now()
+    pin: Optional[str] = None
+    assigned_team: Optional[str] = None
+    if team_name:
+        result = assign_team_to_member(league_id, actor_user_id, target_user_id, team_name)
+        assigned_team = str(result.get("team_name") or team_name)
+        pin = str(result.get("pin") or "")
+    else:
+        with db() as conn:
+            exists = conn.execute(
+                """
+                SELECT 1 FROM league_members
+                WHERE league_id=? AND user_id=? AND status != 'removed'
+                """,
+                (league_id, target_user_id),
+            ).fetchone()
+            if not exists:
+                conn.execute(
+                    """
+                    INSERT INTO league_members (
+                      id, league_id, user_id, team_name, role, status,
+                      control_mode, coach_setup_complete, joined_at
+                    ) VALUES (?,?,?,?,?,?,?,?,?)
+                    """,
+                    (
+                        str(uuid.uuid4()),
+                        league_id,
+                        target_user_id,
+                        None,
+                        "coach",
+                        "unassigned",
+                        "human",
+                        0,
+                        now,
+                    ),
+                )
+
+    with db() as conn:
+        conn.execute(
+            """
+            UPDATE league_join_requests
+            SET status='accepted', resolved_at=?, resolved_by_user_id=?
+            WHERE id=? AND league_id=?
+            """,
+            (now, actor_user_id, request_id, league_id),
+        )
+        requester_label = _user_email(target_user_id) or "Coach"
+        detail = f"Approved join request from {requester_label}"
+        if assigned_team:
+            detail += f" — assigned {assigned_team}"
+        conn.execute(
+            """
+            INSERT INTO league_activity_log (id, league_id, actor_user_id, action, detail_json, created_at)
+            VALUES (?,?,?,?,?,?)
+            """,
+            (
+                str(uuid.uuid4()),
+                league_id,
+                actor_user_id,
+                "join_request_approved",
+                json.dumps({"text": detail, "icon": "✅"}),
+                now,
+            ),
+        )
+
+    out: Dict[str, Any] = {
+        "ok": True,
+        "request_id": request_id,
+        "user_id": target_user_id,
+        "team_name": assigned_team,
+    }
+    if pin:
+        out["pin"] = pin
+    return out
+
+
+def reject_join_request(league_id: str, actor_user_id: str, request_id: str) -> Dict[str, Any]:
+    _require_commish_write(league_id, actor_user_id)
+    now = _now()
+    with db() as conn:
+        req = conn.execute(
+            """
+            SELECT id, user_id, status FROM league_join_requests
+            WHERE id=? AND league_id=?
+            """,
+            (request_id, league_id),
+        ).fetchone()
+        if not req or str(req["status"]) != "pending":
+            raise ValueError("join request not found or already resolved")
+        target_user_id = str(req["user_id"])
+        conn.execute(
+            """
+            UPDATE league_join_requests
+            SET status='rejected', resolved_at=?, resolved_by_user_id=?
+            WHERE id=? AND league_id=?
+            """,
+            (now, actor_user_id, request_id, league_id),
+        )
+        requester_label = _user_email(target_user_id) or "Coach"
+        conn.execute(
+            """
+            INSERT INTO league_activity_log (id, league_id, actor_user_id, action, detail_json, created_at)
+            VALUES (?,?,?,?,?,?)
+            """,
+            (
+                str(uuid.uuid4()),
+                league_id,
+                actor_user_id,
+                "join_request_rejected",
+                json.dumps({"text": f"Denied join request from {requester_label}", "icon": "🚫"}),
+                now,
+            ),
+        )
+    return {"ok": True, "request_id": request_id}
 
 
 def apply_member_coach_setup(
@@ -1474,7 +1759,7 @@ def try_auto_advance_league(league_id: str) -> bool:
     if not commish_id:
         return False
     try:
-        commish_advance_league(league_id, commish_id)
+        commish_advance_league(league_id, commish_id, advance_source="auto")
     except Exception:
         return False
     with db() as conn:
@@ -1692,6 +1977,7 @@ def list_leagues_for_user(user_id: str) -> List[Dict[str, Any]]:
                 "is_platform_owner_view": item["is_platform_owner_view"],
                 "can_run_league": item["can_run_league"],
                 "teams": teams,
+                "unassigned": bool(item.get("unassigned")),
                 "updated_at": item["updated_at"],
                 "badges": badges,
                 "submitted": submitted,
@@ -2054,6 +2340,79 @@ def build_league_dashboard(
     }
 
 
+    return owner_user_id
+
+
+def _first_team_name_from_teams_data(teams_data: Optional[Dict[str, Any]]) -> Optional[str]:
+    if not isinstance(teams_data, dict):
+        return None
+    rows = teams_data.get("teams")
+    if not isinstance(rows, list):
+        return None
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        name = str(row.get("name") or row.get("school") or "").strip()
+        if name:
+            return name
+    return None
+
+
+def _resolve_bootstrap_team_name(
+    teams_data: Optional[Dict[str, Any]],
+    user_team: Optional[str] = None,
+) -> str:
+    clean = str(user_team or "").strip()
+    if clean:
+        return clean
+    from_teams = _first_team_name_from_teams_data(teams_data)
+    if from_teams:
+        return from_teams
+    from systems.teams_loader import load_league_config_from_json
+
+    cfg = load_league_config_from_json()
+    from_default = _first_team_name_from_teams_data(cfg if isinstance(cfg, dict) else None)
+    if from_default:
+        return from_default
+    raise ValueError("Could not determine a team for league bootstrap")
+
+
+def _minimal_bootstrap_coach_config() -> Dict[str, Any]:
+    return {
+        "name": "Staff",
+        "age": 38,
+        "playcalling": 5,
+        "player_development": 5,
+        "community_outreach": 5,
+        "culture": 5,
+        "recruiting": 5,
+        "scheme_teach": 5,
+        "offensive_style": "balanced",
+        "defensive_style": "multiple_4_3",
+        "winter_strength_pct": 50,
+        "offensive_formation": "spread",
+        "defensive_formation": "multiple_4_3",
+    }
+
+
+def _restore_cpu_coach_on_team(state: Dict[str, Any], team_name: str) -> None:
+    from systems.coach_generator import generate_coach_for_team
+    from systems.save_system import team_from_dict, team_to_dict
+
+    teams_list = state.get("teams")
+    if not isinstance(teams_list, list):
+        return
+    for idx, row in enumerate(teams_list):
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("name") or "") != team_name:
+            continue
+        team = team_from_dict(row)
+        team.coach = generate_coach_for_team(team)
+        teams_list[idx] = team_to_dict(team)
+        break
+
+
 def create_admin_league(
     owner_user_id: str,
     *,
@@ -2067,6 +2426,7 @@ def create_admin_league(
     commissioner_user_id: Optional[str] = None,
     commissioner_email: Optional[str] = None,
     timezone: str = "America/New_York",
+    defer_commish_setup: bool = False,
 ) -> Dict[str, Any]:
     """Platform owner creates a multiplayer league (same options as single-player new dynasty)."""
     from backend.services.league_service import create_save
@@ -2080,9 +2440,21 @@ def create_admin_league(
             raise ValueError("teams_data must include a teams array")
         if len(team_rows) > 120:
             raise ValueError("multiplayer leagues support at most 120 teams")
-    user_team = str(user_team or "").strip()
-    if not user_team:
-        raise ValueError("user_team required")
+
+    commish_id = resolve_commissioner_user_id(
+        owner_user_id,
+        commissioner_user_id=commissioner_user_id,
+        commissioner_email=commissioner_email,
+    )
+
+    if defer_commish_setup:
+        bootstrap_team = _resolve_bootstrap_team_name(teams_data, user_team or None)
+        bootstrap_coach = _minimal_bootstrap_coach_config()
+    else:
+        bootstrap_team = str(user_team or "").strip()
+        if not bootstrap_team:
+            raise ValueError("user_team required")
+        bootstrap_coach = coach_config or {}
 
     league_id = str(uuid.uuid4())
     save_dir = _league_dir(league_id)
@@ -2099,8 +2471,8 @@ def create_admin_league(
     bootstrap = create_save(
         owner_user_id,
         bootstrap_name,
-        user_team,
-        coach_config or {},
+        bootstrap_team,
+        bootstrap_coach,
         **create_kwargs,
     )
     save_id = bootstrap.get("save_id")
@@ -2124,19 +2496,26 @@ def create_admin_league(
     from backend.services.league_service import ensure_multiplayer_opening_schedule
 
     state = _load_state(save_dir)
+    if defer_commish_setup:
+        _restore_cpu_coach_on_team(state, bootstrap_team)
+        state.pop("user_team", None)
+        state.pop("user_coach_name", None)
+        banks = state.get("offseason_coach_dev_banks")
+        if isinstance(banks, dict):
+            banks.pop(bootstrap_team, None)
+        state.pop("offseason_coach_dev_bank", None)
     state["multiplayer_league"] = True
     state["multiplayer"] = {"league_id": league_id}
-    state["user_team"] = user_team
+    if not defer_commish_setup:
+        state["user_team"] = bootstrap_team
     ensure_multiplayer_opening_schedule(state)
     _save_state(save_dir, state)
 
     now = _now()
-    commish_id = resolve_commissioner_user_id(
-        owner_user_id,
-        commissioner_user_id=commissioner_user_id,
-        commissioner_email=commissioner_email,
-    )
-    commish_pin = generate_team_pin()
+    commish_pin: Optional[str] = None
+    commish_team: Optional[str] = None
+    if not defer_commish_setup:
+        commish_pin = generate_team_pin()
     commish_lookup = lookup_user_by_email(_user_email(commish_id)) or {}
     commish_display = str(
         commish_lookup.get("email") or commish_lookup.get("username") or commish_id
@@ -2178,13 +2557,13 @@ def create_admin_league(
                 str(uuid.uuid4()),
                 league_id,
                 commish_id,
-                user_team,
+                None if defer_commish_setup else bootstrap_team,
                 "commissioner",
-                "active",
+                "unassigned" if defer_commish_setup else "active",
                 "human",
-                _hash_pin(commish_pin),
-                now,
-                1,
+                _hash_pin(commish_pin) if commish_pin else None,
+                now if commish_pin else None,
+                0 if defer_commish_setup else 1,
                 now,
             ),
         )
@@ -2203,14 +2582,22 @@ def create_admin_league(
             ),
         )
 
+    from backend.services.league_notifications import ensure_notification_settings
+
+    ensure_notification_settings(league_id)
+
+    if not defer_commish_setup:
+        commish_team = bootstrap_team
+
     return {
         "league_id": league_id,
         "name": name.strip(),
         "save_dir": save_dir,
         "commissioner_user_id": commish_id,
         "commissioner_email": commish_display,
-        "commissioner_team": user_team,
+        "commissioner_team": commish_team,
         "commissioner_pin": commish_pin,
+        "defer_commish_setup": defer_commish_setup,
     }
 
 
@@ -2319,6 +2706,9 @@ def permanently_delete_admin_league(owner_user_id: str, league_id: str) -> Dict[
         conn.execute("DELETE FROM league_activity_log WHERE league_id=?", (league_id,))
         conn.execute("DELETE FROM league_chat_messages WHERE league_id=?", (league_id,))
         conn.execute("DELETE FROM league_invites WHERE league_id=?", (league_id,))
+        conn.execute("DELETE FROM league_join_requests WHERE league_id=?", (league_id,))
+        conn.execute("DELETE FROM league_email_log WHERE league_id=?", (league_id,))
+        conn.execute("DELETE FROM league_notification_settings WHERE league_id=?", (league_id,))
         conn.execute("DELETE FROM league_members WHERE league_id=?", (league_id,))
         conn.execute("DELETE FROM leagues WHERE id=?", (league_id,))
     if save_dir and os.path.isdir(save_dir):
@@ -2485,6 +2875,9 @@ def update_league_settings(
     advance_deadline_time_local: Optional[str] = None,
     submit_lockout_minutes: Optional[int] = None,
     timezone: Optional[str] = None,
+    email_week_advanced: Optional[bool] = None,
+    email_advance_reminder_24h: Optional[bool] = None,
+    email_advance_lockout: Optional[bool] = None,
 ) -> Dict[str, Any]:
     league_row = _load_league_row(league_id)
     if not league_row:
@@ -2518,12 +2911,26 @@ def update_league_settings(
             """,
             (mode, dow, str(time_local or "23:59"), lockout, tz, now, league_id),
         )
+    from backend.services.league_notifications import get_notification_settings, update_notification_settings
+
+    notifications = get_notification_settings(league_id)
+    if any(
+        v is not None
+        for v in (email_week_advanced, email_advance_reminder_24h, email_advance_lockout)
+    ):
+        notifications = update_notification_settings(
+            league_id,
+            email_week_advanced=email_week_advanced,
+            email_advance_reminder_24h=email_advance_reminder_24h,
+            email_advance_lockout=email_advance_lockout,
+        )
     return {
         "advance_mode": mode,
         "advance_deadline_dow": dow,
         "advance_deadline_time_local": str(time_local or "23:59"),
         "submit_lockout_minutes": lockout,
         "timezone": tz,
+        "notifications": notifications,
     }
 
 
@@ -2587,6 +2994,7 @@ def commish_advance_league(
     user_id: str,
     *,
     cross_region_picks: Optional[List[Dict[str, Any]]] = None,
+    advance_source: str = "manual",
 ) -> Dict[str, Any]:
     """Sim/advance one league step (commissioner)."""
     from backend.services.league_service import (
@@ -2605,6 +3013,8 @@ def commish_advance_league(
     league_row = _verify_commish_game_access(league_id, user_id)
     save_dir = str(league_row.get("save_dir") or "")
     state = _load_state(save_dir)
+    completed_stage_key = _stage_key_from_state(state)
+    league_name = str(league_row.get("name") or "League")
     phase = str(state.get("season_phase") or "regular").strip().lower()
 
     league_history: Dict[str, Any] = {"seasons": []}
@@ -2762,6 +3172,19 @@ def commish_advance_league(
                         now,
                     ),
                 )
+
+    try:
+        from backend.services.league_notifications import notify_week_advanced
+
+        notify_week_advanced(
+            league_id,
+            advance_source=advance_source,
+            action_label=action_label,
+            completed_stage_key=completed_stage_key,
+            league_name=league_name,
+        )
+    except Exception:
+        logger.exception("Failed to send week-advanced notifications for league %s", league_id)
 
     return {
         "ok": True,
@@ -2977,6 +3400,16 @@ def build_commish_dashboard(league_id: str, user_id: str) -> Dict[str, Any]:
             """,
             (league_id,),
         ).fetchall()
+        join_request_rows = conn.execute(
+            """
+            SELECT r.id, r.user_id, r.message, r.created_at, u.email, u.username
+            FROM league_join_requests r
+            LEFT JOIN users u ON u.id = r.user_id
+            WHERE r.league_id=? AND r.status='pending'
+            ORDER BY r.created_at DESC
+            """,
+            (league_id,),
+        ).fetchall()
 
     assigned_teams = {
         str(r["team_name"])
@@ -3012,6 +3445,17 @@ def build_commish_dashboard(league_id: str, user_id: str) -> Dict[str, Any]:
         for inv in invite_rows
     ]
 
+    pending_join_requests = [
+        {
+            "request_id": str(req["id"]),
+            "user_id": str(req["user_id"]),
+            "email": str(req["email"] or req["username"] or "").strip(),
+            "message": str(req["message"] or "").strip() or None,
+            "created_at": int(req["created_at"]),
+        }
+        for req in join_request_rows
+    ]
+
     human_team_names = {
         str(r["team_name"]) for r in member_rows if r["team_name"] and str(r["status"]) == "active"
     }
@@ -3021,6 +3465,10 @@ def build_commish_dashboard(league_id: str, user_id: str) -> Dict[str, Any]:
 
     league_name = str(league_row.get("name") or "League")
     deadline_iso = _advance_countdown_iso(league_row)
+
+    from backend.services.league_notifications import get_notification_settings
+
+    notification_settings = get_notification_settings(league_id)
 
     acting_team: Optional[str] = None
     coach_setup_complete = False
@@ -3061,9 +3509,11 @@ def build_commish_dashboard(league_id: str, user_id: str) -> Dict[str, Any]:
             "timezone": str(league_row.get("timezone") or "America/New_York"),
             "advance_deadline_iso": deadline_iso,
             "countdown_value": _format_countdown(deadline_iso),
+            "notifications": notification_settings,
         },
         "members": members,
         "pending_invites": pending_invites,
+        "pending_join_requests": pending_join_requests,
         "vacant_teams": vacant_teams,
         "all_teams": all_teams,
         "state_version": int(league_row.get("state_version") or 0),

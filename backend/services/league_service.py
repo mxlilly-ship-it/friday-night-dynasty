@@ -169,6 +169,7 @@ from systems.game_stats import (
     season_stats_map_from_jsonable,
     season_stats_map_to_jsonable,
     player_game_stats_map_to_json_list,
+    rebuild_season_player_stats_from_state,
 )
 from systems.gameplan_presets import list_defensive_preset_catalog, list_offensive_preset_catalog
 from systems.gameplan_v2 import (
@@ -6981,11 +6982,17 @@ def finish_season_state(
     if phase_s == "playoffs" or (
         playoffs and playoffs.get("completed") and str(playoffs.get("champion") or "").strip()
     ):
-        season_player_stats = season_stats_map_from_jsonable(state.get("playoff_season_player_stats") or {})
+        season_player_stats = rebuild_season_player_stats_from_state(state)
     else:
         season_player_stats = season_stats_map_from_jsonable(run_playoff_stats)
+        if not season_player_stats:
+            season_player_stats = rebuild_season_player_stats_from_state(state)
 
     year_num = int(state.get("current_year", 1))
+
+    from systems.awards_system import compute_awards, team_awards_lines
+
+    season_awards = compute_awards(season_player_stats, state=state)
 
     team_coaches: Dict[str, str] = {}
     for name, t in teams.items():
@@ -7121,6 +7128,12 @@ def finish_season_state(
                 lines.append(f"- {ps.player_name}: {total_yds} yds, {td} TD | Pass {ps.pass_yds} ({ps.comp}/{ps.att}) | Rush {ps.rush_yds} | Rec {ps.rec_yds}")
         else:
             lines.append("(no player season stats recorded)")
+        team_award = team_awards_lines(season_awards, team_name)
+        if team_award:
+            lines.append("")
+            lines.append("AWARDS & ALL-STATE")
+            lines.append("-" * 66)
+            lines.extend(team_award)
 
         season_recaps[rel_path] = "\n".join(lines).strip() + "\n"
         team_recap_files[team_name] = rel_path
@@ -7143,6 +7156,7 @@ def finish_season_state(
         team_recap_files=team_recap_files,
         regional_champions=regional_champions,
         playoffs_by_class=p_bc_snap_fs,
+        state=state,
     )
     league_history = out_hist.get("league_history") or league_history
     records = out_hist.get("records") or records
@@ -9817,12 +9831,19 @@ def finish_season(
     if phase_s == "playoffs" or (
         playoffs and playoffs.get("completed") and str(playoffs.get("champion") or "").strip()
     ):
-        season_player_stats = season_stats_map_from_jsonable(state.get("playoff_season_player_stats") or {})
+        season_player_stats = rebuild_season_player_stats_from_state(state)
     else:
         season_player_stats = season_stats_map_from_jsonable(run_playoff_stats)
+        if not season_player_stats:
+            season_player_stats = rebuild_season_player_stats_from_state(state)
 
     # --- Build per-team recap files for this season (before offseason changes roster/coaches) ---
     year_num = int(state.get("current_year", 1))
+
+    from systems.awards_system import compute_awards, team_awards_lines
+
+    season_awards = compute_awards(season_player_stats, state=state)
+
     recap_dir = os.path.join(save_dir, "season_recaps", f"year_{year_num}")
     try:
         makedirs_with_path_fallback(os.path.abspath(os.path.normpath(recap_dir)))
@@ -9968,6 +9989,12 @@ def finish_season(
                 lines.append(f"- {ps.player_name}: {total_yds} yds, {td} TD | Pass {ps.pass_yds} ({ps.comp}/{ps.att}) | Rush {ps.rush_yds} | Rec {ps.rec_yds}")
         else:
             lines.append("(no player season stats recorded)")
+        team_award = team_awards_lines(season_awards, team_name)
+        if team_award:
+            lines.append("")
+            lines.append("AWARDS & ALL-STATE")
+            lines.append("-" * 66)
+            lines.extend(team_award)
 
         try:
             with open_text_with_path_fallback(os.path.abspath(p), "w") as f:
@@ -9992,6 +10019,7 @@ def finish_season(
         regional_champions=regional_champions,
         playoffs_by_class=p_bc_snap,
         save_dir=save_dir,
+        state=state,
     )
     append_season_to_coach_career_log(
         state,

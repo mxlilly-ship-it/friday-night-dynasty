@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import './LeagueDashboardPage.css'
-import type { DeletedLeagueListItem, LeagueListItem } from './multiplayer'
+import RequestLeagueStartModal from './RequestLeagueStartModal'
+import type { BrowsableLeague, DeletedLeagueListItem, LeagueListItem } from './multiplayer'
 import {
   deleteAdminLeague,
+  fetchBrowsableLeagues,
   fetchDeletedLeagues,
   fetchMyLeagues,
+  leagueAwaitingTeamAssignment,
   permanentDeleteAdminLeague,
+  requestToJoinLeague,
   restoreAdminLeague,
 } from './multiplayer'
 
@@ -34,6 +38,7 @@ export default function MultiplayerLeaguesPage({
   onCreateLeague,
 }: MultiplayerLeaguesPageProps) {
   const [leagues, setLeagues] = useState<LeagueListItem[]>([])
+  const [browsableLeagues, setBrowsableLeagues] = useState<BrowsableLeague[]>([])
   const [isPlatformOwner, setIsPlatformOwner] = useState(false)
   const [platformOwnerConfigured, setPlatformOwnerConfigured] = useState(false)
   const [accountEmail, setAccountEmail] = useState('')
@@ -44,6 +49,8 @@ export default function MultiplayerLeaguesPage({
   const [deletedLeagues, setDeletedLeagues] = useState<DeletedLeagueListItem[]>([])
   const [selectedArchivedId, setSelectedArchivedId] = useState('')
   const [permanentDeletingId, setPermanentDeletingId] = useState('')
+  const [requestingId, setRequestingId] = useState('')
+  const [showStartRequest, setShowStartRequest] = useState(false)
   const [flash, setFlash] = useState('')
 
   const reload = useCallback(async () => {
@@ -55,6 +62,16 @@ export default function MultiplayerLeaguesPage({
       setIsPlatformOwner(data.is_platform_owner)
       setPlatformOwnerConfigured(Boolean(data.platform_owner_configured))
       setAccountEmail(data.account_email ?? '')
+      if (!data.is_platform_owner) {
+        try {
+          const browse = await fetchBrowsableLeagues(apiBase, headers)
+          setBrowsableLeagues(browse)
+        } catch {
+          setBrowsableLeagues([])
+        }
+      } else {
+        setBrowsableLeagues([])
+      }
       setLoading(false)
       if (data.is_platform_owner) {
         void fetchDeletedLeagues(apiBase, headers)
@@ -143,6 +160,30 @@ export default function MultiplayerLeaguesPage({
     }
   }
 
+  async function onRequestJoin(league: BrowsableLeague) {
+    const message = window.prompt(
+      `Request to join "${league.name}"?\n\nOptional message to the commissioner:`,
+      '',
+    )
+    if (message === null) return
+    setRequestingId(league.league_id)
+    setError('')
+    setFlash('')
+    try {
+      const res = await requestToJoinLeague(apiBase, headers, league.league_id, message)
+      await reload()
+      setFlash(
+        res.email_sent
+          ? `Join request sent for «${league.name}». The commissioner was emailed.`
+          : `Join request sent for «${league.name}». The commissioner will see it on their dashboard.`,
+      )
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to send join request')
+    } finally {
+      setRequestingId('')
+    }
+  }
+
   const selectedArchived =
     deletedLeagues.find((l) => l.league_id === selectedArchivedId) ?? null
 
@@ -174,6 +215,29 @@ export default function MultiplayerLeaguesPage({
         ) : null}
         {flash ? (
           <p style={{ margin: '0 0 12px', color: 'var(--green-status)', fontSize: '0.9rem' }}>{flash}</p>
+        ) : null}
+
+        {!loading && !isPlatformOwner ? (
+          <div className="ldash-panel" style={{ marginBottom: 16 }}>
+            <div className="ldash-panel-header">
+              <span className="ldash-panel-title">
+                Start a <span className="accent">league</span>
+              </span>
+            </div>
+            <div className="ldash-panel-body">
+              <p style={{ margin: '0 0 12px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                Want to run a new multiplayer dynasty? Send us your league details and we&apos;ll help get it set up
+                on the server.
+              </p>
+              <button
+                type="button"
+                className="ldash-action-btn ldash-action-btn--gold"
+                onClick={() => setShowStartRequest(true)}
+              >
+                Request to start a league
+              </button>
+            </div>
+          </div>
         ) : null}
 
         {isPlatformOwner && onCreateLeague ? (
@@ -279,13 +343,69 @@ export default function MultiplayerLeaguesPage({
           </div>
         ) : null}
 
+        {!loading && !isPlatformOwner && browsableLeagues.length > 0 ? (
+          <div className="ldash-panel" style={{ marginBottom: 16 }}>
+            <div className="ldash-panel-header">
+              <span className="ldash-panel-title">
+                Join a <span className="accent">league</span>
+              </span>
+            </div>
+            <div className="ldash-panel-body">
+              <p style={{ margin: '0 0 12px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                Request to join an open league. The commissioner will approve your request and assign
+                your team.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {browsableLeagues.map((league) => (
+                  <div
+                    key={league.league_id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      padding: '10px 12px',
+                      borderRadius: 8,
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{league.name}</div>
+                      <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                        {league.vacant_teams > 0
+                          ? `${league.vacant_teams} open team${league.vacant_teams === 1 ? '' : 's'}`
+                          : 'No open teams'}
+                      </div>
+                    </div>
+                    {league.join_request_status === 'pending' ? (
+                      <span className="ldash-list-badge ldash-list-badge--wait">Request pending</span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="ldash-action-btn ldash-action-btn--gold"
+                        disabled={Boolean(requestingId)}
+                        onClick={() => void onRequestJoin(league)}
+                      >
+                        {requestingId === league.league_id ? 'Sending…' : 'Request to join'}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {!loading && !error && leagues.length === 0 ? (
           <div className="ldash-panel">
             <div className="ldash-panel-body">
               <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
                 {isPlatformOwner
                   ? 'No leagues yet — use Create new league above to get started.'
-                  : 'No multiplayer leagues yet. When a commissioner invites your email, your league will appear here.'}
+                  : browsableLeagues.length > 0
+                    ? 'No leagues yet — request to join one above, or wait for a commissioner invite.'
+                    : 'No multiplayer leagues yet. When a commissioner invites your email, your league will appear here.'}
               </p>
             </div>
           </div>
@@ -294,12 +414,14 @@ export default function MultiplayerLeaguesPage({
         {!loading && leagues.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {leagues.map((league) => {
+              const awaitingTeam = leagueAwaitingTeamAssignment(league)
               const badges =
                 league.badges && league.badges.length
                   ? league.badges
                   : [
                       ...(league.is_commissioner ? ['Commissioner'] : []),
                       ...(league.is_platform_owner_view && !league.can_run_league ? ['Admin'] : []),
+                      ...(awaitingTeam ? ['Awaiting team'] : []),
                       ...(league.submitted ? ['Submitted'] : []),
                       ...(league.your_turn ? ['Your turn'] : []),
                     ]
@@ -318,7 +440,7 @@ export default function MultiplayerLeaguesPage({
                       border: 0,
                       padding: 0,
                       color: 'inherit',
-                      cursor: 'pointer',
+                      cursor: awaitingTeam ? 'default' : 'pointer',
                     }}
                     onClick={() => onOpenLeague(league)}
                   >
@@ -326,10 +448,16 @@ export default function MultiplayerLeaguesPage({
                       {league.name}
                     </span>
                     <span className="ldash-your-status-sub" style={{ display: 'block', marginTop: 4 }}>
-                      {league.week_label ? `${league.week_label} · ` : ''}
-                      {league.teams.length > 0
-                        ? league.teams.map((t) => t.team_name).filter(Boolean).join(', ')
-                        : 'League overview'}
+                      {awaitingTeam
+                        ? 'Invite accepted — waiting for your commissioner to assign a team'
+                        : league.week_label
+                          ? `${league.week_label} · `
+                          : ''}
+                      {!awaitingTeam
+                        ? league.teams.length > 0
+                          ? league.teams.map((t) => t.team_name).filter(Boolean).join(', ')
+                          : 'League overview'
+                        : null}
                     </span>
                     {badges.length ? (
                       <span className="ldash-list-badges">
@@ -364,6 +492,15 @@ export default function MultiplayerLeaguesPage({
           </div>
         ) : null}
       </div>
+
+      <RequestLeagueStartModal
+        open={showStartRequest}
+        onClose={() => setShowStartRequest(false)}
+        apiBase={apiBase}
+        headers={headers}
+        defaultEmail={accountEmail}
+        onSuccess={(message) => setFlash(message)}
+      />
     </div>
   )
 }

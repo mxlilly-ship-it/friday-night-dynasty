@@ -88,3 +88,29 @@ def send_league_invite_email(
         ]
     )
     return send_email(to_email=to_email, subject=subject, text=text)
+
+
+def send_join_request_email_to_commish(
+    *,
+    to_email: str,
+    league_name: str,
+    requester_label: str,
+    message: Optional[str] = None,
+) -> bool:
+    app_url = app_public_url()
+    subject = f"Join request for {league_name} on Friday Night Dynasty"
+    lines = [
+        f"{requester_label} requested to join your multiplayer league \"{league_name}\".",
+    ]
+    if message:
+        lines.extend(["", f"Their message: {message.strip()}"])
+    lines.extend(
+        [
+            "",
+            "Open your commissioner dashboard to approve or deny the request:",
+            f"{app_url}",
+            "",
+            "If you weren't expecting this, you can deny the request from the dashboard.",
+        ]
+    )
+    return send_email(to_email=to_email, subject=subject, text="\n".join(lines))

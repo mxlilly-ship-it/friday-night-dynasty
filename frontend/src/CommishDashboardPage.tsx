@@ -25,13 +25,15 @@ type CommishDashboardPageProps = {
   onInvite: (email: string) => Promise<{ email_sent?: boolean } | void>
   onAssign: (email: string, teamName: string) => Promise<string>
   onResetPin: (userId: string) => Promise<string>
-  onOpenDynastyAsTeam?: (teamName: string) => void
   onSaveSettings: (patch: {
     advance_mode: string
     advance_deadline_dow: number | null
     advance_deadline_time_local: string
     submit_lockout_minutes: number
     timezone: string
+    email_week_advanced: boolean
+    email_advance_reminder_24h: boolean
+    email_advance_lockout: boolean
   }) => Promise<void>
   onOpenLeagueHub?: () => void
   onOpenMyDynasty?: () => void
@@ -43,6 +45,8 @@ type CommishDashboardPageProps = {
   onVacate?: (userId: string) => Promise<void>
   onRemove?: (userId: string) => Promise<void>
   onRevokeInvite?: (inviteId: string) => Promise<void>
+  onApproveJoinRequest?: (requestId: string, teamName?: string) => Promise<string | void>
+  onRejectJoinRequest?: (requestId: string) => Promise<void>
 }
 
 export default function CommishDashboardPage({
@@ -57,7 +61,6 @@ export default function CommishDashboardPage({
   onInvite,
   onAssign,
   onResetPin,
-  onOpenDynastyAsTeam,
   onSaveSettings,
   onOpenLeagueHub,
   onOpenMyDynasty,
@@ -69,16 +72,17 @@ export default function CommishDashboardPage({
   onVacate,
   onRemove,
   onRevokeInvite,
+  onApproveJoinRequest,
+  onRejectJoinRequest,
 }: CommishDashboardPageProps) {
   const readOnly = data.can_manage === false || data.is_read_only_admin === true
   const coachTeam = data.acting_team_name || null
   const showCoachActions = Boolean(hasCoachTeam || coachTeam)
   const submitted = Boolean(data.your_status?.submitted)
-  const allTeams = (data.all_teams ?? []).filter(Boolean)
   const [inviteEmail, setInviteEmail] = useState('')
   const [assignEmail, setAssignEmail] = useState('')
   const [assignTeam, setAssignTeam] = useState(data.vacant_teams[0] ?? '')
-  const [viewAsTeam, setViewAsTeam] = useState(coachTeam ?? allTeams[0] ?? '')
+  const [joinRequestTeams, setJoinRequestTeams] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState('')
   const [flash, setFlash] = useState('')
   const [pinFlash, setPinFlash] = useState('')
@@ -90,6 +94,15 @@ export default function CommishDashboardPage({
   const [deadlineTime, setDeadlineTime] = useState(data.settings.advance_deadline_time_local)
   const [lockoutMinutes, setLockoutMinutes] = useState(String(data.settings.submit_lockout_minutes))
   const [timezone, setTimezone] = useState(data.settings.timezone)
+  const [emailWeekAdvanced, setEmailWeekAdvanced] = useState(
+    data.settings.notifications?.email_week_advanced ?? true,
+  )
+  const [emailAdvanceReminder, setEmailAdvanceReminder] = useState(
+    data.settings.notifications?.email_advance_reminder_24h ?? true,
+  )
+  const [emailAdvanceLockout, setEmailAdvanceLockout] = useState(
+    data.settings.notifications?.email_advance_lockout ?? true,
+  )
   const [settingsBusy, setSettingsBusy] = useState(false)
 
   useEffect(() => {
@@ -98,13 +111,13 @@ export default function CommishDashboardPage({
     setDeadlineTime(data.settings.advance_deadline_time_local)
     setLockoutMinutes(String(data.settings.submit_lockout_minutes))
     setTimezone(data.settings.timezone)
-    if (!viewAsTeam) {
-      setViewAsTeam(data.acting_team_name || data.all_teams?.[0] || '')
-    }
+    setEmailWeekAdvanced(data.settings.notifications?.email_week_advanced ?? true)
+    setEmailAdvanceReminder(data.settings.notifications?.email_advance_reminder_24h ?? true)
+    setEmailAdvanceLockout(data.settings.notifications?.email_advance_lockout ?? true)
     if (!assignTeam && data.vacant_teams.length) {
       setAssignTeam(data.vacant_teams[0])
     }
-  }, [data, assignTeam, viewAsTeam])
+  }, [data, assignTeam])
 
   async function runAction(key: string, fn: () => Promise<void>) {
     setBusy(key)
@@ -123,6 +136,62 @@ export default function CommishDashboardPage({
 
   const [errorLocal, setErrorLocal] = useState('')
 
+  const assignedCoaches = data.members.filter(
+    (m) => m.status === 'active' && Boolean(m.team_name) && m.email.includes('@'),
+  )
+  const unsubmittedCoaches = assignedCoaches.filter((m) => !m.submitted)
+  const deadlineLabel = (() => {
+    if (!data.settings.advance_deadline_iso) return ''
+    try {
+      return new Date(data.settings.advance_deadline_iso).toLocaleString([], {
+        weekday: 'long',
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZoneName: 'short',
+      })
+    } catch {
+      return ''
+    }
+  })()
+
+  function openCoachEmailDraft(kind: 'unsubmitted' | 'all' | 'advanced') {
+    const recipients = kind === 'unsubmitted' ? unsubmittedCoaches : assignedCoaches
+    if (!recipients.length) {
+      setErrorLocal(
+        kind === 'unsubmitted'
+          ? 'No unsubmitted coaches with email addresses.'
+          : 'No assigned coaches with email addresses.',
+      )
+      return
+    }
+    const subject =
+      kind === 'advanced'
+        ? `${data.league_name} — ${data.week_label} advanced`
+        : `${data.league_name} — ${data.week_label} reminder`
+    const body =
+      kind === 'advanced'
+        ? [
+            `The league has advanced in ${data.league_name}.`,
+            '',
+            `Current stage: ${data.week_label}`,
+            '',
+            'Open Friday Night Dynasty to review results and prep for what is next.',
+          ].join('\n')
+        : [
+            `Reminder for ${data.league_name}: ${data.week_label}.`,
+            deadlineLabel ? `Advance deadline: ${deadlineLabel}.` : '',
+            '',
+            'Please submit your week when you get a chance.',
+            '',
+            'Thanks!',
+          ]
+            .filter(Boolean)
+            .join('\n')
+    const bcc = recipients.map((m) => m.email.trim()).join(',')
+    const mailto = `mailto:?bcc=${encodeURIComponent(bcc)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+    window.location.href = mailto
+  }
+
   return (
     <div className="cdash-root ldash-root">
       <header className="cdash-header">
@@ -140,26 +209,6 @@ export default function CommishDashboardPage({
             <button type="button" className="cdash-btn cdash-btn--blue" onClick={onOpenLeagueHub}>
               League hub
             </button>
-          ) : null}
-          {onOpenDynastyAsTeam && allTeams.length ? (
-            <select
-              className="cdash-select"
-              value={viewAsTeam}
-              onChange={(e) => {
-                const t = e.target.value
-                setViewAsTeam(t)
-                if (t) onOpenDynastyAsTeam(t)
-              }}
-              disabled={myDynastyBusy}
-              title="View/open the dynasty as a specific team"
-              style={{ maxWidth: 220 }}
-            >
-              {allTeams.map((t) => (
-                <option key={t} value={t}>
-                  View as: {t}
-                </option>
-              ))}
-            </select>
           ) : null}
           {showCoachActions && onOpenMyDynasty ? (
             <button
@@ -281,6 +330,45 @@ export default function CommishDashboardPage({
       <div className="cdash-grid">
         {!readOnly ? (
         <>
+        <section className="cdash-panel cdash-panel--wide">
+          <div className="cdash-panel-head">Email coaches</div>
+          <div className="cdash-panel-body">
+            <p className="cdash-subtitle" style={{ marginTop: 0, marginBottom: 12 }}>
+              Opens your email app with a draft you can edit and send from your own account. Coaches are
+              placed on BCC so their emails stay private.
+            </p>
+            <div className="cdash-form-row">
+              <button
+                type="button"
+                className="cdash-btn cdash-btn--gold"
+                disabled={!unsubmittedCoaches.length}
+                onClick={() => openCoachEmailDraft('unsubmitted')}
+              >
+                Email unsubmitted coaches ({unsubmittedCoaches.length})
+              </button>
+              <button
+                type="button"
+                className="cdash-btn"
+                disabled={!assignedCoaches.length}
+                onClick={() => openCoachEmailDraft('all')}
+              >
+                Email all coaches ({assignedCoaches.length})
+              </button>
+              <button
+                type="button"
+                className="cdash-btn"
+                disabled={!assignedCoaches.length}
+                onClick={() => openCoachEmailDraft('advanced')}
+              >
+                Week advanced draft
+              </button>
+            </div>
+            <p className="cdash-empty" style={{ marginTop: 10 }}>
+              This does not require Resend. It uses the assigned coaches&apos; account emails.
+            </p>
+          </div>
+        </section>
+
         <section className="cdash-panel">
           <div className="cdash-panel-head">Invite coach</div>
           <div className="cdash-panel-body">
@@ -347,6 +435,101 @@ export default function CommishDashboardPage({
         </section>
 
         <section className="cdash-panel">
+          <div className="cdash-panel-head">Join requests</div>
+          <div className="cdash-panel-body">
+            <p className="cdash-subtitle" style={{ marginTop: 0, marginBottom: 12 }}>
+              Coaches who requested to join this league. Approve to add them — optionally assign a team
+              now or leave unassigned and assign later.
+            </p>
+            {(data.pending_join_requests?.length ?? 0) > 0 ? (
+              <ul className="cdash-invite-list">
+                {(data.pending_join_requests ?? []).map((req) => {
+                  const teamPick = joinRequestTeams[req.request_id] ?? data.vacant_teams[0] ?? ''
+                  return (
+                    <li key={req.request_id} style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                        <span>
+                          <strong>{req.email || req.user_id}</strong>
+                          {req.message ? (
+                            <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                              “{req.message}”
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="cdash-tag cdash-tag--wait">Pending</span>
+                      </div>
+                      <div className="cdash-form-row" style={{ margin: 0 }}>
+                        <select
+                          className="cdash-select"
+                          value={teamPick}
+                          onChange={(e) =>
+                            setJoinRequestTeams((prev) => ({
+                              ...prev,
+                              [req.request_id]: e.target.value,
+                            }))
+                          }
+                        >
+                          <option value="">Approve without team</option>
+                          {data.vacant_teams.map((t) => (
+                            <option key={t} value={t}>
+                              {t}
+                            </option>
+                          ))}
+                        </select>
+                        {onApproveJoinRequest ? (
+                          <button
+                            type="button"
+                            className="cdash-btn cdash-btn--gold"
+                            disabled={Boolean(busy)}
+                            onClick={() =>
+                              void runAction(`approve-${req.request_id}`, async () => {
+                                const pin = await onApproveJoinRequest(
+                                  req.request_id,
+                                  teamPick || undefined,
+                                )
+                                if (pin) {
+                                  setPinFlash(pin)
+                                  setFlash(
+                                    teamPick
+                                      ? `Approved ${req.email} — assigned ${teamPick}. Share the PIN.`
+                                      : `Approved ${req.email}. Assign their team when ready.`,
+                                  )
+                                } else {
+                                  setFlash(`Approved ${req.email}. Assign their team when ready.`)
+                                }
+                              })
+                            }
+                          >
+                            {busy === `approve-${req.request_id}` ? 'Approving…' : 'Approve'}
+                          </button>
+                        ) : null}
+                        {onRejectJoinRequest ? (
+                          <button
+                            type="button"
+                            className="cdash-btn cdash-btn--small"
+                            disabled={Boolean(busy)}
+                            onClick={() =>
+                              void runAction(`reject-${req.request_id}`, async () => {
+                                await onRejectJoinRequest(req.request_id)
+                                setFlash(`Denied join request from ${req.email || 'coach'}.`)
+                              })
+                            }
+                          >
+                            Deny
+                          </button>
+                        ) : null}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : (
+              <p className="cdash-empty">No pending join requests.</p>
+            )}
+          </div>
+        </section>
+
+        <section className="cdash-panel">
           <div className="cdash-panel-head">Assign team</div>
           <div className="cdash-panel-body">
             <div className="cdash-form-row">
@@ -393,7 +576,9 @@ export default function CommishDashboardPage({
           </div>
         </section>
         </>
-        ) : data.pending_invites.length ? (
+        ) : data.pending_invites.length || (data.pending_join_requests?.length ?? 0) ? (
+        <>
+        {data.pending_invites.length ? (
         <section className="cdash-panel cdash-panel--wide">
           <div className="cdash-panel-head">Pending invites</div>
           <div className="cdash-panel-body">
@@ -407,6 +592,30 @@ export default function CommishDashboardPage({
             </ul>
           </div>
         </section>
+        ) : null}
+        {(data.pending_join_requests?.length ?? 0) > 0 ? (
+        <section className="cdash-panel cdash-panel--wide">
+          <div className="cdash-panel-head">Join requests</div>
+          <div className="cdash-panel-body">
+            <ul className="cdash-invite-list">
+              {(data.pending_join_requests ?? []).map((req) => (
+                <li key={req.request_id}>
+                  <span>
+                    {req.email || req.user_id}
+                    {req.message ? (
+                      <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                        “{req.message}”
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="cdash-tag cdash-tag--wait">Pending</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+        ) : null}
+        </>
         ) : null}
 
         <section className="cdash-panel cdash-panel--wide">
@@ -598,6 +807,57 @@ export default function CommishDashboardPage({
                 />
               </div>
             </div>
+            <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontWeight: 600, marginBottom: 8 }}>Email notifications</div>
+              <p className="cdash-subtitle" style={{ marginTop: 0, marginBottom: 12 }}>
+                Emails go to assigned coaches with a valid account email. Reminders apply only when
+                auto-advance is enabled.
+              </p>
+              <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 10, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={emailWeekAdvanced}
+                  onChange={(e) => setEmailWeekAdvanced(e.target.checked)}
+                  style={{ marginTop: 3 }}
+                />
+                <span>
+                  <strong>When the week advances</strong>
+                  <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                    Manual sim or auto-advance — coaches get a different message for each.
+                  </span>
+                </span>
+              </label>
+              <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 10, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={emailAdvanceReminder}
+                  disabled={advanceMode !== 'auto'}
+                  onChange={(e) => setEmailAdvanceReminder(e.target.checked)}
+                  style={{ marginTop: 3 }}
+                />
+                <span>
+                  <strong>24-hour submit reminder</strong>
+                  <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                    Email coaches who have not submitted yet, 24 hours before the deadline.
+                  </span>
+                </span>
+              </label>
+              <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={emailAdvanceLockout}
+                  disabled={advanceMode !== 'auto'}
+                  onChange={(e) => setEmailAdvanceLockout(e.target.checked)}
+                  style={{ marginTop: 3 }}
+                />
+                <span>
+                  <strong>Lockout started</strong>
+                  <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                    When submit lockout begins, nudge coaches who still have not submitted.
+                  </span>
+                </span>
+              </label>
+            </div>
             <div style={{ marginTop: 14 }}>
               <button
                 type="button"
@@ -612,6 +872,9 @@ export default function CommishDashboardPage({
                     advance_deadline_time_local: deadlineTime,
                     submit_lockout_minutes: Number(lockoutMinutes) || 0,
                     timezone: timezone.trim() || 'America/New_York',
+                    email_week_advanced: emailWeekAdvanced,
+                    email_advance_reminder_24h: emailAdvanceReminder,
+                    email_advance_lockout: emailAdvanceLockout,
                   })
                     .then(() => {
                       setFlash('Settings saved.')

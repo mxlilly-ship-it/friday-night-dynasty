@@ -48,6 +48,11 @@ def leagues_base_dir() -> str:
     return os.path.join(data_root(), "leagues")
 
 
+def league_start_requests_dir() -> str:
+    """Uploaded league files attached to start-league requests."""
+    return os.path.join(data_root(), "league_start_requests")
+
+
 def default_logos_dir() -> str:
     """Built-in crest images shipped with the league (data/logos/)."""
     return os.path.join(_PROJECT_ROOT, "data", "logos")

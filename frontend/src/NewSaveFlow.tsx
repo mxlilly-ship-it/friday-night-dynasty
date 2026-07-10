@@ -64,7 +64,11 @@ type Props = {
   onLeagueCreated?: (
     leagueId: string,
     logos?: SaveBundle['logos'],
-    extras?: { commissioner_pin?: string; commissioner_email?: string },
+    extras?: {
+      commissioner_pin?: string
+      commissioner_email?: string
+      deferred_setup?: boolean
+    },
   ) => void
   onCoachSetupComplete?: () => void
 }
@@ -92,11 +96,10 @@ export function NewSaveFlow({
 }: Props) {
   const isMpAdmin = mode === 'multiplayer_admin'
   const isMpCoach = mode === 'multiplayer_coach'
-  const firstStep = isMpCoach ? 1 : 0
-  const lastStep = isMpCoach ? 2 : 3
+  const [commishFinishesSetup, setCommishFinishesSetup] = useState(false)
   const stepLabels = isMpCoach ? STEPS_COACH : STEPS_FULL
 
-  const [step, setStep] = useState(firstStep)
+  const [step, setStep] = useState(0)
   const [saveName, setSaveName] = useState(isMpAdmin ? 'My Multiplayer League' : 'My Dynasty')
   const [startYear, setStartYear] = useState<number>(2026)
   const [presetId, setPresetId] = useState('balanced')
@@ -130,6 +133,14 @@ export function NewSaveFlow({
   const defaultAdminEmail = defaultCoachName?.includes('@') ? defaultCoachName.trim() : ''
   const [commishIsSelf, setCommishIsSelf] = useState(true)
   const [commissionerEmail, setCommissionerEmail] = useState(defaultAdminEmail)
+  const adminDeferredSetup = isMpAdmin && !commishIsSelf && commishFinishesSetup
+  const firstStep = isMpCoach ? 1 : 0
+  const lastStep = isMpCoach ? 2 : adminDeferredSetup ? 0 : 3
+
+  useEffect(() => {
+    if (step < firstStep) setStep(firstStep)
+    else if (step > lastStep) setStep(lastStep)
+  }, [firstStep, lastStep, step])
   const [commissionerLookupStatus, setCommissionerLookupStatus] = useState<'idle' | 'ok' | 'missing' | 'checking'>('idle')
 
   const setLogoFolderInputEl = useCallback((el: HTMLInputElement | null) => {
@@ -410,6 +421,10 @@ export function NewSaveFlow({
           onError('Enter a valid commissioner email.')
           return
         }
+        if (adminDeferredSetup && commissionerLookupStatus !== 'ok') {
+          onError('Verify the commissioner account before creating the league.')
+          return
+        }
         if (commissionerLookupStatus === 'missing') {
           onError('No FND account found for that email. They must sign in once before you appoint them.')
           return
@@ -469,7 +484,9 @@ export function NewSaveFlow({
       if (!saveName.trim()) return false
       if (isMpAdmin && !commishIsSelf) {
         const em = commissionerEmail.trim()
-        return Boolean(em && em.includes('@'))
+        if (!em || !em.includes('@')) return false
+        if (adminDeferredSetup && commissionerLookupStatus !== 'ok') return false
+        return true
       }
       return true
     }
@@ -580,18 +597,40 @@ export function NewSaveFlow({
       }
 
       if (isMpAdmin) {
+        if (adminDeferredSetup) {
+          const em = commissionerEmail.trim()
+          if (!em || !em.includes('@')) {
+            onError('Enter a valid commissioner email.')
+            return
+          }
+          if (commissionerLookupStatus !== 'ok') {
+            onError('Verify the commissioner account before creating the league.')
+            return
+          }
+          if (teamSource === 'upload' && !teamsData?.teams?.length) {
+            onError('Upload a valid teams JSON file.')
+            return
+          }
+        }
         const r = await fetch(`${apiBase}/leagues/admin/leagues`, {
           method: 'POST',
           headers: { ...auth, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name: saveName.trim(),
-            user_team: userTeam,
-            coach_config: coachConfig,
+            ...(adminDeferredSetup
+              ? {
+                  defer_commish_setup: true,
+                  commissioner_email: commissionerEmail.trim(),
+                }
+              : {
+                  user_team: userTeam,
+                  coach_config: coachConfig,
+                  ...(commishIsSelf ? {} : { commissioner_email: commissionerEmail.trim() }),
+                }),
             start_year: startYear,
             teams_data: teamSource === 'upload' ? teamsData : undefined,
             allow_user_coach_firing: allowCoachFiring,
             transfers_disabled: disableTransfers,
-            ...(commishIsSelf ? {} : { commissioner_email: commissionerEmail.trim() }),
           }),
         })
         if (!r.ok) {
@@ -611,6 +650,7 @@ export function NewSaveFlow({
           league_id?: string
           commissioner_pin?: string
           commissioner_email?: string
+          defer_commish_setup?: boolean
         }
         if (!created?.league_id) {
           onError('League created but no id returned.')
@@ -646,6 +686,7 @@ export function NewSaveFlow({
         onLeagueCreated?.(created.league_id, logosBundle, {
           commissioner_pin: created.commissioner_pin,
           commissioner_email: created.commissioner_email,
+          deferred_setup: created.defer_commish_setup,
         })
         return
       }
@@ -799,6 +840,7 @@ export function NewSaveFlow({
                   checked={commishIsSelf}
                   onChange={() => {
                     setCommishIsSelf(true)
+                    setCommishFinishesSetup(false)
                     setCommissionerLookupStatus('idle')
                     onError('')
                   }}
@@ -826,11 +868,38 @@ export function NewSaveFlow({
                 <span style={{ flex: 1 }}>
                   <strong>Appoint someone else</strong>
                   <span className="newsave-sub" style={{ display: 'block', marginTop: 4 }}>
-                    They must have signed in to FND at least once. You still set up their school and coach profile
-                    below.
+                    {commishFinishesSetup
+                      ? 'You set up the league file only — they assign their school and coach profile after signing in.'
+                      : 'They must have signed in to FND at least once. You set up their school and coach profile below.'}
                   </span>
                   {!commishIsSelf ? (
                     <>
+                      <label
+                        style={{
+                          display: 'flex',
+                          gap: 10,
+                          alignItems: 'flex-start',
+                          marginTop: 12,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={commishFinishesSetup}
+                          onChange={(e) => {
+                            setCommishFinishesSetup(e.target.checked)
+                            onError('')
+                          }}
+                          style={{ marginTop: 3 }}
+                        />
+                        <span>
+                          <strong>I&apos;m not joining — commissioner finishes setup</strong>
+                          <span className="newsave-sub" style={{ display: 'block', marginTop: 4 }}>
+                            Skips coach and school steps. They open the commish dashboard, assign their team, and
+                            complete coach setup.
+                          </span>
+                        </span>
+                      </label>
                       <input
                         className="newsave-input"
                         type="email"
@@ -1410,10 +1479,9 @@ export function NewSaveFlow({
             onClick={createSave}
             disabled={
               creating ||
-              (!isMpCoach && !userTeam) ||
-              !coachName.trim() ||
-              coachAge < 21 ||
-              coachAge > 75
+              (adminDeferredSetup
+                ? !saveName.trim() || commissionerLookupStatus !== 'ok'
+                : (!isMpCoach && !userTeam) || !coachName.trim() || coachAge < 21 || coachAge > 75)
             }
           >
             {creating

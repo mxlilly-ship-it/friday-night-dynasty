@@ -42,10 +42,12 @@ import LeagueDashboardPage from './LeagueDashboardPage'
 import CommishDashboardPage from './CommishDashboardPage'
 import {
   assignTeamByEmail,
+  approveJoinRequest,
   commishSimWeek,
   fetchCommishDashboard,
   fetchCommishCrossRegionPlanning,
   fetchLeagueCommishGame,
+  fetchMyLeagues,
   fetchLeagueDashboard,
   fetchLeagueGame,
   fetchWithRetry,
@@ -53,6 +55,7 @@ import {
   postLeagueChat,
   saveLeagueCommishGame,
   removeLeagueMember,
+  rejectJoinRequest,
   resetMemberPin,
   revokeLeagueInvite,
   saveLeagueGame,
@@ -64,6 +67,8 @@ import {
   type CommishDashboardData,
   type LeagueDashboardData,
   type LeagueListItem,
+  leagueAwaitingTeamAssignment,
+  leaguesAwaitingTeamAssignment,
 } from './multiplayer'
 
 /** Stable reference so child effects do not re-run when logged out (browser saves). */
@@ -190,6 +195,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
   const [mpCoachDashBusy, setMpCoachDashBusy] = useState(false)
   const [mpSubmitBusy, setMpSubmitBusy] = useState(false)
   const [mpCommishSimBusy, setMpCommishSimBusy] = useState(false)
+  const [mpAwaitingTeamLeagues, setMpAwaitingTeamLeagues] = useState<LeagueListItem[]>([])
   const [autosaveEnabled, setAutosaveEnabled] = useState<boolean>(() => {
     const raw = localStorage.getItem('fnd_autosave_enabled')
     return raw == null ? true : raw === 'true'
@@ -479,6 +485,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
     localStorage.removeItem('fnd_username')
     setToken('')
     setBillingStatus(null)
+    setMpAwaitingTeamLeagues([])
     void firebaseSignOut()
   }
 
@@ -526,6 +533,21 @@ export default function App({ devNoFirebase = false }: AppProps) {
       setUsername(label)
     }
     void refreshBillingStatus({ Authorization: `Bearer ${data.token}` })
+    void refreshMultiplayerInviteStatus(data.token)
+  }
+
+  async function refreshMultiplayerInviteStatus(authToken?: string) {
+    const t = (authToken ?? token).trim()
+    if (!t) {
+      setMpAwaitingTeamLeagues([])
+      return
+    }
+    try {
+      const data = await fetchMyLeagues(API_BASE, { Authorization: `Bearer ${t}` })
+      setMpAwaitingTeamLeagues(leaguesAwaitingTeamAssignment(data.leagues ?? []))
+    } catch {
+      setMpAwaitingTeamLeagues([])
+    }
   }
 
   async function handleTrialOrApiError(r: Response): Promise<boolean> {
@@ -1717,6 +1739,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
       if (!ok) clearStaleSession()
       else {
         void refreshBillingStatus({ Authorization: `Bearer ${token}` })
+        void refreshMultiplayerInviteStatus(token)
         if (screen === 'load') {
           void loadBrowserSaveList()
           void loadCloudSaves()
@@ -1725,6 +1748,17 @@ export default function App({ devNoFirebase = false }: AppProps) {
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- validate stored token once on load
   }, [])
+
+  useEffect(() => {
+    if (!token) {
+      setMpAwaitingTeamLeagues([])
+      return
+    }
+    if (screen === 'title' || screen === 'load' || screen === 'purchase' || screen === 'multiplayer') {
+      void refreshMultiplayerInviteStatus(token)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, screen])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -2133,8 +2167,12 @@ export default function App({ devNoFirebase = false }: AppProps) {
       return
     }
     const assignedTeams = league.teams.map((t) => t.team_name).filter((n): n is string => Boolean(n))
-    if (assignedTeams.length === 0) {
-      setError('Waiting for the commissioner to assign your team.')
+    if (assignedTeams.length === 0 || leagueAwaitingTeamAssignment(league)) {
+      setError('')
+      setSuccessMessage(
+        `You're in ${league.name}, but your commissioner hasn't assigned a team yet. You'll get a team PIN once they assign your school.`,
+      )
+      setTimeout(() => setSuccessMessage(''), 8000)
       return
     }
     if (assignedTeams.length === 1) {
@@ -2238,14 +2276,22 @@ export default function App({ devNoFirebase = false }: AppProps) {
           onLeagueCreated={(_leagueId, _logos, extras) => {
             const pin = extras?.commissioner_pin
             const commishEmail = extras?.commissioner_email
-            const selfCommish = !commishEmail || commishEmail === username.trim()
-            setSuccessMessage(
-              pin
-                ? selfCommish
-                  ? `League created. Your commissioner team PIN is ${pin} — save it; you will need it each visit.`
-                  : `League created. Commissioner ${commishEmail} — share their team PIN: ${pin}`
-                : 'League created.',
-            )
+            if (extras?.deferred_setup) {
+              setSuccessMessage(
+                commishEmail
+                  ? `League created for ${commishEmail}. They can sign in, open the league, assign their school, and finish coach setup.`
+                  : 'League created. The commissioner can sign in to finish setup.',
+              )
+            } else {
+              const selfCommish = !commishEmail || commishEmail === username.trim()
+              setSuccessMessage(
+                pin
+                  ? selfCommish
+                    ? `League created. Your commissioner team PIN is ${pin} — save it; you will need it each visit.`
+                    : `League created. Commissioner ${commishEmail} — share their team PIN: ${pin}`
+                  : 'League created.',
+              )
+            }
             setScreen('multiplayer')
           }}
         />
@@ -2510,6 +2556,19 @@ export default function App({ devNoFirebase = false }: AppProps) {
           onRevokeInvite={async (inviteId) => {
             await revokeLeagueInvite(API_BASE, headers, mpCommishDashboard.league_id, inviteId)
           }}
+          onApproveJoinRequest={async (requestId, teamName) => {
+            const res = await approveJoinRequest(
+              API_BASE,
+              headers,
+              mpCommishDashboard.league_id,
+              requestId,
+              teamName,
+            )
+            return res.pin
+          }}
+          onRejectJoinRequest={async (requestId) => {
+            await rejectJoinRequest(API_BASE, headers, mpCommishDashboard.league_id, requestId)
+          }}
           hasCoachTeam={Boolean(coachTeam)}
           onOpenLeagueHub={
             coachTeam
@@ -2529,13 +2588,6 @@ export default function App({ devNoFirebase = false }: AppProps) {
                   })
               : undefined
           }
-          onOpenDynastyAsTeam={(teamName) => {
-            void openMultiplayerDynasty({
-              leagueId: mpCommishDashboard.league_id,
-              teamName,
-              leagueName: mpCommishDashboard.league_name,
-            })
-          }}
           myDynastyBusy={mpCoachDashBusy}
           onSubmitWeek={coachTeam ? () => void onMultiplayerSubmitWeek() : undefined}
           onUnsubmitWeek={coachTeam ? () => void onMultiplayerUnsubmitWeek() : undefined}
@@ -2779,10 +2831,49 @@ export default function App({ devNoFirebase = false }: AppProps) {
   }
 
   /* ——— Title + Load list + New save ——— */
+  const mpAwaitingTeamNotice =
+    token && mpAwaitingTeamLeagues.length > 0 ? (
+      <>
+        {mpAwaitingTeamLeagues.length === 1 ? (
+          <p style={{ margin: 0 }}>
+            You&apos;re in <strong>{mpAwaitingTeamLeagues[0].name}</strong>, but your commissioner hasn&apos;t assigned
+            your team yet. You&apos;ll get a team PIN once they assign your school.
+          </p>
+        ) : (
+          <p style={{ margin: 0 }}>
+            You&apos;re waiting for team assignments in{' '}
+            <strong>{mpAwaitingTeamLeagues.map((l) => l.name).join(', ')}</strong>.
+          </p>
+        )}
+        <div className="fnd-mp-invite-banner-actions">
+          <button type="button" className="fnd-title-btn" onClick={() => setScreen('multiplayer')}>
+            View multiplayer leagues
+          </button>
+        </div>
+      </>
+    ) : null
+
+  const mpAwaitingTeamBanner = mpAwaitingTeamNotice ? (
+    <div className="fnd-mp-invite-banner" role="status">
+      {mpAwaitingTeamNotice}
+    </div>
+  ) : null
+
+  const mpAwaitingTeamPanel = mpAwaitingTeamNotice ? (
+    <div
+      className="fnd-mp-invite-banner fnd-mp-invite-banner--panel"
+      role="status"
+      style={{ position: 'static', transform: 'none', width: '100%' }}
+    >
+      {mpAwaitingTeamNotice}
+    </div>
+  ) : null
+
   return (
     <div className={screen === 'title' ? 'fnd-title-root fnd-title-root--landing' : 'fnd-title-root'}>
       {screen === 'title' ? (
         <>
+          {mpAwaitingTeamBanner}
           <iframe
             className="fnd-title-iframe"
             title="Friday Night Dynasty"
@@ -2802,6 +2893,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
 
         {screen === 'load' && (
           <div className="fnd-panel">
+            {mpAwaitingTeamPanel ? <div style={{ marginBottom: '1rem' }}>{mpAwaitingTeamPanel}</div> : null}
             <button type="button" className="fnd-back" onClick={goTitle}>
               ← Back
             </button>
