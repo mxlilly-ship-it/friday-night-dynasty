@@ -83,6 +83,7 @@ import {
   standingsListToRecord,
 } from './leagueHistoryView'
 import SeasonSummaryPanel from './SeasonSummaryPanel'
+import AllStateAwardsSection from './AllStateAwardsSection'
 import HomeGameThemesPanel from './HomeGameThemesPanel'
 import { themeLabelForGame } from './homeGameThemes'
 import type { HomeThemeSelection } from './homeGameThemes'
@@ -1780,9 +1781,14 @@ function TeamHomePageBody({
     [saveState, phase],
   )
   const isMultiplayerLeague = useMemo(() => isMultiplayerLeagueSave(saveState), [saveState])
-  const needsCrossRegionPickUi = Boolean(
-    schedulePlanningInfo && !crossRegionReady && !leagueAdvanceLocked && !isMultiplayerLeague,
+  const showCrossRegionPlanningUi = Boolean(
+    schedulePlanningInfo &&
+      !leagueAdvanceLocked &&
+      !isMultiplayerLeague &&
+      (phase === 'schedule_planning' ||
+        (phase === 'season_summary' && effectiveCrossRegionSlots > 0)),
   )
+  const needsCrossRegionPickUi = Boolean(showCrossRegionPlanningUi && !crossRegionReady)
 
   const commishCrossRegionBlocksAdvance = Boolean(
     mpCommishLeagueId && mpCommishCrossRegionPlanning?.active && !mpCommishCrossRegionPlanning.all_complete,
@@ -3858,6 +3864,19 @@ function TeamHomePageBody({
               </div>
             ) : null}
 
+            {leagueHistEffectiveMode !== 'live' && lhArchivedSeasonEntry ? (
+              <AllStateAwardsSection
+                seasonEntry={lhArchivedSeasonEntry}
+                userTeam={userTeam}
+                apiBase={apiBase}
+                headers={headers}
+                logoVersion={logoVersion}
+                defaultClass={String(
+                  (saveState?.teams ?? []).find((t: { name?: string }) => t?.name === userTeam)?.classification ?? '',
+                ).trim() || undefined}
+              />
+            ) : null}
+
             <div className="teamhome-card-title teamhome-league-history-section-head">Rankings · all classes</div>
             <p className="teamhome-small" style={{ opacity: 0.85, marginTop: -4 }}>
               Uses each team&apos;s classification on your current save rosters — same cutoff logic as Rankings elsewhere.
@@ -5612,7 +5631,7 @@ function TeamHomePageBody({
                   onOpenTeamHistory={() => setStateMenu('Team History')}
                 />
               )}
-              {schedulePlanningInfo && needsCrossRegionPickUi ? (
+              {showCrossRegionPlanningUi && schedulePlanningInfo ? (
                 <SchedulePlanningPanel
                   apiBase={apiBase}
                   headers={headers}
@@ -5631,7 +5650,7 @@ function TeamHomePageBody({
                     see the full schedule after the league advances.
                   </div>
                 </div>
-              ) : phase === 'schedule_planning' && !isMultiplayerLeague ? (
+              ) : phase === 'schedule_planning' && !isMultiplayerLeague && !showCrossRegionPlanningUi ? (
                 <div className="teamhome-preseason-panelA teamhome-preseason-panelA--compact teamhome-schedplan-fallback">
                   <div className="teamhome-preseason-title">Non-region selection</div>
                   <div className="teamhome-preseason-sub">
