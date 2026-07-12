@@ -178,6 +178,37 @@ def _build_league_leaders(
     return result
 
 
+def _season_player_stats_to_json_list(season_stats_map: Dict[int, PlayerSeasonStats]) -> List[Dict[str, Any]]:
+    return [
+        {
+            "name": s.player_name,
+            "team": s.team_name,
+            "position": s.position,
+            "pass_yds": s.pass_yds,
+            "pass_td": s.pass_td,
+            "comp": s.comp,
+            "att": s.att,
+            "int_thrown": s.int_thrown,
+            "rush_yds": s.rush_yds,
+            "rush_td": s.rush_td,
+            "rec": s.rec,
+            "rec_yds": s.rec_yds,
+            "rec_td": s.rec_td,
+            "tackles": s.tackles,
+            "sacks": s.sacks,
+            "tfl": s.tfl,
+            "interceptions": s.interceptions,
+            "fg_made": s.fg_made,
+            "fg_att": s.fg_att,
+            "xp_made": s.xp_made,
+            "xp_att": s.xp_att,
+            "punts": s.punts,
+            "punt_yards": s.punt_yards,
+        }
+        for s in season_stats_map.values()
+    ]
+
+
 def team_won_state_in_season_entry(team_name: str, season_entry: Dict[str, Any]) -> bool:
     """True if this team won a state title in ``season_entry`` (top-level or any multiclass bracket)."""
     if not team_name or not isinstance(season_entry, dict):
@@ -312,6 +343,7 @@ def append_season(
     playoffs_by_class: Optional[Dict[str, Any]] = None,
     path: Optional[str] = None,
     save_dir: Optional[str] = None,
+    state: Optional[Dict[str, Any]] = None,
 ) -> None:
     """
     Append one season to league history.
@@ -335,31 +367,12 @@ def append_season(
     seasons = data["seasons"]
     seq = season_number if season_number is not None else len(seasons) + 1
 
-    poy = _pick_player_of_the_year(season_player_stats)
-    leaders = _build_league_leaders(season_player_stats, top_n=5)
-
     from systems.awards_system import compute_awards
 
-    awards = compute_awards(season_player_stats)
-    player_stats_list = [
-        {
-            "name": s.player_name,
-            "team": s.team_name,
-            "pass_yds": s.pass_yds,
-            "pass_td": s.pass_td,
-            "comp": s.comp,
-            "att": s.att,
-            "rush_yds": s.rush_yds,
-            "rush_td": s.rush_td,
-            "rec": s.rec,
-            "rec_yds": s.rec_yds,
-            "rec_td": s.rec_td,
-            "tackles": s.tackles,
-            "sacks": s.sacks,
-            "interceptions": s.interceptions,
-        }
-        for s in season_player_stats.values()
-    ]
+    awards = compute_awards(season_player_stats, state=state)
+    poy = awards.get("player_of_the_year")
+    leaders = _build_league_leaders(season_player_stats, top_n=5)
+    player_stats_list = _season_player_stats_to_json_list(season_player_stats)
 
     standings_list = _build_standings_list(team_names, standings)
     if team_coaches:
@@ -411,6 +424,7 @@ def append_season_in_memory(
     team_recap_files: Optional[Dict[str, str]] = None,
     regional_champions: Optional[List[str]] = None,
     playoffs_by_class: Optional[Dict[str, Any]] = None,
+    state: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Stateless version of append_season:
@@ -421,31 +435,12 @@ def append_season_in_memory(
     seasons = league_history["seasons"]
     seq = season_number if season_number is not None else len(seasons) + 1
 
-    poy = _pick_player_of_the_year(season_player_stats)
-    leaders = _build_league_leaders(season_player_stats, top_n=5)
-
     from systems.awards_system import compute_awards
 
-    awards = compute_awards(season_player_stats)
-    player_stats_list = [
-        {
-            "name": s.player_name,
-            "team": s.team_name,
-            "pass_yds": s.pass_yds,
-            "pass_td": s.pass_td,
-            "comp": s.comp,
-            "att": s.att,
-            "rush_yds": s.rush_yds,
-            "rush_td": s.rush_td,
-            "rec": s.rec,
-            "rec_yds": s.rec_yds,
-            "rec_td": s.rec_td,
-            "tackles": s.tackles,
-            "sacks": s.sacks,
-            "interceptions": s.interceptions,
-        }
-        for s in season_player_stats.values()
-    ]
+    awards = compute_awards(season_player_stats, state=state)
+    poy = awards.get("player_of_the_year")
+    leaders = _build_league_leaders(season_player_stats, top_n=5)
+    player_stats_list = _season_player_stats_to_json_list(season_player_stats)
 
     standings_list = _build_standings_list(team_names, standings)
     if team_coaches:
