@@ -84,7 +84,9 @@ def support_contact_route(
     if body.category == "refund":
         hint = (
             "Refund request received. We will email you at "
-            f"{contact_email}. Approved refunds are processed through Stripe and remove game access."
+            f"{contact_email}. Refunds are available within 5 days of purchase — "
+            "email mxlilly@gmail.com or use this form, and approved refunds are processed through Stripe "
+            "(game access is removed)."
         )
     elif support_notify_configured():
         hint = f"Message sent. We will reply to {contact_email}."

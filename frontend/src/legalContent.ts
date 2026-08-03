@@ -1,3 +1,9 @@
+export const SUPPORT_CONTACT_EMAIL = 'mxlilly@gmail.com'
+
+/** Shown on purchase screens and refund support form. */
+export const REFUND_POLICY_SHORT =
+  'One-time purchase. Request a full refund within 5 days of purchase by emailing mxlilly@gmail.com (or use Help & support → Refund request). Approved refunds are processed through Stripe and remove game access.'
+
 export type LegalSection = {
   title: string
   paragraphs?: string[]
@@ -15,7 +21,7 @@ export type LegalDocument = {
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   title: 'Terms of Service',
-  effectiveDate: 'June 18, 2026',
+  effectiveDate: 'August 3, 2026',
   intro:
     'Welcome to Friday Night Dynasty (“the Game”, “we”, “our”, or “us”). By accessing or using the Game, you agree to the following Terms of Service.',
   sections: [
@@ -29,7 +35,7 @@ export const TERMS_OF_SERVICE: LegalDocument = {
       title: '2. Description of Service',
       paragraphs: [
         'Friday Night Dynasty is a browser-based football simulation game that allows users to manage teams, simulate games, and interact with game data. The Game is currently in beta, and features may change at any time.',
-        'We reserve the right to modify, suspend, or discontinue the Game at any time without notice.',
+        'Full access requires a one-time purchase. We reserve the right to modify, suspend, or discontinue the Game at any time without notice.',
       ],
     },
     {
@@ -55,7 +61,15 @@ export const TERMS_OF_SERVICE: LegalDocument = {
       subBullets: ['Violation may result in account suspension or termination.'],
     },
     {
-      title: '5. Game Data & Beta Disclaimer',
+      title: '5. Purchases & Refunds',
+      paragraphs: [
+        'Friday Night Dynasty is sold as a one-time purchase that unlocks full access for your account.',
+        'If you are not satisfied, you may request a full refund within 5 days of purchase by emailing mxlilly@gmail.com or submitting a Refund request through in-game Help & support. Include the email used to purchase and the approximate purchase date.',
+        'Approved refunds are processed through Stripe. After a refund, purchase entitlement is removed and you will need to buy again to continue playing.',
+      ],
+    },
+    {
+      title: '6. Game Data & Beta Disclaimer',
       paragraphs: ['The Game is in beta.', 'You acknowledge:'],
       bullets: [
         'Game data may be reset at any time',
@@ -65,7 +79,7 @@ export const TERMS_OF_SERVICE: LegalDocument = {
       subBullets: ['We are not responsible for any loss of game data.'],
     },
     {
-      title: '6. Intellectual Property',
+      title: '7. Intellectual Property',
       paragraphs: [
         'All content in the Game, including but not limited to code, design, logos, and text, is owned by Friday Night Dynasty.',
         'You may not:',
@@ -74,7 +88,7 @@ export const TERMS_OF_SERVICE: LegalDocument = {
       subBullets: ['any part of the Game without permission.'],
     },
     {
-      title: '7. Disclaimers',
+      title: '8. Disclaimers',
       paragraphs: [
         'The Game is provided “AS IS” and “AS AVAILABLE” without warranties of any kind.',
         'We do not guarantee:',
@@ -86,22 +100,22 @@ export const TERMS_OF_SERVICE: LegalDocument = {
       ],
     },
     {
-      title: '8. Limitation of Liability',
+      title: '9. Limitation of Liability',
       paragraphs: ['To the fullest extent permitted by law, we are not liable for:'],
       bullets: ['Loss of data', 'Loss of profits', 'Service interruptions', 'Bugs or errors'],
     },
     {
-      title: '9. Changes to Terms',
+      title: '10. Changes to Terms',
       paragraphs: [
         'We may update these Terms at any time. Continued use of the Game means you accept the updated Terms.',
       ],
     },
     {
-      title: '10. Governing Law',
+      title: '11. Governing Law',
       paragraphs: ['These Terms are governed by the laws of the State of West Virginia, United States.'],
     },
     {
-      title: '11. Contact',
+      title: '12. Contact',
       paragraphs: ['If you have questions, contact us at:'],
     },
   ],

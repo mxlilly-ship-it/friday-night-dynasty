@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import './SupportContactModal.css'
 import { SUPPORT_CATEGORIES, submitSupportContact, type SupportCategory } from './supportContact'
+import { SUPPORT_CONTACT_EMAIL } from './legalContent'
 
 type Props = {
   open: boolean
@@ -45,7 +46,7 @@ export default function SupportContactModal({
   const refundNote = useMemo(
     () =>
       category === 'refund'
-        ? 'Include the email you used to purchase and the approximate date. Refunds are reviewed manually and processed through Stripe.'
+        ? `Refunds are available within 5 days of purchase. Include the email you used to purchase and the approximate date. Email ${SUPPORT_CONTACT_EMAIL} or submit here — approved refunds are processed through Stripe and remove game access.`
         : '',
     [category],
   )
