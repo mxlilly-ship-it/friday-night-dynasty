@@ -1136,6 +1136,165 @@ def _find_team_logo_in_dir(logo_dir: str, team_name: str) -> Optional[str]:
     return None
 
 
+def get_save_dir_team_logo_path(save_dir: str, team_name: str) -> Optional[str]:
+    """Crest from a league/save folder ``_logos/`` directory."""
+    if not save_dir or not team_name:
+        return None
+    return _find_team_logo_in_dir(os.path.join(save_dir, "_logos"), team_name)
+
+
+def list_save_dir_logo_files(save_dir: str) -> List[Dict[str, str]]:
+    """Return [{team_hint, filename, path}] for images under ``save_dir/_logos``."""
+    logo_dir = os.path.join(save_dir, "_logos")
+    out: List[Dict[str, str]] = []
+    try:
+        names = sorted(os.listdir(logo_dir))
+    except OSError:
+        return out
+    for fname in names:
+        stem, ext = os.path.splitext(fname)
+        if ext.lower() not in _LOGO_EXTENSIONS:
+            continue
+        plain = os.path.abspath(os.path.join(logo_dir, fname))
+        path = None
+        for p in io_path_candidates(plain):
+            try:
+                if os.path.isfile(p):
+                    path = p
+                    break
+            except OSError:
+                continue
+        if not path:
+            continue
+        out.append({"team_hint": stem, "filename": fname, "path": path})
+    return out
+
+
+_MAX_LOGO_PACK_BYTES = 15 * 1024 * 1024
+_MAX_LOGO_PACK_FILES = 400
+_MAX_SINGLE_LOGO_BYTES = 5 * 1024 * 1024
+
+
+def apply_logo_pack_zip(
+    save_dir: str,
+    zip_bytes: bytes,
+    valid_teams: List[str],
+) -> Dict[str, Any]:
+    """
+    Unpack a commissioner logo zip into ``save_dir/_logos/``.
+
+    Filenames should match team names (``Hamilton.png``, ``ALA - QC.webp``, …).
+    Nested folders are allowed; only the basename is matched.
+    """
+    import io
+    import zipfile
+
+    if not zip_bytes:
+        raise ValueError("Logo pack is empty.")
+    if len(zip_bytes) > _MAX_LOGO_PACK_BYTES:
+        raise ValueError("Logo pack is too large (max 15 MB).")
+    teams = [str(t).strip() for t in (valid_teams or []) if str(t).strip()]
+    if not teams:
+        raise ValueError("No teams found in this league.")
+
+    imported: List[Dict[str, str]] = []
+    skipped: List[Dict[str, str]] = []
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(zip_bytes))
+    except zipfile.BadZipFile as e:
+        raise ValueError("Not a valid zip file.") from e
+
+    with zf:
+        infos = [i for i in zf.infolist() if not i.is_dir()]
+        if len(infos) > _MAX_LOGO_PACK_FILES:
+            raise ValueError(f"Too many files in pack (max {_MAX_LOGO_PACK_FILES}).")
+        for info in infos:
+            raw_name = str(info.filename or "").replace("\\", "/")
+            base = os.path.basename(raw_name.strip())
+            if not base or base.startswith(".") or base.startswith("__MACOSX"):
+                continue
+            if ".." in raw_name.split("/"):
+                skipped.append({"file": raw_name, "reason": "Invalid path"})
+                continue
+            stem, ext = os.path.splitext(base)
+            ext = ext.lower()
+            if ext not in _LOGO_EXTENSIONS:
+                skipped.append({"file": base, "reason": "Unsupported file type"})
+                continue
+            if info.file_size > _MAX_SINGLE_LOGO_BYTES:
+                skipped.append({"file": base, "reason": "File too large (max 5 MB)"})
+                continue
+            team_name = match_logo_filename_to_team(teams, stem)
+            if not team_name:
+                skipped.append({"file": base, "reason": "No matching team name found"})
+                continue
+            try:
+                data = zf.read(info)
+            except Exception as e:
+                skipped.append({"file": base, "reason": f"Could not read: {e}"})
+                continue
+            if not data:
+                skipped.append({"file": base, "reason": "Empty file"})
+                continue
+            try:
+                save_dir_team_logo(save_dir, team_name, data, ext)
+                imported.append({"file": base, "team_name": team_name})
+            except ValueError as e:
+                skipped.append({"file": base, "reason": str(e)})
+
+    return {
+        "ok": True,
+        "imported_count": len(imported),
+        "skipped_count": len(skipped),
+        "imported": imported,
+        "skipped": skipped,
+    }
+
+
+def build_logo_pack_zip(save_dir: str, *, league_name: str = "league") -> bytes:
+    """Zip all crests under ``save_dir/_logos/`` for coach download."""
+    import io
+    import re
+    import zipfile
+
+    files = list_save_dir_logo_files(save_dir)
+    if not files:
+        raise ValueError("No logos uploaded for this league yet.")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        used_names: set[str] = set()
+        for item in files:
+            fname = str(item.get("filename") or "logo.png")
+            path = str(item.get("path") or "")
+            if not path:
+                continue
+            out_name = fname
+            if out_name in used_names:
+                stem, ext = os.path.splitext(fname)
+                n = 2
+                while f"{stem}_{n}{ext}" in used_names:
+                    n += 1
+                out_name = f"{stem}_{n}{ext}"
+            used_names.add(out_name)
+            data_bytes: Optional[bytes] = None
+            for p in io_path_candidates(path):
+                try:
+                    with open(p, "rb") as f:
+                        data_bytes = f.read()
+                    break
+                except OSError:
+                    continue
+            if data_bytes is None:
+                continue
+            zf.writestr(out_name, data_bytes)
+    data = buf.getvalue()
+    if not data:
+        raise ValueError("No logos uploaded for this league yet.")
+    # Filename sanitized for Content-Disposition callers.
+    _ = re.sub(r"[^\w\-]+", "_", str(league_name or "league")).strip("_") or "league"
+    return data
+
+
 def get_team_logo_path(user_id: str, team_name: str, *, custom_league: bool = False) -> Optional[str]:
     if not custom_league:
         from backend.data_paths import default_logos_dir
