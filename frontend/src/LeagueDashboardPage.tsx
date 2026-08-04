@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './LeagueDashboardPage.css'
 import type { LeagueChatMessage, LeagueDashboardData } from './multiplayer'
+import { downloadLeagueLogoPack, fetchLeagueLogoPackStatus } from './multiplayer'
 
 type LeagueDashboardPageProps = {
+  apiBase: string
+  headers: Record<string, string>
   data: LeagueDashboardData
   onBack: () => void
   onOpenCoachDashboard?: () => void
@@ -15,6 +18,8 @@ type LeagueDashboardPageProps = {
 }
 
 export default function LeagueDashboardPage({
+  apiBase,
+  headers,
   data,
   onBack,
   onOpenCoachDashboard,
@@ -38,6 +43,9 @@ export default function LeagueDashboardPage({
   const [chatDraft, setChatDraft] = useState('')
   const [chatBusy, setChatBusy] = useState(false)
   const [chatError, setChatError] = useState('')
+  const [logoCount, setLogoCount] = useState(0)
+  const [logoBusy, setLogoBusy] = useState(false)
+  const [logoError, setLogoError] = useState('')
   const chatEndRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -47,6 +55,20 @@ export default function LeagueDashboardPage({
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [chatMessages])
+
+  useEffect(() => {
+    let cancelled = false
+    void fetchLeagueLogoPackStatus(apiBase, headers, data.league_id)
+      .then((s) => {
+        if (!cancelled) setLogoCount(s.logo_count || 0)
+      })
+      .catch(() => {
+        if (!cancelled) setLogoCount(0)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [apiBase, headers, data.league_id])
 
   const divisionFilters = useMemo(() => {
     const divs = new Set<string>()
@@ -89,6 +111,38 @@ export default function LeagueDashboardPage({
           <button type="button" className="ldash-back-btn" onClick={onBack}>
             ← Leagues
           </button>
+          {data.logos_download_url ? (
+            <button
+              type="button"
+              className="ldash-action-btn"
+              title="Open the commissioner logo pack link"
+              onClick={() =>
+                window.open(data.logos_download_url!, '_blank', 'noopener,noreferrer')
+              }
+            >
+              Download logos
+            </button>
+          ) : logoCount > 0 ? (
+            <button
+              type="button"
+              className="ldash-action-btn"
+              disabled={logoBusy}
+              title={`${logoCount} league logo${logoCount === 1 ? '' : 's'} available`}
+              onClick={() => {
+                setLogoBusy(true)
+                setLogoError('')
+                const safe =
+                  data.league_name.replace(/[^\w\-]+/g, '_').replace(/^_|_$/g, '') || 'league'
+                void downloadLeagueLogoPack(apiBase, headers, data.league_id, `${safe}_logos.zip`)
+                  .catch((err: unknown) => {
+                    setLogoError(err instanceof Error ? err.message : 'Download failed')
+                  })
+                  .finally(() => setLogoBusy(false))
+              }}
+            >
+              {logoBusy ? 'Downloading…' : 'Download logos'}
+            </button>
+          ) : null}
           {showCoachCta ? (
             <button
               type="button"
@@ -277,6 +331,7 @@ export default function LeagueDashboardPage({
               )}
               <div ref={chatEndRef} />
               {chatError ? <p className="ldash-error" style={{ marginTop: 8 }}>{chatError}</p> : null}
+              {logoError ? <p className="ldash-error" style={{ marginTop: 8 }}>{logoError}</p> : null}
             </div>
             <div className="ldash-chat-input-row">
               <input

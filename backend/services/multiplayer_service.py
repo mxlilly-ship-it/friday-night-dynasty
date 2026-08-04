@@ -2337,6 +2337,7 @@ def build_league_dashboard(
         "can_run_league": bool(is_commish),
         "acting_team_name": acting,
         "state_version": int(league_row.get("state_version") or 0),
+        "logos_download_url": str(league_row.get("logos_download_url") or "").strip() or None,
     }
 
 
@@ -2866,6 +2867,19 @@ def reset_member_pin(
     return {"team_name": team_name, "pin": pin_value, "user_id": target_user_id}
 
 
+def _normalize_logos_download_url(raw: Optional[str]) -> Optional[str]:
+    """Allow clearing with blank; otherwise require http(s) URL."""
+    url = str(raw or "").strip()
+    if not url:
+        return None
+    if len(url) > 2000:
+        raise ValueError("logos download link is too long")
+    lower = url.lower()
+    if not (lower.startswith("http://") or lower.startswith("https://")):
+        raise ValueError("logos download link must start with http:// or https://")
+    return url
+
+
 def update_league_settings(
     league_id: str,
     actor_user_id: str,
@@ -2878,6 +2892,7 @@ def update_league_settings(
     email_week_advanced: Optional[bool] = None,
     email_advance_reminder_24h: Optional[bool] = None,
     email_advance_lockout: Optional[bool] = None,
+    logos_download_url: Optional[str] = None,
 ) -> Dict[str, Any]:
     league_row = _load_league_row(league_id)
     if not league_row:
@@ -2900,16 +2915,20 @@ def update_league_settings(
         else int(league_row.get("submit_lockout_minutes") or 5)
     )
     tz = str(timezone or league_row.get("timezone") or "America/New_York").strip()
+    if logos_download_url is not None:
+        logos_url = _normalize_logos_download_url(logos_download_url)
+    else:
+        logos_url = str(league_row.get("logos_download_url") or "").strip() or None
     now = _now()
     with db() as conn:
         conn.execute(
             """
             UPDATE leagues
             SET advance_mode=?, advance_deadline_dow=?, advance_deadline_time_local=?,
-                submit_lockout_minutes=?, timezone=?, updated_at=?
+                submit_lockout_minutes=?, timezone=?, logos_download_url=?, updated_at=?
             WHERE id=?
             """,
-            (mode, dow, str(time_local or "23:59"), lockout, tz, now, league_id),
+            (mode, dow, str(time_local or "23:59"), lockout, tz, logos_url, now, league_id),
         )
     from backend.services.league_notifications import get_notification_settings, update_notification_settings
 
@@ -2930,6 +2949,7 @@ def update_league_settings(
         "advance_deadline_time_local": str(time_local or "23:59"),
         "submit_lockout_minutes": lockout,
         "timezone": tz,
+        "logos_download_url": logos_url,
         "notifications": notifications,
     }
 
@@ -3510,6 +3530,7 @@ def build_commish_dashboard(league_id: str, user_id: str) -> Dict[str, Any]:
             "advance_deadline_iso": deadline_iso,
             "countdown_value": _format_countdown(deadline_iso),
             "notifications": notification_settings,
+            "logos_download_url": str(league_row.get("logos_download_url") or "").strip() or None,
         },
         "members": members,
         "pending_invites": pending_invites,

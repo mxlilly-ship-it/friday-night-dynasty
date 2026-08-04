@@ -207,6 +207,8 @@ def _migrate_multiplayer_leagues(conn: sqlite3.Connection) -> None:
     cols = {row[1] for row in conn.execute("PRAGMA table_info(leagues)").fetchall()}
     if "last_auto_advance_at" not in cols:
         conn.execute("ALTER TABLE leagues ADD COLUMN last_auto_advance_at INTEGER")
+    if "logos_download_url" not in cols:
+        conn.execute("ALTER TABLE leagues ADD COLUMN logos_download_url TEXT")
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS league_chat_messages (

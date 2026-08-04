@@ -1,11 +1,20 @@
 import os
+import re
 from typing import Any, Dict, List, Optional
+from urllib.parse import quote
 
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field, model_validator
 
 from backend.deps import require_entitled
-from backend.services.league_service import save_dir_team_logo
+from backend.services.league_service import (
+    apply_logo_pack_zip,
+    build_logo_pack_zip,
+    get_save_dir_team_logo_path,
+    list_save_dir_logo_files,
+    save_dir_team_logo,
+)
 from backend.services.multiplayer_service import (
     apply_league_coach_prep,
     apply_member_coach_setup,
@@ -47,11 +56,13 @@ from backend.services.multiplayer_service import (
     vacate_team_member,
     verify_team_pin,
     _load_league_row,
+    _load_state,
+    _require_commish_write,
+    _verify_league_member_or_owner,
 )
 from backend.storage.db import db
 from backend.storage.league_start_requests import create_league_start_request
 from backend.support_notify import notify_league_start_request, support_notify_configured
-
 
 router = APIRouter()
 
@@ -111,6 +122,7 @@ class CommishSettingsBody(BaseModel):
     email_week_advanced: Optional[bool] = None
     email_advance_reminder_24h: Optional[bool] = None
     email_advance_lockout: Optional[bool] = None
+    logos_download_url: Optional[str] = Field(None, max_length=2000)
 
 
 class CoachSetupBody(BaseModel):
@@ -290,6 +302,7 @@ def commish_settings_route(
             email_week_advanced=body.email_week_advanced,
             email_advance_reminder_24h=body.email_advance_reminder_24h,
             email_advance_lockout=body.email_advance_lockout,
+            logos_download_url=body.logos_download_url,
         )
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e)) from e
@@ -508,6 +521,120 @@ def coach_setup_route(
         raise HTTPException(status_code=403, detail=str(e)) from e
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.post("/{league_id}/logos/pack", response_model=Dict[str, Any])
+async def upload_league_logo_pack_route(
+    league_id: str,
+    pack: UploadFile = File(...),
+    user=Depends(require_entitled),
+):
+    """Commissioner uploads a zip of team crests (filenames match school names)."""
+    try:
+        if is_platform_owner_user(user["user_id"]):
+            league_row = _load_league_row(league_id)
+            if not league_row:
+                raise ValueError("league not found")
+        else:
+            league_row = _require_commish_write(league_id, user["user_id"])
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+    save_dir = str(league_row.get("save_dir") or "")
+    if not save_dir:
+        raise HTTPException(status_code=500, detail="league save missing")
+    raw_name = str(pack.filename or "").lower()
+    if not raw_name.endswith(".zip"):
+        raise HTTPException(status_code=400, detail="Upload a .zip logo pack")
+    data = await pack.read()
+    try:
+        state = _load_state(save_dir)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to load league: {e}") from e
+    valid_teams = [
+        str(t.get("name", "")).strip()
+        for t in (state.get("teams") or [])
+        if isinstance(t, dict) and t.get("name")
+    ]
+    try:
+        result = apply_logo_pack_zip(save_dir, data, valid_teams)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    result["logo_count"] = len(list_save_dir_logo_files(save_dir))
+    return result
+
+
+@router.get("/{league_id}/logos/pack")
+def download_league_logo_pack_route(league_id: str, user=Depends(require_entitled)):
+    """Any league member can download the current logo pack as a zip."""
+    try:
+        league_row = _verify_league_member_or_owner(league_id, user["user_id"])
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    save_dir = str(league_row.get("save_dir") or "")
+    if not save_dir:
+        raise HTTPException(status_code=500, detail="league save missing")
+    league_name = str(league_row.get("name") or "league")
+    try:
+        payload = build_logo_pack_zip(save_dir, league_name=league_name)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    safe = re.sub(r"[^\w\-]+", "_", league_name).strip("_") or "league"
+    filename = f"{safe}_logos.zip"
+    return Response(
+        content=payload,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f"attachment; filename=\"{filename}\"; filename*=UTF-8''{quote(filename)}",
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@router.get("/{league_id}/logos/status", response_model=Dict[str, Any])
+def league_logo_pack_status_route(league_id: str, user=Depends(require_entitled)):
+    try:
+        league_row = _verify_league_member_or_owner(league_id, user["user_id"])
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    save_dir = str(league_row.get("save_dir") or "")
+    files = list_save_dir_logo_files(save_dir) if save_dir else []
+    return {"ok": True, "logo_count": len(files), "has_pack": len(files) > 0}
+
+
+@router.get("/{league_id}/logos/{team_name}")
+def get_league_logo_route(league_id: str, team_name: str, user=Depends(require_entitled)):
+    """Serve a league crest from the shared save folder (live for all coaches)."""
+    try:
+        league_row = _verify_league_member_or_owner(league_id, user["user_id"])
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    name = (team_name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Missing team name")
+    save_dir = str(league_row.get("save_dir") or "")
+    path = get_save_dir_team_logo_path(save_dir, name) if save_dir else None
+    if not path:
+        raise HTTPException(status_code=404, detail="Logo not found")
+    media_type = "image/png"
+    low = path.lower()
+    if low.endswith(".jpg") or low.endswith(".jpeg"):
+        media_type = "image/jpeg"
+    elif low.endswith(".webp"):
+        media_type = "image/webp"
+    return FileResponse(
+        path,
+        media_type=media_type,
+        headers={"Cache-Control": "no-store, max-age=0", "Pragma": "no-cache"},
+    )
 
 
 @router.post("/{league_id}/logos/{team_name}", response_model=Dict[str, Any])

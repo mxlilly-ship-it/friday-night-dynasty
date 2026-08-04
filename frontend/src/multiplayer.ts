@@ -92,6 +92,8 @@ export type LeagueDashboardData = {
   can_run_league?: boolean
   acting_team_name: string | null
   state_version: number
+  /** Commissioner-set Drive/Dropbox/etc link for league logos. */
+  logos_download_url?: string | null
 }
 
 export type LeagueChatMessage = {
@@ -175,6 +177,7 @@ export type CommishDashboardData = {
     timezone: string
     advance_deadline_iso: string | null
     countdown_value: string | null
+    logos_download_url?: string | null
     notifications?: {
       email_week_advanced: boolean
       email_advance_reminder_24h: boolean
@@ -580,6 +583,7 @@ export type CommishSettingsPatch = {
   email_week_advanced?: boolean
   email_advance_reminder_24h?: boolean
   email_advance_lockout?: boolean
+  logos_download_url?: string | null
 }
 
 export async function updateCommishSettings(
@@ -680,4 +684,77 @@ export async function revokeLeagueInvite(
     headers: { ...headers, 'Content-Type': 'application/json' },
   })
   if (!r.ok) throw new Error(await r.text())
+}
+
+export type LogoPackUploadResult = {
+  ok: boolean
+  imported_count: number
+  skipped_count: number
+  logo_count?: number
+  imported: Array<{ file: string; team_name: string }>
+  skipped: Array<{ file: string; reason: string }>
+}
+
+export async function uploadLeagueLogoPack(
+  apiBase: string,
+  headers: Record<string, string>,
+  leagueId: string,
+  file: File,
+): Promise<LogoPackUploadResult> {
+  const form = new FormData()
+  form.append('pack', file, file.name)
+  const authHeaders: Record<string, string> = {}
+  if (headers.Authorization) authHeaders.Authorization = headers.Authorization
+  const r = await fetchWithRetry(`${apiBase}/leagues/${leagueId}/logos/pack`, {
+    method: 'POST',
+    headers: authHeaders,
+    body: form,
+  })
+  if (!r.ok) {
+    try {
+      const maybe = await r.json()
+      if (typeof maybe?.detail === 'string') throw new Error(maybe.detail)
+    } catch (e) {
+      if (e instanceof Error && e.message && !e.message.startsWith('{')) throw e
+    }
+    throw new Error(await r.text())
+  }
+  return (await r.json()) as LogoPackUploadResult
+}
+
+export async function fetchLeagueLogoPackStatus(
+  apiBase: string,
+  headers: Record<string, string>,
+  leagueId: string,
+): Promise<{ ok: boolean; logo_count: number; has_pack: boolean }> {
+  const r = await fetchWithRetry(`${apiBase}/leagues/${leagueId}/logos/status`, { headers })
+  if (!r.ok) throw new Error(await r.text())
+  return (await r.json()) as { ok: boolean; logo_count: number; has_pack: boolean }
+}
+
+export async function downloadLeagueLogoPack(
+  apiBase: string,
+  headers: Record<string, string>,
+  leagueId: string,
+  suggestedName?: string,
+): Promise<void> {
+  const r = await fetchWithRetry(`${apiBase}/leagues/${leagueId}/logos/pack`, { headers })
+  if (!r.ok) {
+    try {
+      const maybe = await r.json()
+      if (typeof maybe?.detail === 'string') throw new Error(maybe.detail)
+    } catch (e) {
+      if (e instanceof Error && e.message && !e.message.startsWith('{')) throw e
+    }
+    throw new Error(await r.text())
+  }
+  const blob = await r.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = suggestedName?.trim() || 'league_logos.zip'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
 }

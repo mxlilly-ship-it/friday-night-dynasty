@@ -1,7 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './CommishDashboardPage.css'
 import CommishCrossRegionPlanning from './CommishCrossRegionPlanning'
 import type { CommishCrossRegionPlanningData, CommishDashboardData } from './multiplayer'
+import {
+  downloadLeagueLogoPack,
+  fetchLeagueLogoPackStatus,
+  uploadLeagueLogoPack,
+} from './multiplayer'
 
 const DOW_OPTIONS = [
   { value: 0, label: 'Monday' },
@@ -26,14 +31,15 @@ type CommishDashboardPageProps = {
   onAssign: (email: string, teamName: string) => Promise<string>
   onResetPin: (userId: string) => Promise<string>
   onSaveSettings: (patch: {
-    advance_mode: string
-    advance_deadline_dow: number | null
-    advance_deadline_time_local: string
-    submit_lockout_minutes: number
-    timezone: string
-    email_week_advanced: boolean
-    email_advance_reminder_24h: boolean
-    email_advance_lockout: boolean
+    advance_mode?: string
+    advance_deadline_dow?: number | null
+    advance_deadline_time_local?: string
+    submit_lockout_minutes?: number
+    timezone?: string
+    email_week_advanced?: boolean
+    email_advance_reminder_24h?: boolean
+    email_advance_lockout?: boolean
+    logos_download_url?: string | null
   }) => Promise<void>
   onOpenLeagueHub?: () => void
   onOpenMyDynasty?: () => void
@@ -104,6 +110,12 @@ export default function CommishDashboardPage({
     data.settings.notifications?.email_advance_lockout ?? true,
   )
   const [settingsBusy, setSettingsBusy] = useState(false)
+  const [logoCount, setLogoCount] = useState(0)
+  const [logoBusy, setLogoBusy] = useState('')
+  const [logoFlash, setLogoFlash] = useState('')
+  const [logosUrl, setLogosUrl] = useState(data.settings.logos_download_url ?? '')
+  const [logosUrlBusy, setLogosUrlBusy] = useState(false)
+  const logoFileRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     setAdvanceMode(data.settings.advance_mode)
@@ -114,10 +126,25 @@ export default function CommishDashboardPage({
     setEmailWeekAdvanced(data.settings.notifications?.email_week_advanced ?? true)
     setEmailAdvanceReminder(data.settings.notifications?.email_advance_reminder_24h ?? true)
     setEmailAdvanceLockout(data.settings.notifications?.email_advance_lockout ?? true)
+    setLogosUrl(data.settings.logos_download_url ?? '')
     if (!assignTeam && data.vacant_teams.length) {
       setAssignTeam(data.vacant_teams[0])
     }
   }, [data, assignTeam])
+
+  useEffect(() => {
+    let cancelled = false
+    void fetchLeagueLogoPackStatus(apiBase, headers, data.league_id)
+      .then((s) => {
+        if (!cancelled) setLogoCount(s.logo_count || 0)
+      })
+      .catch(() => {
+        if (!cancelled) setLogoCount(0)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [apiBase, headers, data.league_id])
 
   async function runAction(key: string, fn: () => Promise<void>) {
     setBusy(key)
@@ -731,6 +758,175 @@ export default function CommishDashboardPage({
                 ))}
               </div>
             )}
+          </div>
+        </section>
+
+        <section className="cdash-panel">
+          <div className="cdash-panel-head">Logo pack link</div>
+          <div className="cdash-panel-body">
+            <p className="cdash-subtitle" style={{ marginTop: 0 }}>
+              Paste a Google Drive, Dropbox, or OneDrive folder link. Coaches get a{' '}
+              <strong>Download logos</strong> button on the League Hub that opens this link — nothing is
+              stored on the server.
+            </p>
+            {readOnly ? (
+              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                {data.settings.logos_download_url ? (
+                  <>
+                    Link set:{' '}
+                    <a
+                      href={data.settings.logos_download_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: 'var(--gold-bright)' }}
+                    >
+                      Open logos folder
+                    </a>
+                  </>
+                ) : (
+                  'No logo pack link set.'
+                )}
+              </p>
+            ) : (
+              <>
+                <div className="cdash-field" style={{ marginBottom: 12 }}>
+                  <label htmlFor="cdash-logos-url">Download URL</label>
+                  <input
+                    id="cdash-logos-url"
+                    className="cdash-input"
+                    type="url"
+                    placeholder="https://drive.google.com/…"
+                    value={logosUrl}
+                    onChange={(e) => setLogosUrl(e.target.value)}
+                  />
+                </div>
+                {logoFlash ? (
+                  <p style={{ margin: '0 0 12px', color: 'var(--gold-bright)', fontSize: '0.9rem' }}>{logoFlash}</p>
+                ) : null}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
+                  <button
+                    type="button"
+                    className="cdash-btn cdash-btn--gold"
+                    disabled={logosUrlBusy}
+                    onClick={() => {
+                      setLogosUrlBusy(true)
+                      setLogoFlash('')
+                      setErrorLocal('')
+                      void onSaveSettings({ logos_download_url: logosUrl.trim() || null })
+                        .then(() => {
+                          setLogoFlash(
+                            logosUrl.trim()
+                              ? 'Logo pack link saved. Coaches can download from League Hub.'
+                              : 'Logo pack link cleared.',
+                          )
+                          return onRefresh()
+                        })
+                        .catch((err: unknown) => {
+                          setErrorLocal(err instanceof Error ? err.message : 'Could not save logo link')
+                        })
+                        .finally(() => setLogosUrlBusy(false))
+                    }}
+                  >
+                    {logosUrlBusy ? 'Saving…' : 'Save logo link'}
+                  </button>
+                  {logosUrl.trim() ? (
+                    <button
+                      type="button"
+                      className="cdash-btn"
+                      onClick={() =>
+                        window.open(logosUrl.trim(), '_blank', 'noopener,noreferrer')
+                      }
+                    >
+                      Test link
+                    </button>
+                  ) : null}
+                </div>
+              </>
+            )}
+            <div
+              style={{
+                marginTop: readOnly ? 12 : 0,
+                paddingTop: 14,
+                borderTop: '1px solid rgba(255,255,255,0.08)',
+              }}
+            >
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>Optional: upload zip to server</div>
+              <p className="cdash-subtitle" style={{ marginTop: 0 }}>
+                Only if you want logos hosted on the league server. Prefer the link above to save space.
+                Name each file like the school (e.g. <code>Hamilton.png</code>).
+              </p>
+              <p style={{ margin: '0 0 12px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                {logoCount > 0
+                  ? `${logoCount} logo${logoCount === 1 ? '' : 's'} on file`
+                  : 'No logos uploaded to the server'}
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                {!readOnly ? (
+                  <>
+                    <input
+                      ref={logoFileRef}
+                      type="file"
+                      accept=".zip,application/zip"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        e.target.value = ''
+                        if (!file) return
+                        setLogoBusy('upload')
+                        setLogoFlash('')
+                        setErrorLocal('')
+                        void uploadLeagueLogoPack(apiBase, headers, data.league_id, file)
+                          .then((res) => {
+                            setLogoCount(res.logo_count ?? res.imported_count)
+                            const skipHint =
+                              res.skipped_count > 0
+                                ? ` · ${res.skipped_count} skipped (name/type mismatch)`
+                                : ''
+                            setLogoFlash(`Imported ${res.imported_count} logo(s)${skipHint}.`)
+                          })
+                          .catch((err: unknown) => {
+                            setErrorLocal(err instanceof Error ? err.message : 'Logo pack upload failed')
+                          })
+                          .finally(() => setLogoBusy(''))
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="cdash-btn"
+                      disabled={Boolean(logoBusy)}
+                      onClick={() => logoFileRef.current?.click()}
+                    >
+                      {logoBusy === 'upload' ? 'Uploading…' : 'Upload logo zip'}
+                    </button>
+                  </>
+                ) : null}
+                <button
+                  type="button"
+                  className="cdash-btn"
+                  disabled={Boolean(logoBusy) || logoCount < 1}
+                  onClick={() => {
+                    setLogoBusy('download')
+                    setLogoFlash('')
+                    setErrorLocal('')
+                    const safe =
+                      data.league_name.replace(/[^\w\-]+/g, '_').replace(/^_|_$/g, '') || 'league'
+                    void downloadLeagueLogoPack(
+                      apiBase,
+                      headers,
+                      data.league_id,
+                      `${safe}_logos.zip`,
+                    )
+                      .then(() => setLogoFlash('Logo pack downloaded.'))
+                      .catch((err: unknown) => {
+                        setErrorLocal(err instanceof Error ? err.message : 'Download failed')
+                      })
+                      .finally(() => setLogoBusy(''))
+                  }}
+                >
+                  {logoBusy === 'download' ? 'Downloading…' : 'Download server pack'}
+                </button>
+              </div>
+            </div>
           </div>
         </section>
 
