@@ -209,6 +209,10 @@ def _migrate_multiplayer_leagues(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE leagues ADD COLUMN last_auto_advance_at INTEGER")
     if "logos_download_url" not in cols:
         conn.execute("ALTER TABLE leagues ADD COLUMN logos_download_url TEXT")
+    if "advance_interval_hours" not in cols:
+        conn.execute("ALTER TABLE leagues ADD COLUMN advance_interval_hours INTEGER")
+    if "advance_cycle_anchor_at" not in cols:
+        conn.execute("ALTER TABLE leagues ADD COLUMN advance_cycle_anchor_at INTEGER")
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS league_chat_messages (

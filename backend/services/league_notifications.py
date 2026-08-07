@@ -314,30 +314,38 @@ def _process_league_scheduled_notifications(league_row: Dict[str, Any]) -> Dict[
     unsubmitted = [c for c in coaches if c["team_name"] not in submitted]
 
     if settings.get("email_advance_reminder_24h") and unsubmitted:
-        reminder_target = deadline - timedelta(hours=24)
-        if _in_cron_window(reminder_target, now):
-            subject = f"{league_name} — Submit by {deadline_text}"
-            for coach in unsubmitted:
-                body = "\n".join(
-                    [
-                        f"You have not submitted for {stage_label} in \"{league_name}\".",
-                        "",
-                        f"The league auto-advances in about 24 hours ({deadline_text}).",
-                        "Complete your prep and submit before the deadline.",
-                        "",
-                        f"Play here: {app_url}",
-                    ]
-                )
-                if _send_to_coach(
-                    to_email=coach["email"],
-                    subject=subject,
-                    body=body,
-                    league_id=league_id,
-                    notification_type=NOTIFICATION_ADVANCE_REMINDER_24H,
-                    stage_key=stage_key,
-                    user_id=coach["user_id"],
-                ):
-                    stats["reminders"] += 1
+        # Interval schedules shorter than 48h can't meaningfully use a 24h-before reminder.
+        interval_hours = None
+        try:
+            raw_iv = league_row.get("advance_interval_hours")
+            interval_hours = int(raw_iv) if raw_iv is not None else None
+        except (TypeError, ValueError):
+            interval_hours = None
+        if interval_hours is None or interval_hours >= 48:
+            reminder_target = deadline - timedelta(hours=24)
+            if _in_cron_window(reminder_target, now):
+                subject = f"{league_name} — Submit by {deadline_text}"
+                for coach in unsubmitted:
+                    body = "\n".join(
+                        [
+                            f"You have not submitted for {stage_label} in \"{league_name}\".",
+                            "",
+                            f"The league auto-advances in about 24 hours ({deadline_text}).",
+                            "Complete your prep and submit before the deadline.",
+                            "",
+                            f"Play here: {app_url}",
+                        ]
+                    )
+                    if _send_to_coach(
+                        to_email=coach["email"],
+                        subject=subject,
+                        body=body,
+                        league_id=league_id,
+                        notification_type=NOTIFICATION_ADVANCE_REMINDER_24H,
+                        stage_key=stage_key,
+                        user_id=coach["user_id"],
+                    ):
+                        stats["reminders"] += 1
 
     if settings.get("email_advance_lockout") and unsubmitted:
         lockout_start = deadline - timedelta(minutes=lockout_minutes)
@@ -386,7 +394,8 @@ def run_notification_tick() -> Dict[str, Any]:
         rows = conn.execute(
             """
             SELECT id, name, save_dir, status, advance_mode, advance_deadline_dow,
-                   advance_deadline_time_local, submit_lockout_minutes, timezone,
+                   advance_deadline_time_local, advance_interval_hours, advance_cycle_anchor_at,
+                   submit_lockout_minutes, timezone,
                    commissioner_user_id, last_auto_advance_at
             FROM leagues
             WHERE status='active' AND lower(advance_mode)='auto'

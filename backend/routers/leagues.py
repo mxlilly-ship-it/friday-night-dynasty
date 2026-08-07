@@ -117,6 +117,7 @@ class CommishSettingsBody(BaseModel):
     advance_mode: Optional[str] = None
     advance_deadline_dow: Optional[int] = Field(None, ge=0, le=6)
     advance_deadline_time_local: Optional[str] = None
+    advance_interval_hours: Optional[int] = Field(None, description="12 or 24 for interval auto-advance; null for weekly")
     submit_lockout_minutes: Optional[int] = Field(None, ge=0, le=120)
     timezone: Optional[str] = None
     email_week_advanced: Optional[bool] = None
@@ -291,19 +292,21 @@ def commish_settings_route(
     user=Depends(require_entitled),
 ):
     try:
-        return update_league_settings(
-            league_id,
-            user["user_id"],
-            advance_mode=body.advance_mode,
-            advance_deadline_dow=body.advance_deadline_dow,
-            advance_deadline_time_local=body.advance_deadline_time_local,
-            submit_lockout_minutes=body.submit_lockout_minutes,
-            timezone=body.timezone,
-            email_week_advanced=body.email_week_advanced,
-            email_advance_reminder_24h=body.email_advance_reminder_24h,
-            email_advance_lockout=body.email_advance_lockout,
-            logos_download_url=body.logos_download_url,
-        )
+        patch = body.model_dump(exclude_unset=True)
+        kwargs: Dict[str, Any] = {
+            "advance_mode": patch.get("advance_mode"),
+            "advance_deadline_dow": patch.get("advance_deadline_dow"),
+            "advance_deadline_time_local": patch.get("advance_deadline_time_local"),
+            "submit_lockout_minutes": patch.get("submit_lockout_minutes"),
+            "timezone": patch.get("timezone"),
+            "email_week_advanced": patch.get("email_week_advanced"),
+            "email_advance_reminder_24h": patch.get("email_advance_reminder_24h"),
+            "email_advance_lockout": patch.get("email_advance_lockout"),
+            "logos_download_url": patch.get("logos_download_url"),
+        }
+        if "advance_interval_hours" in patch:
+            kwargs["advance_interval_hours"] = patch.get("advance_interval_hours")
+        return update_league_settings(league_id, user["user_id"], **kwargs)
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e)) from e
     except ValueError as e:

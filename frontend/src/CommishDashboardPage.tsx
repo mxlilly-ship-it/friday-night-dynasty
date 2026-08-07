@@ -34,6 +34,7 @@ type CommishDashboardPageProps = {
     advance_mode?: string
     advance_deadline_dow?: number | null
     advance_deadline_time_local?: string
+    advance_interval_hours?: number | null
     submit_lockout_minutes?: number
     timezone?: string
     email_week_advanced?: boolean
@@ -94,6 +95,12 @@ export default function CommishDashboardPage({
   const [pinFlash, setPinFlash] = useState('')
 
   const [advanceMode, setAdvanceMode] = useState(data.settings.advance_mode)
+  const [scheduleKind, setScheduleKind] = useState<'weekly' | '12' | '24'>(() => {
+    const h = data.settings.advance_interval_hours
+    if (h === 12) return '12'
+    if (h === 24) return '24'
+    return 'weekly'
+  })
   const [deadlineDow, setDeadlineDow] = useState<number | ''>(
     data.settings.advance_deadline_dow ?? '',
   )
@@ -119,6 +126,8 @@ export default function CommishDashboardPage({
 
   useEffect(() => {
     setAdvanceMode(data.settings.advance_mode)
+    const h = data.settings.advance_interval_hours
+    setScheduleKind(h === 12 ? '12' : h === 24 ? '24' : 'weekly')
     setDeadlineDow(data.settings.advance_deadline_dow ?? '')
     setDeadlineTime(data.settings.advance_deadline_time_local)
     setLockoutMinutes(String(data.settings.submit_lockout_minutes))
@@ -232,9 +241,9 @@ export default function CommishDashboardPage({
           <button type="button" className="ldash-back-btn" onClick={onBack}>
             ← Leagues
           </button>
-          {showCoachActions && onOpenLeagueHub ? (
+          {onOpenLeagueHub ? (
             <button type="button" className="cdash-btn cdash-btn--blue" onClick={onOpenLeagueHub}>
-              League hub
+              {showCoachActions ? 'League hub' : 'League hub (view)'}
             </button>
           ) : null}
           {showCoachActions && onOpenMyDynasty ? (
@@ -324,7 +333,12 @@ export default function CommishDashboardPage({
           <div className="cdash-status-pill">Advance in {data.settings.countdown_value}</div>
         ) : null}
         <div className="cdash-status-pill">
-          Mode: {data.settings.advance_mode === 'auto' ? 'Auto-advance' : 'Manual'}
+          Mode:{' '}
+          {data.settings.advance_mode === 'auto'
+            ? data.settings.advance_interval_hours
+              ? `Auto every ${data.settings.advance_interval_hours}h`
+              : 'Auto-advance'
+            : 'Manual'}
         </div>
       </div>
 
@@ -935,8 +949,13 @@ export default function CommishDashboardPage({
           <div className="cdash-panel-body">
             {readOnly ? (
               <p className="cdash-subtitle" style={{ margin: 0 }}>
-                Mode: {data.settings.advance_mode === 'auto' ? 'Auto-advance' : 'Manual'} · Lockout{' '}
-                {data.settings.submit_lockout_minutes}m · {data.settings.timezone}
+                Mode:{' '}
+                {data.settings.advance_mode === 'auto'
+                  ? data.settings.advance_interval_hours
+                    ? `Auto every ${data.settings.advance_interval_hours}h`
+                    : 'Auto weekly'
+                  : 'Manual'}{' '}
+                · Lockout {data.settings.submit_lockout_minutes}m · {data.settings.timezone}
               </p>
             ) : (
             <>
@@ -962,34 +981,61 @@ export default function CommishDashboardPage({
                   onChange={(e) => setTimezone(e.target.value)}
                 />
               </div>
-              <div className="cdash-field">
-                <label htmlFor="cdash-dow">Deadline day</label>
-                <select
-                  id="cdash-dow"
-                  className="cdash-select"
-                  value={deadlineDow === '' ? '' : String(deadlineDow)}
-                  onChange={(e) =>
-                    setDeadlineDow(e.target.value === '' ? '' : Number(e.target.value))
-                  }
-                >
-                  <option value="">Not set</option>
-                  {DOW_OPTIONS.map((d) => (
-                    <option key={d.value} value={d.value}>
-                      {d.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="cdash-field">
-                <label htmlFor="cdash-time">Deadline time</label>
-                <input
-                  id="cdash-time"
-                  type="time"
-                  className="cdash-input"
-                  value={deadlineTime}
-                  onChange={(e) => setDeadlineTime(e.target.value)}
-                />
-              </div>
+              {advanceMode === 'auto' ? (
+                <div className="cdash-field">
+                  <label htmlFor="cdash-schedule">Schedule</label>
+                  <select
+                    id="cdash-schedule"
+                    className="cdash-select"
+                    value={scheduleKind}
+                    onChange={(e) => setScheduleKind(e.target.value as 'weekly' | '12' | '24')}
+                  >
+                    <option value="weekly">Weekly (day + time)</option>
+                    <option value="24">Every 24 hours</option>
+                    <option value="12">Every 12 hours</option>
+                  </select>
+                </div>
+              ) : null}
+              {advanceMode === 'auto' && scheduleKind === 'weekly' ? (
+                <>
+                  <div className="cdash-field">
+                    <label htmlFor="cdash-dow">Deadline day</label>
+                    <select
+                      id="cdash-dow"
+                      className="cdash-select"
+                      value={deadlineDow === '' ? '' : String(deadlineDow)}
+                      onChange={(e) =>
+                        setDeadlineDow(e.target.value === '' ? '' : Number(e.target.value))
+                      }
+                    >
+                      <option value="">Not set</option>
+                      {DOW_OPTIONS.map((d) => (
+                        <option key={d.value} value={d.value}>
+                          {d.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="cdash-field">
+                    <label htmlFor="cdash-time">Deadline time</label>
+                    <input
+                      id="cdash-time"
+                      type="time"
+                      className="cdash-input"
+                      value={deadlineTime}
+                      onChange={(e) => setDeadlineTime(e.target.value)}
+                    />
+                  </div>
+                </>
+              ) : null}
+              {advanceMode === 'auto' && scheduleKind !== 'weekly' ? (
+                <div className="cdash-field" style={{ gridColumn: '1 / -1' }}>
+                  <p className="cdash-subtitle" style={{ margin: 0 }}>
+                    League advances every {scheduleKind} hours from when you save this setting (or
+                    from the last auto-advance). Countdown shows on League Hub.
+                  </p>
+                </div>
+              ) : null}
               <div className="cdash-field">
                 <label htmlFor="cdash-lockout">Submit lockout (minutes)</label>
                 <input
@@ -1027,14 +1073,16 @@ export default function CommishDashboardPage({
                 <input
                   type="checkbox"
                   checked={emailAdvanceReminder}
-                  disabled={advanceMode !== 'auto'}
+                  disabled={advanceMode !== 'auto' || scheduleKind !== 'weekly'}
                   onChange={(e) => setEmailAdvanceReminder(e.target.checked)}
                   style={{ marginTop: 3 }}
                 />
                 <span>
                   <strong>24-hour submit reminder</strong>
                   <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                    Email coaches who have not submitted yet, 24 hours before the deadline.
+                    {scheduleKind === 'weekly'
+                      ? 'Email coaches who have not submitted yet, 24 hours before the deadline.'
+                      : 'Only available for weekly schedules (12/24h cycles are too short).'}
                   </span>
                 </span>
               </label>
@@ -1064,12 +1112,24 @@ export default function CommishDashboardPage({
                   setErrorLocal('')
                   void onSaveSettings({
                     advance_mode: advanceMode,
-                    advance_deadline_dow: deadlineDow === '' ? null : deadlineDow,
+                    advance_deadline_dow:
+                      advanceMode === 'auto' && scheduleKind === 'weekly'
+                        ? deadlineDow === ''
+                          ? null
+                          : deadlineDow
+                        : null,
                     advance_deadline_time_local: deadlineTime,
+                    advance_interval_hours:
+                      advanceMode === 'auto' && scheduleKind !== 'weekly'
+                        ? Number(scheduleKind)
+                        : null,
                     submit_lockout_minutes: Number(lockoutMinutes) || 0,
                     timezone: timezone.trim() || 'America/New_York',
                     email_week_advanced: emailWeekAdvanced,
-                    email_advance_reminder_24h: emailAdvanceReminder,
+                    email_advance_reminder_24h:
+                      advanceMode === 'auto' && scheduleKind === 'weekly'
+                        ? emailAdvanceReminder
+                        : false,
                     email_advance_lockout: emailAdvanceLockout,
                   })
                     .then(() => {

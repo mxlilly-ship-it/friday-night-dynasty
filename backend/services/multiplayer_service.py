@@ -1667,18 +1667,73 @@ def league_schools_for_user(league_id: str, user_id: str) -> List[Dict[str, Any]
     return schools
 
 
+def _league_timezone(league_row: Dict[str, Any]) -> ZoneInfo:
+    from datetime import timezone as dt_timezone
+
+    tz_name = str(league_row.get("timezone") or "America/New_York")
+    for candidate in (tz_name, "America/New_York"):
+        try:
+            return ZoneInfo(candidate)
+        except Exception:
+            continue
+    # Windows/local envs without tzdata — UTC is good enough for interval math.
+    return dt_timezone.utc  # type: ignore[return-value]
+
+
+_ALLOWED_ADVANCE_INTERVAL_HOURS = frozenset({12, 24})
+
+
+def _normalize_advance_interval_hours(raw: Any) -> Optional[int]:
+    """Return 12/24 for interval mode, or None for weekly day+time mode."""
+    if raw is None or raw == "":
+        return None
+    try:
+        hours = int(raw)
+    except (TypeError, ValueError):
+        raise ValueError("advance_interval_hours must be 12 or 24") from None
+    if hours not in _ALLOWED_ADVANCE_INTERVAL_HOURS:
+        raise ValueError("advance_interval_hours must be 12 or 24")
+    return hours
+
+
+def _advance_interval_hours(league_row: Dict[str, Any]) -> Optional[int]:
+    try:
+        return _normalize_advance_interval_hours(league_row.get("advance_interval_hours"))
+    except ValueError:
+        return None
+
+
+def _interval_cycle_base_ts(league_row: Dict[str, Any]) -> Optional[int]:
+    """Unix timestamp of last advance, or cycle start when interval mode was enabled."""
+    last_at = int(league_row.get("last_auto_advance_at") or 0)
+    if last_at > 0:
+        return last_at
+    anchor = int(league_row.get("advance_cycle_anchor_at") or 0)
+    return anchor if anchor > 0 else None
+
+
+def _next_interval_deadline(league_row: Dict[str, Any]) -> Optional[datetime]:
+    hours = _advance_interval_hours(league_row)
+    if not hours:
+        return None
+    base = _interval_cycle_base_ts(league_row)
+    if not base:
+        return None
+    tz = _league_timezone(league_row)
+    return datetime.fromtimestamp(base, tz) + timedelta(hours=hours)
+
+
 def _advance_countdown_iso(league_row: Dict[str, Any]) -> Optional[str]:
     if str(league_row.get("advance_mode") or "manual").lower() != "auto":
         return None
-    tz_name = str(league_row.get("timezone") or "America/New_York")
+    if _advance_interval_hours(league_row):
+        deadline = _next_interval_deadline(league_row)
+        return deadline.isoformat() if deadline else None
+    tz = _league_timezone(league_row)
     dow = league_row.get("advance_deadline_dow")
     time_local = str(league_row.get("advance_deadline_time_local") or "23:59").strip()
     if dow is None:
         return None
-    try:
-        tz = ZoneInfo(tz_name)
-    except Exception:
-        tz = ZoneInfo("America/New_York")
     try:
         hour, minute = [int(x) for x in time_local.split(":", 1)]
     except Exception:
@@ -1716,18 +1771,16 @@ def _format_countdown(deadline_iso: Optional[str]) -> Optional[str]:
 
 
 def _most_recent_advance_deadline(league_row: Dict[str, Any]) -> Optional[datetime]:
-    """Most recent scheduled auto-advance instant (may be in the past)."""
+    """Most recent scheduled auto-advance instant (may be in the past). Weekly mode only."""
     if str(league_row.get("advance_mode") or "manual").lower() != "auto":
+        return None
+    if _advance_interval_hours(league_row):
         return None
     dow = league_row.get("advance_deadline_dow")
     if dow is None:
         return None
-    tz_name = str(league_row.get("timezone") or "America/New_York")
+    tz = _league_timezone(league_row)
     time_local = str(league_row.get("advance_deadline_time_local") or "23:59").strip()
-    try:
-        tz = ZoneInfo(tz_name)
-    except Exception:
-        tz = ZoneInfo("America/New_York")
     try:
         hour, minute = [int(x) for x in time_local.split(":", 1)]
     except Exception:
@@ -1746,15 +1799,28 @@ def try_auto_advance_league(league_id: str) -> bool:
     league_row = _load_league_row(league_id)
     if not league_row:
         return False
-    deadline = _most_recent_advance_deadline(league_row)
-    if deadline is None:
+    if str(league_row.get("advance_mode") or "manual").lower() != "auto":
         return False
-    now = datetime.now(deadline.tzinfo)
-    if now < deadline:
-        return False
-    last_at = int(league_row.get("last_auto_advance_at") or 0)
-    if last_at >= int(deadline.timestamp()):
-        return False
+
+    hours = _advance_interval_hours(league_row)
+    if hours:
+        deadline = _next_interval_deadline(league_row)
+        if deadline is None:
+            return False
+        now = datetime.now(deadline.tzinfo)
+        if now < deadline:
+            return False
+    else:
+        deadline = _most_recent_advance_deadline(league_row)
+        if deadline is None:
+            return False
+        now = datetime.now(deadline.tzinfo)
+        if now < deadline:
+            return False
+        last_at = int(league_row.get("last_auto_advance_at") or 0)
+        if last_at >= int(deadline.timestamp()):
+            return False
+
     commish_id = str(league_row.get("commissioner_user_id") or "")
     if not commish_id:
         return False
@@ -2332,8 +2398,8 @@ def build_league_dashboard(
         "activity": activity,
         "chat_enabled": True,
         "chat_messages": chat_messages,
-        "is_commissioner": is_commish or is_owner,
-        "is_read_only_admin": is_owner,
+        "is_commissioner": bool(is_commish),
+        "is_read_only_admin": bool(is_owner and not is_commish),
         "can_run_league": bool(is_commish),
         "acting_team_name": acting,
         "state_version": int(league_row.get("state_version") or 0),
@@ -2887,6 +2953,7 @@ def update_league_settings(
     advance_mode: Optional[str] = None,
     advance_deadline_dow: Optional[int] = None,
     advance_deadline_time_local: Optional[str] = None,
+    advance_interval_hours: Any = ...,
     submit_lockout_minutes: Optional[int] = None,
     timezone: Optional[str] = None,
     email_week_advanced: Optional[bool] = None,
@@ -2909,6 +2976,12 @@ def update_league_settings(
         if advance_deadline_time_local is not None
         else league_row.get("advance_deadline_time_local")
     )
+    if advance_interval_hours is ...:
+        interval_hours = _advance_interval_hours(league_row)
+    else:
+        interval_hours = _normalize_advance_interval_hours(advance_interval_hours)
+    if mode == "auto" and interval_hours is None and dow is None:
+        raise ValueError("Choose a weekly deadline day, or every 12/24 hours")
     lockout = (
         int(submit_lockout_minutes)
         if submit_lockout_minutes is not None
@@ -2920,16 +2993,58 @@ def update_league_settings(
     else:
         logos_url = str(league_row.get("logos_download_url") or "").strip() or None
     now = _now()
-    with db() as conn:
-        conn.execute(
-            """
-            UPDATE leagues
-            SET advance_mode=?, advance_deadline_dow=?, advance_deadline_time_local=?,
-                submit_lockout_minutes=?, timezone=?, logos_download_url=?, updated_at=?
-            WHERE id=?
-            """,
-            (mode, dow, str(time_local or "23:59"), lockout, tz, logos_url, now, league_id),
-        )
+    prev_interval = _advance_interval_hours(league_row)
+    cycle_anchor = league_row.get("advance_cycle_anchor_at")
+    # Starting or changing interval schedule: reset the cycle clock so the next
+    # advance is interval_hours from now (not an old weekly last_auto_advance_at).
+    if mode == "auto" and interval_hours is not None and interval_hours != prev_interval:
+        cycle_anchor = now
+        with db() as conn:
+            conn.execute(
+                """
+                UPDATE leagues
+                SET advance_mode=?, advance_deadline_dow=?, advance_deadline_time_local=?,
+                    advance_interval_hours=?, advance_cycle_anchor_at=?, last_auto_advance_at=?,
+                    submit_lockout_minutes=?, timezone=?, logos_download_url=?, updated_at=?
+                WHERE id=?
+                """,
+                (
+                    mode,
+                    None if interval_hours else dow,
+                    str(time_local or "23:59"),
+                    interval_hours,
+                    cycle_anchor,
+                    now,
+                    lockout,
+                    tz,
+                    logos_url,
+                    now,
+                    league_id,
+                ),
+            )
+    else:
+        with db() as conn:
+            conn.execute(
+                """
+                UPDATE leagues
+                SET advance_mode=?, advance_deadline_dow=?, advance_deadline_time_local=?,
+                    advance_interval_hours=?, advance_cycle_anchor_at=?,
+                    submit_lockout_minutes=?, timezone=?, logos_download_url=?, updated_at=?
+                WHERE id=?
+                """,
+                (
+                    mode,
+                    None if interval_hours else dow,
+                    str(time_local or "23:59"),
+                    interval_hours,
+                    None if interval_hours is None else cycle_anchor,
+                    lockout,
+                    tz,
+                    logos_url,
+                    now,
+                    league_id,
+                ),
+            )
     from backend.services.league_notifications import get_notification_settings, update_notification_settings
 
     notifications = get_notification_settings(league_id)
@@ -2945,8 +3060,9 @@ def update_league_settings(
         )
     return {
         "advance_mode": mode,
-        "advance_deadline_dow": dow,
+        "advance_deadline_dow": None if interval_hours else dow,
         "advance_deadline_time_local": str(time_local or "23:59"),
+        "advance_interval_hours": interval_hours,
         "submit_lockout_minutes": lockout,
         "timezone": tz,
         "logos_download_url": logos_url,
@@ -3525,6 +3641,7 @@ def build_commish_dashboard(league_id: str, user_id: str) -> Dict[str, Any]:
             "advance_mode": str(league_row.get("advance_mode") or "manual"),
             "advance_deadline_dow": league_row.get("advance_deadline_dow"),
             "advance_deadline_time_local": str(league_row.get("advance_deadline_time_local") or "23:59"),
+            "advance_interval_hours": _advance_interval_hours(league_row),
             "submit_lockout_minutes": int(league_row.get("submit_lockout_minutes") or 5),
             "timezone": str(league_row.get("timezone") or "America/New_York"),
             "advance_deadline_iso": deadline_iso,

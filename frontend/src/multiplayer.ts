@@ -173,6 +173,7 @@ export type CommishDashboardData = {
     advance_mode: string
     advance_deadline_dow: number | null
     advance_deadline_time_local: string
+    advance_interval_hours?: number | null
     submit_lockout_minutes: number
     timezone: string
     advance_deadline_iso: string | null
@@ -578,6 +579,7 @@ export type CommishSettingsPatch = {
   advance_mode?: string
   advance_deadline_dow?: number | null
   advance_deadline_time_local?: string
+  advance_interval_hours?: number | null
   submit_lockout_minutes?: number
   timezone?: string
   email_week_advanced?: boolean
