@@ -7,7 +7,7 @@ from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, UploadF
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field, model_validator
 
-from backend.deps import require_entitled
+from backend.deps import require_purchased
 from backend.services.league_service import (
     apply_logo_pack_zip,
     build_logo_pack_zip,
@@ -152,7 +152,7 @@ class ChatMessageBody(BaseModel):
 
 
 @router.get("/mine", response_model=Dict[str, Any])
-def list_my_leagues_route(user=Depends(require_entitled)):
+def list_my_leagues_route(user=Depends(require_purchased)):
     from backend.platform_config import platform_owner_emails_configured
 
     user_id = user["user_id"]
@@ -172,7 +172,7 @@ def list_my_leagues_route(user=Depends(require_entitled)):
 
 
 @router.get("/browse", response_model=Dict[str, Any])
-def browse_leagues_route(user=Depends(require_entitled)):
+def browse_leagues_route(user=Depends(require_purchased)):
     try:
         leagues = list_browsable_leagues(user["user_id"])
     except Exception as e:
@@ -188,7 +188,7 @@ async def league_start_request_route(
     contact_email: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
     league_file: Optional[UploadFile] = File(None),
-    user=Depends(require_entitled),
+    user=Depends(require_purchased),
 ):
     from backend.services.multiplayer_service import account_identity_for_user
 
@@ -244,7 +244,7 @@ async def league_start_request_route(
 
 
 @router.get("/{league_id}/schools", response_model=Dict[str, Any])
-def league_schools_route(league_id: str, user=Depends(require_entitled)):
+def league_schools_route(league_id: str, user=Depends(require_purchased)):
     from backend.services.multiplayer_service import league_schools_for_user
 
     try:
@@ -265,7 +265,7 @@ def coach_prep_route(
     league_id: str,
     team_name: str,
     body: CoachPrepBody,
-    user=Depends(require_entitled),
+    user=Depends(require_purchased),
 ):
     try:
         return apply_league_coach_prep(league_id, user["user_id"], team_name, body.prep)
@@ -276,7 +276,7 @@ def coach_prep_route(
 
 
 @router.get("/{league_id}/commish/dashboard", response_model=Dict[str, Any])
-def commish_dashboard_route(league_id: str, user=Depends(require_entitled)):
+def commish_dashboard_route(league_id: str, user=Depends(require_purchased)):
     try:
         return build_commish_dashboard(league_id, user["user_id"])
     except PermissionError as e:
@@ -289,7 +289,7 @@ def commish_dashboard_route(league_id: str, user=Depends(require_entitled)):
 def commish_settings_route(
     league_id: str,
     body: CommishSettingsBody,
-    user=Depends(require_entitled),
+    user=Depends(require_purchased),
 ):
     try:
         patch = body.model_dump(exclude_unset=True)
@@ -322,7 +322,7 @@ class CommishCrossRegionPicksBody(BaseModel):
 
 
 @router.get("/{league_id}/commish/cross-region-planning", response_model=Dict[str, Any])
-def commish_cross_region_planning_route(league_id: str, user=Depends(require_entitled)):
+def commish_cross_region_planning_route(league_id: str, user=Depends(require_purchased)):
     try:
         return build_commish_cross_region_planning(league_id, user["user_id"])
     except PermissionError as e:
@@ -336,7 +336,7 @@ def commish_cross_region_picks_route(
     league_id: str,
     team_name: str,
     body: CommishCrossRegionPicksBody,
-    user=Depends(require_entitled),
+    user=Depends(require_purchased),
 ):
     try:
         return save_commish_cross_region_picks(
@@ -355,7 +355,7 @@ def commish_cross_region_picks_route(
 def commish_sim_week_route(
     league_id: str,
     body: Optional[CommishSimWeekBody] = Body(None),
-    user=Depends(require_entitled),
+    user=Depends(require_purchased),
 ):
     try:
         picks = body.cross_region_picks if body else None
@@ -369,7 +369,7 @@ def commish_sim_week_route(
 
 
 @router.get("/{league_id}/commish/game", response_model=Dict[str, Any])
-def league_commish_game_route(league_id: str, user=Depends(require_entitled)):
+def league_commish_game_route(league_id: str, user=Depends(require_purchased)):
     try:
         return get_league_commish_game_bundle(league_id, user["user_id"])
     except PermissionError as e:
@@ -382,7 +382,7 @@ def league_commish_game_route(league_id: str, user=Depends(require_entitled)):
 def league_commish_game_save_route(
     league_id: str,
     body: LeagueGameBody,
-    user=Depends(require_entitled),
+    user=Depends(require_purchased),
 ):
     try:
         return save_league_commish_game_state(league_id, user["user_id"], body.state)
@@ -396,7 +396,7 @@ def league_commish_game_save_route(
 def league_game_route(
     league_id: str,
     team_name: str,
-    user=Depends(require_entitled),
+    user=Depends(require_purchased),
 ):
     try:
         return get_league_game_bundle(league_id, user["user_id"], team_name)
@@ -411,7 +411,7 @@ def league_game_save_route(
     league_id: str,
     team_name: str,
     body: LeagueGameBody,
-    user=Depends(require_entitled),
+    user=Depends(require_purchased),
 ):
     try:
         return save_league_game_state(league_id, user["user_id"], team_name, body.state)
@@ -425,7 +425,7 @@ def league_game_save_route(
 def league_dashboard_route(
     league_id: str,
     team_name: Optional[str] = None,
-    user=Depends(require_entitled),
+    user=Depends(require_purchased),
 ):
     try:
         return build_league_dashboard(league_id, user["user_id"], acting_team_name=team_name)
@@ -436,7 +436,7 @@ def league_dashboard_route(
 
 
 @router.get("/{league_id}/chat", response_model=Dict[str, Any])
-def league_chat_list_route(league_id: str, user=Depends(require_entitled)):
+def league_chat_list_route(league_id: str, user=Depends(require_purchased)):
     try:
         messages = list_league_chat_messages(league_id, user["user_id"])
     except PermissionError as e:
@@ -450,7 +450,7 @@ def league_chat_list_route(league_id: str, user=Depends(require_entitled)):
 def league_chat_post_route(
     league_id: str,
     body: ChatMessageBody,
-    user=Depends(require_entitled),
+    user=Depends(require_purchased),
 ):
     try:
         return post_league_chat_message(
@@ -469,7 +469,7 @@ def league_chat_post_route(
 def submit_week_route(
     league_id: str,
     team_name: str,
-    user=Depends(require_entitled),
+    user=Depends(require_purchased),
 ):
     try:
         return submit_league_week(league_id, user["user_id"], team_name)
@@ -483,7 +483,7 @@ def submit_week_route(
 def unsubmit_week_route(
     league_id: str,
     team_name: str,
-    user=Depends(require_entitled),
+    user=Depends(require_purchased),
 ):
     try:
         return unsubmit_league_week(league_id, user["user_id"], team_name)
@@ -498,7 +498,7 @@ def verify_pin_route(
     league_id: str,
     team_name: str,
     body: VerifyPinBody,
-    user=Depends(require_entitled),
+    user=Depends(require_purchased),
 ):
     ok = verify_team_pin(league_id, user["user_id"], team_name, body.pin)
     if not ok:
@@ -511,7 +511,7 @@ def coach_setup_route(
     league_id: str,
     team_name: str,
     body: CoachSetupBody,
-    user=Depends(require_entitled),
+    user=Depends(require_purchased),
 ):
     try:
         return apply_member_coach_setup(
@@ -530,7 +530,7 @@ def coach_setup_route(
 async def upload_league_logo_pack_route(
     league_id: str,
     pack: UploadFile = File(...),
-    user=Depends(require_entitled),
+    user=Depends(require_purchased),
 ):
     """Commissioner uploads a zip of team crests (filenames match school names)."""
     try:
@@ -570,7 +570,7 @@ async def upload_league_logo_pack_route(
 
 
 @router.get("/{league_id}/logos/pack")
-def download_league_logo_pack_route(league_id: str, user=Depends(require_entitled)):
+def download_league_logo_pack_route(league_id: str, user=Depends(require_purchased)):
     """Any league member can download the current logo pack as a zip."""
     try:
         league_row = _verify_league_member_or_owner(league_id, user["user_id"])
@@ -599,7 +599,7 @@ def download_league_logo_pack_route(league_id: str, user=Depends(require_entitle
 
 
 @router.get("/{league_id}/logos/status", response_model=Dict[str, Any])
-def league_logo_pack_status_route(league_id: str, user=Depends(require_entitled)):
+def league_logo_pack_status_route(league_id: str, user=Depends(require_purchased)):
     try:
         league_row = _verify_league_member_or_owner(league_id, user["user_id"])
     except PermissionError as e:
@@ -612,7 +612,7 @@ def league_logo_pack_status_route(league_id: str, user=Depends(require_entitled)
 
 
 @router.get("/{league_id}/logos/{team_name}")
-def get_league_logo_route(league_id: str, team_name: str, user=Depends(require_entitled)):
+def get_league_logo_route(league_id: str, team_name: str, user=Depends(require_purchased)):
     """Serve a league crest from the shared save folder (live for all coaches)."""
     try:
         league_row = _verify_league_member_or_owner(league_id, user["user_id"])
@@ -645,7 +645,7 @@ async def upload_league_logo_route(
     league_id: str,
     team_name: str,
     logo: UploadFile = File(...),
-    user=Depends(require_entitled),
+    user=Depends(require_purchased),
 ):
     if not is_platform_owner_user(user["user_id"]):
         league_row = _load_league_row(league_id)
@@ -672,7 +672,7 @@ async def upload_league_logo_route(
 
 
 @router.get("/admin/users/lookup", response_model=Dict[str, Any])
-def admin_lookup_user_route(email: str, user=Depends(require_entitled)):
+def admin_lookup_user_route(email: str, user=Depends(require_purchased)):
     if not is_platform_owner_user(user["user_id"]):
         raise HTTPException(status_code=403, detail="Platform owner only")
     found = lookup_user_by_email(email)
@@ -682,7 +682,7 @@ def admin_lookup_user_route(email: str, user=Depends(require_entitled)):
 
 
 @router.post("/admin/leagues", response_model=Dict[str, Any])
-def admin_create_league_route(body: AdminCreateLeagueBody, user=Depends(require_entitled)):
+def admin_create_league_route(body: AdminCreateLeagueBody, user=Depends(require_purchased)):
     if not is_platform_owner_user(user["user_id"]):
         raise HTTPException(status_code=403, detail="Platform owner only")
     try:
@@ -707,7 +707,7 @@ def admin_create_league_route(body: AdminCreateLeagueBody, user=Depends(require_
 
 
 @router.delete("/admin/leagues/{league_id}", response_model=Dict[str, Any])
-def admin_delete_league_route(league_id: str, user=Depends(require_entitled)):
+def admin_delete_league_route(league_id: str, user=Depends(require_purchased)):
     if not is_platform_owner_user(user["user_id"]):
         raise HTTPException(status_code=403, detail="Platform owner only")
     try:
@@ -719,7 +719,7 @@ def admin_delete_league_route(league_id: str, user=Depends(require_entitled)):
 
 
 @router.get("/admin/leagues/deleted", response_model=Dict[str, Any])
-def admin_list_deleted_leagues_route(user=Depends(require_entitled)):
+def admin_list_deleted_leagues_route(user=Depends(require_purchased)):
     if not is_platform_owner_user(user["user_id"]):
         raise HTTPException(status_code=403, detail="Platform owner only")
     try:
@@ -729,7 +729,7 @@ def admin_list_deleted_leagues_route(user=Depends(require_entitled)):
 
 
 @router.post("/admin/leagues/{league_id}/restore", response_model=Dict[str, Any])
-def admin_restore_league_route(league_id: str, user=Depends(require_entitled)):
+def admin_restore_league_route(league_id: str, user=Depends(require_purchased)):
     if not is_platform_owner_user(user["user_id"]):
         raise HTTPException(status_code=403, detail="Platform owner only")
     try:
@@ -741,7 +741,7 @@ def admin_restore_league_route(league_id: str, user=Depends(require_entitled)):
 
 
 @router.delete("/admin/leagues/{league_id}/permanent", response_model=Dict[str, Any])
-def admin_permanent_delete_league_route(league_id: str, user=Depends(require_entitled)):
+def admin_permanent_delete_league_route(league_id: str, user=Depends(require_purchased)):
     if not is_platform_owner_user(user["user_id"]):
         raise HTTPException(status_code=403, detail="Platform owner only")
     try:
@@ -753,7 +753,7 @@ def admin_permanent_delete_league_route(league_id: str, user=Depends(require_ent
 
 
 @router.post("/{league_id}/invites", response_model=Dict[str, Any])
-def invite_to_league_route(league_id: str, body: InviteBody, user=Depends(require_entitled)):
+def invite_to_league_route(league_id: str, body: InviteBody, user=Depends(require_purchased)):
     try:
         return invite_user_to_league(league_id, user["user_id"], body.email)
     except PermissionError as e:
@@ -766,7 +766,7 @@ def invite_to_league_route(league_id: str, body: InviteBody, user=Depends(requir
 def create_join_request_route(
     league_id: str,
     body: JoinRequestBody,
-    user=Depends(require_entitled),
+    user=Depends(require_purchased),
 ):
     try:
         return create_join_request(league_id, user["user_id"], message=body.message)
@@ -779,7 +779,7 @@ def approve_join_request_route(
     league_id: str,
     request_id: str,
     body: ApproveJoinRequestBody,
-    user=Depends(require_entitled),
+    user=Depends(require_purchased),
 ):
     try:
         return approve_join_request(
@@ -798,7 +798,7 @@ def approve_join_request_route(
 def reject_join_request_route(
     league_id: str,
     request_id: str,
-    user=Depends(require_entitled),
+    user=Depends(require_purchased),
 ):
     try:
         return reject_join_request(league_id, user["user_id"], request_id)
@@ -809,7 +809,7 @@ def reject_join_request_route(
 
 
 @router.post("/{league_id}/members/assign", response_model=Dict[str, Any])
-def assign_team_route(league_id: str, body: AssignTeamBody, user=Depends(require_entitled)):
+def assign_team_route(league_id: str, body: AssignTeamBody, user=Depends(require_purchased)):
     try:
         return assign_team_to_member(
             league_id,
@@ -825,7 +825,7 @@ def assign_team_route(league_id: str, body: AssignTeamBody, user=Depends(require
 
 
 @router.post("/{league_id}/members/assign-by-email", response_model=Dict[str, Any])
-def assign_team_by_email_route(league_id: str, body: AssignByEmailBody, user=Depends(require_entitled)):
+def assign_team_by_email_route(league_id: str, body: AssignByEmailBody, user=Depends(require_purchased)):
     try:
         return assign_team_by_email(
             league_id,
@@ -845,7 +845,7 @@ def reset_pin_route(
     league_id: str,
     target_user_id: str,
     body: ResetPinBody,
-    user=Depends(require_entitled),
+    user=Depends(require_purchased),
 ):
     try:
         return reset_member_pin(
@@ -861,7 +861,7 @@ def reset_pin_route(
 
 
 @router.post("/{league_id}/members/{target_user_id}/vacate", response_model=Dict[str, Any])
-def vacate_team_route(league_id: str, target_user_id: str, user=Depends(require_entitled)):
+def vacate_team_route(league_id: str, target_user_id: str, user=Depends(require_purchased)):
     try:
         return vacate_team_member(league_id, user["user_id"], target_user_id)
     except PermissionError as e:
@@ -871,7 +871,7 @@ def vacate_team_route(league_id: str, target_user_id: str, user=Depends(require_
 
 
 @router.delete("/{league_id}/members/{target_user_id}", response_model=Dict[str, Any])
-def remove_member_route(league_id: str, target_user_id: str, user=Depends(require_entitled)):
+def remove_member_route(league_id: str, target_user_id: str, user=Depends(require_purchased)):
     try:
         return remove_league_member(league_id, user["user_id"], target_user_id)
     except PermissionError as e:
@@ -881,7 +881,7 @@ def remove_member_route(league_id: str, target_user_id: str, user=Depends(requir
 
 
 @router.delete("/{league_id}/invites/{invite_id}", response_model=Dict[str, Any])
-def revoke_invite_route(league_id: str, invite_id: str, user=Depends(require_entitled)):
+def revoke_invite_route(league_id: str, invite_id: str, user=Depends(require_purchased)):
     try:
         return revoke_league_invite(league_id, user["user_id"], invite_id)
     except PermissionError as e:

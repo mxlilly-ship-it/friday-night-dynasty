@@ -173,8 +173,20 @@
     .game-btn:active { transform: scale(0.97); }
 
     .btn-row--purchase {
+      flex-direction: column;
+      align-items: center;
       margin-top: clamp(10px, 1.8vh, 18px);
       animation: fadeUp 1.4s .62s cubic-bezier(.16,1,.3,1) both;
+    }
+
+    .demo-note {
+      margin: 0 0 clamp(8px, 1.2vh, 12px);
+      font-family: 'EB Garamond', serif;
+      font-style: italic;
+      font-size: clamp(13px, 1.35vw, 16px);
+      color: rgba(245, 240, 232, 0.72);
+      letter-spacing: 0.04em;
+      text-align: center;
     }
 
     .game-btn--small {
@@ -326,6 +338,7 @@
         </button>
       </div>
       <div class="btn-row btn-row--purchase">
+        <p class="demo-note">One season free — purchase to continue your dynasty.</p>
         <button class="game-btn game-btn--small" id="btn-purchase" onclick="startPurchase()">
           <span class="fill"></span>Purchase
         </button>

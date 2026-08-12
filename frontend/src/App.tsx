@@ -211,7 +211,12 @@ export default function App({ devNoFirebase = false }: AppProps) {
   const [backupPromptReason, setBackupPromptReason] = useState('')
   const [showTrialPurchaseModal, setShowTrialPurchaseModal] = useState(false)
   const inLocalRuntime = Boolean(localBundle) && (isBrowserSaveId(saveId) || isMultiplayerSaveId(saveId))
-  const needsBillingPurchase = Boolean(billingStatus?.billing_required && !billingStatus?.entitled)
+  const needsBillingPurchase = Boolean(
+    billingStatus?.billing_required && !billingStatus?.entitled && !billingStatus?.trial_available,
+  )
+  const onFreeTrial = Boolean(
+    billingStatus?.billing_required && !billingStatus?.entitled && billingStatus?.trial_available,
+  )
   const supportDefaultEmail = useMemo(() => {
     const em = email.trim()
     if (em) return em
@@ -2772,10 +2777,13 @@ export default function App({ devNoFirebase = false }: AppProps) {
               className="fnd-panel"
               style={{ width: 'min(520px, 100%)', margin: 0, border: '1px solid #3d4654' }}
             >
-              <h2 style={{ marginTop: 0 }}>Purchase required</h2>
+              <h2 style={{ marginTop: 0 }}>
+                {billingStatus?.trial_completed ? 'Season complete!' : 'Purchase required'}
+              </h2>
               <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
-                A one-time purchase unlocks Friday Night Dynasty for your account — full dynasty play with no season
-                limit.
+                {billingStatus?.trial_completed
+                  ? "You've finished your free season — from preseason through schedule release. Purchase once to continue your dynasty into year two and beyond."
+                  : 'A one-time purchase unlocks Friday Night Dynasty for your account — full dynasty play with no season limit. Your first season is free.'}
               </p>
               <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.82rem', lineHeight: 1.45 }}>
                 {REFUND_POLICY_SHORT}
@@ -2810,7 +2818,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
                 style={{ marginTop: 12, maxWidth: '100%' }}
                 onClick={() => setShowTrialPurchaseModal(false)}
               >
-                Close
+                {billingStatus?.trial_completed ? 'Keep browsing schedule' : 'Close'}
               </button>
               <button
                 type="button"
@@ -2886,7 +2894,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
           <iframe
             className="fnd-title-iframe"
             title="Friday Night Dynasty"
-            src={`${import.meta.env.BASE_URL}fnd_homepage.html?v=20260728a`}
+            src={`${import.meta.env.BASE_URL}fnd_homepage.html?v=20260812a`}
           />
           <button
             type="button"
@@ -3092,7 +3100,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
             </button>
             <h2>Purchase</h2>
             <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
-              Sign in, then complete secure checkout to unlock Friday Night Dynasty for your account.
+              Sign in, then complete secure checkout to unlock the full game after your free season.
             </p>
             <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.82rem', lineHeight: 1.45 }}>
               {REFUND_POLICY_SHORT}
@@ -3176,7 +3184,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
             </button>
             <h2>Purchase</h2>
             <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
-              One-time purchase unlocks full dynasty access for{' '}
+              One-time purchase unlocks year two and beyond for{' '}
               <strong style={{ color: '#d0d4dc' }}>{username}</strong>.
             </p>
             <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.82rem', lineHeight: 1.45 }}>
@@ -3241,7 +3249,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
             <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
               {devNoFirebase
                 ? 'Local dev mode: enter a coach name (no Firebase). Dynasties save in this browser and on the API when you create a save.'
-                : 'Log in to create a new dynasty. A one-time purchase is required to play.'}
+                : 'Log in to create a new dynasty. Your first full season is free — purchase to continue after schedule release.'}
             </p>
             {devNoFirebase ? (
               <div className="fnd-login-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
@@ -3340,8 +3348,9 @@ export default function App({ devNoFirebase = false }: AppProps) {
             </button>
             <h2>Unlock Friday Night Dynasty</h2>
             <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
-              Purchase once to unlock full dynasty access for{' '}
-              <strong style={{ color: '#d0d4dc' }}>{username}</strong>.
+              You&apos;ve used your free season on{' '}
+              <strong style={{ color: '#d0d4dc' }}>{username}</strong>. Purchase once to continue your dynasty and
+              start new saves.
             </p>
             <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.82rem', lineHeight: 1.45 }}>
               {REFUND_POLICY_SHORT}
@@ -3381,6 +3390,19 @@ export default function App({ devNoFirebase = false }: AppProps) {
           </div>
         ) : screen === 'new' && token ? (
           <>
+            {onFreeTrial ? (
+              <p
+                style={{
+                  margin: '0 0 1rem',
+                  color: '#9ca3af',
+                  fontSize: '0.9rem',
+                  maxWidth: 560,
+                }}
+              >
+                Your <strong style={{ color: '#d0d4dc' }}>first full season is free</strong> — preseason through
+                schedule release. Purchase afterward to continue into year two.
+              </p>
+            ) : null}
             <NewSaveFlow
             apiBase={API_BASE}
             headers={headers}

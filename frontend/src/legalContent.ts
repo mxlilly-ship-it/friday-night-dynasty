@@ -35,7 +35,7 @@ export const TERMS_OF_SERVICE: LegalDocument = {
       title: '2. Description of Service',
       paragraphs: [
         'Friday Night Dynasty is a browser-based football simulation game that allows users to manage teams, simulate games, and interact with game data. The Game is currently in beta, and features may change at any time.',
-        'Full access requires a one-time purchase. We reserve the right to modify, suspend, or discontinue the Game at any time without notice.',
+        'You may play one single-player season for free. Continuing into year two and joining multiplayer leagues requires a one-time purchase. We reserve the right to modify, suspend, or discontinue the Game at any time without notice.',
       ],
     },
     {
@@ -63,7 +63,7 @@ export const TERMS_OF_SERVICE: LegalDocument = {
     {
       title: '5. Purchases & Refunds',
       paragraphs: [
-        'Friday Night Dynasty is sold as a one-time purchase that unlocks full access for your account.',
+        'Friday Night Dynasty is sold as a one-time purchase that unlocks full access for your account after the free season.',
         'If you are not satisfied, you may request a full refund within 5 days of purchase by emailing mxlilly@gmail.com or submitting a Refund request through in-game Help & support. Include the email used to purchase and the approximate purchase date.',
         'Approved refunds are processed through Stripe. After a refund, purchase entitlement is removed and you will need to buy again to continue playing.',
       ],

@@ -16,16 +16,16 @@ PAYMENT_REQUIRED_MESSAGE = (
     "Purchase required to play Friday Night Dynasty. Complete checkout to unlock your account."
 )
 
-# Kept for older clients that still key off TRIAL_COMPLETE after schedule release.
-TRIAL_COMPLETE_MESSAGE = PAYMENT_REQUIRED_MESSAGE
+TRIAL_COMPLETE_MESSAGE = (
+    "Your free season is complete. Purchase Friday Night Dynasty to continue your dynasty."
+)
 
 
 class TrialSeasonCompleteError(Exception):
-    """Raised when a non-entitled user hits a paid-only action (legacy name)."""
+    """Non-entitled user reached the end of the one free season (Schedule Release → year 2)."""
 
 
 def user_trial_completed(user_id: str) -> bool:
-    """Legacy flag — no longer grants free play; retained for status/reporting."""
     user_id = str(user_id or "").strip()
     if not user_id:
         return False
@@ -51,39 +51,44 @@ def mark_trial_completed(user_id: str) -> None:
 
 
 def user_can_play(user_id: str) -> bool:
-    """True when billing is off, or the user has purchased."""
+    """Full purchase, or one free season not yet finished."""
     if not billing_required():
         return True
-    return user_is_entitled(user_id)
+    if user_is_entitled(user_id):
+        return True
+    return not user_trial_completed(user_id)
 
 
 def check_trial_before_year2_preseason(user_id: Optional[str]) -> None:
     """
-    Safety gate before year-2 preseason.
-    Purchase is required for all play when billing is on; this remains as a belt-and-suspenders check.
+    Block advancing past Schedule Release for non-purchasers.
+    Marks the account trial complete on first block.
     """
     if not billing_required():
         return
     uid = str(user_id or "").strip()
     if not uid:
         raise TrialSeasonCompleteError(
-            PAYMENT_REQUIRED_MESSAGE + " Sign in with your account to continue."
+            TRIAL_COMPLETE_MESSAGE + " Sign in with your account to continue."
         )
     if user_is_entitled(uid):
         return
     mark_trial_completed(uid)
-    raise TrialSeasonCompleteError(PAYMENT_REQUIRED_MESSAGE)
+    raise TrialSeasonCompleteError(TRIAL_COMPLETE_MESSAGE)
 
 
 def trial_complete_http_detail(message: Optional[str] = None) -> Dict[str, Any]:
     return {
-        "code": "PAYMENT_REQUIRED",
-        "message": message or PAYMENT_REQUIRED_MESSAGE,
+        "code": "TRIAL_COMPLETE",
+        "message": message or TRIAL_COMPLETE_MESSAGE,
     }
 
 
 def payment_required_http_detail(message: Optional[str] = None) -> Dict[str, Any]:
-    return trial_complete_http_detail(message)
+    return {
+        "code": "PAYMENT_REQUIRED",
+        "message": message or PAYMENT_REQUIRED_MESSAGE,
+    }
 
 
 def user_is_entitled(user_id: str) -> bool:
@@ -115,7 +120,7 @@ def get_entitlement_status(user_id: str) -> Dict[str, Any]:
             "entitled": False,
             "purchased_at": None,
             "trial_completed": False,
-            "trial_available": False,
+            "trial_available": billing_required(),
         }
     entitled = bool(int(row["entitlement_active"] or 0))
     trial_done = user_trial_completed(user_id)
@@ -124,8 +129,7 @@ def get_entitlement_status(user_id: str) -> Dict[str, Any]:
         "purchased_at": int(row["purchased_at"]) if row["purchased_at"] else None,
         "stripe_customer_id": row["stripe_customer_id"] or None,
         "trial_completed": trial_done,
-        # Free season removed — purchase required when billing is enabled.
-        "trial_available": False,
+        "trial_available": billing_required() and not entitled and not trial_done,
     }
 
 
