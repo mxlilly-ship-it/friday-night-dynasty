@@ -1011,6 +1011,64 @@ def _sync_mp_inbox_emails_for_human_teams(
     state.pop("coach_inbox", None)
 
 
+def _equipment_item_ids(rows: Any) -> set[str]:
+    out: set[str] = set()
+    if not isinstance(rows, list):
+        return out
+    for row in rows:
+        if isinstance(row, dict):
+            iid = str(row.get("item_id") or row.get("id") or "").strip()
+            if iid:
+                out.add(iid)
+    return out
+
+
+def _merge_team_program_fields(
+    canonical_row: Dict[str, Any],
+    incoming_row: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Keep owned equipment when a stale coach save omits or drops program inventory."""
+    import copy
+
+    merged = copy.deepcopy(incoming_row)
+    can_eq = canonical_row.get("program_equipment")
+    inc_eq = incoming_row.get("program_equipment")
+    can_ids = _equipment_item_ids(can_eq)
+    inc_ids = _equipment_item_ids(inc_eq)
+    if not isinstance(inc_eq, list):
+        if isinstance(can_eq, list):
+            merged["program_equipment"] = copy.deepcopy(can_eq)
+        if incoming_row.get("program_funding_balance") is None and canonical_row.get("program_funding_balance") is not None:
+            merged["program_funding_balance"] = canonical_row.get("program_funding_balance")
+        if incoming_row.get("program_last_funding_income") is None and canonical_row.get(
+            "program_last_funding_income"
+        ) is not None:
+            merged["program_last_funding_income"] = canonical_row.get("program_last_funding_income")
+        return merged
+    lost = can_ids - inc_ids
+    if lost:
+        by_id: Dict[str, Dict[str, Any]] = {}
+        if isinstance(can_eq, list):
+            for row in can_eq:
+                if isinstance(row, dict):
+                    iid = str(row.get("item_id") or row.get("id") or "").strip()
+                    if iid:
+                        by_id[iid] = copy.deepcopy(row)
+        for row in inc_eq:
+            if isinstance(row, dict):
+                iid = str(row.get("item_id") or row.get("id") or "").strip()
+                if iid:
+                    by_id[iid] = copy.deepcopy(row)
+        merged["program_equipment"] = list(by_id.values())
+        try:
+            can_bal = int(canonical_row.get("program_funding_balance") or 0)
+            inc_bal = int(incoming_row.get("program_funding_balance") or 0)
+            merged["program_funding_balance"] = min(can_bal, inc_bal)
+        except (TypeError, ValueError):
+            pass
+    return merged
+
+
 def _merge_coach_state_into_canonical(
     canonical: Dict[str, Any],
     incoming: Dict[str, Any],
@@ -1033,7 +1091,7 @@ def _merge_coach_state_into_canonical(
         replaced = False
         for row in out.get("teams") or []:
             if isinstance(row, dict) and str(row.get("name") or "") == team_name:
-                kept.append(copy.deepcopy(inc_teams[team_name]))
+                kept.append(_merge_team_program_fields(row, inc_teams[team_name]))
                 replaced = True
             elif isinstance(row, dict):
                 kept.append(copy.deepcopy(row))
@@ -1176,6 +1234,29 @@ def _merge_coach_state_into_canonical(
         canon_picks = copy.deepcopy(canon_picks)
         canon_picks[team_name] = copy.deepcopy(inc_picks[team_name])
         out["cross_region_picks"] = canon_picks
+
+    inc_year = incoming.get("program_development_prepared_year")
+    if inc_year is not None:
+        try:
+            out["program_development_prepared_year"] = max(
+                int(out.get("program_development_prepared_year") or 0),
+                int(inc_year or 0),
+            )
+        except (TypeError, ValueError):
+            pass
+
+    pending_root = out.get("multiplayer_program_dev_pending_by_team")
+    if not isinstance(pending_root, dict):
+        pending_root = {}
+    pending_root = copy.deepcopy(pending_root)
+    inc_pending_map = incoming.get("multiplayer_program_dev_pending_by_team")
+    if isinstance(inc_pending_map, dict) and team_name in inc_pending_map:
+        pending_root[team_name] = copy.deepcopy(inc_pending_map[team_name])
+    inc_pending = incoming.get("program_development_pending_actions")
+    if isinstance(inc_pending, list):
+        pending_root[team_name] = copy.deepcopy(inc_pending)
+    if pending_root:
+        out["multiplayer_program_dev_pending_by_team"] = pending_root
 
     out["multiplayer_league"] = True
     mp = out.get("multiplayer") if isinstance(out.get("multiplayer"), dict) else {}

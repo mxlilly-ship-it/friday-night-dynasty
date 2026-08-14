@@ -4360,6 +4360,21 @@ function TeamHomePageBody({
     }
   }, [phase, offseasonCurrentStage])
 
+  const flushMpPrepAndSubmitWeek = async () => {
+    if (!onSubmitWeek) return
+    if (
+      isMultiplayerLeague &&
+      phase === 'offseason' &&
+      offseasonCurrentStage === 'Program Development' &&
+      programDevPendingActions.length
+    ) {
+      const ok = await onSimWeek({ offseasonBody: { program_development_actions: programDevPendingActions } })
+      if (ok === false) return
+      setProgramDevPendingActions([])
+    }
+    await onSubmitWeek()
+  }
+
   const coachDevBank = saveState?.offseason_coach_dev_bank
   const coachDevTotalCp = Number(coachDevBank?.cp_total ?? 0)
   const coachDevAllocatedCp = COACH_DEV_SKILLS.reduce((sum, { key }) => sum + Number(coachDevAllocations[key] ?? 0), 0)
@@ -5345,7 +5360,10 @@ function TeamHomePageBody({
                       ? { seven_on_seven_ack_results: true }
                       : { seven_on_seven_tournament: sevenOnSevenTier }
                   }
-                  await onSimWeek({ offseasonBody })
+                  const ok = await onSimWeek({ offseasonBody })
+                  if (ok !== false && offseasonCurrentStage === 'Program Development') {
+                    setProgramDevPendingActions([])
+                  }
                 } else if (phase === 'preseason' && isPositionChangesStage) {
                   const t = findTeam(saveState, userTeam)
                   const roster = t?.roster ?? []
@@ -5460,7 +5478,7 @@ function TeamHomePageBody({
               type="button"
               className="teamhome-select"
               disabled={submitWeekBusy}
-              onClick={() => void onSubmitWeek()}
+              onClick={() => void flushMpPrepAndSubmitWeek()}
               title="Submit your prep for this week"
             >
               {submitWeekBusy ? 'Submitting…' : 'Submit week'}
@@ -6725,8 +6743,8 @@ function TeamHomePageBody({
                   <>
                     <div className="teamhome-preseason-title">Program development</div>
                     <div className="teamhome-preseason-sub" style={{ marginTop: 8, maxWidth: 860 }}>
-                      Invest annual funding in equipment and facilities. Purchases apply when you press Continue; CPU schools
-                      shop automatically afterward.
+                      Invest annual funding in equipment and facilities. Purchases apply when you press Continue
+                      {isMultiplayerLeague ? ' or Submit week' : ''}; CPU schools shop automatically afterward.
                     </div>
                     <div style={{ marginTop: 14, width: '100%', maxWidth: 980 }}>
                       <ProgramDevelopmentPanel

@@ -2421,6 +2421,35 @@ def _ensure_program_development_inventory_aged(state: Dict[str, Any], teams: Dic
         state["program_development_last_expired"] = expired_rows[-20:]
 
 
+def _mp_program_dev_pending_by_team(state: Dict[str, Any]) -> Dict[str, Any]:
+    raw = state.get("multiplayer_program_dev_pending_by_team")
+    if not isinstance(raw, dict):
+        raw = {}
+        state["multiplayer_program_dev_pending_by_team"] = raw
+    return raw
+
+
+def _apply_pending_mp_program_dev_actions(
+    state: Dict[str, Any],
+    teams: Dict[str, Any],
+    *,
+    current_year: int,
+    skip_team: Optional[str] = None,
+) -> None:
+    pending = state.get("multiplayer_program_dev_pending_by_team")
+    if not isinstance(pending, dict):
+        return
+    skip = str(skip_team or "").strip()
+    for name, actions in pending.items():
+        team_name = str(name or "").strip()
+        if not team_name or team_name == skip:
+            continue
+        t = teams.get(team_name)
+        if t is None or not isinstance(actions, list) or not actions:
+            continue
+        apply_user_program_actions(t, actions, current_year=current_year)
+
+
 def _apply_program_development_stage(
     state: Dict[str, Any],
     teams: Dict[str, Any],
@@ -2434,8 +2463,13 @@ def _apply_program_development_stage(
     cy = int(state.get("current_year", 1) or 1)
     ut = teams.get(user_team_name) if user_team_name else None
     raw_actions = body.get("program_development_actions")
+    if not isinstance(raw_actions, list) or not raw_actions:
+        raw_actions = body.get("program_development_pending_actions")
     if ut and isinstance(raw_actions, list) and raw_actions:
         apply_user_program_actions(ut, raw_actions, current_year=cy)
+        if is_multiplayer_league_state(state):
+            _mp_program_dev_pending_by_team(state)[user_team_name] = copy.deepcopy(raw_actions)
+    _apply_pending_mp_program_dev_actions(state, teams, current_year=cy, skip_team=user_team_name)
     humans = mp_human_teams if mp_human_teams is not None else set()
     submitted = mp_submitted_teams if mp_submitted_teams is not None else set()
     mp = is_multiplayer_league_state(state)
@@ -2451,6 +2485,8 @@ def _apply_program_development_stage(
                 # Commish advance: humans who submitted already saved their shop cart.
                 continue
         run_ai_program_purchases(t, current_year=cy)
+    if mp and not user_team_name:
+        state["multiplayer_program_dev_pending_by_team"] = {}
 
 
 def normalize_offseason_stages(state: Dict[str, Any]) -> bool:
