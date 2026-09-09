@@ -317,6 +317,18 @@ def create_app() -> FastAPI:
                 return FileResponse(p)
             raise HTTPException(status_code=404)
 
+        @app.get("/ads.txt")
+        def spa_ads_txt():
+            """Authorized sellers for AdSense crawlers (must be at site root)."""
+            p = dist / "ads.txt"
+            if p.is_file():
+                return FileResponse(
+                    p,
+                    media_type="text/plain; charset=utf-8",
+                    headers={"Cache-Control": "public, max-age=3600"},
+                )
+            raise HTTPException(status_code=404)
+
         @app.get("/fnd-landing.png")
         def spa_landing_image():
             p = dist / "fnd-landing.png"
