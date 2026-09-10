@@ -31,11 +31,11 @@ def billing_checkout_configured() -> bool:
 def billing_required() -> bool:
     """
     When True, game APIs require an active purchase.
-    Defaults to True if Stripe checkout is configured, unless FND_BILLING_REQUIRED=0.
+    Defaults to False (game is free). Set FND_BILLING_REQUIRED=1 to re-enable paywall.
     """
     if not billing_checkout_configured():
         return False
-    return _truthy("FND_BILLING_REQUIRED", default=True)
+    return _truthy("FND_BILLING_REQUIRED", default=False)
 
 
 def billing_success_url(request_base: str) -> str:

@@ -38,6 +38,7 @@ import SupportContactModal from './SupportContactModal'
 import { getOrCreateDeviceId } from './deviceId.js'
 import { confirmCheckoutSession, createCheckoutSession, fetchBillingStatus, parseApiError, syncBillingAccess as syncBillingAccessApi, type BillingStatus } from './billing'
 import { REFUND_POLICY_SHORT } from './legalContent'
+import { TIP_JAR_URL } from './tipJar'
 import MultiplayerLeaguesPage from './MultiplayerLeaguesPage'
 import LeagueDashboardPage from './LeagueDashboardPage'
 import CommishDashboardPage from './CommishDashboardPage'
@@ -301,6 +302,8 @@ export default function App({ devNoFirebase = false }: AppProps) {
     if (!token) return EMPTY_AUTH_HEADERS
     return { Authorization: `Bearer ${token}` }
   }, [token])
+
+  const getLiveSaveState = useCallback(() => saveStateRef.current, [])
 
   const persistCurrentBrowserSave = useCallback(async () => {
     if (!localBundle) return
@@ -1654,6 +1657,10 @@ export default function App({ devNoFirebase = false }: AppProps) {
   async function onPurchaseClick() {
     setError('')
     setSuccessMessage('')
+    if (TIP_JAR_URL) {
+      window.open(TIP_JAR_URL, '_blank', 'noopener,noreferrer')
+      return
+    }
     if (!token) {
       setScreen('purchase')
       return
@@ -1670,20 +1677,36 @@ export default function App({ devNoFirebase = false }: AppProps) {
       return
     }
     if (status && !status.billing_required) {
-      setSuccessMessage('Purchase is not required on this server.')
+      setSuccessMessage(
+        'The game is free to play. Set VITE_TIP_JAR_URL on the build if you want Tip jar to open a different donation link.',
+      )
       setScreen('purchase')
       return
     }
     await startCheckout()
   }
 
+  function onTipClick() {
+    setError('')
+    setSuccessMessage('')
+    if (TIP_JAR_URL) {
+      window.open(TIP_JAR_URL, '_blank', 'noopener,noreferrer')
+      return
+    }
+    setSuccessMessage(
+      'Thanks for wanting to support FND. Tip jar link is not configured yet — use Help & support, or set VITE_TIP_JAR_URL.',
+    )
+    setShowSupportContact(true)
+  }
+
   const titleNavRef = useRef({
     onNewSaveClick,
     onLoadSaveClick,
     onPurchaseClick,
+    onTipClick,
     onMultiplayerClick: () => setScreen('multiplayer'),
   })
-  titleNavRef.current = { onNewSaveClick, onLoadSaveClick, onPurchaseClick, onMultiplayerClick }
+  titleNavRef.current = { onNewSaveClick, onLoadSaveClick, onPurchaseClick, onTipClick, onMultiplayerClick }
 
   useEffect(() => {
     if (screen !== 'title') setShowScreenshotsGallery(false)
@@ -1696,7 +1719,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
       if (!d || d.type !== 'fnd-title') return
       if (d.action === 'new') void titleNavRef.current.onNewSaveClick()
       else if (d.action === 'load') void titleNavRef.current.onLoadSaveClick()
-      else if (d.action === 'purchase') void titleNavRef.current.onPurchaseClick()
+      else if (d.action === 'purchase' || d.action === 'tip') titleNavRef.current.onTipClick()
       else if (d.action === 'multiplayer') void titleNavRef.current.onMultiplayerClick()
       else if (d.action === 'screenshots') setShowScreenshotsGallery(true)
       else if (d.action === 'support') setShowSupportContact(true)
@@ -1920,7 +1943,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
     if (!token) return
     const data = await fetchLeagueDashboard(API_BASE, headers, leagueId, teamName ?? undefined)
     setMpDashboard(data)
-    setMpCommishDashboard(null)
+    // Keep commish dashboard mounted so admin/commish can return from League Hub.
     setScreen('league_dashboard')
     setError('')
   }
@@ -2317,6 +2340,11 @@ export default function App({ devNoFirebase = false }: AppProps) {
           headers={token ? headers : EMPTY_AUTH_HEADERS}
           onBack={goTitle}
           onOpenLeague={onOpenMultiplayerLeague}
+          onOpenLeagueHub={(league) => {
+            void loadLeagueDashboard(league.league_id, null).catch((e: unknown) =>
+              setError(e instanceof Error ? e.message : 'Failed to open league hub'),
+            )
+          }}
           onCreateLeague={() => setScreen('multiplayer_create')}
         />
         {successMessage ? (
@@ -2363,7 +2391,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
               ) : (
                 <>
                   <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
-                    Log in with the email your commissioner invited. Purchase is required to join a league.
+                    Log in with the email your commissioner invited. Multiplayer is free to join.
                   </p>
                   <div className="fnd-login-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
                     <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" />
@@ -2571,14 +2599,10 @@ export default function App({ devNoFirebase = false }: AppProps) {
             await rejectJoinRequest(API_BASE, headers, mpCommishDashboard.league_id, requestId)
           }}
           hasCoachTeam={Boolean(coachTeam)}
-          onOpenLeagueHub={
-            coachTeam
-              ? () => {
-                  setMpPendingLeague(leagueForCoachAccess)
-                  void loadLeagueDashboard(mpCommishDashboard.league_id, coachTeam)
-                }
-              : undefined
-          }
+          onOpenLeagueHub={() => {
+            if (coachTeam) setMpPendingLeague(leagueForCoachAccess)
+            void loadLeagueDashboard(mpCommishDashboard.league_id, coachTeam)
+          }}
           onOpenMyDynasty={
             coachTeam
               ? () =>
@@ -2613,9 +2637,15 @@ export default function App({ devNoFirebase = false }: AppProps) {
           data={mpDashboard}
           onBack={() => {
             setMpDashboard(null)
-            setScreen('multiplayer')
+            if (mpCommishDashboard?.league_id === mpDashboard.league_id) {
+              setScreen('commish_dashboard')
+            } else {
+              setScreen('multiplayer')
+            }
           }}
-          onOpenCoachDashboard={() => void openMultiplayerDynasty()}
+          onOpenCoachDashboard={
+            mpDashboard.acting_team_name ? () => void openMultiplayerDynasty() : undefined
+          }
           coachDashBusy={mpCoachDashBusy}
           onSubmitWeek={showSubmitControls ? () => void onMultiplayerSubmitWeek() : undefined}
           onUnsubmitWeek={showSubmitControls ? () => void onMultiplayerUnsubmitWeek() : undefined}
@@ -2673,7 +2703,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
               saveState={saveState}
               onMainMenu={goTitle}
               onSimWeek={simWeek}
-              getLiveSaveState={() => saveStateRef.current}
+              getLiveSaveState={getLiveSaveState}
               onSaveState={patchSaveState}
               onError={setError}
               backupReminderFrequency={backupReminderFrequency}
@@ -2894,7 +2924,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
           <iframe
             className="fnd-title-iframe"
             title="Friday Night Dynasty"
-            src={`${import.meta.env.BASE_URL}fnd_homepage.html?v=20260812a`}
+            src={`${import.meta.env.BASE_URL}fnd_homepage.html?v=20260909a`}
           />
           <button
             type="button"
@@ -3098,9 +3128,9 @@ export default function App({ devNoFirebase = false }: AppProps) {
             <button type="button" className="fnd-back" onClick={goTitle}>
               ← Back
             </button>
-            <h2>Purchase</h2>
+            <h2>Tip jar</h2>
             <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
-              Sign in, then complete secure checkout to unlock the full game after your free season.
+              The game is free. Tips are optional and help keep Friday Night Dynasty going.
             </p>
             <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.82rem', lineHeight: 1.45 }}>
               {REFUND_POLICY_SHORT}
@@ -3182,10 +3212,11 @@ export default function App({ devNoFirebase = false }: AppProps) {
             <button type="button" className="fnd-back" onClick={goTitle}>
               ← Back
             </button>
-            <h2>Purchase</h2>
+            <h2>Tip jar</h2>
             <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
-              One-time purchase unlocks year two and beyond for{' '}
-              <strong style={{ color: '#d0d4dc' }}>{username}</strong>.
+              {TIP_JAR_URL
+                ? `Thanks for supporting Friday Night Dynasty, ${username}.`
+                : `The game is free for ${username}. Tip jar link is not configured yet.`}
             </p>
             <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.82rem', lineHeight: 1.45 }}>
               {REFUND_POLICY_SHORT}
@@ -3197,9 +3228,21 @@ export default function App({ devNoFirebase = false }: AppProps) {
                 This account already has full access.
               </p>
             ) : billingStatus && !billingStatus.billing_required ? (
-              <p style={{ color: '#9ca3af', fontSize: '0.9rem', margin: 0 }}>
-                Purchase is not required on this server.
-              </p>
+              <div>
+                <p style={{ color: '#9ca3af', fontSize: '0.9rem', margin: '0 0 1rem' }}>
+                  The game is free to play. Tips are optional.
+                </p>
+                {TIP_JAR_URL ? (
+                  <button
+                    type="button"
+                    className="fnd-title-btn"
+                    style={{ maxWidth: '100%' }}
+                    onClick={() => window.open(TIP_JAR_URL, '_blank', 'noopener,noreferrer')}
+                  >
+                    Open tip jar
+                  </button>
+                ) : null}
+              </div>
             ) : (
               <>
                 <button
@@ -3249,7 +3292,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
             <p style={{ margin: '0 0 1rem', color: '#9ca3af', fontSize: '0.9rem' }}>
               {devNoFirebase
                 ? 'Local dev mode: enter a coach name (no Firebase). Dynasties save in this browser and on the API when you create a save.'
-                : 'Log in to create a new dynasty. Your first full season is free — purchase to continue after schedule release.'}
+                : 'Log in to create a new dynasty. The game is free to play.'}
             </p>
             {devNoFirebase ? (
               <div className="fnd-login-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
@@ -3399,8 +3442,8 @@ export default function App({ devNoFirebase = false }: AppProps) {
                   maxWidth: 560,
                 }}
               >
-                Your <strong style={{ color: '#d0d4dc' }}>first full season is free</strong> — preseason through
-                schedule release. Purchase afterward to continue into year two.
+                The game is <strong style={{ color: '#d0d4dc' }}>free to play</strong> — tip jar is optional if you
+                want to support development.
               </p>
             ) : null}
             <NewSaveFlow

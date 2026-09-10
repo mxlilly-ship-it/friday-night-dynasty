@@ -287,6 +287,86 @@
       line-height: 1.45;
       animation: fadeUp 2s .95s both;
     }
+  
+    /* FND mobile phone polish */
+    @media (max-width: 720px) {
+      html, body {
+        overflow-x: hidden;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      #hero {
+        min-height: 100vh;
+        min-height: 100dvh;
+        height: auto;
+        align-items: flex-end;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+      }
+      #bg {
+        background-position: center 22%;
+      }
+      #panel {
+        width: 100%;
+        padding: 0 16px calc(88px + env(safe-area-inset-bottom, 0px));
+        box-sizing: border-box;
+      }
+      h1 {
+        font-size: clamp(28px, 9vw, 42px);
+        padding: 0 8px;
+      }
+      .sub {
+        letter-spacing: 0.28em;
+        font-size: 11px;
+      }
+      .btn-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+        width: 100%;
+        max-width: 320px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .game-btn,
+      .game-btn--wide,
+      .game-btn--small {
+        width: 100%;
+        min-height: 48px;
+        letter-spacing: 0.18em;
+        font-size: 16px;
+        padding: 14px 18px;
+      }
+      .game-btn:hover { color: var(--cream); }
+      .game-btn:active {
+        color: var(--dark);
+      }
+      .game-btn:active .fill {
+        opacity: 1;
+        transform: scaleX(1);
+      }
+      .social-links {
+        position: static;
+        justify-content: center;
+        width: 100%;
+        margin: 18px auto 8px;
+        padding: 0 12px;
+        order: 2;
+      }
+      .social-link--discord {
+        font-size: 15px;
+        min-height: 44px;
+      }
+      .beta-disclaimer {
+        position: static;
+        max-width: none;
+        width: 100%;
+        text-align: center;
+        margin: 8px auto 16px;
+        font-size: 11px;
+        padding: 0 16px;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -338,9 +418,9 @@
         </button>
       </div>
       <div class="btn-row btn-row--purchase">
-        <p class="demo-note">One season free — purchase to continue your dynasty.</p>
-        <button class="game-btn game-btn--small" id="btn-purchase" onclick="startPurchase()">
-          <span class="fill"></span>Purchase
+        <p class="demo-note">Free to play — tips keep the lights on.</p>
+        <button class="game-btn game-btn--small" id="btn-purchase" onclick="startTip()">
+          <span class="fill"></span>Tip jar
         </button>
       </div>
     </div>
@@ -367,7 +447,8 @@
     function startMultiplayer() { fndPost('multiplayer'); }
     function showScreenshots() { fndPost('screenshots'); }
     function showSupport() { fndPost('support'); }
-    function startPurchase() { fndPost('purchase'); }
+    function startTip() { fndPost('tip'); }
+    function startPurchase() { fndPost('tip'); }
   </script>
 </body>
 </html>

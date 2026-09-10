@@ -2,7 +2,7 @@ export const SUPPORT_CONTACT_EMAIL = 'mxlilly@gmail.com'
 
 /** Shown on purchase screens and refund support form. */
 export const REFUND_POLICY_SHORT =
-  'One-time purchase. Request a full refund within 5 days of purchase by emailing mxlilly@gmail.com (or use Help & support → Refund request). Approved refunds are processed through Stripe and remove game access.'
+  'The game is free to play. Tips are optional. Past purchases: request a refund within 5 days by emailing mxlilly@gmail.com (or Help & support → Refund request).'
 
 export type LegalSection = {
   title: string
@@ -35,7 +35,7 @@ export const TERMS_OF_SERVICE: LegalDocument = {
       title: '2. Description of Service',
       paragraphs: [
         'Friday Night Dynasty is a browser-based football simulation game that allows users to manage teams, simulate games, and interact with game data. The Game is currently in beta, and features may change at any time.',
-        'You may play one single-player season for free. Continuing into year two and joining multiplayer leagues requires a one-time purchase. We reserve the right to modify, suspend, or discontinue the Game at any time without notice.',
+        'Friday Night Dynasty is free to play, including single-player dynasties and multiplayer leagues. Optional tips help support continued development. We reserve the right to modify, suspend, or discontinue the Game at any time without notice.',
       ],
     },
     {
@@ -61,11 +61,11 @@ export const TERMS_OF_SERVICE: LegalDocument = {
       subBullets: ['Violation may result in account suspension or termination.'],
     },
     {
-      title: '5. Purchases & Refunds',
+      title: '5. Tips, Purchases & Refunds',
       paragraphs: [
-        'Friday Night Dynasty is sold as a one-time purchase that unlocks full access for your account after the free season.',
-        'If you are not satisfied, you may request a full refund within 5 days of purchase by emailing mxlilly@gmail.com or submitting a Refund request through in-game Help & support. Include the email used to purchase and the approximate purchase date.',
-        'Approved refunds are processed through Stripe. After a refund, purchase entitlement is removed and you will need to buy again to continue playing.',
+        'Friday Night Dynasty is free to play. Tips and donations are optional and do not unlock extra features unless we clearly say otherwise.',
+        'If you previously purchased access, that purchase remains recognized for your account. For refund questions on a past purchase, email mxlilly@gmail.com or use Help & support within 5 days of the charge date.',
+        'Approved refunds for paid purchases are processed through Stripe. Tips through third-party tip jars follow that service’s own refund rules.',
       ],
     },
     {
