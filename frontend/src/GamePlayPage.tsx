@@ -137,6 +137,7 @@ type FetchOptionsOverride = {
   game?: unknown
   down?: number
   is_overtime?: boolean
+  possession?: 'home' | 'away'
   preservePlayId?: string | null
 }
 
@@ -168,8 +169,33 @@ function supplementFourthDownPlays(opts: PlayOptions, down: number, isOvertime: 
   return { ...opts, offense_plays: off, defense_plays: def }
 }
 
-function userPlayPool(opts: PlayOptions, userTeam: string): PlayOption[] {
-  const userOnOffense = userTeam === opts.offense_team
+function sameTeamName(a: string, b: string) {
+  return a.trim().toLowerCase() === b.trim().toLowerCase()
+}
+
+function userOnOffenseFromPossession(
+  userTeam: string,
+  homeTeam: string,
+  awayTeam: string,
+  possession: 'home' | 'away',
+): boolean {
+  return possession === 'home' ? sameTeamName(userTeam, homeTeam) : sameTeamName(userTeam, awayTeam)
+}
+
+/** Same side as the call sheet: options names first, then possession + home/away. */
+function userOnOffenseForOptions(
+  opts: PlayOptions,
+  userTeam: string,
+  homeTeam: string,
+  awayTeam: string,
+  possession: 'home' | 'away',
+): boolean {
+  if (sameTeamName(userTeam, opts.offense_team)) return true
+  if (sameTeamName(userTeam, opts.defense_team)) return false
+  return userOnOffenseFromPossession(userTeam, homeTeam, awayTeam, possession)
+}
+
+function userPlayPool(opts: PlayOptions, userOnOffense: boolean): PlayOption[] {
   return (userOnOffense ? opts.offense_plays : opts.defense_plays) as PlayOption[]
 }
 
@@ -254,7 +280,11 @@ export default function GamePlayPage({
   onContinue,
   onError,
 }: Props) {
-  const liveState = useCallback(() => getLiveSaveState?.() ?? saveState ?? {}, [getLiveSaveState, saveState])
+  const getLiveSaveStateRef = useRef(getLiveSaveState)
+  const saveStateRef = useRef(saveState)
+  getLiveSaveStateRef.current = getLiveSaveState
+  saveStateRef.current = saveState
+  const liveState = useCallback(() => getLiveSaveStateRef.current?.() ?? saveStateRef.current ?? {}, [])
   const [state, setState] = useState<GameState>(initialState)
   const [localGame, setLocalGame] = useState<any>(() => {
     const bundled = (initialState as { __game?: unknown })?.__game
@@ -265,6 +295,8 @@ export default function GamePlayPage({
   /** Call sheet column key for "PLAY TYPE" display (matches game_interface playType). */
   const [callsheetBucket, setCallsheetBucket] = useState<string>('')
   const [callsheetSide, setCallsheetSide] = useState<CallsheetSide>('offense')
+  /** Narrow screens: which call-sheet column is shown as a single list. */
+  const [mobileCallsheetBucket, setMobileCallsheetBucket] = useState<CallsheetBucket>('rushing')
   const [previousPlay, setPreviousPlay] = useState<string | null>(null)
   const [previousOpponentPlay, setPreviousOpponentPlay] = useState<string | null>(null)
   const [lastResult, setLastResult] = useState<string | null>(null)
@@ -274,19 +306,25 @@ export default function GamePlayPage({
   const [playFeed, setPlayFeed] = useState<string[]>([])
   const commentaryStripRef = useRef<HTMLDivElement>(null)
   const selectedPlayRef = useRef<PlayOption | null>(null)
+  const callsheetBucketRef = useRef('')
   const localGameRef = useRef<any>(null)
   const optionsRequestRef = useRef(0)
+  const onErrorRef = useRef(onError)
+  onErrorRef.current = onError
 
   useEffect(() => {
     selectedPlayRef.current = selectedPlay
   }, [selectedPlay])
 
   useEffect(() => {
+    callsheetBucketRef.current = callsheetBucket
+  }, [callsheetBucket])
+
+  useEffect(() => {
     localGameRef.current = localGame
   }, [localGame])
 
-  const sameTeam = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
-  const isUserOnOffense = state.possession === 'home' ? sameTeam(userTeam, homeTeam) : sameTeam(userTeam, awayTeam)
+  const isUserOnOffense = userOnOffenseFromPossession(userTeam, homeTeam, awayTeam, state.possession)
   const homeHasBall = state.possession === 'home'
   const awayHasBall = state.possession === 'away'
   const gameOver = !!state.ot_winner || (state.quarter > 4 && !state.is_overtime)
@@ -299,8 +337,10 @@ export default function GamePlayPage({
     const requestId = ++optionsRequestRef.current
     const down = override?.down ?? state.down
     const isOvertime = override?.is_overtime ?? !!state.is_overtime
-    const gamePayload = override?.game ?? localGameRef.current ?? localGame ?? {}
-    const preservePlayId = override?.preservePlayId ?? selectedPlayRef.current?.id ?? null
+    const possession = override?.possession ?? state.possession
+    const gamePayload = override?.game ?? localGameRef.current ?? {}
+    // Capture at start for explicit overrides; at completion prefer the latest user click.
+    const preservePlayIdAtStart = override?.preservePlayId ?? selectedPlayRef.current?.id ?? null
     try {
       const r = isLocalBundle
         ? await fetch(`${apiBase}/sim/game/options`, {
@@ -312,24 +352,34 @@ export default function GamePlayPage({
       if (!r.ok) throw new Error(await apiErrorMessage(r, 'Failed to load play options'))
       if (requestId !== optionsRequestRef.current) return
       const data = await r.json()
-      if (isLocalBundle && data.game) setLocalGame(data.game)
+      // Do not setLocalGame from options — serialize_game is a new object every time and
+      // would retrigger this fetch in a loop, resetting selection mid-click.
       let opts = data.options as PlayOptions
       opts = supplementFourthDownPlays(opts, down, isOvertime)
       if (requestId !== optionsRequestRef.current) return
       setOptions(opts)
-      const userOnOffense = userTeam === opts.offense_team
-      const plays = userPlayPool(opts, userTeam)
-      const nextPlay = resolveUserPlay(plays, preservePlayId, userOnOffense, down, isOvertime)
-      setSelectedPlay(nextPlay)
-      if (!preservePlayId || !nextPlay || nextPlay.id !== preservePlayId) {
-        setCallsheetBucket('')
+      const userOnOffense = userOnOffenseForOptions(opts, userTeam, homeTeam, awayTeam, possession)
+      const plays = userPlayPool(opts, userOnOffense)
+      const preferredId =
+        override?.preservePlayId !== undefined
+          ? override.preservePlayId
+          : (selectedPlayRef.current?.id ?? preservePlayIdAtStart)
+      const nextPlay = resolveUserPlay(plays, preferredId, userOnOffense, down, isOvertime)
+      const keptSamePlay = !!preferredId && !!nextPlay && nextPlay.id === preferredId
+      if (keptSamePlay) {
+        selectedPlayRef.current = nextPlay
+        setSelectedPlay(nextPlay)
+      } else {
+        selectedPlayRef.current = nextPlay
+        setSelectedPlay(nextPlay)
+        if (callsheetBucketRef.current) setCallsheetBucket('')
       }
       setCallsheetSide(userOnOffense ? 'offense' : 'defense')
     } catch (e: unknown) {
       if (requestId !== optionsRequestRef.current) return
-      onError(e instanceof Error ? e.message : 'Failed to load options')
+      onErrorRef.current(e instanceof Error ? e.message : 'Failed to load options')
     }
-  }, [apiBase, gameId, saveId, headers, userTeam, isLocalBundle, localGame, liveState, state.down, state.is_overtime, onError])
+  }, [apiBase, gameId, saveId, headers, userTeam, homeTeam, awayTeam, isLocalBundle, liveState, state.down, state.is_overtime, state.possession])
 
   useEffect(() => {
     if (!isLocalBundle) return
@@ -341,8 +391,10 @@ export default function GamePlayPage({
   }, [isLocalBundle, initialState, localGame])
 
   useEffect(() => {
-    if (!gameOver && (!isLocalBundle || localGame)) fetchOptions()
-  }, [gameId, saveId, gameOver, isLocalBundle, localGame, state.possession, state.down, state.ball_position, state.pending_pat, fetchOptions])
+    if (!gameOver && (!isLocalBundle || localGame)) void fetchOptions()
+    // Intentionally omit fetchOptions identity — refetch only when the down/situation changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
+  }, [gameId, saveId, gameOver, isLocalBundle, localGame, state.possession, state.down, state.ball_position, state.pending_pat])
 
   useEffect(() => {
     setCallsheetSide(isUserOnOffense ? 'offense' : 'defense')
@@ -462,7 +514,8 @@ export default function GamePlayPage({
         game: isLocalBundle ? data.game ?? localGame : undefined,
         down: data.state.down,
         is_overtime: !!data.state.is_overtime,
-        preservePlayId: selectedPlayRef.current?.id,
+        possession: data.state.possession,
+        preservePlayId: possessionChanged ? null : selectedPlayRef.current?.id,
       })
     } catch (e: unknown) {
       onError(e instanceof Error ? e.message : 'Play failed')
@@ -500,6 +553,7 @@ export default function GamePlayPage({
           game: isLocalBundle ? data.game ?? localGame : undefined,
           down: data.state.down,
           is_overtime: !!data.state.is_overtime,
+          possession: data.state.possession,
         })
       }
     } catch (e: unknown) {
@@ -546,6 +600,12 @@ export default function GamePlayPage({
     state.yards_to_go,
   ])
 
+  useEffect(() => {
+    const firstWithPlays =
+      CALLSHEET_BUCKET_ORDER.find((b) => (gridPlays[b] ?? []).length > 0) ?? CALLSHEET_BUCKET_ORDER[0]
+    setMobileCallsheetBucket((prev) => ((gridPlays[prev] ?? []).length > 0 ? prev : firstWithPlays))
+  }, [gridPlays])
+
   const tagClass: Record<string, string> = {
     base: 'tag-base',
     'red-zone': 'tag-red-zone',
@@ -570,6 +630,9 @@ export default function GamePlayPage({
     if (!canSelect) return
     const full = [...options.offense_plays, ...options.defense_plays].find((p) => p.id === row.id)
     if (!full) return
+    // Keep ref in sync immediately so an in-flight options refresh cannot clobber this click.
+    selectedPlayRef.current = full
+    callsheetBucketRef.current = bucket.toUpperCase()
     setSelectedPlay(full)
     setCallsheetBucket(bucket.toUpperCase())
   }
@@ -891,9 +954,32 @@ export default function GamePlayPage({
           </button>
         </div>
 
+        <div className="cs-mobile-buckets" role="tablist" aria-label="Play categories">
+          {CALLSHEET_BUCKET_ORDER.map((bucket) => {
+            const count = (gridPlays[bucket] ?? []).length
+            return (
+              <button
+                key={bucket}
+                type="button"
+                role="tab"
+                aria-selected={mobileCallsheetBucket === bucket}
+                className={`cs-mobile-bucket ${mobileCallsheetBucket === bucket ? 'active' : ''} ${callsheetHeaderClass(bucket)}`}
+                disabled={count === 0}
+                onClick={() => setMobileCallsheetBucket(bucket)}
+              >
+                {callsheetHeaderTitle(bucket, callsheetSide)}
+                <span className="cs-mobile-bucket-count">{count}</span>
+              </button>
+            )
+          })}
+        </div>
+
         <div className="callsheet-grid">
           {CALLSHEET_BUCKET_ORDER.map((bucket) => (
-            <div key={bucket} className="cs-category">
+            <div
+              key={bucket}
+              className={`cs-category${mobileCallsheetBucket === bucket ? ' cs-category--mobile-active' : ''}`}
+            >
               <div className={`cs-cat-header ${callsheetHeaderClass(bucket)}`}>
                 {callsheetHeaderTitle(bucket, callsheetSide)}
               </div>
