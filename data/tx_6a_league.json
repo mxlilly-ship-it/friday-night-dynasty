@@ -1,0 +1,4741 @@
+{
+  "_schema": "name, nickname, prestige (1-15), classification, region (UIL district), culture_grade, booster_support, community, enrollment, facilities_grade, abbreviation, stadium_name, rivals",
+  "_description": "Texas UIL 6A, 2026-28 alignment. 249 schools, 32 districts. Each district plays a round-robin, then non-district games are added until every team has 10. Playoffs are the top 64 teams in 6A by wins, then point differential (top64). Prestige, facilities, and community are estimates from program reputation, not official UIL ratings.",
+  "league_id": "tx_6a",
+  "state": "Texas 6A",
+  "email_pack": "fnd",
+  "playoff_system": "top64",
+  "teams": [
+    {
+      "name": "El Paso Coronado",
+      "nickname": "Thunderbirds",
+      "abbreviation": "EPC",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 1",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "urban",
+      "enrollment": 2830,
+      "facilities_grade": 4,
+      "stadium_name": "Thunderbirds Stadium",
+      "rivals": [
+        "El Paso Eastlake",
+        "El Paso Eastwood",
+        "El Paso Franklin"
+      ]
+    },
+    {
+      "name": "El Paso Eastlake",
+      "nickname": "Falcons",
+      "abbreviation": "EPE",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 1",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "urban",
+      "enrollment": 3339,
+      "facilities_grade": 5,
+      "stadium_name": "Falcons Stadium",
+      "rivals": [
+        "El Paso Coronado",
+        "El Paso Eastwood",
+        "El Paso Franklin"
+      ]
+    },
+    {
+      "name": "El Paso Eastwood",
+      "nickname": "Troopers",
+      "abbreviation": "EPE2",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 1",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "urban",
+      "enrollment": 2615,
+      "facilities_grade": 6,
+      "stadium_name": "Troopers Stadium",
+      "rivals": [
+        "El Paso Franklin",
+        "El Paso Coronado",
+        "El Paso Eastlake"
+      ]
+    },
+    {
+      "name": "El Paso Franklin",
+      "nickname": "Cougars",
+      "abbreviation": "EPF",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 1",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "urban",
+      "enrollment": 2878,
+      "facilities_grade": 5,
+      "stadium_name": "Cougars Stadium",
+      "rivals": [
+        "El Paso Eastwood",
+        "El Paso Coronado",
+        "El Paso Eastlake"
+      ]
+    },
+    {
+      "name": "El Paso Montwood",
+      "nickname": "Rams",
+      "abbreviation": "EPM",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 1",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "urban",
+      "enrollment": 2784,
+      "facilities_grade": 4,
+      "stadium_name": "Rams Stadium",
+      "rivals": [
+        "El Paso Coronado",
+        "El Paso Eastlake",
+        "El Paso Eastwood"
+      ]
+    },
+    {
+      "name": "El Paso Pebble Hills",
+      "nickname": "Spartans",
+      "abbreviation": "PPH",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 1",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "urban",
+      "enrollment": 2447,
+      "facilities_grade": 5,
+      "stadium_name": "Spartans Stadium",
+      "rivals": [
+        "El Paso Coronado",
+        "El Paso Eastlake",
+        "El Paso Eastwood"
+      ]
+    },
+    {
+      "name": "El Paso Socorro",
+      "nickname": "Bulldogs",
+      "abbreviation": "EPS",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 1",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "urban",
+      "enrollment": 2360,
+      "facilities_grade": 4,
+      "stadium_name": "Bulldogs Stadium",
+      "rivals": [
+        "El Paso Coronado",
+        "El Paso Eastlake",
+        "El Paso Eastwood"
+      ]
+    },
+    {
+      "name": "Midland",
+      "nickname": "Bulldogs",
+      "abbreviation": "MID",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 2",
+      "culture_grade": 5,
+      "booster_support": 4,
+      "community": "blue-collar",
+      "enrollment": 3382,
+      "facilities_grade": 3,
+      "stadium_name": "Bulldogs Stadium",
+      "rivals": [
+        "Midland Lee",
+        "Odessa",
+        "Odessa Permian"
+      ]
+    },
+    {
+      "name": "Midland Lee",
+      "nickname": "Rebels",
+      "abbreviation": "ML",
+      "prestige": 11,
+      "classification": "6A",
+      "region": "District 2",
+      "culture_grade": 8,
+      "booster_support": 7,
+      "community": "blue-collar",
+      "enrollment": 2628,
+      "facilities_grade": 6,
+      "stadium_name": "Rebels Stadium",
+      "rivals": [
+        "Midland",
+        "Odessa Permian",
+        "Odessa"
+      ]
+    },
+    {
+      "name": "Odessa",
+      "nickname": "Bronchos",
+      "abbreviation": "ODE",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 2",
+      "culture_grade": 7,
+      "booster_support": 6,
+      "community": "blue-collar",
+      "enrollment": 3324,
+      "facilities_grade": 5,
+      "stadium_name": "Ratliff Stadium",
+      "rivals": [
+        "Odessa Permian",
+        "Midland",
+        "Midland Lee"
+      ]
+    },
+    {
+      "name": "Odessa Permian",
+      "nickname": "Panthers",
+      "abbreviation": "OP",
+      "prestige": 13,
+      "classification": "6A",
+      "region": "District 2",
+      "culture_grade": 10,
+      "booster_support": 10,
+      "community": "football factory",
+      "enrollment": 2968,
+      "facilities_grade": 10,
+      "stadium_name": "Ratliff Stadium",
+      "rivals": [
+        "Odessa",
+        "Midland Lee",
+        "Midland"
+      ]
+    },
+    {
+      "name": "San Angelo Central",
+      "nickname": "Bobcats",
+      "abbreviation": "SAC",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 2",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 2582,
+      "facilities_grade": 5,
+      "stadium_name": "Bobcats Stadium",
+      "rivals": [
+        "Midland",
+        "Midland Lee",
+        "Odessa"
+      ]
+    },
+    {
+      "name": "Aledo",
+      "nickname": "Bearcats",
+      "abbreviation": "ALE",
+      "prestige": 14,
+      "classification": "6A",
+      "region": "District 3",
+      "culture_grade": 10,
+      "booster_support": 10,
+      "community": "football factory",
+      "enrollment": 3522,
+      "facilities_grade": 10,
+      "stadium_name": "Bearcat Stadium",
+      "rivals": [
+        "Arlington",
+        "Arlington Bowie",
+        "Arlington Houston"
+      ]
+    },
+    {
+      "name": "Arlington",
+      "nickname": "Colts",
+      "abbreviation": "ARL",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 3",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 3267,
+      "facilities_grade": 5,
+      "stadium_name": "Colts Stadium",
+      "rivals": [
+        "Aledo",
+        "Arlington Bowie",
+        "Arlington Houston"
+      ]
+    },
+    {
+      "name": "Arlington Bowie",
+      "nickname": "Volunteers",
+      "abbreviation": "AB",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 3",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 2313,
+      "facilities_grade": 5,
+      "stadium_name": "Volunteers Stadium",
+      "rivals": [
+        "Aledo",
+        "Arlington",
+        "Arlington Houston"
+      ]
+    },
+    {
+      "name": "Arlington Houston",
+      "nickname": "Texans",
+      "abbreviation": "AH",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 3",
+      "culture_grade": 4,
+      "booster_support": 4,
+      "community": "suburban",
+      "enrollment": 2971,
+      "facilities_grade": 4,
+      "stadium_name": "Texans Stadium",
+      "rivals": [
+        "Aledo",
+        "Arlington",
+        "Arlington Bowie"
+      ]
+    },
+    {
+      "name": "Arlington Lamar",
+      "nickname": "Vikings",
+      "abbreviation": "AL",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 3",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 2800,
+      "facilities_grade": 5,
+      "stadium_name": "Vikings Stadium",
+      "rivals": [
+        "Aledo",
+        "Arlington",
+        "Arlington Bowie"
+      ]
+    },
+    {
+      "name": "Arlington Martin",
+      "nickname": "Warriors",
+      "abbreviation": "AM",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 3",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 3174,
+      "facilities_grade": 6,
+      "stadium_name": "Warriors Stadium",
+      "rivals": [
+        "Aledo",
+        "Arlington",
+        "Arlington Bowie"
+      ]
+    },
+    {
+      "name": "Granbury",
+      "nickname": "Pirates",
+      "abbreviation": "GRA",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 3",
+      "culture_grade": 6,
+      "booster_support": 4,
+      "community": "rural",
+      "enrollment": 2471,
+      "facilities_grade": 4,
+      "stadium_name": "Pirates Stadium",
+      "rivals": [
+        "Aledo",
+        "Arlington",
+        "Arlington Bowie"
+      ]
+    },
+    {
+      "name": "Weatherford",
+      "nickname": "Kangaroos",
+      "abbreviation": "WEA",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 3",
+      "culture_grade": 7,
+      "booster_support": 5,
+      "community": "rural",
+      "enrollment": 3120,
+      "facilities_grade": 5,
+      "stadium_name": "Kangaroos Stadium",
+      "rivals": [
+        "Aledo",
+        "Arlington",
+        "Arlington Bowie"
+      ]
+    },
+    {
+      "name": "Fort Worth Boswell",
+      "nickname": "Pioneers",
+      "abbreviation": "FWB",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 4",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "urban",
+      "enrollment": 2708,
+      "facilities_grade": 4,
+      "stadium_name": "Pioneers Stadium",
+      "rivals": [
+        "Keller",
+        "Keller Central",
+        "Keller Timber Creek"
+      ]
+    },
+    {
+      "name": "Keller",
+      "nickname": "Indians",
+      "abbreviation": "KEL",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 4",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 2396,
+      "facilities_grade": 7,
+      "stadium_name": "Indians Stadium",
+      "rivals": [
+        "Fort Worth Boswell",
+        "Keller Central",
+        "Keller Timber Creek"
+      ]
+    },
+    {
+      "name": "Keller Central",
+      "nickname": "Chargers",
+      "abbreviation": "KC",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 4",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 3349,
+      "facilities_grade": 5,
+      "stadium_name": "Chargers Stadium",
+      "rivals": [
+        "Fort Worth Boswell",
+        "Keller",
+        "Keller Timber Creek"
+      ]
+    },
+    {
+      "name": "Keller Timber Creek",
+      "nickname": "Falcons",
+      "abbreviation": "KTC",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 4",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 3177,
+      "facilities_grade": 5,
+      "stadium_name": "Falcons Stadium",
+      "rivals": [
+        "Fort Worth Boswell",
+        "Keller",
+        "Keller Central"
+      ]
+    },
+    {
+      "name": "Northwest",
+      "nickname": "Texans",
+      "abbreviation": "NOR",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 4",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 2643,
+      "facilities_grade": 6,
+      "stadium_name": "Texans Stadium",
+      "rivals": [
+        "Fort Worth Boswell",
+        "Keller",
+        "Keller Central"
+      ]
+    },
+    {
+      "name": "Northwest Eaton",
+      "nickname": "Eagles",
+      "abbreviation": "NE",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 4",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 3458,
+      "facilities_grade": 7,
+      "stadium_name": "Eagles Stadium",
+      "rivals": [
+        "Fort Worth Boswell",
+        "Keller",
+        "Keller Central"
+      ]
+    },
+    {
+      "name": "Northwest Nelson",
+      "nickname": "Bobcats",
+      "abbreviation": "NN",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 4",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 3514,
+      "facilities_grade": 5,
+      "stadium_name": "Bobcats Stadium",
+      "rivals": [
+        "Fort Worth Boswell",
+        "Keller",
+        "Keller Central"
+      ]
+    },
+    {
+      "name": "Southlake Carroll",
+      "nickname": "Dragons",
+      "abbreviation": "SC",
+      "prestige": 14,
+      "classification": "6A",
+      "region": "District 4",
+      "culture_grade": 10,
+      "booster_support": 10,
+      "community": "football factory",
+      "enrollment": 3400,
+      "facilities_grade": 10,
+      "stadium_name": "Dragon Stadium",
+      "rivals": [
+        "Denton Guyer",
+        "Fort Worth Boswell",
+        "Keller"
+      ]
+    },
+    {
+      "name": "Denton Braswell",
+      "nickname": "Bengals",
+      "abbreviation": "DB",
+      "prestige": 11,
+      "classification": "6A",
+      "region": "District 5",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 3553,
+      "facilities_grade": 7,
+      "stadium_name": "Bengals Stadium",
+      "rivals": [
+        "Denton Guyer",
+        "Frisco Wakeland",
+        "Lewisville"
+      ]
+    },
+    {
+      "name": "Denton Guyer",
+      "nickname": "Wildcats",
+      "abbreviation": "DG",
+      "prestige": 14,
+      "classification": "6A",
+      "region": "District 5",
+      "culture_grade": 10,
+      "booster_support": 10,
+      "community": "football factory",
+      "enrollment": 3433,
+      "facilities_grade": 10,
+      "stadium_name": "John Clark Stadium",
+      "rivals": [
+        "Southlake Carroll",
+        "Denton Braswell",
+        "Frisco Wakeland"
+      ]
+    },
+    {
+      "name": "Frisco Wakeland",
+      "nickname": "Wolverines",
+      "abbreviation": "FW",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 5",
+      "culture_grade": 4,
+      "booster_support": 4,
+      "community": "suburban",
+      "enrollment": 2842,
+      "facilities_grade": 4,
+      "stadium_name": "Wolverines Stadium",
+      "rivals": [
+        "Denton Braswell",
+        "Denton Guyer",
+        "Lewisville"
+      ]
+    },
+    {
+      "name": "Lewisville",
+      "nickname": "Fighting Farmers",
+      "abbreviation": "LEW",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 5",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 3109,
+      "facilities_grade": 5,
+      "stadium_name": "Fighting Farmers Stadium",
+      "rivals": [
+        "Denton Braswell",
+        "Denton Guyer",
+        "Frisco Wakeland"
+      ]
+    },
+    {
+      "name": "Lewisville Flower Mound",
+      "nickname": "Jaguars",
+      "abbreviation": "LFM",
+      "prestige": 11,
+      "classification": "6A",
+      "region": "District 5",
+      "culture_grade": 7,
+      "booster_support": 8,
+      "community": "affluent",
+      "enrollment": 2615,
+      "facilities_grade": 8,
+      "stadium_name": "Jaguars Stadium",
+      "rivals": [
+        "Lewisville Hebron",
+        "Denton Braswell",
+        "Denton Guyer"
+      ]
+    },
+    {
+      "name": "Lewisville Hebron",
+      "nickname": "Hawks",
+      "abbreviation": "LH",
+      "prestige": 11,
+      "classification": "6A",
+      "region": "District 5",
+      "culture_grade": 7,
+      "booster_support": 8,
+      "community": "affluent",
+      "enrollment": 3483,
+      "facilities_grade": 8,
+      "stadium_name": "Hawks Stadium",
+      "rivals": [
+        "Lewisville Flower Mound",
+        "Denton Braswell",
+        "Denton Guyer"
+      ]
+    },
+    {
+      "name": "Lewisville Marcus",
+      "nickname": "Marauders",
+      "abbreviation": "LM",
+      "prestige": 11,
+      "classification": "6A",
+      "region": "District 5",
+      "culture_grade": 7,
+      "booster_support": 8,
+      "community": "affluent",
+      "enrollment": 2552,
+      "facilities_grade": 8,
+      "stadium_name": "Marauders Stadium",
+      "rivals": [
+        "Denton Braswell",
+        "Denton Guyer",
+        "Frisco Wakeland"
+      ]
+    },
+    {
+      "name": "Little Elm",
+      "nickname": "Lobos",
+      "abbreviation": "LE",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 5",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 2689,
+      "facilities_grade": 6,
+      "stadium_name": "Lobos Stadium",
+      "rivals": [
+        "Denton Braswell",
+        "Denton Guyer",
+        "Frisco Wakeland"
+      ]
+    },
+    {
+      "name": "Allen",
+      "nickname": "Eagles",
+      "abbreviation": "ALL",
+      "prestige": 14,
+      "classification": "6A",
+      "region": "District 6",
+      "culture_grade": 10,
+      "booster_support": 10,
+      "community": "football factory",
+      "enrollment": 6900,
+      "facilities_grade": 10,
+      "stadium_name": "Eagle Stadium",
+      "rivals": [
+        "Plano East",
+        "Prosper",
+        "Dallas Jesuit"
+      ]
+    },
+    {
+      "name": "Dallas Jesuit",
+      "nickname": "Rangers",
+      "abbreviation": "DJ",
+      "prestige": 13,
+      "classification": "6A",
+      "region": "District 6",
+      "culture_grade": 10,
+      "booster_support": 10,
+      "community": "football factory",
+      "enrollment": 1100,
+      "facilities_grade": 10,
+      "stadium_name": "Rangers Stadium",
+      "rivals": [
+        "Houston Strake Jesuit",
+        "Allen",
+        "McKinney"
+      ]
+    },
+    {
+      "name": "McKinney",
+      "nickname": "Lions",
+      "abbreviation": "MCK",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 6",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 2659,
+      "facilities_grade": 7,
+      "stadium_name": "Lions Stadium",
+      "rivals": [
+        "Allen",
+        "Dallas Jesuit",
+        "McKinney Boyd"
+      ]
+    },
+    {
+      "name": "McKinney Boyd",
+      "nickname": "Broncos",
+      "abbreviation": "MB",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 6",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 3673,
+      "facilities_grade": 7,
+      "stadium_name": "Broncos Stadium",
+      "rivals": [
+        "Allen",
+        "Dallas Jesuit",
+        "McKinney"
+      ]
+    },
+    {
+      "name": "Princeton",
+      "nickname": "Panthers",
+      "abbreviation": "PRI",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 6",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 2887,
+      "facilities_grade": 6,
+      "stadium_name": "Panthers Stadium",
+      "rivals": [
+        "Allen",
+        "Dallas Jesuit",
+        "McKinney"
+      ]
+    },
+    {
+      "name": "Prosper",
+      "nickname": "Eagles",
+      "abbreviation": "PRO",
+      "prestige": 13,
+      "classification": "6A",
+      "region": "District 6",
+      "culture_grade": 9,
+      "booster_support": 10,
+      "community": "affluent",
+      "enrollment": 2696,
+      "facilities_grade": 10,
+      "stadium_name": "Eagles Stadium",
+      "rivals": [
+        "Allen",
+        "Dallas Jesuit",
+        "McKinney"
+      ]
+    },
+    {
+      "name": "Prosper Rock Hill",
+      "nickname": "Blue Hawks",
+      "abbreviation": "PRH",
+      "prestige": 11,
+      "classification": "6A",
+      "region": "District 6",
+      "culture_grade": 7,
+      "booster_support": 8,
+      "community": "affluent",
+      "enrollment": 3280,
+      "facilities_grade": 8,
+      "stadium_name": "Blue Hawks Stadium",
+      "rivals": [
+        "Allen",
+        "Dallas Jesuit",
+        "McKinney"
+      ]
+    },
+    {
+      "name": "Prosper Walnut Grove",
+      "nickname": "Wildcats",
+      "abbreviation": "PWG",
+      "prestige": 11,
+      "classification": "6A",
+      "region": "District 6",
+      "culture_grade": 7,
+      "booster_support": 8,
+      "community": "affluent",
+      "enrollment": 3022,
+      "facilities_grade": 8,
+      "stadium_name": "Wildcats Stadium",
+      "rivals": [
+        "Allen",
+        "Dallas Jesuit",
+        "McKinney"
+      ]
+    },
+    {
+      "name": "Coppell",
+      "nickname": "Cowboys",
+      "abbreviation": "COP",
+      "prestige": 12,
+      "classification": "6A",
+      "region": "District 7",
+      "culture_grade": 8,
+      "booster_support": 9,
+      "community": "affluent",
+      "enrollment": 3100,
+      "facilities_grade": 9,
+      "stadium_name": "Cowboys Stadium",
+      "rivals": [
+        "Plano",
+        "Plano East",
+        "Plano West"
+      ]
+    },
+    {
+      "name": "Plano",
+      "nickname": "Wildcats",
+      "abbreviation": "PLA",
+      "prestige": 11,
+      "classification": "6A",
+      "region": "District 7",
+      "culture_grade": 7,
+      "booster_support": 8,
+      "community": "affluent",
+      "enrollment": 4500,
+      "facilities_grade": 8,
+      "stadium_name": "Wildcats Stadium",
+      "rivals": [
+        "Plano East",
+        "Coppell",
+        "Plano West"
+      ]
+    },
+    {
+      "name": "Plano East",
+      "nickname": "Panthers",
+      "abbreviation": "PE",
+      "prestige": 11,
+      "classification": "6A",
+      "region": "District 7",
+      "culture_grade": 7,
+      "booster_support": 8,
+      "community": "affluent",
+      "enrollment": 5400,
+      "facilities_grade": 8,
+      "stadium_name": "Panthers Stadium",
+      "rivals": [
+        "Allen",
+        "Plano",
+        "Plano West"
+      ]
+    },
+    {
+      "name": "Plano West",
+      "nickname": "Wolves",
+      "abbreviation": "PW",
+      "prestige": 11,
+      "classification": "6A",
+      "region": "District 7",
+      "culture_grade": 7,
+      "booster_support": 8,
+      "community": "affluent",
+      "enrollment": 2794,
+      "facilities_grade": 8,
+      "stadium_name": "Wolves Stadium",
+      "rivals": [
+        "Plano East",
+        "Coppell",
+        "Plano"
+      ]
+    },
+    {
+      "name": "Richardson",
+      "nickname": "Eagles",
+      "abbreviation": "RIC",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 7",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 2402,
+      "facilities_grade": 5,
+      "stadium_name": "Eagles Stadium",
+      "rivals": [
+        "Coppell",
+        "Plano",
+        "Plano East"
+      ]
+    },
+    {
+      "name": "Richardson Berkner",
+      "nickname": "Rams",
+      "abbreviation": "RB",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 7",
+      "culture_grade": 4,
+      "booster_support": 4,
+      "community": "suburban",
+      "enrollment": 2339,
+      "facilities_grade": 4,
+      "stadium_name": "Rams Stadium",
+      "rivals": [
+        "Coppell",
+        "Plano",
+        "Plano East"
+      ]
+    },
+    {
+      "name": "Richardson Lake Highlands",
+      "nickname": "Wildcats",
+      "abbreviation": "RLH",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 7",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 2617,
+      "facilities_grade": 6,
+      "stadium_name": "Wildcats Stadium",
+      "rivals": [
+        "Coppell",
+        "Plano",
+        "Plano East"
+      ]
+    },
+    {
+      "name": "Richardson Pearce",
+      "nickname": "Mustangs",
+      "abbreviation": "RP",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 7",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 2770,
+      "facilities_grade": 6,
+      "stadium_name": "Mustangs Stadium",
+      "rivals": [
+        "Coppell",
+        "Plano",
+        "Plano East"
+      ]
+    },
+    {
+      "name": "Euless Trinity",
+      "nickname": "Trojans",
+      "abbreviation": "ET",
+      "prestige": 13,
+      "classification": "6A",
+      "region": "District 8",
+      "culture_grade": 9,
+      "booster_support": 9,
+      "community": "suburban",
+      "enrollment": 2857,
+      "facilities_grade": 9,
+      "stadium_name": "Trojans Stadium",
+      "rivals": [
+        "South Grand Prairie",
+        "Grand Prairie",
+        "Haltom City Haltom"
+      ]
+    },
+    {
+      "name": "Grand Prairie",
+      "nickname": "Gophers",
+      "abbreviation": "GP",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 8",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 2885,
+      "facilities_grade": 5,
+      "stadium_name": "Gophers Stadium",
+      "rivals": [
+        "Euless Trinity",
+        "Haltom City Haltom",
+        "Hurst Bell"
+      ]
+    },
+    {
+      "name": "Haltom City Haltom",
+      "nickname": "Buffalos",
+      "abbreviation": "HCH",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 8",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 3432,
+      "facilities_grade": 5,
+      "stadium_name": "Buffalos Stadium",
+      "rivals": [
+        "Euless Trinity",
+        "Grand Prairie",
+        "Hurst Bell"
+      ]
+    },
+    {
+      "name": "Hurst Bell",
+      "nickname": "Blue Raiders",
+      "abbreviation": "HB",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 8",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 2642,
+      "facilities_grade": 5,
+      "stadium_name": "Blue Raiders Stadium",
+      "rivals": [
+        "Euless Trinity",
+        "Grand Prairie",
+        "Haltom City Haltom"
+      ]
+    },
+    {
+      "name": "Irving",
+      "nickname": "Tigers",
+      "abbreviation": "IRV",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 8",
+      "culture_grade": 4,
+      "booster_support": 4,
+      "community": "urban",
+      "enrollment": 3588,
+      "facilities_grade": 3,
+      "stadium_name": "Tigers Stadium",
+      "rivals": [
+        "Euless Trinity",
+        "Grand Prairie",
+        "Haltom City Haltom"
+      ]
+    },
+    {
+      "name": "Irving MacArthur",
+      "nickname": "Cardinals",
+      "abbreviation": "IM",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 8",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "urban",
+      "enrollment": 3539,
+      "facilities_grade": 4,
+      "stadium_name": "Cardinals Stadium",
+      "rivals": [
+        "Euless Trinity",
+        "Grand Prairie",
+        "Haltom City Haltom"
+      ]
+    },
+    {
+      "name": "Irving Nimitz",
+      "nickname": "Vikings",
+      "abbreviation": "IN",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 8",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "urban",
+      "enrollment": 3495,
+      "facilities_grade": 4,
+      "stadium_name": "Vikings Stadium",
+      "rivals": [
+        "Euless Trinity",
+        "Grand Prairie",
+        "Haltom City Haltom"
+      ]
+    },
+    {
+      "name": "South Grand Prairie",
+      "nickname": "Warriors",
+      "abbreviation": "SGP",
+      "prestige": 12,
+      "classification": "6A",
+      "region": "District 8",
+      "culture_grade": 8,
+      "booster_support": 8,
+      "community": "suburban",
+      "enrollment": 3472,
+      "facilities_grade": 8,
+      "stadium_name": "Warriors Stadium",
+      "rivals": [
+        "Euless Trinity",
+        "Grand Prairie",
+        "Haltom City Haltom"
+      ]
+    },
+    {
+      "name": "Garland",
+      "nickname": "Owls",
+      "abbreviation": "GAR",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 9",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 3062,
+      "facilities_grade": 5,
+      "stadium_name": "Owls Stadium",
+      "rivals": [
+        "Garland Lakeview Centennial",
+        "Garland Rowlett",
+        "Garland Sachse"
+      ]
+    },
+    {
+      "name": "Garland Lakeview Centennial",
+      "nickname": "Patriots",
+      "abbreviation": "GLC",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 9",
+      "culture_grade": 4,
+      "booster_support": 4,
+      "community": "suburban",
+      "enrollment": 2487,
+      "facilities_grade": 4,
+      "stadium_name": "Patriots Stadium",
+      "rivals": [
+        "Garland",
+        "Garland Rowlett",
+        "Garland Sachse"
+      ]
+    },
+    {
+      "name": "Garland Rowlett",
+      "nickname": "Eagles",
+      "abbreviation": "GR",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 9",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 3135,
+      "facilities_grade": 5,
+      "stadium_name": "Eagles Stadium",
+      "rivals": [
+        "Garland",
+        "Garland Lakeview Centennial",
+        "Garland Sachse"
+      ]
+    },
+    {
+      "name": "Garland Sachse",
+      "nickname": "Mustangs",
+      "abbreviation": "GS",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 9",
+      "culture_grade": 4,
+      "booster_support": 4,
+      "community": "suburban",
+      "enrollment": 2445,
+      "facilities_grade": 4,
+      "stadium_name": "Mustangs Stadium",
+      "rivals": [
+        "Garland",
+        "Garland Lakeview Centennial",
+        "Garland Rowlett"
+      ]
+    },
+    {
+      "name": "North Garland",
+      "nickname": "Raiders",
+      "abbreviation": "NG",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 9",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 2905,
+      "facilities_grade": 5,
+      "stadium_name": "Raiders Stadium",
+      "rivals": [
+        "Garland",
+        "Garland Lakeview Centennial",
+        "Garland Rowlett"
+      ]
+    },
+    {
+      "name": "South Garland",
+      "nickname": "Colonials",
+      "abbreviation": "SG",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 9",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 3641,
+      "facilities_grade": 5,
+      "stadium_name": "Colonials Stadium",
+      "rivals": [
+        "Garland",
+        "Garland Lakeview Centennial",
+        "Garland Rowlett"
+      ]
+    },
+    {
+      "name": "Wylie",
+      "nickname": "Pirates",
+      "abbreviation": "WYL",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 9",
+      "culture_grade": 4,
+      "booster_support": 4,
+      "community": "suburban",
+      "enrollment": 2847,
+      "facilities_grade": 4,
+      "stadium_name": "Pirates Stadium",
+      "rivals": [
+        "Garland",
+        "Garland Lakeview Centennial",
+        "Garland Rowlett"
+      ]
+    },
+    {
+      "name": "Wylie East",
+      "nickname": "Raiders",
+      "abbreviation": "WE",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 9",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 2644,
+      "facilities_grade": 6,
+      "stadium_name": "Raiders Stadium",
+      "rivals": [
+        "Garland",
+        "Garland Lakeview Centennial",
+        "Garland Rowlett"
+      ]
+    },
+    {
+      "name": "Forney",
+      "nickname": "Jackrabbits",
+      "abbreviation": "FOR",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 10",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 2768,
+      "facilities_grade": 7,
+      "stadium_name": "Jackrabbits Stadium",
+      "rivals": [
+        "Longview",
+        "Mesquite Horn",
+        "North Forney"
+      ]
+    },
+    {
+      "name": "Longview",
+      "nickname": "Lobos",
+      "abbreviation": "LON",
+      "prestige": 13,
+      "classification": "6A",
+      "region": "District 10",
+      "culture_grade": 9,
+      "booster_support": 9,
+      "community": "suburban",
+      "enrollment": 2880,
+      "facilities_grade": 9,
+      "stadium_name": "Lobos Stadium",
+      "rivals": [
+        "Tyler Legacy",
+        "Forney",
+        "Mesquite Horn"
+      ]
+    },
+    {
+      "name": "Mesquite Horn",
+      "nickname": "Jaguars",
+      "abbreviation": "MH",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 10",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 2521,
+      "facilities_grade": 7,
+      "stadium_name": "Jaguars Stadium",
+      "rivals": [
+        "Forney",
+        "Longview",
+        "North Forney"
+      ]
+    },
+    {
+      "name": "North Forney",
+      "nickname": "Falcons",
+      "abbreviation": "NF",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 10",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 3531,
+      "facilities_grade": 6,
+      "stadium_name": "Falcons Stadium",
+      "rivals": [
+        "Forney",
+        "Longview",
+        "Mesquite Horn"
+      ]
+    },
+    {
+      "name": "Rockwall",
+      "nickname": "Yellowjackets",
+      "abbreviation": "ROC",
+      "prestige": 12,
+      "classification": "6A",
+      "region": "District 10",
+      "culture_grade": 8,
+      "booster_support": 9,
+      "community": "affluent",
+      "enrollment": 2628,
+      "facilities_grade": 9,
+      "stadium_name": "Yellowjackets Stadium",
+      "rivals": [
+        "Rockwall Heath",
+        "Forney",
+        "Longview"
+      ]
+    },
+    {
+      "name": "Rockwall Heath",
+      "nickname": "Hawks",
+      "abbreviation": "RH",
+      "prestige": 12,
+      "classification": "6A",
+      "region": "District 10",
+      "culture_grade": 8,
+      "booster_support": 9,
+      "community": "affluent",
+      "enrollment": 3350,
+      "facilities_grade": 9,
+      "stadium_name": "Hawks Stadium",
+      "rivals": [
+        "Rockwall",
+        "Forney",
+        "Longview"
+      ]
+    },
+    {
+      "name": "Royse City",
+      "nickname": "Bulldogs",
+      "abbreviation": "RC",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 10",
+      "culture_grade": 7,
+      "booster_support": 5,
+      "community": "rural",
+      "enrollment": 3016,
+      "facilities_grade": 5,
+      "stadium_name": "Bulldogs Stadium",
+      "rivals": [
+        "Forney",
+        "Longview",
+        "Mesquite Horn"
+      ]
+    },
+    {
+      "name": "Tyler Legacy",
+      "nickname": "Red Raiders",
+      "abbreviation": "TL",
+      "prestige": 12,
+      "classification": "6A",
+      "region": "District 10",
+      "culture_grade": 8,
+      "booster_support": 8,
+      "community": "suburban",
+      "enrollment": 2682,
+      "facilities_grade": 8,
+      "stadium_name": "Red Raiders Stadium",
+      "rivals": [
+        "Longview",
+        "Forney",
+        "Mesquite Horn"
+      ]
+    },
+    {
+      "name": "Crowley",
+      "nickname": "Eagles",
+      "abbreviation": "CRO",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 11",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 2810,
+      "facilities_grade": 7,
+      "stadium_name": "Eagles Stadium",
+      "rivals": [
+        "Dallas Skyline",
+        "Duncanville",
+        "Mansfield"
+      ]
+    },
+    {
+      "name": "Dallas Skyline",
+      "nickname": "Raiders",
+      "abbreviation": "DS",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 11",
+      "culture_grade": 4,
+      "booster_support": 4,
+      "community": "urban",
+      "enrollment": 4600,
+      "facilities_grade": 3,
+      "stadium_name": "Raiders Stadium",
+      "rivals": [
+        "Crowley",
+        "Duncanville",
+        "Mansfield"
+      ]
+    },
+    {
+      "name": "Duncanville",
+      "nickname": "Panthers",
+      "abbreviation": "DUN",
+      "prestige": 15,
+      "classification": "6A",
+      "region": "District 11",
+      "culture_grade": 10,
+      "booster_support": 10,
+      "community": "football factory",
+      "enrollment": 4300,
+      "facilities_grade": 10,
+      "stadium_name": "Panther Stadium",
+      "rivals": [
+        "North Crowley",
+        "Galena Park North Shore",
+        "Crowley"
+      ]
+    },
+    {
+      "name": "Mansfield",
+      "nickname": "Tigers",
+      "abbreviation": "MAN",
+      "prestige": 11,
+      "classification": "6A",
+      "region": "District 11",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 3048,
+      "facilities_grade": 7,
+      "stadium_name": "Tigers Stadium",
+      "rivals": [
+        "Crowley",
+        "Dallas Skyline",
+        "Duncanville"
+      ]
+    },
+    {
+      "name": "Mansfield Lake Ridge",
+      "nickname": "Eagles",
+      "abbreviation": "MLR",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 11",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 3592,
+      "facilities_grade": 6,
+      "stadium_name": "Eagles Stadium",
+      "rivals": [
+        "Crowley",
+        "Dallas Skyline",
+        "Duncanville"
+      ]
+    },
+    {
+      "name": "North Crowley",
+      "nickname": "Panthers",
+      "abbreviation": "NC",
+      "prestige": 14,
+      "classification": "6A",
+      "region": "District 11",
+      "culture_grade": 10,
+      "booster_support": 10,
+      "community": "football factory",
+      "enrollment": 2653,
+      "facilities_grade": 10,
+      "stadium_name": "Panthers Stadium",
+      "rivals": [
+        "Duncanville",
+        "Crowley",
+        "Dallas Skyline"
+      ]
+    },
+    {
+      "name": "Red Oak",
+      "nickname": "Hawks",
+      "abbreviation": "RO",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 11",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 3307,
+      "facilities_grade": 7,
+      "stadium_name": "Hawks Stadium",
+      "rivals": [
+        "Crowley",
+        "Dallas Skyline",
+        "Duncanville"
+      ]
+    },
+    {
+      "name": "Waxahachie",
+      "nickname": "Indians",
+      "abbreviation": "WAX",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 11",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 3432,
+      "facilities_grade": 7,
+      "stadium_name": "Indians Stadium",
+      "rivals": [
+        "Crowley",
+        "Dallas Skyline",
+        "Duncanville"
+      ]
+    },
+    {
+      "name": "Bryan",
+      "nickname": "Vikings",
+      "abbreviation": "BRY",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 12",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 2897,
+      "facilities_grade": 5,
+      "stadium_name": "Vikings Stadium",
+      "rivals": [
+        "Copperas Cove",
+        "Killeen Chaparral",
+        "Killeen Harker Heights"
+      ]
+    },
+    {
+      "name": "Copperas Cove",
+      "nickname": "Bulldawgs",
+      "abbreviation": "CC",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 12",
+      "culture_grade": 6,
+      "booster_support": 4,
+      "community": "rural",
+      "enrollment": 3575,
+      "facilities_grade": 4,
+      "stadium_name": "Bulldawgs Stadium",
+      "rivals": [
+        "Bryan",
+        "Killeen Chaparral",
+        "Killeen Harker Heights"
+      ]
+    },
+    {
+      "name": "Killeen Chaparral",
+      "nickname": "Bobcats",
+      "abbreviation": "KC2",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 12",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 2631,
+      "facilities_grade": 5,
+      "stadium_name": "Bobcats Stadium",
+      "rivals": [
+        "Bryan",
+        "Copperas Cove",
+        "Killeen Harker Heights"
+      ]
+    },
+    {
+      "name": "Killeen Harker Heights",
+      "nickname": "Knights",
+      "abbreviation": "KHH",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 12",
+      "culture_grade": 4,
+      "booster_support": 4,
+      "community": "suburban",
+      "enrollment": 3530,
+      "facilities_grade": 4,
+      "stadium_name": "Knights Stadium",
+      "rivals": [
+        "Bryan",
+        "Copperas Cove",
+        "Killeen Chaparral"
+      ]
+    },
+    {
+      "name": "Lake Belton",
+      "nickname": "Broncos",
+      "abbreviation": "LB",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 12",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 2726,
+      "facilities_grade": 6,
+      "stadium_name": "Broncos Stadium",
+      "rivals": [
+        "Bryan",
+        "Copperas Cove",
+        "Killeen Chaparral"
+      ]
+    },
+    {
+      "name": "Temple",
+      "nickname": "Wildcats",
+      "abbreviation": "TEM",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 12",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 3260,
+      "facilities_grade": 5,
+      "stadium_name": "Wildcats Stadium",
+      "rivals": [
+        "Bryan",
+        "Copperas Cove",
+        "Killeen Chaparral"
+      ]
+    },
+    {
+      "name": "Waco Midway",
+      "nickname": "Panthers",
+      "abbreviation": "WM",
+      "prestige": 11,
+      "classification": "6A",
+      "region": "District 12",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "urban",
+      "enrollment": 2746,
+      "facilities_grade": 6,
+      "stadium_name": "Panthers Stadium",
+      "rivals": [
+        "Bryan",
+        "Copperas Cove",
+        "Killeen Chaparral"
+      ]
+    },
+    {
+      "name": "Cleveland",
+      "nickname": "Indians",
+      "abbreviation": "CLE",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 13",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 3115,
+      "facilities_grade": 5,
+      "stadium_name": "Indians Stadium",
+      "rivals": [
+        "Conroe",
+        "Conroe Caney Creek",
+        "Conroe Grand Oaks"
+      ]
+    },
+    {
+      "name": "Conroe",
+      "nickname": "Tigers",
+      "abbreviation": "CON",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 13",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 4000,
+      "facilities_grade": 5,
+      "stadium_name": "Tigers Stadium",
+      "rivals": [
+        "Cleveland",
+        "Conroe Caney Creek",
+        "Conroe Grand Oaks"
+      ]
+    },
+    {
+      "name": "Conroe Caney Creek",
+      "nickname": "Panthers",
+      "abbreviation": "CCC",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 13",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 3309,
+      "facilities_grade": 5,
+      "stadium_name": "Panthers Stadium",
+      "rivals": [
+        "Cleveland",
+        "Conroe",
+        "Conroe Grand Oaks"
+      ]
+    },
+    {
+      "name": "Conroe Grand Oaks",
+      "nickname": "Grizzlies",
+      "abbreviation": "CGO",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 13",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 2837,
+      "facilities_grade": 6,
+      "stadium_name": "Grizzlies Stadium",
+      "rivals": [
+        "Cleveland",
+        "Conroe",
+        "Conroe Caney Creek"
+      ]
+    },
+    {
+      "name": "Conroe Oak Ridge",
+      "nickname": "War Eagles",
+      "abbreviation": "COR",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 13",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 2561,
+      "facilities_grade": 6,
+      "stadium_name": "War Eagles Stadium",
+      "rivals": [
+        "Cleveland",
+        "Conroe",
+        "Conroe Caney Creek"
+      ]
+    },
+    {
+      "name": "Conroe The Woodlands",
+      "nickname": "Highlanders",
+      "abbreviation": "CTW",
+      "prestige": 13,
+      "classification": "6A",
+      "region": "District 13",
+      "culture_grade": 9,
+      "booster_support": 10,
+      "community": "affluent",
+      "enrollment": 4300,
+      "facilities_grade": 10,
+      "stadium_name": "Highlanders Stadium",
+      "rivals": [
+        "Conroe Woodlands College Park",
+        "Cleveland",
+        "Conroe"
+      ]
+    },
+    {
+      "name": "Conroe Woodlands College Park",
+      "nickname": "Cavaliers",
+      "abbreviation": "WCP",
+      "prestige": 12,
+      "classification": "6A",
+      "region": "District 13",
+      "culture_grade": 8,
+      "booster_support": 9,
+      "community": "affluent",
+      "enrollment": 2543,
+      "facilities_grade": 9,
+      "stadium_name": "Cavaliers Stadium",
+      "rivals": [
+        "Conroe The Woodlands",
+        "Cleveland",
+        "Conroe"
+      ]
+    },
+    {
+      "name": "Willis",
+      "nickname": "Wildkats",
+      "abbreviation": "WIL",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 13",
+      "culture_grade": 5,
+      "booster_support": 3,
+      "community": "rural",
+      "enrollment": 2353,
+      "facilities_grade": 3,
+      "stadium_name": "Wildkats Stadium",
+      "rivals": [
+        "Cleveland",
+        "Conroe",
+        "Conroe Caney Creek"
+      ]
+    },
+    {
+      "name": "Houston Aldine",
+      "nickname": "Mustangs",
+      "abbreviation": "HA",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 14",
+      "culture_grade": 6,
+      "booster_support": 5,
+      "community": "blue-collar",
+      "enrollment": 3442,
+      "facilities_grade": 4,
+      "stadium_name": "Mustangs Stadium",
+      "rivals": [
+        "Houston Benjamin Davis",
+        "Houston Eisenhower",
+        "Houston MacArthur"
+      ]
+    },
+    {
+      "name": "Houston Benjamin Davis",
+      "nickname": "Panthers",
+      "abbreviation": "HBD",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 14",
+      "culture_grade": 6,
+      "booster_support": 5,
+      "community": "blue-collar",
+      "enrollment": 2584,
+      "facilities_grade": 4,
+      "stadium_name": "Panthers Stadium",
+      "rivals": [
+        "Houston Aldine",
+        "Houston Eisenhower",
+        "Houston MacArthur"
+      ]
+    },
+    {
+      "name": "Houston Eisenhower",
+      "nickname": "Eagles",
+      "abbreviation": "HE",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 14",
+      "culture_grade": 5,
+      "booster_support": 4,
+      "community": "blue-collar",
+      "enrollment": 2990,
+      "facilities_grade": 3,
+      "stadium_name": "Eagles Stadium",
+      "rivals": [
+        "Houston Aldine",
+        "Houston Benjamin Davis",
+        "Houston MacArthur"
+      ]
+    },
+    {
+      "name": "Houston MacArthur",
+      "nickname": "Generals",
+      "abbreviation": "HM",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 14",
+      "culture_grade": 5,
+      "booster_support": 4,
+      "community": "blue-collar",
+      "enrollment": 2316,
+      "facilities_grade": 3,
+      "stadium_name": "Generals Stadium",
+      "rivals": [
+        "Houston Aldine",
+        "Houston Benjamin Davis",
+        "Houston Eisenhower"
+      ]
+    },
+    {
+      "name": "Houston Nimitz",
+      "nickname": "Cougars",
+      "abbreviation": "HN",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 14",
+      "culture_grade": 6,
+      "booster_support": 5,
+      "community": "blue-collar",
+      "enrollment": 3640,
+      "facilities_grade": 4,
+      "stadium_name": "Cougars Stadium",
+      "rivals": [
+        "Houston Aldine",
+        "Houston Benjamin Davis",
+        "Houston Eisenhower"
+      ]
+    },
+    {
+      "name": "Spring",
+      "nickname": "Lions",
+      "abbreviation": "SPR",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 14",
+      "culture_grade": 6,
+      "booster_support": 5,
+      "community": "blue-collar",
+      "enrollment": 3016,
+      "facilities_grade": 4,
+      "stadium_name": "Lions Stadium",
+      "rivals": [
+        "Houston Aldine",
+        "Houston Benjamin Davis",
+        "Houston Eisenhower"
+      ]
+    },
+    {
+      "name": "Spring Dekaney",
+      "nickname": "Wildcats",
+      "abbreviation": "SD",
+      "prestige": 12,
+      "classification": "6A",
+      "region": "District 14",
+      "culture_grade": 9,
+      "booster_support": 8,
+      "community": "blue-collar",
+      "enrollment": 2521,
+      "facilities_grade": 7,
+      "stadium_name": "Wildcats Stadium",
+      "rivals": [
+        "Spring Westfield",
+        "Houston Aldine",
+        "Houston Benjamin Davis"
+      ]
+    },
+    {
+      "name": "Spring Westfield",
+      "nickname": "Mustangs",
+      "abbreviation": "SW",
+      "prestige": 13,
+      "classification": "6A",
+      "region": "District 14",
+      "culture_grade": 10,
+      "booster_support": 10,
+      "community": "football factory",
+      "enrollment": 4000,
+      "facilities_grade": 10,
+      "stadium_name": "Mustangs Stadium",
+      "rivals": [
+        "Spring Dekaney",
+        "Houston Aldine",
+        "Houston Benjamin Davis"
+      ]
+    },
+    {
+      "name": "Klein",
+      "nickname": "Bearkats",
+      "abbreviation": "KLE",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 15",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 3800,
+      "facilities_grade": 6,
+      "stadium_name": "Bearkats Stadium",
+      "rivals": [
+        "Klein Cain",
+        "Klein Collins",
+        "Klein Forest"
+      ]
+    },
+    {
+      "name": "Klein Cain",
+      "nickname": "Hurricanes",
+      "abbreviation": "KC3",
+      "prestige": 13,
+      "classification": "6A",
+      "region": "District 15",
+      "culture_grade": 9,
+      "booster_support": 9,
+      "community": "suburban",
+      "enrollment": 3275,
+      "facilities_grade": 9,
+      "stadium_name": "Hurricanes Stadium",
+      "rivals": [
+        "Klein",
+        "Klein Collins",
+        "Klein Forest"
+      ]
+    },
+    {
+      "name": "Klein Collins",
+      "nickname": "Tigers",
+      "abbreviation": "KC4",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 15",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 3484,
+      "facilities_grade": 7,
+      "stadium_name": "Tigers Stadium",
+      "rivals": [
+        "Klein",
+        "Klein Cain",
+        "Klein Forest"
+      ]
+    },
+    {
+      "name": "Klein Forest",
+      "nickname": "Eagles",
+      "abbreviation": "KF",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 15",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 3363,
+      "facilities_grade": 5,
+      "stadium_name": "Eagles Stadium",
+      "rivals": [
+        "Klein",
+        "Klein Cain",
+        "Klein Collins"
+      ]
+    },
+    {
+      "name": "Klein Oak",
+      "nickname": "Panthers",
+      "abbreviation": "KO",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 15",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 2651,
+      "facilities_grade": 7,
+      "stadium_name": "Panthers Stadium",
+      "rivals": [
+        "Klein",
+        "Klein Cain",
+        "Klein Collins"
+      ]
+    },
+    {
+      "name": "Magnolia",
+      "nickname": "Bulldogs",
+      "abbreviation": "MAG",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 15",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 3565,
+      "facilities_grade": 6,
+      "stadium_name": "Bulldogs Stadium",
+      "rivals": [
+        "Klein",
+        "Klein Cain",
+        "Klein Collins"
+      ]
+    },
+    {
+      "name": "Magnolia West",
+      "nickname": "Mustangs",
+      "abbreviation": "MW",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 15",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 2688,
+      "facilities_grade": 6,
+      "stadium_name": "Mustangs Stadium",
+      "rivals": [
+        "Klein",
+        "Klein Cain",
+        "Klein Collins"
+      ]
+    },
+    {
+      "name": "Tomball",
+      "nickname": "Cougars",
+      "abbreviation": "TOM",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 15",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 2384,
+      "facilities_grade": 6,
+      "stadium_name": "Cougars Stadium",
+      "rivals": [
+        "Klein",
+        "Klein Cain",
+        "Klein Collins"
+      ]
+    },
+    {
+      "name": "Tomball Memorial",
+      "nickname": "Wildcats",
+      "abbreviation": "TM",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 15",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 2870,
+      "facilities_grade": 7,
+      "stadium_name": "Wildcats Stadium",
+      "rivals": [
+        "Klein",
+        "Klein Cain",
+        "Klein Collins"
+      ]
+    },
+    {
+      "name": "Cy-Fair",
+      "nickname": "Bobcats",
+      "abbreviation": "CF",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 16",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 3600,
+      "facilities_grade": 5,
+      "stadium_name": "Bobcats Stadium",
+      "rivals": [
+        "Cypress Creek",
+        "Cypress Falls",
+        "Cypress Lakes"
+      ]
+    },
+    {
+      "name": "Cypress Creek",
+      "nickname": "Cougars",
+      "abbreviation": "CC2",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 16",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 3200,
+      "facilities_grade": 6,
+      "stadium_name": "Cougars Stadium",
+      "rivals": [
+        "Cy-Fair",
+        "Cypress Falls",
+        "Cypress Lakes"
+      ]
+    },
+    {
+      "name": "Cypress Falls",
+      "nickname": "Eagles",
+      "abbreviation": "CF2",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 16",
+      "culture_grade": 4,
+      "booster_support": 4,
+      "community": "suburban",
+      "enrollment": 3048,
+      "facilities_grade": 4,
+      "stadium_name": "Eagles Stadium",
+      "rivals": [
+        "Cy-Fair",
+        "Cypress Creek",
+        "Cypress Lakes"
+      ]
+    },
+    {
+      "name": "Cypress Lakes",
+      "nickname": "Spartans",
+      "abbreviation": "CL",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 16",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 2414,
+      "facilities_grade": 5,
+      "stadium_name": "Spartans Stadium",
+      "rivals": [
+        "Cy-Fair",
+        "Cypress Creek",
+        "Cypress Falls"
+      ]
+    },
+    {
+      "name": "Cypress Ridge",
+      "nickname": "Rams",
+      "abbreviation": "CR",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 16",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 2625,
+      "facilities_grade": 5,
+      "stadium_name": "Rams Stadium",
+      "rivals": [
+        "Cy-Fair",
+        "Cypress Creek",
+        "Cypress Falls"
+      ]
+    },
+    {
+      "name": "Cypress Woods",
+      "nickname": "Wildcats",
+      "abbreviation": "CW",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 16",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 2698,
+      "facilities_grade": 7,
+      "stadium_name": "Wildcats Stadium",
+      "rivals": [
+        "Cy-Fair",
+        "Cypress Creek",
+        "Cypress Falls"
+      ]
+    },
+    {
+      "name": "Jersey Village",
+      "nickname": "Falcons",
+      "abbreviation": "JV",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 16",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 2875,
+      "facilities_grade": 6,
+      "stadium_name": "Falcons Stadium",
+      "rivals": [
+        "Cy-Fair",
+        "Cypress Creek",
+        "Cypress Falls"
+      ]
+    },
+    {
+      "name": "Langham Creek",
+      "nickname": "Lobos",
+      "abbreviation": "LC",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 16",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 3319,
+      "facilities_grade": 5,
+      "stadium_name": "Lobos Stadium",
+      "rivals": [
+        "Cy-Fair",
+        "Cypress Creek",
+        "Cypress Falls"
+      ]
+    },
+    {
+      "name": "Channelview",
+      "nickname": "Falcons",
+      "abbreviation": "CHA",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 17",
+      "culture_grade": 6,
+      "booster_support": 5,
+      "community": "blue-collar",
+      "enrollment": 3481,
+      "facilities_grade": 4,
+      "stadium_name": "Falcons Stadium",
+      "rivals": [
+        "Crosby",
+        "Galena Park North Shore",
+        "Humble"
+      ]
+    },
+    {
+      "name": "Crosby",
+      "nickname": "Cougars",
+      "abbreviation": "CRO2",
+      "prestige": 11,
+      "classification": "6A",
+      "region": "District 17",
+      "culture_grade": 8,
+      "booster_support": 7,
+      "community": "blue-collar",
+      "enrollment": 2951,
+      "facilities_grade": 6,
+      "stadium_name": "Cougars Stadium",
+      "rivals": [
+        "Channelview",
+        "Galena Park North Shore",
+        "Humble"
+      ]
+    },
+    {
+      "name": "Galena Park North Shore",
+      "nickname": "Mustangs",
+      "abbreviation": "PNS",
+      "prestige": 15,
+      "classification": "6A",
+      "region": "District 17",
+      "culture_grade": 10,
+      "booster_support": 10,
+      "community": "football factory",
+      "enrollment": 4500,
+      "facilities_grade": 10,
+      "stadium_name": "Galena Park ISD Stadium",
+      "rivals": [
+        "Duncanville",
+        "Humble Atascocita",
+        "Channelview"
+      ]
+    },
+    {
+      "name": "Humble",
+      "nickname": "Wildcats",
+      "abbreviation": "HUM",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 17",
+      "culture_grade": 4,
+      "booster_support": 4,
+      "community": "suburban",
+      "enrollment": 2426,
+      "facilities_grade": 4,
+      "stadium_name": "Wildcats Stadium",
+      "rivals": [
+        "Channelview",
+        "Crosby",
+        "Galena Park North Shore"
+      ]
+    },
+    {
+      "name": "Humble Atascocita",
+      "nickname": "Eagles",
+      "abbreviation": "HA2",
+      "prestige": 13,
+      "classification": "6A",
+      "region": "District 17",
+      "culture_grade": 10,
+      "booster_support": 10,
+      "community": "football factory",
+      "enrollment": 4200,
+      "facilities_grade": 10,
+      "stadium_name": "Eagles Stadium",
+      "rivals": [
+        "Humble Summer Creek",
+        "Galena Park North Shore",
+        "Channelview"
+      ]
+    },
+    {
+      "name": "Humble Kingwood",
+      "nickname": "Mustangs",
+      "abbreviation": "HK",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 17",
+      "culture_grade": 7,
+      "booster_support": 8,
+      "community": "affluent",
+      "enrollment": 2780,
+      "facilities_grade": 8,
+      "stadium_name": "Mustangs Stadium",
+      "rivals": [
+        "Channelview",
+        "Crosby",
+        "Galena Park North Shore"
+      ]
+    },
+    {
+      "name": "Humble Summer Creek",
+      "nickname": "Stallions",
+      "abbreviation": "HSC",
+      "prestige": 12,
+      "classification": "6A",
+      "region": "District 17",
+      "culture_grade": 8,
+      "booster_support": 8,
+      "community": "suburban",
+      "enrollment": 2677,
+      "facilities_grade": 8,
+      "stadium_name": "Stallions Stadium",
+      "rivals": [
+        "Humble Atascocita",
+        "Channelview",
+        "Crosby"
+      ]
+    },
+    {
+      "name": "Sheldon King",
+      "nickname": "Panthers",
+      "abbreviation": "SK",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 17",
+      "culture_grade": 6,
+      "booster_support": 5,
+      "community": "blue-collar",
+      "enrollment": 2827,
+      "facilities_grade": 4,
+      "stadium_name": "Panthers Stadium",
+      "rivals": [
+        "Channelview",
+        "Crosby",
+        "Galena Park North Shore"
+      ]
+    },
+    {
+      "name": "Deer Park",
+      "nickname": "Deer",
+      "abbreviation": "DP",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 18",
+      "culture_grade": 6,
+      "booster_support": 5,
+      "community": "blue-collar",
+      "enrollment": 2651,
+      "facilities_grade": 4,
+      "stadium_name": "Deer Stadium",
+      "rivals": [
+        "Dickinson",
+        "Friendswood Clear Brook",
+        "Houston Clear Lake"
+      ]
+    },
+    {
+      "name": "Dickinson",
+      "nickname": "Gators",
+      "abbreviation": "DIC",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 18",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 3399,
+      "facilities_grade": 5,
+      "stadium_name": "Gators Stadium",
+      "rivals": [
+        "Deer Park",
+        "Friendswood Clear Brook",
+        "Houston Clear Lake"
+      ]
+    },
+    {
+      "name": "Friendswood Clear Brook",
+      "nickname": "Wolverines",
+      "abbreviation": "FCB",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 18",
+      "culture_grade": 6,
+      "booster_support": 7,
+      "community": "affluent",
+      "enrollment": 2405,
+      "facilities_grade": 7,
+      "stadium_name": "Wolverines Stadium",
+      "rivals": [
+        "Deer Park",
+        "Dickinson",
+        "Houston Clear Lake"
+      ]
+    },
+    {
+      "name": "Houston Clear Lake",
+      "nickname": "Falcons",
+      "abbreviation": "HCL",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 18",
+      "culture_grade": 6,
+      "booster_support": 7,
+      "community": "affluent",
+      "enrollment": 3505,
+      "facilities_grade": 7,
+      "stadium_name": "Falcons Stadium",
+      "rivals": [
+        "Deer Park",
+        "Dickinson",
+        "Friendswood Clear Brook"
+      ]
+    },
+    {
+      "name": "League City Clear Creek",
+      "nickname": "Wildcats",
+      "abbreviation": "CCC2",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 18",
+      "culture_grade": 7,
+      "booster_support": 8,
+      "community": "affluent",
+      "enrollment": 2706,
+      "facilities_grade": 8,
+      "stadium_name": "Wildcats Stadium",
+      "rivals": [
+        "League City Clear Springs",
+        "Deer Park",
+        "Dickinson"
+      ]
+    },
+    {
+      "name": "League City Clear Falls",
+      "nickname": "Knights",
+      "abbreviation": "CCF",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 18",
+      "culture_grade": 6,
+      "booster_support": 7,
+      "community": "affluent",
+      "enrollment": 2554,
+      "facilities_grade": 7,
+      "stadium_name": "Knights Stadium",
+      "rivals": [
+        "Deer Park",
+        "Dickinson",
+        "Friendswood Clear Brook"
+      ]
+    },
+    {
+      "name": "League City Clear Springs",
+      "nickname": "Chargers",
+      "abbreviation": "CCS",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 18",
+      "culture_grade": 7,
+      "booster_support": 8,
+      "community": "affluent",
+      "enrollment": 2870,
+      "facilities_grade": 8,
+      "stadium_name": "Chargers Stadium",
+      "rivals": [
+        "League City Clear Creek",
+        "Deer Park",
+        "Dickinson"
+      ]
+    },
+    {
+      "name": "Mount Belvieu Barbers Hill",
+      "nickname": "Eagles",
+      "abbreviation": "BBH",
+      "prestige": 12,
+      "classification": "6A",
+      "region": "District 18",
+      "culture_grade": 8,
+      "booster_support": 8,
+      "community": "suburban",
+      "enrollment": 2654,
+      "facilities_grade": 8,
+      "stadium_name": "Eagles Stadium",
+      "rivals": [
+        "Deer Park",
+        "Dickinson",
+        "Friendswood Clear Brook"
+      ]
+    },
+    {
+      "name": "Alvin",
+      "nickname": "Yellowjackets",
+      "abbreviation": "ALV",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 19",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 3103,
+      "facilities_grade": 6,
+      "stadium_name": "Yellowjackets Stadium",
+      "rivals": [
+        "Alvin Shadow Creek",
+        "Clute Brazoswood",
+        "Manvel"
+      ]
+    },
+    {
+      "name": "Alvin Shadow Creek",
+      "nickname": "Sharks",
+      "abbreviation": "ASC",
+      "prestige": 13,
+      "classification": "6A",
+      "region": "District 19",
+      "culture_grade": 9,
+      "booster_support": 9,
+      "community": "suburban",
+      "enrollment": 3159,
+      "facilities_grade": 9,
+      "stadium_name": "Sharks Stadium",
+      "rivals": [
+        "Pearland",
+        "Alvin",
+        "Clute Brazoswood"
+      ]
+    },
+    {
+      "name": "Clute Brazoswood",
+      "nickname": "Buccaneers",
+      "abbreviation": "CB",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 19",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 3324,
+      "facilities_grade": 5,
+      "stadium_name": "Buccaneers Stadium",
+      "rivals": [
+        "Alvin",
+        "Alvin Shadow Creek",
+        "Manvel"
+      ]
+    },
+    {
+      "name": "Manvel",
+      "nickname": "Mavericks",
+      "abbreviation": "MAN2",
+      "prestige": 12,
+      "classification": "6A",
+      "region": "District 19",
+      "culture_grade": 8,
+      "booster_support": 8,
+      "community": "suburban",
+      "enrollment": 3064,
+      "facilities_grade": 8,
+      "stadium_name": "Mavericks Stadium",
+      "rivals": [
+        "Alvin",
+        "Alvin Shadow Creek",
+        "Clute Brazoswood"
+      ]
+    },
+    {
+      "name": "Pasadena Dobie",
+      "nickname": "Longhorns",
+      "abbreviation": "PD",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 19",
+      "culture_grade": 6,
+      "booster_support": 5,
+      "community": "blue-collar",
+      "enrollment": 3389,
+      "facilities_grade": 4,
+      "stadium_name": "Longhorns Stadium",
+      "rivals": [
+        "Alvin",
+        "Alvin Shadow Creek",
+        "Clute Brazoswood"
+      ]
+    },
+    {
+      "name": "Pasadena Memorial",
+      "nickname": "Mavericks",
+      "abbreviation": "PM",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 19",
+      "culture_grade": 6,
+      "booster_support": 5,
+      "community": "blue-collar",
+      "enrollment": 3144,
+      "facilities_grade": 4,
+      "stadium_name": "Mavericks Stadium",
+      "rivals": [
+        "Alvin",
+        "Alvin Shadow Creek",
+        "Clute Brazoswood"
+      ]
+    },
+    {
+      "name": "Pasadena Rayburn",
+      "nickname": "Texans",
+      "abbreviation": "PR",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 19",
+      "culture_grade": 6,
+      "booster_support": 5,
+      "community": "blue-collar",
+      "enrollment": 3613,
+      "facilities_grade": 4,
+      "stadium_name": "Texans Stadium",
+      "rivals": [
+        "Alvin",
+        "Alvin Shadow Creek",
+        "Clute Brazoswood"
+      ]
+    },
+    {
+      "name": "Pearland",
+      "nickname": "Oilers",
+      "abbreviation": "PEA",
+      "prestige": 11,
+      "classification": "6A",
+      "region": "District 19",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 2508,
+      "facilities_grade": 7,
+      "stadium_name": "Oilers Stadium",
+      "rivals": [
+        "Alvin Shadow Creek",
+        "Alvin",
+        "Clute Brazoswood"
+      ]
+    },
+    {
+      "name": "Pearland Dawson",
+      "nickname": "Eagles",
+      "abbreviation": "PD2",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 19",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 3696,
+      "facilities_grade": 6,
+      "stadium_name": "Eagles Stadium",
+      "rivals": [
+        "Alvin",
+        "Alvin Shadow Creek",
+        "Clute Brazoswood"
+      ]
+    },
+    {
+      "name": "Alief Elsik",
+      "nickname": "Rams",
+      "abbreviation": "AE",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 20",
+      "culture_grade": 6,
+      "booster_support": 5,
+      "community": "blue-collar",
+      "enrollment": 4200,
+      "facilities_grade": 4,
+      "stadium_name": "Rams Stadium",
+      "rivals": [
+        "Alief Hastings",
+        "Alief Taylor",
+        "Houston Bellaire"
+      ]
+    },
+    {
+      "name": "Alief Hastings",
+      "nickname": "Bears",
+      "abbreviation": "AH2",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 20",
+      "culture_grade": 5,
+      "booster_support": 4,
+      "community": "blue-collar",
+      "enrollment": 2455,
+      "facilities_grade": 3,
+      "stadium_name": "Bears Stadium",
+      "rivals": [
+        "Alief Elsik",
+        "Alief Taylor",
+        "Houston Bellaire"
+      ]
+    },
+    {
+      "name": "Alief Taylor",
+      "nickname": "Lions",
+      "abbreviation": "AT",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 20",
+      "culture_grade": 6,
+      "booster_support": 5,
+      "community": "blue-collar",
+      "enrollment": 3281,
+      "facilities_grade": 4,
+      "stadium_name": "Lions Stadium",
+      "rivals": [
+        "Alief Elsik",
+        "Alief Hastings",
+        "Houston Bellaire"
+      ]
+    },
+    {
+      "name": "Houston Bellaire",
+      "nickname": "Cardinals",
+      "abbreviation": "HB2",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 20",
+      "culture_grade": 5,
+      "booster_support": 6,
+      "community": "affluent",
+      "enrollment": 2477,
+      "facilities_grade": 6,
+      "stadium_name": "Cardinals Stadium",
+      "rivals": [
+        "Alief Elsik",
+        "Alief Hastings",
+        "Alief Taylor"
+      ]
+    },
+    {
+      "name": "Houston Heights",
+      "nickname": "Bulldogs",
+      "abbreviation": "HH",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 20",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "urban",
+      "enrollment": 2769,
+      "facilities_grade": 5,
+      "stadium_name": "Bulldogs Stadium",
+      "rivals": [
+        "Alief Elsik",
+        "Alief Hastings",
+        "Alief Taylor"
+      ]
+    },
+    {
+      "name": "Houston Lamar",
+      "nickname": "Texans",
+      "abbreviation": "HL",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 20",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "urban",
+      "enrollment": 3618,
+      "facilities_grade": 5,
+      "stadium_name": "Texans Stadium",
+      "rivals": [
+        "Alief Elsik",
+        "Alief Hastings",
+        "Alief Taylor"
+      ]
+    },
+    {
+      "name": "Houston Westside",
+      "nickname": "Wolves",
+      "abbreviation": "HW",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 20",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "urban",
+      "enrollment": 3301,
+      "facilities_grade": 4,
+      "stadium_name": "Wolves Stadium",
+      "rivals": [
+        "Alief Elsik",
+        "Alief Hastings",
+        "Alief Taylor"
+      ]
+    },
+    {
+      "name": "Houston Memorial",
+      "nickname": "Mustangs",
+      "abbreviation": "HM2",
+      "prestige": 12,
+      "classification": "6A",
+      "region": "District 20",
+      "culture_grade": 8,
+      "booster_support": 9,
+      "community": "affluent",
+      "enrollment": 3499,
+      "facilities_grade": 9,
+      "stadium_name": "Mustangs Stadium",
+      "rivals": [
+        "Alief Elsik",
+        "Alief Hastings",
+        "Alief Taylor"
+      ]
+    },
+    {
+      "name": "Houston Stratford",
+      "nickname": "Spartans",
+      "abbreviation": "HS",
+      "prestige": 11,
+      "classification": "6A",
+      "region": "District 20",
+      "culture_grade": 7,
+      "booster_support": 8,
+      "community": "affluent",
+      "enrollment": 3254,
+      "facilities_grade": 8,
+      "stadium_name": "Spartans Stadium",
+      "rivals": [
+        "Alief Elsik",
+        "Alief Hastings",
+        "Alief Taylor"
+      ]
+    },
+    {
+      "name": "Fort Bend Austin",
+      "nickname": "Bulldogs",
+      "abbreviation": "FBA",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 21",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 2893,
+      "facilities_grade": 6,
+      "stadium_name": "Bulldogs Stadium",
+      "rivals": [
+        "Fort Bend Bush",
+        "Fort Bend Clements",
+        "Fort Bend Elkins"
+      ]
+    },
+    {
+      "name": "Fort Bend Bush",
+      "nickname": "Broncos",
+      "abbreviation": "FBB",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 21",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 3107,
+      "facilities_grade": 6,
+      "stadium_name": "Broncos Stadium",
+      "rivals": [
+        "Fort Bend Austin",
+        "Fort Bend Clements",
+        "Fort Bend Elkins"
+      ]
+    },
+    {
+      "name": "Fort Bend Clements",
+      "nickname": "Rangers",
+      "abbreviation": "FBC",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 21",
+      "culture_grade": 7,
+      "booster_support": 8,
+      "community": "affluent",
+      "enrollment": 3564,
+      "facilities_grade": 8,
+      "stadium_name": "Rangers Stadium",
+      "rivals": [
+        "Fort Bend Austin",
+        "Fort Bend Bush",
+        "Fort Bend Elkins"
+      ]
+    },
+    {
+      "name": "Fort Bend Elkins",
+      "nickname": "Knights",
+      "abbreviation": "FBE",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 21",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 3423,
+      "facilities_grade": 6,
+      "stadium_name": "Knights Stadium",
+      "rivals": [
+        "Fort Bend Austin",
+        "Fort Bend Bush",
+        "Fort Bend Clements"
+      ]
+    },
+    {
+      "name": "Fort Bend Hightower",
+      "nickname": "Canes",
+      "abbreviation": "FBH",
+      "prestige": 11,
+      "classification": "6A",
+      "region": "District 21",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 2906,
+      "facilities_grade": 7,
+      "stadium_name": "Canes Stadium",
+      "rivals": [
+        "Fort Bend Austin",
+        "Fort Bend Bush",
+        "Fort Bend Clements"
+      ]
+    },
+    {
+      "name": "Fort Bend Ridge Point",
+      "nickname": "Panthers",
+      "abbreviation": "BRP",
+      "prestige": 12,
+      "classification": "6A",
+      "region": "District 21",
+      "culture_grade": 8,
+      "booster_support": 9,
+      "community": "affluent",
+      "enrollment": 2862,
+      "facilities_grade": 9,
+      "stadium_name": "Panthers Stadium",
+      "rivals": [
+        "Fort Bend Austin",
+        "Fort Bend Bush",
+        "Fort Bend Clements"
+      ]
+    },
+    {
+      "name": "Fort Bend Travis",
+      "nickname": "Tigers",
+      "abbreviation": "FBT",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 21",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 2666,
+      "facilities_grade": 7,
+      "stadium_name": "Tigers Stadium",
+      "rivals": [
+        "Fort Bend Austin",
+        "Fort Bend Bush",
+        "Fort Bend Clements"
+      ]
+    },
+    {
+      "name": "Houston Strake Jesuit",
+      "nickname": "Fighting Crusaders",
+      "abbreviation": "HSJ",
+      "prestige": 12,
+      "classification": "6A",
+      "region": "District 21",
+      "culture_grade": 8,
+      "booster_support": 9,
+      "community": "affluent",
+      "enrollment": 1100,
+      "facilities_grade": 9,
+      "stadium_name": "Fighting Crusaders Stadium",
+      "rivals": [
+        "Dallas Jesuit",
+        "Fort Bend Austin",
+        "Fort Bend Bush"
+      ]
+    },
+    {
+      "name": "Katy",
+      "nickname": "Tigers",
+      "abbreviation": "KAT",
+      "prestige": 14,
+      "classification": "6A",
+      "region": "District 22",
+      "culture_grade": 10,
+      "booster_support": 10,
+      "community": "football factory",
+      "enrollment": 3700,
+      "facilities_grade": 10,
+      "stadium_name": "Legacy Stadium",
+      "rivals": [
+        "Katy Cinco Ranch",
+        "Katy Tompkins",
+        "Katy Jordan"
+      ]
+    },
+    {
+      "name": "Katy Cinco Ranch",
+      "nickname": "Cougars",
+      "abbreviation": "KCR",
+      "prestige": 12,
+      "classification": "6A",
+      "region": "District 22",
+      "culture_grade": 8,
+      "booster_support": 9,
+      "community": "affluent",
+      "enrollment": 3278,
+      "facilities_grade": 9,
+      "stadium_name": "Legacy Stadium",
+      "rivals": [
+        "Katy",
+        "Katy Jordan",
+        "Katy Mayde Creek"
+      ]
+    },
+    {
+      "name": "Katy Jordan",
+      "nickname": "Jaguars",
+      "abbreviation": "KJ",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 22",
+      "culture_grade": 7,
+      "booster_support": 8,
+      "community": "affluent",
+      "enrollment": 2684,
+      "facilities_grade": 8,
+      "stadium_name": "Legacy Stadium",
+      "rivals": [
+        "Katy",
+        "Katy Cinco Ranch",
+        "Katy Mayde Creek"
+      ]
+    },
+    {
+      "name": "Katy Mayde Creek",
+      "nickname": "Rams",
+      "abbreviation": "KMC",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 22",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 2520,
+      "facilities_grade": 5,
+      "stadium_name": "Legacy Stadium",
+      "rivals": [
+        "Katy",
+        "Katy Cinco Ranch",
+        "Katy Jordan"
+      ]
+    },
+    {
+      "name": "Katy Morton Ranch",
+      "nickname": "Mavericks",
+      "abbreviation": "KMR",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 22",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 2313,
+      "facilities_grade": 5,
+      "stadium_name": "Legacy Stadium",
+      "rivals": [
+        "Katy",
+        "Katy Cinco Ranch",
+        "Katy Jordan"
+      ]
+    },
+    {
+      "name": "Katy Paetow",
+      "nickname": "Panthers",
+      "abbreviation": "KP",
+      "prestige": 13,
+      "classification": "6A",
+      "region": "District 22",
+      "culture_grade": 9,
+      "booster_support": 9,
+      "community": "suburban",
+      "enrollment": 2966,
+      "facilities_grade": 9,
+      "stadium_name": "Legacy Stadium",
+      "rivals": [
+        "Katy",
+        "Katy Cinco Ranch",
+        "Katy Jordan"
+      ]
+    },
+    {
+      "name": "Katy Seven Lakes",
+      "nickname": "Spartans",
+      "abbreviation": "KSL",
+      "prestige": 12,
+      "classification": "6A",
+      "region": "District 22",
+      "culture_grade": 8,
+      "booster_support": 9,
+      "community": "affluent",
+      "enrollment": 2751,
+      "facilities_grade": 9,
+      "stadium_name": "Legacy Stadium",
+      "rivals": [
+        "Katy",
+        "Katy Cinco Ranch",
+        "Katy Jordan"
+      ]
+    },
+    {
+      "name": "Katy Taylor",
+      "nickname": "Tigers",
+      "abbreviation": "KT",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 22",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 2777,
+      "facilities_grade": 7,
+      "stadium_name": "Legacy Stadium",
+      "rivals": [
+        "Katy",
+        "Katy Cinco Ranch",
+        "Katy Jordan"
+      ]
+    },
+    {
+      "name": "Katy Tompkins",
+      "nickname": "Falcons",
+      "abbreviation": "KT2",
+      "prestige": 12,
+      "classification": "6A",
+      "region": "District 22",
+      "culture_grade": 8,
+      "booster_support": 9,
+      "community": "affluent",
+      "enrollment": 3107,
+      "facilities_grade": 9,
+      "stadium_name": "Legacy Stadium",
+      "rivals": [
+        "Katy",
+        "Katy Cinco Ranch",
+        "Katy Jordan"
+      ]
+    },
+    {
+      "name": "Bridgeland",
+      "nickname": "Bears",
+      "abbreviation": "BRI",
+      "prestige": 12,
+      "classification": "6A",
+      "region": "District 23",
+      "culture_grade": 8,
+      "booster_support": 9,
+      "community": "affluent",
+      "enrollment": 2377,
+      "facilities_grade": 9,
+      "stadium_name": "Bears Stadium",
+      "rivals": [
+        "Cypress Park",
+        "Cypress Ranch",
+        "Cypress Springs"
+      ]
+    },
+    {
+      "name": "Cypress Park",
+      "nickname": "Tigers",
+      "abbreviation": "CP",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 23",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 2948,
+      "facilities_grade": 7,
+      "stadium_name": "Tigers Stadium",
+      "rivals": [
+        "Bridgeland",
+        "Cypress Ranch",
+        "Cypress Springs"
+      ]
+    },
+    {
+      "name": "Cypress Ranch",
+      "nickname": "Mustangs",
+      "abbreviation": "CR2",
+      "prestige": 12,
+      "classification": "6A",
+      "region": "District 23",
+      "culture_grade": 8,
+      "booster_support": 8,
+      "community": "suburban",
+      "enrollment": 3074,
+      "facilities_grade": 8,
+      "stadium_name": "Mustangs Stadium",
+      "rivals": [
+        "Bridgeland",
+        "Cypress Park",
+        "Cypress Springs"
+      ]
+    },
+    {
+      "name": "Cypress Springs",
+      "nickname": "Panthers",
+      "abbreviation": "CS",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 23",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 2644,
+      "facilities_grade": 5,
+      "stadium_name": "Panthers Stadium",
+      "rivals": [
+        "Bridgeland",
+        "Cypress Park",
+        "Cypress Ranch"
+      ]
+    },
+    {
+      "name": "Lamar Fulshear",
+      "nickname": "Chargers",
+      "abbreviation": "LF",
+      "prestige": 11,
+      "classification": "6A",
+      "region": "District 23",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 2908,
+      "facilities_grade": 7,
+      "stadium_name": "Chargers Stadium",
+      "rivals": [
+        "Bridgeland",
+        "Cypress Park",
+        "Cypress Ranch"
+      ]
+    },
+    {
+      "name": "Richmond Foster",
+      "nickname": "Falcons",
+      "abbreviation": "RF",
+      "prestige": 11,
+      "classification": "6A",
+      "region": "District 23",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 2372,
+      "facilities_grade": 7,
+      "stadium_name": "Falcons Stadium",
+      "rivals": [
+        "Bridgeland",
+        "Cypress Park",
+        "Cypress Ranch"
+      ]
+    },
+    {
+      "name": "Richmond George Ranch",
+      "nickname": "Longhorns",
+      "abbreviation": "RGR",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 23",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 3126,
+      "facilities_grade": 6,
+      "stadium_name": "Longhorns Stadium",
+      "rivals": [
+        "Bridgeland",
+        "Cypress Park",
+        "Cypress Ranch"
+      ]
+    },
+    {
+      "name": "Waller",
+      "nickname": "Bulldogs",
+      "abbreviation": "WAL",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 23",
+      "culture_grade": 6,
+      "booster_support": 4,
+      "community": "rural",
+      "enrollment": 2676,
+      "facilities_grade": 4,
+      "stadium_name": "Bulldogs Stadium",
+      "rivals": [
+        "Bridgeland",
+        "Cypress Park",
+        "Cypress Ranch"
+      ]
+    },
+    {
+      "name": "Austin Vandegrift",
+      "nickname": "Vipers",
+      "abbreviation": "AV",
+      "prestige": 13,
+      "classification": "6A",
+      "region": "District 24",
+      "culture_grade": 9,
+      "booster_support": 10,
+      "community": "affluent",
+      "enrollment": 3075,
+      "facilities_grade": 10,
+      "stadium_name": "Vipers Stadium",
+      "rivals": [
+        "Cedar Park",
+        "Cedar Park Vista Ridge",
+        "Georgetown East View"
+      ]
+    },
+    {
+      "name": "Cedar Park",
+      "nickname": "Timberwolves",
+      "abbreviation": "CP2",
+      "prestige": 11,
+      "classification": "6A",
+      "region": "District 24",
+      "culture_grade": 7,
+      "booster_support": 8,
+      "community": "affluent",
+      "enrollment": 3098,
+      "facilities_grade": 8,
+      "stadium_name": "Timberwolves Stadium",
+      "rivals": [
+        "Austin Vandegrift",
+        "Cedar Park Vista Ridge",
+        "Georgetown East View"
+      ]
+    },
+    {
+      "name": "Cedar Park Vista Ridge",
+      "nickname": "Rangers",
+      "abbreviation": "PVR",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 24",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 3628,
+      "facilities_grade": 6,
+      "stadium_name": "Rangers Stadium",
+      "rivals": [
+        "Austin Vandegrift",
+        "Cedar Park",
+        "Georgetown East View"
+      ]
+    },
+    {
+      "name": "Georgetown East View",
+      "nickname": "Patriots",
+      "abbreviation": "GEV",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 24",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 3286,
+      "facilities_grade": 6,
+      "stadium_name": "Patriots Stadium",
+      "rivals": [
+        "Austin Vandegrift",
+        "Cedar Park",
+        "Cedar Park Vista Ridge"
+      ]
+    },
+    {
+      "name": "Hutto",
+      "nickname": "Hippos",
+      "abbreviation": "HUT",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 24",
+      "culture_grade": 7,
+      "booster_support": 5,
+      "community": "rural",
+      "enrollment": 3697,
+      "facilities_grade": 5,
+      "stadium_name": "Hippos Stadium",
+      "rivals": [
+        "Austin Vandegrift",
+        "Cedar Park",
+        "Cedar Park Vista Ridge"
+      ]
+    },
+    {
+      "name": "Leander",
+      "nickname": "Lions",
+      "abbreviation": "LEA",
+      "prestige": 11,
+      "classification": "6A",
+      "region": "District 24",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 3696,
+      "facilities_grade": 7,
+      "stadium_name": "Lions Stadium",
+      "rivals": [
+        "Austin Vandegrift",
+        "Cedar Park",
+        "Cedar Park Vista Ridge"
+      ]
+    },
+    {
+      "name": "Leander Rouse",
+      "nickname": "Raiders",
+      "abbreviation": "LR",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 24",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 3062,
+      "facilities_grade": 6,
+      "stadium_name": "Raiders Stadium",
+      "rivals": [
+        "Austin Vandegrift",
+        "Cedar Park",
+        "Cedar Park Vista Ridge"
+      ]
+    },
+    {
+      "name": "Austin Lake Travis",
+      "nickname": "Cavaliers",
+      "abbreviation": "ALT",
+      "prestige": 14,
+      "classification": "6A",
+      "region": "District 25",
+      "culture_grade": 10,
+      "booster_support": 10,
+      "community": "football factory",
+      "enrollment": 3200,
+      "facilities_grade": 10,
+      "stadium_name": "Cavalier Stadium",
+      "rivals": [
+        "Austin Westlake",
+        "Round Rock",
+        "Round Rock McNeil"
+      ]
+    },
+    {
+      "name": "Austin Westlake",
+      "nickname": "Chaparrals",
+      "abbreviation": "AW",
+      "prestige": 15,
+      "classification": "6A",
+      "region": "District 25",
+      "culture_grade": 10,
+      "booster_support": 10,
+      "community": "football factory",
+      "enrollment": 2800,
+      "facilities_grade": 10,
+      "stadium_name": "Chaparral Stadium",
+      "rivals": [
+        "Austin Lake Travis",
+        "Round Rock",
+        "Round Rock McNeil"
+      ]
+    },
+    {
+      "name": "Round Rock",
+      "nickname": "Dragons",
+      "abbreviation": "RR",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 25",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 3148,
+      "facilities_grade": 7,
+      "stadium_name": "Dragons Stadium",
+      "rivals": [
+        "Austin Lake Travis",
+        "Austin Westlake",
+        "Round Rock McNeil"
+      ]
+    },
+    {
+      "name": "Round Rock McNeil",
+      "nickname": "Mavericks",
+      "abbreviation": "RRM",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 25",
+      "culture_grade": 4,
+      "booster_support": 4,
+      "community": "suburban",
+      "enrollment": 3356,
+      "facilities_grade": 4,
+      "stadium_name": "Mavericks Stadium",
+      "rivals": [
+        "Austin Lake Travis",
+        "Austin Westlake",
+        "Round Rock"
+      ]
+    },
+    {
+      "name": "Round Rock Stony Point",
+      "nickname": "Tigers",
+      "abbreviation": "RSP",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 25",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 3259,
+      "facilities_grade": 5,
+      "stadium_name": "Tigers Stadium",
+      "rivals": [
+        "Austin Lake Travis",
+        "Austin Westlake",
+        "Round Rock"
+      ]
+    },
+    {
+      "name": "Round Rock Westwood",
+      "nickname": "Warriors",
+      "abbreviation": "RRW",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 25",
+      "culture_grade": 5,
+      "booster_support": 6,
+      "community": "affluent",
+      "enrollment": 3600,
+      "facilities_grade": 6,
+      "stadium_name": "Warriors Stadium",
+      "rivals": [
+        "Austin Lake Travis",
+        "Austin Westlake",
+        "Round Rock"
+      ]
+    },
+    {
+      "name": "Round Rock Cedar Ridge",
+      "nickname": "Raiders",
+      "abbreviation": "RCR",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 25",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 3070,
+      "facilities_grade": 6,
+      "stadium_name": "Raiders Stadium",
+      "rivals": [
+        "Austin Lake Travis",
+        "Austin Westlake",
+        "Round Rock"
+      ]
+    },
+    {
+      "name": "Austin",
+      "nickname": "Maroon",
+      "abbreviation": "AUS",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 26",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "urban",
+      "enrollment": 3353,
+      "facilities_grade": 4,
+      "stadium_name": "Maroon Stadium",
+      "rivals": [
+        "Austin Akins",
+        "Austin Bowie",
+        "Buda Hays"
+      ]
+    },
+    {
+      "name": "Austin Akins",
+      "nickname": "Eagles",
+      "abbreviation": "AA",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 26",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 3271,
+      "facilities_grade": 5,
+      "stadium_name": "Eagles Stadium",
+      "rivals": [
+        "Austin",
+        "Austin Bowie",
+        "Buda Hays"
+      ]
+    },
+    {
+      "name": "Austin Bowie",
+      "nickname": "Bulldogs",
+      "abbreviation": "AB2",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 26",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 2775,
+      "facilities_grade": 7,
+      "stadium_name": "Bulldogs Stadium",
+      "rivals": [
+        "Austin",
+        "Austin Akins",
+        "Buda Hays"
+      ]
+    },
+    {
+      "name": "Buda Hays",
+      "nickname": "Hawks",
+      "abbreviation": "BH",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 26",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 3630,
+      "facilities_grade": 7,
+      "stadium_name": "Hawks Stadium",
+      "rivals": [
+        "Austin",
+        "Austin Akins",
+        "Austin Bowie"
+      ]
+    },
+    {
+      "name": "Buda Johnson",
+      "nickname": "Jaguars",
+      "abbreviation": "BJ",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 26",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 2424,
+      "facilities_grade": 6,
+      "stadium_name": "Jaguars Stadium",
+      "rivals": [
+        "Austin",
+        "Austin Akins",
+        "Austin Bowie"
+      ]
+    },
+    {
+      "name": "Del Valle",
+      "nickname": "Cardinals",
+      "abbreviation": "DV",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 26",
+      "culture_grade": 6,
+      "booster_support": 4,
+      "community": "rural",
+      "enrollment": 2606,
+      "facilities_grade": 4,
+      "stadium_name": "Cardinals Stadium",
+      "rivals": [
+        "Austin",
+        "Austin Akins",
+        "Austin Bowie"
+      ]
+    },
+    {
+      "name": "Dripping Springs",
+      "nickname": "Tigers",
+      "abbreviation": "DS2",
+      "prestige": 12,
+      "classification": "6A",
+      "region": "District 26",
+      "culture_grade": 8,
+      "booster_support": 9,
+      "community": "affluent",
+      "enrollment": 2680,
+      "facilities_grade": 9,
+      "stadium_name": "Tigers Stadium",
+      "rivals": [
+        "Austin",
+        "Austin Akins",
+        "Austin Bowie"
+      ]
+    },
+    {
+      "name": "Cibolo Steele",
+      "nickname": "Knights",
+      "abbreviation": "CS2",
+      "prestige": 12,
+      "classification": "6A",
+      "region": "District 27",
+      "culture_grade": 8,
+      "booster_support": 8,
+      "community": "suburban",
+      "enrollment": 3191,
+      "facilities_grade": 8,
+      "stadium_name": "Knights Stadium",
+      "rivals": [
+        "Converse Judson",
+        "Comal Canyon",
+        "Comal Pieper"
+      ]
+    },
+    {
+      "name": "Comal Canyon",
+      "nickname": "Hawks",
+      "abbreviation": "CC3",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 27",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 2401,
+      "facilities_grade": 6,
+      "stadium_name": "Hawks Stadium",
+      "rivals": [
+        "Cibolo Steele",
+        "Comal Pieper",
+        "Converse Judson"
+      ]
+    },
+    {
+      "name": "Comal Pieper",
+      "nickname": "Warriors",
+      "abbreviation": "CP3",
+      "prestige": 11,
+      "classification": "6A",
+      "region": "District 27",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 3302,
+      "facilities_grade": 7,
+      "stadium_name": "Warriors Stadium",
+      "rivals": [
+        "Cibolo Steele",
+        "Comal Canyon",
+        "Converse Judson"
+      ]
+    },
+    {
+      "name": "Converse Judson",
+      "nickname": "Rockets",
+      "abbreviation": "CJ",
+      "prestige": 12,
+      "classification": "6A",
+      "region": "District 27",
+      "culture_grade": 8,
+      "booster_support": 8,
+      "community": "suburban",
+      "enrollment": 3181,
+      "facilities_grade": 8,
+      "stadium_name": "Rockets Stadium",
+      "rivals": [
+        "Cibolo Steele",
+        "Comal Canyon",
+        "Comal Pieper"
+      ]
+    },
+    {
+      "name": "San Antonio East Central",
+      "nickname": "Hornets",
+      "abbreviation": "AEC",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 27",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "urban",
+      "enrollment": 3357,
+      "facilities_grade": 4,
+      "stadium_name": "Hornets Stadium",
+      "rivals": [
+        "Cibolo Steele",
+        "Comal Canyon",
+        "Comal Pieper"
+      ]
+    },
+    {
+      "name": "San Antonio Wagner",
+      "nickname": "Thunderbirds",
+      "abbreviation": "SAW",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 27",
+      "culture_grade": 4,
+      "booster_support": 4,
+      "community": "urban",
+      "enrollment": 2331,
+      "facilities_grade": 3,
+      "stadium_name": "Thunderbirds Stadium",
+      "rivals": [
+        "Cibolo Steele",
+        "Comal Canyon",
+        "Comal Pieper"
+      ]
+    },
+    {
+      "name": "San Marcos",
+      "nickname": "Rattlers",
+      "abbreviation": "SM",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 27",
+      "culture_grade": 5,
+      "booster_support": 3,
+      "community": "rural",
+      "enrollment": 2780,
+      "facilities_grade": 3,
+      "stadium_name": "Rattlers Stadium",
+      "rivals": [
+        "Cibolo Steele",
+        "Comal Canyon",
+        "Comal Pieper"
+      ]
+    },
+    {
+      "name": "Schertz Clemens",
+      "nickname": "Buffaloes",
+      "abbreviation": "SC2",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 27",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 3247,
+      "facilities_grade": 7,
+      "stadium_name": "Buffaloes Stadium",
+      "rivals": [
+        "Cibolo Steele",
+        "Comal Canyon",
+        "Comal Pieper"
+      ]
+    },
+    {
+      "name": "Northside Brandeis",
+      "nickname": "Broncos",
+      "abbreviation": "NB",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 28",
+      "culture_grade": 4,
+      "booster_support": 4,
+      "community": "suburban",
+      "enrollment": 3133,
+      "facilities_grade": 4,
+      "stadium_name": "Broncos Stadium",
+      "rivals": [
+        "Northside Clark",
+        "San Antonio Churchill",
+        "San Antonio Johnson"
+      ]
+    },
+    {
+      "name": "Northside Clark",
+      "nickname": "Cougars",
+      "abbreviation": "NC2",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 28",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 3354,
+      "facilities_grade": 5,
+      "stadium_name": "Cougars Stadium",
+      "rivals": [
+        "Northside Brandeis",
+        "San Antonio Churchill",
+        "San Antonio Johnson"
+      ]
+    },
+    {
+      "name": "San Antonio Churchill",
+      "nickname": "Chargers",
+      "abbreviation": "SAC2",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 28",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "urban",
+      "enrollment": 3237,
+      "facilities_grade": 4,
+      "stadium_name": "Chargers Stadium",
+      "rivals": [
+        "Northside Brandeis",
+        "Northside Clark",
+        "San Antonio Johnson"
+      ]
+    },
+    {
+      "name": "San Antonio Johnson",
+      "nickname": "Jaguars",
+      "abbreviation": "SAJ",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 28",
+      "culture_grade": 4,
+      "booster_support": 4,
+      "community": "urban",
+      "enrollment": 2758,
+      "facilities_grade": 3,
+      "stadium_name": "Jaguars Stadium",
+      "rivals": [
+        "Northside Brandeis",
+        "Northside Clark",
+        "San Antonio Churchill"
+      ]
+    },
+    {
+      "name": "San Antonio LEE",
+      "nickname": "Volunteers",
+      "abbreviation": "SAL",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 28",
+      "culture_grade": 4,
+      "booster_support": 4,
+      "community": "urban",
+      "enrollment": 3389,
+      "facilities_grade": 3,
+      "stadium_name": "Volunteers Stadium",
+      "rivals": [
+        "Northside Brandeis",
+        "Northside Clark",
+        "San Antonio Churchill"
+      ]
+    },
+    {
+      "name": "San Antonio Madison",
+      "nickname": "Mavericks",
+      "abbreviation": "SAM",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 28",
+      "culture_grade": 4,
+      "booster_support": 4,
+      "community": "urban",
+      "enrollment": 3330,
+      "facilities_grade": 3,
+      "stadium_name": "Mavericks Stadium",
+      "rivals": [
+        "Northside Brandeis",
+        "Northside Clark",
+        "San Antonio Churchill"
+      ]
+    },
+    {
+      "name": "San Antonio Reagan",
+      "nickname": "Rattlers",
+      "abbreviation": "SAR",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 28",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "urban",
+      "enrollment": 3197,
+      "facilities_grade": 6,
+      "stadium_name": "Rattlers Stadium",
+      "rivals": [
+        "Northside Brandeis",
+        "Northside Clark",
+        "San Antonio Churchill"
+      ]
+    },
+    {
+      "name": "San Antonio Roosevelt",
+      "nickname": "Rough Riders",
+      "abbreviation": "SAR2",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 28",
+      "culture_grade": 4,
+      "booster_support": 4,
+      "community": "urban",
+      "enrollment": 3386,
+      "facilities_grade": 3,
+      "stadium_name": "Rough Riders Stadium",
+      "rivals": [
+        "Northside Brandeis",
+        "Northside Clark",
+        "San Antonio Churchill"
+      ]
+    },
+    {
+      "name": "Northside Brennan",
+      "nickname": "Bears",
+      "abbreviation": "NB2",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 29",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 2665,
+      "facilities_grade": 6,
+      "stadium_name": "Bears Stadium",
+      "rivals": [
+        "Northside Harlan",
+        "Northside Holmes",
+        "Northside Marshall"
+      ]
+    },
+    {
+      "name": "Northside Harlan",
+      "nickname": "Hawks",
+      "abbreviation": "NH",
+      "prestige": 11,
+      "classification": "6A",
+      "region": "District 29",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 3619,
+      "facilities_grade": 7,
+      "stadium_name": "Hawks Stadium",
+      "rivals": [
+        "Northside Brennan",
+        "Northside Holmes",
+        "Northside Marshall"
+      ]
+    },
+    {
+      "name": "Northside Holmes",
+      "nickname": "Huskies",
+      "abbreviation": "NH2",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 29",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 2669,
+      "facilities_grade": 5,
+      "stadium_name": "Huskies Stadium",
+      "rivals": [
+        "Northside Brennan",
+        "Northside Harlan",
+        "Northside Marshall"
+      ]
+    },
+    {
+      "name": "Northside Marshall",
+      "nickname": "Rams",
+      "abbreviation": "NM",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 29",
+      "culture_grade": 4,
+      "booster_support": 4,
+      "community": "suburban",
+      "enrollment": 3609,
+      "facilities_grade": 4,
+      "stadium_name": "Rams Stadium",
+      "rivals": [
+        "Northside Brennan",
+        "Northside Harlan",
+        "Northside Holmes"
+      ]
+    },
+    {
+      "name": "Northside O'Connor",
+      "nickname": "Panthers",
+      "abbreviation": "NO",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 29",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 2618,
+      "facilities_grade": 6,
+      "stadium_name": "Panthers Stadium",
+      "rivals": [
+        "Northside Brennan",
+        "Northside Harlan",
+        "Northside Holmes"
+      ]
+    },
+    {
+      "name": "Northside Sotomayor",
+      "nickname": "Wolves",
+      "abbreviation": "NS",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 29",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 2394,
+      "facilities_grade": 5,
+      "stadium_name": "Wolves Stadium",
+      "rivals": [
+        "Northside Brennan",
+        "Northside Harlan",
+        "Northside Holmes"
+      ]
+    },
+    {
+      "name": "Northside Stevens",
+      "nickname": "Falcons",
+      "abbreviation": "NS2",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 29",
+      "culture_grade": 4,
+      "booster_support": 4,
+      "community": "suburban",
+      "enrollment": 3413,
+      "facilities_grade": 4,
+      "stadium_name": "Falcons Stadium",
+      "rivals": [
+        "Northside Brennan",
+        "Northside Harlan",
+        "Northside Holmes"
+      ]
+    },
+    {
+      "name": "Northside Taft",
+      "nickname": "Raiders",
+      "abbreviation": "NT",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 29",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 2332,
+      "facilities_grade": 5,
+      "stadium_name": "Raiders Stadium",
+      "rivals": [
+        "Northside Brennan",
+        "Northside Harlan",
+        "Northside Holmes"
+      ]
+    },
+    {
+      "name": "Northside Warren",
+      "nickname": "Warriors",
+      "abbreviation": "NW",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 29",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "suburban",
+      "enrollment": 2420,
+      "facilities_grade": 5,
+      "stadium_name": "Warriors Stadium",
+      "rivals": [
+        "Northside Brennan",
+        "Northside Harlan",
+        "Northside Holmes"
+      ]
+    },
+    {
+      "name": "Del Rio",
+      "nickname": "Rams",
+      "abbreviation": "DR",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 30",
+      "culture_grade": 6,
+      "booster_support": 5,
+      "community": "blue-collar",
+      "enrollment": 2572,
+      "facilities_grade": 4,
+      "stadium_name": "Rams Stadium",
+      "rivals": [
+        "Eagle Pass",
+        "Laredo Alexander",
+        "Laredo Johnson"
+      ]
+    },
+    {
+      "name": "Eagle Pass",
+      "nickname": "Eagles",
+      "abbreviation": "EP",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 30",
+      "culture_grade": 5,
+      "booster_support": 4,
+      "community": "blue-collar",
+      "enrollment": 2818,
+      "facilities_grade": 3,
+      "stadium_name": "Eagles Stadium",
+      "rivals": [
+        "Del Rio",
+        "Laredo Alexander",
+        "Laredo Johnson"
+      ]
+    },
+    {
+      "name": "Laredo Alexander",
+      "nickname": "Bulldogs",
+      "abbreviation": "LA",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 30",
+      "culture_grade": 6,
+      "booster_support": 5,
+      "community": "blue-collar",
+      "enrollment": 2392,
+      "facilities_grade": 4,
+      "stadium_name": "Bulldogs Stadium",
+      "rivals": [
+        "Del Rio",
+        "Eagle Pass",
+        "Laredo Johnson"
+      ]
+    },
+    {
+      "name": "Laredo Johnson",
+      "nickname": "Wolves",
+      "abbreviation": "LJ",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 30",
+      "culture_grade": 6,
+      "booster_support": 5,
+      "community": "blue-collar",
+      "enrollment": 2651,
+      "facilities_grade": 4,
+      "stadium_name": "Wolves Stadium",
+      "rivals": [
+        "Del Rio",
+        "Eagle Pass",
+        "Laredo Alexander"
+      ]
+    },
+    {
+      "name": "Laredo United",
+      "nickname": "Longhorns",
+      "abbreviation": "LU",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 30",
+      "culture_grade": 7,
+      "booster_support": 6,
+      "community": "blue-collar",
+      "enrollment": 3205,
+      "facilities_grade": 5,
+      "stadium_name": "Longhorns Stadium",
+      "rivals": [
+        "Laredo United South",
+        "Del Rio",
+        "Eagle Pass"
+      ]
+    },
+    {
+      "name": "Laredo United South",
+      "nickname": "Panthers",
+      "abbreviation": "LUS",
+      "prestige": 7,
+      "classification": "6A",
+      "region": "District 30",
+      "culture_grade": 6,
+      "booster_support": 5,
+      "community": "blue-collar",
+      "enrollment": 2520,
+      "facilities_grade": 4,
+      "stadium_name": "Panthers Stadium",
+      "rivals": [
+        "Laredo United",
+        "Del Rio",
+        "Eagle Pass"
+      ]
+    },
+    {
+      "name": "San Antonio Southwest",
+      "nickname": "Dragons",
+      "abbreviation": "SAS",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 30",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "urban",
+      "enrollment": 3445,
+      "facilities_grade": 5,
+      "stadium_name": "Dragons Stadium",
+      "rivals": [
+        "Del Rio",
+        "Eagle Pass",
+        "Laredo Alexander"
+      ]
+    },
+    {
+      "name": "Southwest Legacy",
+      "nickname": "Titans",
+      "abbreviation": "SL",
+      "prestige": 9,
+      "classification": "6A",
+      "region": "District 30",
+      "culture_grade": 6,
+      "booster_support": 6,
+      "community": "suburban",
+      "enrollment": 3024,
+      "facilities_grade": 6,
+      "stadium_name": "Titans Stadium",
+      "rivals": [
+        "Del Rio",
+        "Eagle Pass",
+        "Laredo Alexander"
+      ]
+    },
+    {
+      "name": "Edinburg",
+      "nickname": "Bobcats",
+      "abbreviation": "EDI",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 31",
+      "culture_grade": 5,
+      "booster_support": 5,
+      "community": "urban",
+      "enrollment": 3621,
+      "facilities_grade": 4,
+      "stadium_name": "Bobcats Stadium",
+      "rivals": [
+        "Edinburg Economedes",
+        "Edinburg North",
+        "Edinburg Vela"
+      ]
+    },
+    {
+      "name": "Edinburg Economedes",
+      "nickname": "Jaguars",
+      "abbreviation": "EE",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 31",
+      "culture_grade": 4,
+      "booster_support": 4,
+      "community": "suburban",
+      "enrollment": 3639,
+      "facilities_grade": 4,
+      "stadium_name": "Jaguars Stadium",
+      "rivals": [
+        "Edinburg",
+        "Edinburg North",
+        "Edinburg Vela"
+      ]
+    },
+    {
+      "name": "Edinburg North",
+      "nickname": "Cougars",
+      "abbreviation": "EN",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 31",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 3192,
+      "facilities_grade": 7,
+      "stadium_name": "Cougars Stadium",
+      "rivals": [
+        "Edinburg",
+        "Edinburg Economedes",
+        "Edinburg Vela"
+      ]
+    },
+    {
+      "name": "Edinburg Vela",
+      "nickname": "Sabercats",
+      "abbreviation": "EV",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 31",
+      "culture_grade": 7,
+      "booster_support": 7,
+      "community": "suburban",
+      "enrollment": 3325,
+      "facilities_grade": 7,
+      "stadium_name": "Sabercats Stadium",
+      "rivals": [
+        "Edinburg",
+        "Edinburg Economedes",
+        "Edinburg North"
+      ]
+    },
+    {
+      "name": "La Joya",
+      "nickname": "Coyotes",
+      "abbreviation": "LJ2",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 31",
+      "culture_grade": 6,
+      "booster_support": 5,
+      "community": "blue-collar",
+      "enrollment": 2773,
+      "facilities_grade": 4,
+      "stadium_name": "Coyotes Stadium",
+      "rivals": [
+        "Edinburg",
+        "Edinburg Economedes",
+        "Edinburg North"
+      ]
+    },
+    {
+      "name": "Weslaco",
+      "nickname": "Panthers",
+      "abbreviation": "WES",
+      "prestige": 8,
+      "classification": "6A",
+      "region": "District 31",
+      "culture_grade": 6,
+      "booster_support": 5,
+      "community": "blue-collar",
+      "enrollment": 2363,
+      "facilities_grade": 4,
+      "stadium_name": "Panthers Stadium",
+      "rivals": [
+        "Edinburg",
+        "Edinburg Economedes",
+        "Edinburg North"
+      ]
+    },
+    {
+      "name": "Brownsville Veterans Memorial",
+      "nickname": "Chargers",
+      "abbreviation": "BVM",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 32",
+      "culture_grade": 5,
+      "booster_support": 4,
+      "community": "blue-collar",
+      "enrollment": 2306,
+      "facilities_grade": 3,
+      "stadium_name": "Chargers Stadium",
+      "rivals": [
+        "Harlingen",
+        "Los Fresnos",
+        "Pharr-San Juan-Alamo"
+      ]
+    },
+    {
+      "name": "Harlingen",
+      "nickname": "Cardinals",
+      "abbreviation": "HAR",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 32",
+      "culture_grade": 8,
+      "booster_support": 7,
+      "community": "blue-collar",
+      "enrollment": 3261,
+      "facilities_grade": 6,
+      "stadium_name": "Cardinals Stadium",
+      "rivals": [
+        "Brownsville Veterans Memorial",
+        "Los Fresnos",
+        "Pharr-San Juan-Alamo"
+      ]
+    },
+    {
+      "name": "Los Fresnos",
+      "nickname": "Falcons",
+      "abbreviation": "LF2",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 32",
+      "culture_grade": 5,
+      "booster_support": 4,
+      "community": "blue-collar",
+      "enrollment": 2515,
+      "facilities_grade": 3,
+      "stadium_name": "Falcons Stadium",
+      "rivals": [
+        "Brownsville Veterans Memorial",
+        "Harlingen",
+        "Pharr-San Juan-Alamo"
+      ]
+    },
+    {
+      "name": "Pharr-San Juan-Alamo",
+      "nickname": "Bears",
+      "abbreviation": "SJA",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 32",
+      "culture_grade": 5,
+      "booster_support": 4,
+      "community": "blue-collar",
+      "enrollment": 3470,
+      "facilities_grade": 3,
+      "stadium_name": "Bears Stadium",
+      "rivals": [
+        "Brownsville Veterans Memorial",
+        "Harlingen",
+        "Los Fresnos"
+      ]
+    },
+    {
+      "name": "PSJA North",
+      "nickname": "Raiders",
+      "abbreviation": "PN",
+      "prestige": 10,
+      "classification": "6A",
+      "region": "District 32",
+      "culture_grade": 8,
+      "booster_support": 7,
+      "community": "blue-collar",
+      "enrollment": 2646,
+      "facilities_grade": 6,
+      "stadium_name": "Raiders Stadium",
+      "rivals": [
+        "Brownsville Veterans Memorial",
+        "Harlingen",
+        "Los Fresnos"
+      ]
+    },
+    {
+      "name": "San Benito",
+      "nickname": "Greyhounds",
+      "abbreviation": "SB",
+      "prestige": 6,
+      "classification": "6A",
+      "region": "District 32",
+      "culture_grade": 5,
+      "booster_support": 4,
+      "community": "blue-collar",
+      "enrollment": 3008,
+      "facilities_grade": 3,
+      "stadium_name": "Greyhounds Stadium",
+      "rivals": [
+        "Brownsville Veterans Memorial",
+        "Harlingen",
+        "Los Fresnos"
+      ]
+    }
+  ]
+}

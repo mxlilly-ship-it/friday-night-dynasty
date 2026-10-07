@@ -102,6 +102,22 @@ PLAYOFF_SYSTEMS: Dict[str, PlayoffSystemConfig] = {
         per_classification=True,
         min_teams=8,
     ),
+    "top64": PlayoffSystemConfig(
+        id="top64",
+        label="Top 64 (one bracket per classification)",
+        description=(
+            "One 64-team bracket per classification. Seeded 1-64 by wins then "
+            "point differential; first-round pairings 1v64, 2v63, and so on. "
+            "Six rounds: Round of 64 -> Round of 32 -> Round of 16 -> "
+            "Quarterfinal -> Semifinal -> Championship. Built for a large "
+            "single class such as Texas 6A, where most districts send more "
+            "than one team but the whole classification does not make the "
+            "postseason."
+        ),
+        bracket_size=64,
+        per_classification=True,
+        min_teams=64,
+    ),
     "wv16": PlayoffSystemConfig(
         id="wv16",
         label="WV-style (16-team per classification)",

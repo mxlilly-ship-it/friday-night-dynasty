@@ -224,3 +224,193 @@ def build_weeks_10_game_for_pods(
             if wi < len(pod_weeks):
                 merged[wi].extend(pod_weeks[wi])
     return rebalance_home_away_weeks(merged)
+
+
+def _region_distance(region_a: str, region_b: str) -> int:
+    """Prefer neighboring numbered districts. Unnumbered regions are equally close."""
+    import re
+
+    ma = re.search(r"(\d+)", region_a or "")
+    mb = re.search(r"(\d+)", region_b or "")
+    if ma and mb:
+        return abs(int(ma.group(1)) - int(mb.group(1)))
+    return 1
+
+
+def fill_weeks_to_target(
+    weeks: List[List[Tuple[str, str]]],
+    team_class: Dict[str, str],
+    team_region: Dict[str, str],
+    target: int = 10,
+) -> List[List[Tuple[str, str]]]:
+    """
+    After each district round-robin, add non-district games until every team
+    has ``target`` games (or no legal opponent remains).
+
+    Same classification only. No rematches. A team plays at most once per week.
+    Numbered districts prefer a nearer district number.
+    """
+    out: List[List[Tuple[str, str]]] = [[(h, a) for h, a in wk] for wk in weeks]
+    names = list(team_class.keys())
+    if len(names) < 2:
+        return out
+
+    played: Set[Tuple[str, str]] = set()
+    counts: Dict[str, int] = {n: 0 for n in names}
+    ha = _ha_counts()
+    for wk in out:
+        for home, away in wk:
+            played.add(tuple(sorted((home, away))))
+            counts[home] = counts.get(home, 0) + 1
+            counts[away] = counts.get(away, 0) + 1
+            record_home_away(home, away, ha)
+
+    def _playing(week: List[Tuple[str, str]]) -> Set[str]:
+        busy: Set[str] = set()
+        for home, away in week:
+            busy.add(home)
+            busy.add(away)
+        return busy
+
+    def _fill_week(week: List[Tuple[str, str]]) -> int:
+        added = 0
+        busy = _playing(week)
+        need = [n for n in names if counts.get(n, 0) < target and n not in busy]
+        need.sort(key=lambda n: (counts.get(n, 0), n))
+        used: Set[str] = set()
+        for team in need:
+            if team in used or counts.get(team, 0) >= target:
+                continue
+            cls = team_class.get(team, "")
+            reg = team_region.get(team, "")
+            cands: List[Tuple[int, int, str]] = []
+            for opp in need:
+                if opp == team or opp in used:
+                    continue
+                if team_class.get(opp, "") != cls:
+                    continue
+                if counts.get(opp, 0) >= target:
+                    continue
+                pair = tuple(sorted((team, opp)))
+                if pair in played:
+                    continue
+                dist = _region_distance(reg, team_region.get(opp, ""))
+                # Same district is a last resort (round-robin already played those).
+                if team_region.get(opp, "") == reg:
+                    dist += 1000
+                cands.append((dist, counts.get(opp, 0), opp))
+            if not cands:
+                continue
+            cands.sort()
+            opp = cands[0][2]
+            home, away = pick_home_away(team, opp, ha)
+            week.append((home, away))
+            played.add(tuple(sorted((home, away))))
+            counts[home] = counts.get(home, 0) + 1
+            counts[away] = counts.get(away, 0) + 1
+            used.add(team)
+            used.add(opp)
+            busy.add(team)
+            busy.add(opp)
+            added += 1
+        return added
+
+    for week in out:
+        _fill_week(week)
+
+    guard = 0
+    while any(counts.get(n, 0) < target for n in names) and guard < target + 5:
+        guard += 1
+        week = []
+        if _fill_week(week) <= 0:
+            break
+        out.append(week)
+
+    def _drop(week: List[Tuple[str, str]], gi: int) -> None:
+        home, away = week.pop(gi)
+        played.discard(tuple(sorted((home, away))))
+        counts[home] -= 1
+        counts[away] -= 1
+        ha[home]["h"] -= 1
+        ha[away]["a"] -= 1
+
+    def _add_to(week: List[Tuple[str, str]], a: str, b: str) -> None:
+        home, away = pick_home_away(a, b, ha)
+        week.append((home, away))
+        played.add(tuple(sorted((home, away))))
+        counts[home] += 1
+        counts[away] += 1
+
+    def _place(a: str, b: str) -> None:
+        for week in out:
+            busy = _playing(week)
+            if a not in busy and b not in busy:
+                _add_to(week, a, b)
+                return
+        fresh: List[Tuple[str, str]] = []
+        _add_to(fresh, a, b)
+        out.append(fresh)
+
+    # If the last teams still short have already played each other, trade one
+    # non-district game so both can reach the target without a rematch.
+    for _ in range(40):
+        short = [n for n in names if counts.get(n, 0) < target]
+        if not short:
+            break
+        short.sort(key=lambda n: (counts[n], n))
+        placed = False
+        for i, a in enumerate(short):
+            for b in short[i + 1 :]:
+                if team_class.get(a) != team_class.get(b):
+                    continue
+                if tuple(sorted((a, b))) in played:
+                    continue
+                _place(a, b)
+                placed = True
+                break
+            if placed:
+                break
+        if placed:
+            continue
+        s1 = short[0]
+        partner = next((b for b in short[1:] if team_class.get(b) == team_class.get(s1)), None)
+        if partner is None:
+            break
+        swapped = False
+        for week in out:
+            for gi, (home, away) in enumerate(week):
+                options = (
+                    (home, away, s1, partner),
+                    (away, home, s1, partner),
+                    (home, away, partner, s1),
+                    (away, home, partner, s1),
+                )
+                for t, u, st, su in options:
+                    if counts.get(t, 0) < target or counts.get(u, 0) < target:
+                        continue
+                    if team_class.get(t) != team_class.get(st):
+                        continue
+                    if team_region.get(t, "") == team_region.get(u, ""):
+                        continue
+                    if tuple(sorted((t, st))) in played or tuple(sorted((u, su))) in played:
+                        continue
+                    _drop(week, gi)
+                    busy = _playing(week)
+                    if st not in busy and su not in busy and t not in busy and u not in busy:
+                        _add_to(week, t, st)
+                        _add_to(week, u, su)
+                    else:
+                        _place(t, st)
+                        _place(u, su)
+                    swapped = True
+                    break
+                if swapped:
+                    break
+            if swapped:
+                break
+        if not swapped:
+            break
+
+    compact = [wk for wk in out if wk]
+    out[:] = compact
+    return out

@@ -28,6 +28,24 @@ LEAGUE_PRESETS: List[Dict[str, str]] = [
         "description": "1A / 2A / 3A — 16-team playoff per class (1-16 seeding, no regional brackets).",
         "filename": "wv_3class_league.json",
     },
+    {
+        "id": "az_6a5a",
+        "label": "Arizona 6A / 5A",
+        "description": "6A / 5A — four regions per class, 16-team statewide playoff per class (wv16).",
+        "filename": "az_6a5a_league.json",
+    },
+    {
+        "id": "wi_1a2a",
+        "label": "Wisconsin 1A / 2A",
+        "description": "WIAA Div 1 / Div 2 — 13/region (odd pods; most get 10 games, a few may get 9), top 8 per region playoffs.",
+        "filename": "wi_1a2a_league.json",
+    },
+    {
+        "id": "tx_6a",
+        "label": "Texas 6A",
+        "description": "UIL 6A 2026–28 — 249 schools, 32 districts. 10-game season, then the top 64 teams in a state bracket.",
+        "filename": "tx_6a_league.json",
+    },
 ]
 
 

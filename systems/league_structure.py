@@ -194,6 +194,63 @@ def _region_index_map(regs_list: List[List[str]]) -> Dict[str, int]:
     return {name: ri for ri, lst in enumerate(regs_list) for name in lst}
 
 
+def _mixed_in_region_target(pod_size: int, max_weeks: int = 8) -> int:
+    """Unique in-region games achievable in ``max_weeks`` without rematches.
+
+    Odd pods have a bye each week, so 8 rounds cannot deliver 8 games to every school.
+    """
+    n = int(pod_size)
+    if n < 2:
+        return 0
+    unique_cap = n - 1
+    if n % 2 == 0:
+        return max(0, min(max_weeks, unique_cap))
+    achievable = (max_weeks * (n - 1)) // n
+    return max(0, min(unique_cap, achievable))
+
+
+def _mixed_cross_target(pod_size: int, total_target: int = 10, max_weeks: int = 8) -> int:
+    """Cross games needed so every school reaches ``total_target`` without in-region rematches."""
+    return max(0, int(total_target) - _mixed_in_region_target(pod_size, max_weeks=max_weeks))
+
+
+def _rounds_for_in_region_target(pod_size: int, target: int) -> int:
+    """How many circle rounds an odd/even pod needs so each team reaches ``target`` games."""
+    n = int(pod_size)
+    t = int(target)
+    if n < 2 or t <= 0:
+        return 0
+    if n % 2 == 0:
+        return min(10, t)
+    # Odd: each round one bye → games ≈ rounds * (n-1)/n. Need ceil(t * n / (n-1)).
+    return min(10, (t * n + (n - 2)) // (n - 1))
+
+
+def _mixed_target_maps(
+    regs_list: List[List[str]], total_target: int = 10, max_weeks: int = 8
+) -> Tuple[Dict[str, int], Dict[str, int]]:
+    """Per-team in/cross targets, aligned so every region needs the same cross count.
+
+    If one pod is odd-sized and needs 3 cross games, even pods drop one in-region
+    game so they can absorb those pairings without going over 10.
+    """
+    per_pod_in = [_mixed_in_region_target(len(lst), max_weeks=max_weeks) for lst in regs_list]
+    max_cross = max((total_target - ir for ir in per_pod_in), default=2)
+    max_cross = max(0, min(4, max_cross))
+    aligned_in = max(0, total_target - max_cross)
+
+    in_tgt: Dict[str, int] = {}
+    cross_tgt: Dict[str, int] = {}
+    for lst, pod_in in zip(regs_list, per_pod_in):
+        # Never ask a pod for more in-region games than it can uniquely schedule.
+        ir = min(pod_in, aligned_in)
+        cr = total_target - ir
+        for t in lst:
+            in_tgt[t] = ir
+            cross_tgt[t] = cr
+    return in_tgt, cross_tgt
+
+
 def _count_cross_games(
     weeks: List[List[Tuple[str, str]]],
     reg_of: Dict[str, int],
@@ -217,12 +274,17 @@ def _teams_playing_week(week: List[Tuple[str, str]]) -> set[str]:
     return playing
 
 
+def _pair_keys_in_block(block: List[List[Tuple[str, str]]]) -> set[Tuple[str, str]]:
+    return {tuple(sorted((h, a))) for week in block for h, a in week}
+
+
 def _pair_cross_week_pools(
     pool_a: List[str],
     pool_b: List[str],
     offset: int,
     used: set[str],
     ha_counts: Dict[str, Dict[str, int]],
+    played: Optional[set[Tuple[str, str]]] = None,
 ) -> List[Tuple[str, str]]:
     from systems.schedule_system import pick_home_away
 
@@ -230,12 +292,38 @@ def _pair_cross_week_pools(
     avail_b = [t for t in pool_b if t not in used]
     n = min(len(avail_a), len(avail_b))
     games: List[Tuple[str, str]] = []
+    local_used: set[str] = set()
     for i in range(n):
         t1 = avail_a[i]
-        t2 = avail_b[(i + offset) % len(avail_b)] if avail_b else avail_b[0]
-        games.append(pick_home_away(t1, t2, ha_counts))
+        if t1 in local_used:
+            continue
+        chosen: Optional[str] = None
+        for j in range(len(avail_b)):
+            t2 = avail_b[(i + offset + j) % len(avail_b)]
+            if t2 in local_used or t2 in used:
+                continue
+            key = tuple(sorted((t1, t2)))
+            if played is not None and key in played:
+                continue
+            chosen = t2
+            break
+        if chosen is None:
+            # Fall back to first free opponent even if rematch when no unique pairing remains.
+            for j in range(len(avail_b)):
+                t2 = avail_b[(i + offset + j) % len(avail_b)]
+                if t2 in local_used or t2 in used:
+                    continue
+                chosen = t2
+                break
+        if chosen is None:
+            continue
+        games.append(pick_home_away(t1, chosen, ha_counts))
         used.add(t1)
-        used.add(t2)
+        used.add(chosen)
+        local_used.add(t1)
+        local_used.add(chosen)
+        if played is not None:
+            played.add(tuple(sorted((t1, chosen))))
     return games
 
 
@@ -243,42 +331,60 @@ def _build_mixed_cross_weeks(
     regs_list: List[List[str]],
     ha_counts: Dict[str, Dict[str, int]],
     locks_fn,
-    cross_target: int = 2,
+    cross_targets: Optional[Dict[str, int]] = None,
+    played: Optional[set[Tuple[str, str]]] = None,
 ) -> List[List[Tuple[str, str]]]:
-    """Two cross-region weeks; gap-fill short teams before finishing BD pairings."""
+    """Cross-region weeks sized to the max per-team cross need (2–4)."""
     cross_weeks: List[List[Tuple[str, str]]] = []
     cross_so_far: Dict[str, int] = {t: 0 for lst in regs_list for t in lst}
+    if cross_targets is None:
+        cross_targets = {t: 2 for t in cross_so_far}
+    max_cross = max(cross_targets.values(), default=2)
     reg_of = _region_index_map(regs_list)
+    played_pairs = played if played is not None else set()
+
+    def _need(team: str) -> int:
+        return cross_targets.get(team, 2)
 
     def _gap_fill_week(week_games: List[Tuple[str, str]]) -> None:
         from systems.schedule_system import pick_home_away
 
-        for _ in range(len(regs_list) * 4):
+        for _ in range(len(regs_list) * 6):
             short = sorted(
-                [t for lst in regs_list for t in lst if cross_so_far.get(t, 0) < cross_target],
-                key=lambda t: (cross_so_far.get(t, 0), t),
+                [t for lst in regs_list for t in lst if cross_so_far.get(t, 0) < _need(t)],
+                key=lambda t: (cross_so_far.get(t, 0) - _need(t), t),
             )
             if not short:
                 break
             team = short[0]
             playing = _teams_playing_week(week_games)
             if team in playing:
-                continue
+                # Try next neediest idle team.
+                idle_short = [t for t in short if t not in playing]
+                if not idle_short:
+                    break
+                team = idle_short[0]
             my_reg = reg_of[team]
             placed = False
+            candidates: List[Tuple[int, int, str]] = []
             for oreg, olist in enumerate(regs_list):
                 if oreg == my_reg:
                     continue
-                for opp in sorted(olist, key=lambda t: (cross_so_far.get(t, 0), t)):
-                    if cross_so_far.get(opp, 0) >= cross_target or opp in playing:
+                for opp in olist:
+                    if cross_so_far.get(opp, 0) >= _need(opp) or opp in playing:
                         continue
-                    week_games.append(pick_home_away(team, opp, ha_counts))
-                    cross_so_far[team] += 1
-                    cross_so_far[opp] += 1
-                    placed = True
-                    break
-                if placed:
-                    break
+                    rematch = 1 if tuple(sorted((team, opp))) in played_pairs else 0
+                    candidates.append((rematch, cross_so_far.get(opp, 0), opp))
+            candidates.sort()
+            for _rematch, _cc, opp in candidates:
+                week_games.append(pick_home_away(team, opp, ha_counts))
+                played_pairs.add(tuple(sorted((team, opp))))
+                cross_so_far[team] += 1
+                cross_so_far[opp] += 1
+                placed = True
+                break
+            if not placed:
+                break
 
     def _pair_regions(wk_idx: int, a: int, b: int, used: set[str], week_games: List[Tuple[str, str]]) -> None:
         locks = locks_fn(wk_idx, a, b)
@@ -294,45 +400,45 @@ def _build_mixed_cross_weeks(
                 used.add(away)
                 cross_so_far[home] += 1
                 cross_so_far[away] += 1
+                played_pairs.add(tuple(sorted((home, away))))
             return
-        need_a = [t for t in regs_list[a] if cross_so_far[t] < cross_target]
-        need_b = [t for t in regs_list[b] if cross_so_far[t] < cross_target]
+        need_a = [t for t in regs_list[a] if cross_so_far[t] < _need(t)]
+        need_b = [t for t in regs_list[b] if cross_so_far[t] < _need(t)]
         need_a.sort(key=lambda t: (cross_so_far[t], t))
         need_b.sort(key=lambda t: (cross_so_far[t], t))
         max_sz = max(len(regs_list[a]), len(regs_list[b]), 1)
-        paired = _pair_cross_week_pools(need_a, need_b, (wk_idx + a + b) % max_sz, used, ha_counts)
+        paired = _pair_cross_week_pools(
+            need_a, need_b, (wk_idx + a + b) % max_sz, used, ha_counts, played_pairs
+        )
         week_games.extend(paired)
         for home, away in paired:
             cross_so_far[home] += 1
             cross_so_far[away] += 1
 
-    # Week 9: AB + CD
-    used_w9: set[str] = set()
-    week9: List[Tuple[str, str]] = []
-    _pair_regions(0, 0, 1, used_w9, week9)
-    _pair_regions(0, 2, 3, used_w9, week9)
-    _gap_fill_week(week9)
-    cross_weeks.append(week9)
+    pair_week_defs = [
+        ((0, 1), (2, 3)),
+        ((0, 2), (1, 3)),
+        ((0, 3), (1, 2)),
+        ((0, 1), (2, 3)),
+    ]
+    num_cross_weeks = min(len(pair_week_defs), max(2, max_cross))
 
-    # Week 10: AC, gap-fill, then BD
-    used_w10: set[str] = set()
-    week10: List[Tuple[str, str]] = []
-    _pair_regions(1, 0, 2, used_w10, week10)
-    _gap_fill_week(week10)
-    used_w10 = _teams_playing_week(week10)
-    _pair_regions(1, 1, 3, used_w10, week10)
-    _gap_fill_week(week10)
-    cross_weeks.append(week10)
-
-    # Week 11: AD + BC when the class is large enough to need a third cross week (e.g. VA Class 2).
-    total_teams = sum(len(lst) for lst in regs_list)
-    if total_teams >= 48:
-        used_w11: set[str] = set()
-        week11: List[Tuple[str, str]] = []
-        _pair_regions(2, 0, 3, used_w11, week11)
-        _pair_regions(2, 1, 2, used_w11, week11)
-        _gap_fill_week(week11)
-        cross_weeks.append(week11)
+    for wk_idx in range(num_cross_weeks):
+        used: set[str] = set()
+        week_games: List[Tuple[str, str]] = []
+        pairs = pair_week_defs[wk_idx]
+        if wk_idx == 1:
+            # AC first, gap-fill, then BD (legacy order helps uneven pods).
+            _pair_regions(wk_idx, pairs[0][0], pairs[0][1], used, week_games)
+            _gap_fill_week(week_games)
+            used = _teams_playing_week(week_games)
+            _pair_regions(wk_idx, pairs[1][0], pairs[1][1], used, week_games)
+            _gap_fill_week(week_games)
+        else:
+            for a, b in pairs:
+                _pair_regions(wk_idx, a, b, used, week_games)
+            _gap_fill_week(week_games)
+        cross_weeks.append(week_games)
     return cross_weeks
 
 
@@ -340,42 +446,53 @@ def _fill_cross_week_gaps(
     block: List[List[Tuple[str, str]]],
     regs_list: List[List[str]],
     ha_counts: Dict[str, Dict[str, int]],
-    cross_target: int = 2,
+    cross_targets: Optional[Dict[str, int]] = None,
     in_region_weeks: int = 8,
 ) -> None:
     """Add cross-region games on dedicated cross weeks for teams that were idle (uneven pods)."""
     from systems.schedule_system import pick_home_away
 
     reg_of = _region_index_map(regs_list)
+    _, default_cross = _mixed_target_maps(regs_list)
+    targets = cross_targets or default_cross
+    played = _pair_keys_in_block(block)
+
+    def _need(team: str) -> int:
+        return targets.get(team, 2)
+
     for wi in range(in_region_weeks, len(block)):
         week = block[wi]
         cross_counts = _count_cross_games(block, reg_of)
         short = sorted(
-            [t for lst in regs_list for t in lst if cross_counts.get(t, 0) < cross_target],
-            key=lambda t: (cross_counts.get(t, 0), t),
+            [t for lst in regs_list for t in lst if cross_counts.get(t, 0) < _need(t)],
+            key=lambda t: (cross_counts.get(t, 0) - _need(t), t),
         )
         for team in short:
-            if cross_counts.get(team, 0) >= cross_target:
+            if cross_counts.get(team, 0) >= _need(team):
                 continue
             playing = _teams_playing_week(week)
             if team in playing:
                 continue
             my_reg = reg_of[team]
+            cands: List[Tuple[int, int, str]] = []
             for oreg, olist in enumerate(regs_list):
                 if oreg == my_reg:
                     continue
-                for opp in sorted(olist):
-                    if cross_counts.get(opp, 0) >= cross_target or opp in playing:
+                for opp in olist:
+                    if cross_counts.get(opp, 0) >= _need(opp) or opp in playing:
                         continue
-                    game = pick_home_away(team, opp, ha_counts)
-                    week.append(game)
-                    cross_counts[team] += 1
-                    cross_counts[opp] += 1
-                    playing.add(team)
-                    playing.add(opp)
-                    break
-                if cross_counts.get(team, 0) >= cross_target:
-                    break
+                    rematch = 1 if tuple(sorted((team, opp))) in played else 0
+                    cands.append((rematch, cross_counts.get(opp, 0), opp))
+            cands.sort()
+            for _rematch, _cc, opp in cands:
+                game = pick_home_away(team, opp, ha_counts)
+                week.append(game)
+                played.add(tuple(sorted((team, opp))))
+                cross_counts[team] += 1
+                cross_counts[opp] += 1
+                playing.add(team)
+                playing.add(opp)
+                break
 
 
 def _spillover_cross_into_in_region_weeks(
@@ -485,12 +602,16 @@ def _embed_cross_on_bye_week(
     regs_list: List[List[str]],
     ha_counts: Dict[str, Dict[str, int]],
     cross_counts: Dict[str, int],
-    cross_target: int = 2,
+    cross_targets: Optional[Dict[str, int]] = None,
+    played: Optional[set[Tuple[str, str]]] = None,
 ) -> None:
     """Use odd-pod bye weeks during in-region play for out-of-region games."""
     from systems.schedule_system import pick_home_away
 
     reg_of = _region_index_map(regs_list)
+    _, default_cross = _mixed_target_maps(regs_list)
+    targets = cross_targets or default_cross
+    played_pairs = played if played is not None else set()
     playing = _teams_playing_week(week_games)
     for pod in regs_list:
         if len(pod) % 2 == 0:
@@ -499,23 +620,97 @@ def _embed_cross_on_bye_week(
         if len(byes) != 1:
             continue
         team = byes[0]
-        if cross_counts.get(team, 0) >= cross_target:
+        if cross_counts.get(team, 0) >= targets.get(team, 2):
             continue
         my_reg = reg_of[team]
+        cands: List[Tuple[int, int, str]] = []
         for oreg, olist in enumerate(regs_list):
             if oreg == my_reg:
                 continue
-            for opp in sorted(olist, key=lambda t: (cross_counts.get(t, 0), t)):
-                if opp in playing or cross_counts.get(opp, 0) >= cross_target:
+            for opp in olist:
+                if opp in playing or cross_counts.get(opp, 0) >= targets.get(opp, 2):
                     continue
-                week_games.append(pick_home_away(team, opp, ha_counts))
-                cross_counts[team] += 1
-                cross_counts[opp] += 1
-                playing.add(team)
-                playing.add(opp)
+                rematch = 1 if tuple(sorted((team, opp))) in played_pairs else 0
+                cands.append((rematch, cross_counts.get(opp, 0), opp))
+        cands.sort()
+        for _rematch, _cc, opp in cands:
+            week_games.append(pick_home_away(team, opp, ha_counts))
+            played_pairs.add(tuple(sorted((team, opp))))
+            cross_counts[team] += 1
+            cross_counts[opp] += 1
+            playing.add(team)
+            playing.add(opp)
+            break
+
+
+def _trim_overscheduled_games(
+    block: List[List[Tuple[str, str]]],
+    regs_list: List[List[str]],
+    total_target: int = 10,
+) -> None:
+    """Drop surplus games so no team exceeds ``total_target`` (prefer rematches / late weeks)."""
+    reg_of = _region_index_map(regs_list)
+
+    def _counts() -> Dict[str, int]:
+        _, _, total = _snapshot_pod_game_counts(block, regs_list)
+        return total
+
+    for _ in range(sum(len(lst) for lst in regs_list) * 8):
+        total = _counts()
+        over = [t for t in total if total[t] > total_target]
+        if not over:
+            break
+        # Prefer removing rematch games involving an overscheduled team in later weeks.
+        pair_weeks: Dict[Tuple[str, str], List[Tuple[int, int]]] = {}
+        for wi, week in enumerate(block):
+            for gi, (home, away) in enumerate(week):
+                key = tuple(sorted((home, away)))
+                pair_weeks.setdefault(key, []).append((wi, gi))
+
+        removed = False
+        # Pass 1: rematches
+        for key, locs in sorted(pair_weeks.items(), key=lambda kv: -len(kv[1])):
+            if len(locs) < 2:
+                continue
+            a, b = key
+            if a not in over and b not in over:
+                continue
+            wi, gi = locs[-1]
+            block[wi].pop(gi)
+            removed = True
+            break
+        if removed:
+            continue
+        # Pass 2: any late-week game for the most overscheduled team
+        team = max(over, key=lambda t: (total[t], t))
+        for wi in range(len(block) - 1, -1, -1):
+            for gi in range(len(block[wi]) - 1, -1, -1):
+                home, away = block[wi][gi]
+                if team not in (home, away):
+                    continue
+                # Prefer dropping a cross game so in-region balance stays intact.
+                is_cross = reg_of.get(home) != reg_of.get(away)
+                if is_cross or wi >= len(block) - 2:
+                    block[wi].pop(gi)
+                    removed = True
+                    break
+            if removed:
                 break
-            if cross_counts.get(team, 0) >= cross_target:
-                break
+            # Pass 3: drop any remaining game for this team
+            for wi in range(len(block) - 1, -1, -1):
+                for gi in range(len(block[wi]) - 1, -1, -1):
+                    home, away = block[wi][gi]
+                    if team in (home, away):
+                        block[wi].pop(gi)
+                        removed = True
+                        break
+                if removed:
+                    break
+        if not removed:
+            break
+    # Drop empty trailing weeks
+    while block and not block[-1]:
+        block.pop()
 
 
 def _ensure_mixed_template_ten_games(
@@ -523,16 +718,22 @@ def _ensure_mixed_template_ten_games(
     regs_list: List[List[str]],
     ha_counts: Dict[str, Dict[str, int]],
     *,
-    in_region_target: int = 8,
-    cross_target: int = 2,
     total_target: int = 10,
     in_region_weeks: int = 8,
+    in_region_targets: Optional[Dict[str, int]] = None,
+    cross_targets: Optional[Dict[str, int]] = None,
 ) -> None:
-    """Guarantee 10-game seasons (8 in-region + 2 cross when possible) for uneven 4-region classes."""
+    """Guarantee 10-game seasons for uneven 4-region classes without forced rematches."""
     from systems.schedule_system import pick_home_away
 
     reg_of = _region_index_map(regs_list)
     all_teams = [t for lst in regs_list for t in lst]
+    default_in, default_cross = _mixed_target_maps(regs_list, total_target)
+    in_targets = in_region_targets or default_in
+    x_targets = cross_targets or default_cross
+
+    def played_pairs() -> set[Tuple[str, str]]:
+        return _pair_keys_in_block(block)
 
     def try_add_cross(
         team: str,
@@ -540,10 +741,11 @@ def _ensure_mixed_template_ten_games(
         cross: Dict[str, int],
         total: Dict[str, int],
     ) -> bool:
-        if cross[team] >= cross_target or total[team] >= total_target:
+        if cross[team] >= x_targets.get(team, 2) or total[team] >= total_target:
             return False
         week_order = list(range(len(block)))
         week_order.sort(key=lambda wi: (0 if wi >= in_region_weeks else 1, wi))
+        played = played_pairs()
         for wi in week_order:
             playing = _teams_playing_week(block[wi])
             if team in playing:
@@ -553,7 +755,11 @@ def _ensure_mixed_template_ten_games(
                 (
                     o
                     for o in all_teams
-                    if reg_of[o] != my_reg and o not in playing and cross[o] < cross_target
+                    if reg_of[o] != my_reg
+                    and o not in playing
+                    and cross[o] < x_targets.get(o, 2)
+                    and total[o] < total_target
+                    and tuple(sorted((team, o))) not in played
                 ),
                 key=lambda o: (cross[o], o),
             )
@@ -562,7 +768,10 @@ def _ensure_mixed_template_ten_games(
                     (
                         o
                         for o in all_teams
-                        if reg_of[o] != my_reg and o not in playing and total[o] < total_target
+                        if reg_of[o] != my_reg
+                        and o not in playing
+                        and total[o] < total_target
+                        and tuple(sorted((team, o))) not in played
                     ),
                     key=lambda o: (cross[o], -in_reg[o], o),
                 )
@@ -572,9 +781,12 @@ def _ensure_mixed_template_ten_games(
             return True
         return False
 
-    def try_add_in_region(team: str, in_reg: Dict[str, int]) -> bool:
+    def try_add_in_region(team: str, in_reg: Dict[str, int], total: Dict[str, int]) -> bool:
+        if in_reg[team] >= in_targets.get(team, 8) or total[team] >= total_target:
+            return False
         my_reg = reg_of[team]
         pod = regs_list[my_reg]
+        played = played_pairs()
         week_order = list(range(min(in_region_weeks, len(block)))) + list(
             range(min(in_region_weeks, len(block)), len(block))
         )
@@ -582,7 +794,14 @@ def _ensure_mixed_template_ten_games(
             playing = _teams_playing_week(block[wi])
             if team in playing:
                 continue
-            cands = [o for o in pod if o != team and o not in playing]
+            cands = [
+                o
+                for o in pod
+                if o != team
+                and o not in playing
+                and total[o] < total_target
+                and tuple(sorted((team, o))) not in played
+            ]
             if not cands:
                 continue
             opp = min(cands, key=lambda o: in_reg[o])
@@ -597,6 +816,7 @@ def _ensure_mixed_template_ten_games(
         total: Dict[str, int],
     ) -> bool:
         my_reg = reg_of[team]
+        played = played_pairs()
         for wi in range(min(in_region_weeks, len(block))):
             for gi, (home, away) in enumerate(block[wi]):
                 if team not in (home, away):
@@ -608,22 +828,28 @@ def _ensure_mixed_template_ten_games(
                 for o in all_teams:
                     if reg_of[o] == my_reg or o in playing or o == team:
                         continue
-                    if cross[o] >= cross_target and total[o] >= total_target:
+                    if cross[o] >= x_targets.get(o, 2) and total[o] >= total_target:
+                        continue
+                    if tuple(sorted((team, o))) in played:
+                        # Allow replacing current game's pair key which is team-opp_in, not team-o
+                        pass
+                    if tuple(sorted((team, o))) in played:
                         continue
                     block[wi][gi] = pick_home_away(team, o, ha_counts)
                     in_reg[team] -= 1
                     in_reg[opp_in] -= 1
                     cross[team] += 1
                     cross[o] += 1
-                    if in_reg[opp_in] < in_region_target:
-                        try_add_in_region(opp_in, in_reg)
+                    if in_reg[opp_in] < in_targets.get(opp_in, 8):
+                        try_add_in_region(opp_in, in_reg, total)
                     return True
         return False
 
-    def try_swap_teammate_cross_for_in(team: str, in_reg: Dict[str, int], cross: Dict[str, int]) -> bool:
+    def try_swap_teammate_cross_for_in(team: str, in_reg: Dict[str, int], cross: Dict[str, int], total: Dict[str, int]) -> bool:
         """Convert a podmate's cross game into an in-region game for ``team`` (same week)."""
         my_reg = reg_of[team]
         pod = set(regs_list[my_reg])
+        played = played_pairs()
         for wi in range(len(block)):
             playing = _teams_playing_week(block[wi])
             if team in playing:
@@ -639,14 +865,16 @@ def _ensure_mixed_template_ten_games(
                     mate, cross_opp = away, home
                 if not mate or not cross_opp:
                     continue
+                if tuple(sorted((team, mate))) in played:
+                    continue
                 block[wi][gi] = pick_home_away(team, mate, ha_counts)
                 cross[mate] -= 1
                 cross[cross_opp] -= 1
                 in_reg[team] += 1
                 in_reg[mate] += 1
-                if cross[mate] < cross_target:
+                if cross[mate] < x_targets.get(mate, 2):
                     try_add_cross(mate, in_reg, cross, total)
-                if cross[cross_opp] < cross_target:
+                if cross[cross_opp] < x_targets.get(cross_opp, 2):
                     try_add_cross(cross_opp, in_reg, cross, total)
                 return True
         return False
@@ -662,22 +890,24 @@ def _ensure_mixed_template_ten_games(
             if total[team] >= total_target:
                 continue
             progressed = False
-            if cross[team] < cross_target:
+            if cross[team] < x_targets.get(team, 2):
                 progressed = try_add_cross(team, in_reg, cross, total)
                 if not progressed:
                     progressed = try_swap_in_for_cross(team, in_reg, cross, total)
-            if not progressed and in_reg[team] < in_region_target:
-                progressed = try_add_in_region(team, in_reg)
-            if not progressed and in_reg[team] < in_region_target:
-                progressed = try_swap_teammate_cross_for_in(team, in_reg, cross)
+            if not progressed and in_reg[team] < in_targets.get(team, 8):
+                progressed = try_add_in_region(team, in_reg, total)
+            if not progressed and in_reg[team] < in_targets.get(team, 8):
+                progressed = try_swap_teammate_cross_for_in(team, in_reg, cross, total)
             if not progressed:
-                progressed = try_add_in_region(team, in_reg)
+                progressed = try_add_in_region(team, in_reg, total)
             if not progressed:
                 progressed = try_add_cross(team, in_reg, cross, total)
             if progressed:
                 progressed_any = True
         if not progressed_any:
             break
+
+    _trim_overscheduled_games(block, regs_list, total_target=total_target)
 
 
 def playoff_pool_team_names(state: Dict[str, Any], teams: Dict[str, "Team"]) -> List[str]:
@@ -704,12 +934,14 @@ def build_regular_season_weeks(
     Build the regular season: independent circle round-robins inside each scheduling pod, merged per week.
 
     Each pod uses at most ``min(10, n-1)`` weeks (``n`` = pod size) so no two schools in the same pod
-    play each other twice in one season.
+    play each other twice in one season. Classes that are not one of the fixed region templates
+    then add non-district games until every team has 10 (no rematches, nearer districts first).
     """
     from systems.schedule_system import (
         _ha_counts,
         build_weeks_10_game,
         build_weeks_10_game_for_pods,
+        fill_weeks_to_target,
         record_home_away,
         rebalance_home_away_weeks,
     )
@@ -1009,8 +1241,8 @@ def build_regular_season_weeks(
             class_blocks.append(block)
             continue
 
-        # Rule template 5: 4 regions (mixed pod sizes) => up to 8 in-region weeks + 2 cross.
-        # Virginia Div 1/2, Ohio D5-style leagues with uneven regional counts.
+        # Rule template 5: 4 regions (mixed pod sizes).
+        # In-region rounds scale to pod size (no forced rematches); cross weeks fill to 10 games.
         exact_four_region = (
             (total == 32 and all(s == 8 for s in sizes))
             or (total == 40 and all(s == 10 for s in sizes))
@@ -1019,31 +1251,61 @@ def build_regular_season_weeks(
         if len(region_names) == 4 and total >= 16 and not exact_four_region:
             handled_classes.add(cls)
             regs_list = [list(regs[r]) for r in region_names]
+            in_targets, cross_targets = _mixed_target_maps(regs_list)
             rr_weeks: List[List[List[Tuple[str, str]]]] = []
             ha = _ha_counts()
-            in_region_rounds = 8
             for lst in regs_list:
-                rw = build_weeks_10_game(lst, max_rounds=in_region_rounds)
+                ir = in_targets[lst[0]]
+                rw = build_weeks_10_game(
+                    lst, max_rounds=_rounds_for_in_region_target(len(lst), ir)
+                )
                 _record_weeks_to_counts(rw, ha)
                 rr_weeks.append(rw)
-            block = []
-            in_weeks = min(in_region_rounds, max((len(rw) for rw in rr_weeks), default=0))
+            block: List[List[Tuple[str, str]]] = []
+            in_weeks = max((len(rw) for rw in rr_weeks), default=0)
             cross_counts: Dict[str, int] = {t: 0 for lst in regs_list for t in lst}
+            played = set()
             for wi in range(in_weeks):
                 week_games: List[Tuple[str, str]] = []
                 for rw in rr_weeks:
                     if wi < len(rw):
                         week_games.extend(rw[wi])
-                _embed_cross_on_bye_week(week_games, regs_list, ha, cross_counts)
+                        for home, away in rw[wi]:
+                            played.add(tuple(sorted((home, away))))
+                _embed_cross_on_bye_week(
+                    week_games,
+                    regs_list,
+                    ha,
+                    cross_counts,
+                    cross_targets=cross_targets,
+                    played=played,
+                )
+                for home, away in week_games:
+                    played.add(tuple(sorted((home, away))))
                 block.append(week_games)
 
             def _locks(wk_idx: int, a: int, b: int) -> List[Tuple[str, str]]:
                 return _cross_locks(cls, region_names[a], region_names[b], wk_idx)
 
-            block.extend(_build_mixed_cross_weeks(regs_list, ha, _locks))
-            _fill_cross_week_gaps(block, regs_list, ha, in_region_weeks=in_weeks)
+            block.extend(
+                _build_mixed_cross_weeks(
+                    regs_list, ha, _locks, cross_targets=cross_targets, played=played
+                )
+            )
+            _fill_cross_week_gaps(
+                block,
+                regs_list,
+                ha,
+                cross_targets=cross_targets,
+                in_region_weeks=in_weeks,
+            )
             _ensure_mixed_template_ten_games(
-                block, regs_list, ha, in_region_weeks=in_weeks
+                block,
+                regs_list,
+                ha,
+                in_region_weeks=in_weeks,
+                in_region_targets=in_targets,
+                cross_targets=cross_targets,
             )
             class_blocks.append(block)
             continue
@@ -1060,8 +1322,19 @@ def build_regular_season_weeks(
         logger.warning("League structure: %s", " | ".join(issues))
     base = build_weeks_10_game_for_pods(pods)
 
+    def _fill_to_ten(weeks: List[List[Tuple[str, str]]]) -> List[List[Tuple[str, str]]]:
+        team_class = {
+            name: classification_key(getattr(t, "classification", None))
+            for name, t in teams.items()
+        }
+        team_region = {
+            name: str(getattr(t, "region", "") or "")
+            for name, t in teams.items()
+        }
+        return fill_weeks_to_target(weeks, team_class, team_region, target=10)
+
     if not handled_classes:
-        return _finalize_weeks(base)
+        return _finalize_weeks(_fill_to_ten(base))
 
     # Keep existing behavior for classes not covered by the explicit templates (e.g. 24-team classes).
     leftover_pods: List[List[str]] = []
@@ -1074,4 +1347,4 @@ def build_regular_season_weeks(
             continue
         leftover_pods.append(pod)
     leftover = build_weeks_10_game_for_pods(leftover_pods)
-    return _finalize_weeks(_merge_class_blocks([custom, leftover]))
+    return _finalize_weeks(_fill_to_ten(_merge_class_blocks([custom, leftover])))
