@@ -349,6 +349,8 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404)
 
         @app.get("/")
+        @app.get("/about")
+        @app.get("/privacy")
         def spa_index():
             """Serve the built React app from frontend/dist (no separate Vite process needed)."""
             if spa_dist_bundle_is_stale(index_html):

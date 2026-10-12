@@ -1,6 +1,52 @@
 import { useEffect } from 'react'
-import type { LegalDocument } from './legalContent'
+import type { LegalDocument, LegalParagraph } from './legalContent'
 import './LegalDocumentModal.css'
+
+export function LegalParagraphText({ value }: { value: LegalParagraph }) {
+  if (typeof value === 'string') return <>{value}</>
+  return (
+    <>
+      {value.before}
+      <a href={value.href} target="_blank" rel="noopener noreferrer">
+        {value.label}
+      </a>
+      {value.after ?? ''}
+    </>
+  )
+}
+
+export function LegalDocumentBody({ document }: { document: LegalDocument }) {
+  return (
+    <>
+      <p className="legal-modal-effective">Effective Date: {document.effectiveDate}</p>
+      {document.intro ? <p className="legal-modal-intro">{document.intro}</p> : null}
+      {document.sections.map((section) => (
+        <section key={section.title} className="legal-modal-section">
+          <h3>{section.title}</h3>
+          {section.paragraphs?.map((p, i) => (
+            <p key={`${section.title}-${i}`}>
+              <LegalParagraphText value={p} />
+            </p>
+          ))}
+          {section.bullets?.length ? (
+            <ul>
+              {section.bullets.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          ) : null}
+          {section.subBullets?.map((p) => (
+            <p key={p}>{p}</p>
+          ))}
+        </section>
+      ))}
+      <p className="legal-modal-contact">
+        Email:{' '}
+        <a href={`mailto:${document.contactEmail}`}>{document.contactEmail}</a>
+      </p>
+    </>
+  )
+}
 
 type Props = {
   document: LegalDocument
@@ -34,30 +80,7 @@ export default function LegalDocumentModal({ document, onClose }: Props) {
           </button>
         </div>
         <div className="legal-modal-body">
-          <p className="legal-modal-effective">Effective Date: {document.effectiveDate}</p>
-          {document.intro ? <p className="legal-modal-intro">{document.intro}</p> : null}
-          {document.sections.map((section) => (
-            <section key={section.title} className="legal-modal-section">
-              <h3>{section.title}</h3>
-              {section.paragraphs?.map((p) => (
-                <p key={p}>{p}</p>
-              ))}
-              {section.bullets?.length ? (
-                <ul>
-                  {section.bullets.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              ) : null}
-              {section.subBullets?.map((p) => (
-                <p key={p}>{p}</p>
-              ))}
-            </section>
-          ))}
-          <p className="legal-modal-contact">
-            Email:{' '}
-            <a href={`mailto:${document.contactEmail}`}>{document.contactEmail}</a>
-          </p>
+          <LegalDocumentBody document={document} />
         </div>
       </div>
     </div>

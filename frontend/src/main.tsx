@@ -2,7 +2,15 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import PublicSitePage from './PublicSitePage.tsx'
 import { configFromImportMeta, initFirebase } from './firebase.js'
+
+function publicPageKind(): 'about' | 'privacy' | null {
+  const path = window.location.pathname.replace(/\/+$/, '') || '/'
+  if (path === '/about') return 'about'
+  if (path === '/privacy') return 'privacy'
+  return null
+}
 
 function ConfigError({ message }: { message: string }) {
   return (
@@ -53,6 +61,16 @@ async function loadFirebaseConfig(): Promise<Record<string, string>> {
 async function bootstrap() {
   const rootEl = document.getElementById('root')
   if (!rootEl) return
+
+  const publicPage = publicPageKind()
+  if (publicPage) {
+    createRoot(rootEl).render(
+      <StrictMode>
+        <PublicSitePage page={publicPage} />
+      </StrictMode>,
+    )
+    return
+  }
 
   let devNoFirebase = false
   try {

@@ -4,9 +4,21 @@ export const SUPPORT_CONTACT_EMAIL = 'mxlilly@gmail.com'
 export const REFUND_POLICY_SHORT =
   'The game is free to play. Tips are optional. Past purchases: request a refund within 5 days by emailing mxlilly@gmail.com (or Help & support → Refund request).'
 
+export const GOOGLE_ADS_DATA_URL = 'https://policies.google.com/technologies/partner-sites'
+
+/** A sentence that includes one external link. */
+export type LegalLinkParagraph = {
+  before: string
+  href: string
+  label: string
+  after?: string
+}
+
+export type LegalParagraph = string | LegalLinkParagraph
+
 export type LegalSection = {
   title: string
-  paragraphs?: string[]
+  paragraphs?: LegalParagraph[]
   bullets?: string[]
   subBullets?: string[]
 }
@@ -124,7 +136,7 @@ export const TERMS_OF_SERVICE: LegalDocument = {
 
 export const PRIVACY_POLICY: LegalDocument = {
   title: 'Privacy Policy',
-  effectiveDate: 'June 18, 2026',
+  effectiveDate: 'October 12, 2026',
   intro:
     'This Privacy Policy explains how Friday Night Dynasty (“we”, “our”, or “us”) collects and uses your information.',
   sections: [
@@ -146,28 +158,41 @@ export const PRIVACY_POLICY: LegalDocument = {
         'Save your progress',
         'Improve gameplay and features',
         'Communicate with users (if applicable)',
+        'Show ads and understand whether those ads are working',
       ],
     },
     {
       title: '3. Third-Party Services',
       paragraphs: [
-        'We use third-party services to operate the Game.',
-        'These include:',
-        'Google Firebase (authentication and data storage)',
+        'We use third-party services to operate the Game and to show ads.',
+        'Google Firebase handles account sign-in and stores account data.',
+        'Google AdSense serves ads on this site. Third parties, including Google, may place and read cookies on your browser, or use web beacons and IP addresses, to collect information as a result of ad serving.',
+        {
+          before: 'See ',
+          href: GOOGLE_ADS_DATA_URL,
+          label: 'how Google uses data when you use our partners’ sites or apps',
+          after: '.',
+        },
         'These services may collect and process data according to their own privacy policies.',
       ],
     },
     {
       title: '4. Data Sharing',
       paragraphs: [
-        'We do NOT sell your personal information.',
-        'We only share data with third-party services necessary to operate the Game.',
+        'We do not sell your personal information.',
+        'We share data with service providers only as needed to run the Game, including Google when an ad is shown on this site.',
       ],
     },
     {
       title: '5. Cookies and Tracking',
-      paragraphs: ['We may use cookies or similar technologies to:'],
-      bullets: ['Maintain sessions', 'Improve user experience'],
+      paragraphs: [
+        'We and our advertising partners may use cookies or similar technologies to:',
+      ],
+      bullets: [
+        'Maintain sessions',
+        'Improve user experience',
+        'Serve ads and measure how those ads perform',
+      ],
     },
     {
       title: '6. Data Security',

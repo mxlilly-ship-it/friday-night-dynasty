@@ -1,0 +1,174 @@
+@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,500;0,600;1,500&family=Oswald:wght@400;500;600&family=Playfair+Display:wght@700;900&display=swap');
+
+.fnd-public {
+  --gold: #c9a84c;
+  --gold-light: #e8c96e;
+  --cream: #f5f0e8;
+  --muted: rgba(245, 240, 232, 0.72);
+  min-height: 100vh;
+  min-height: 100dvh;
+  background:
+    radial-gradient(1200px 520px at 50% -10%, rgba(201, 168, 76, 0.16), transparent 55%),
+    #0a0a0a;
+  color: var(--cream);
+  font-family: 'EB Garamond', Georgia, serif;
+}
+
+.fnd-public-header,
+.fnd-public-footer {
+  width: min(760px, calc(100% - 2.5rem));
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+  flex-wrap: wrap;
+}
+
+.fnd-public-header {
+  padding: 1.35rem 0 1rem;
+  border-bottom: 1px solid rgba(201, 168, 76, 0.35);
+}
+
+.fnd-public-mark {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 900;
+  font-size: 1.15rem;
+  letter-spacing: 0.03em;
+  color: var(--cream);
+  text-decoration: none;
+}
+
+.fnd-public-mark span {
+  color: var(--gold-light);
+}
+
+.fnd-public-nav,
+.fnd-public-footer nav {
+  display: flex;
+  gap: 1.1rem;
+}
+
+.fnd-public-nav a,
+.fnd-public-footer a {
+  font-family: 'Oswald', system-ui, sans-serif;
+  font-size: 0.82rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.fnd-public-nav a[aria-current='page'] {
+  color: var(--gold-light);
+}
+
+.fnd-public-nav a:hover,
+.fnd-public-footer a:hover {
+  color: var(--gold-light);
+}
+
+.fnd-public-main {
+  width: min(760px, calc(100% - 2.5rem));
+  margin: 0 auto;
+  padding: 2.25rem 0 3rem;
+}
+
+.fnd-public-kicker {
+  margin: 0 0 0.65rem;
+  font-family: 'Oswald', system-ui, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.fnd-public h1 {
+  margin: 0 0 1rem;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 900;
+  font-size: clamp(2.1rem, 5vw, 3.4rem);
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+}
+
+.fnd-public-lead,
+.fnd-public p,
+.fnd-public li {
+  font-size: 1.2rem;
+  line-height: 1.65;
+  color: rgba(245, 240, 232, 0.88);
+}
+
+.fnd-public-lead {
+  margin: 0 0 1.75rem;
+  font-size: 1.35rem;
+}
+
+.fnd-public section {
+  margin: 0 0 1.35rem;
+}
+
+.fnd-public h2 {
+  margin: 0 0 0.35rem;
+  font-family: 'Oswald', system-ui, sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold-light);
+}
+
+.fnd-public section p {
+  margin: 0;
+}
+
+.fnd-public-legal .legal-modal-effective,
+.fnd-public-legal .legal-modal-intro,
+.fnd-public-legal .legal-modal-section p,
+.fnd-public-legal .legal-modal-section li,
+.fnd-public-legal .legal-modal-contact {
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 1.15rem;
+  line-height: 1.65;
+  color: rgba(245, 240, 232, 0.88);
+}
+
+.fnd-public-legal .legal-modal-section h3 {
+  font-family: 'Oswald', system-ui, sans-serif;
+  font-size: 0.92rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold-light);
+}
+
+.fnd-public-legal .legal-modal-section a,
+.fnd-public-legal .legal-modal-contact a,
+.fnd-public-footer p a {
+  color: var(--gold-light);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.fnd-public-footer {
+  padding: 1.1rem 0 1.6rem;
+  border-top: 1px solid rgba(201, 168, 76, 0.28);
+}
+
+.fnd-public-footer p {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+@media (max-width: 640px) {
+  .fnd-public-header,
+  .fnd-public-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .fnd-public-main {
+    padding-top: 1.6rem;
+  }
+}
