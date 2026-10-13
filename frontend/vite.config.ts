@@ -9,6 +9,7 @@ const apiProxy = {
     // Override with: set VITE_API_PROXY_TARGET=http://127.0.0.1:PORT
     target: process.env.VITE_API_PROXY_TARGET ?? 'http://127.0.0.1:8000',
     changeOrigin: true,
+    timeout: 10 * 60 * 1000,
     rewrite: (path: string) => path.replace(/^\/api/, ''),
   },
 }
@@ -17,12 +18,13 @@ const apiProxy = {
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: '127.0.0.1',
+    // 127.0.0.1 = this PC only. true = also LAN (phone on same Wi‑Fi).
+    host: true,
     port: 5173,
     proxy: { ...apiProxy },
   },
   preview: {
-    host: '127.0.0.1',
+    host: true,
     port: 5173,
     proxy: { ...apiProxy },
   },

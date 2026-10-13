@@ -39,6 +39,9 @@ from systems.coach_email_system import ensure_coach_inbox, generate_week_checkli
 
 def _sim_finalize_state(state: Any) -> Any:
     if isinstance(state, dict):
+        from backend.services.league_service import _sanitize_json_floats
+
+        _sanitize_json_floats(state)
         normalize_offseason_stages(state)
         _finalize_cross_region_schedule_state(state)
         from backend.services.league_service import (

@@ -1,6 +1,7 @@
 import copy
 import json
 import logging
+import math
 import os
 import random
 import time
@@ -4303,7 +4304,12 @@ def save_state(user_id: str, save_id: str, state: Dict[str, Any], save_dir: str)
             pass
     _refresh_user_coach_unemployed_flag(state)
     dest_plain = _league_save_plain_path(save_dir)
-    payload = json.dumps(state, indent=2, ensure_ascii=False)
+    _sanitize_json_floats(state)
+    try:
+        payload = json.dumps(state, indent=2, ensure_ascii=False, allow_nan=False)
+    except ValueError:
+        _sanitize_json_floats(state)
+        payload = json.dumps(state, indent=2, ensure_ascii=False, allow_nan=False, default=str)
     tmp_plain = f"{dest_plain}.tmp.{uuid.uuid4().hex}"
     try:
         with open_text_with_path_fallback(tmp_plain, "w") as f:
@@ -7129,21 +7135,7 @@ def finish_season_state(
         runner_up = str(playoffs.get("runner_up") or "")
         bracket_results = list(playoffs.get("bracket_results") or [])
     elif phase_s == "playoffs":
-        while True:
-            p = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else None
-            if p and p.get("completed"):
-                _sync_playoff_top_level_champion_runner(p)
-            if p and p.get("completed") and str(p.get("champion") or "").strip():
-                champion = str(p.get("champion") or "")
-                runner_up = str(p.get("runner_up") or "")
-                bracket_results = list(p.get("bracket_results") or [])
-                break
-            if p and p.get("completed"):
-                champion = ""
-                runner_up = str(p.get("runner_up") or "")
-                bracket_results = list(p.get("bracket_results") or [])
-                break
-            state = _advance_playoff_one_round_state(state)
+        champion, runner_up, bracket_results = _run_remaining_playoff_rounds(state)
     else:
         # Fallback: finish_season called from outside the playoffs phase.
         # Build the bracket(s) from scratch using the active playoff system
@@ -8559,6 +8551,61 @@ def _simulate_full_bracket_to_completion(
             break
 
 
+def _sanitize_json_floats(obj: Any) -> Any:
+    """Replace NaN/Inf so Starlette JSONResponse (allow_nan=False) does not 500 after finish_season."""
+    if isinstance(obj, dict):
+        for key, val in obj.items():
+            obj[key] = _sanitize_json_floats(val)
+        return obj
+    if isinstance(obj, list):
+        for i, val in enumerate(obj):
+            obj[i] = _sanitize_json_floats(val)
+        return obj
+    if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+        return 0.0
+    return obj
+
+
+def _playoff_progress_marker(playoffs: Optional[Dict[str, Any]]) -> Tuple[int, int, bool]:
+    if not isinstance(playoffs, dict):
+        return (0, 0, False)
+    top = len(playoffs.get("bracket_results") or [])
+    nested = 0
+    by_class = playoffs.get("by_class") or {}
+    if isinstance(by_class, dict):
+        for pdata in by_class.values():
+            if isinstance(pdata, dict):
+                nested += len(pdata.get("bracket_results") or [])
+    return (top, nested, bool(playoffs.get("completed")))
+
+
+def _run_remaining_playoff_rounds(state: Dict[str, Any]) -> Tuple[str, str, List[Dict[str, Any]]]:
+    """Advance playoffs until complete. Bounded so a stuck bracket cannot hang the API."""
+    last_marker: Optional[Tuple[int, int, bool]] = None
+    for _ in range(24):
+        p = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else None
+        if p and p.get("completed"):
+            _sync_playoff_top_level_champion_runner(p)
+            return (
+                str(p.get("champion") or ""),
+                str(p.get("runner_up") or ""),
+                list(p.get("bracket_results") or []),
+            )
+        marker = _playoff_progress_marker(p)
+        state = _advance_playoff_one_round_state(state)
+        after = _playoff_progress_marker(
+            state.get("playoffs") if isinstance(state.get("playoffs"), dict) else None
+        )
+        if after == marker or after == last_marker:
+            raise ValueError(
+                "Playoffs could not finish (a bracket is stuck). Sim the next playoff round, then try Finish season again."
+            )
+        last_marker = after
+    raise ValueError(
+        "Playoffs did not complete in time. Sim the next playoff round, then try Finish season again."
+    )
+
+
 def _advance_playoff_one_round_state(state: Dict[str, Any]) -> Dict[str, Any]:
     """Simulate the next playoff round in-place for every classification bracket.
 
@@ -9911,6 +9958,7 @@ def _attach_league_history_to_result(save_dir: str, result: Dict[str, Any]) -> D
         result["league_history"] = load_league_history(league_history_path(save_dir))
     except Exception:
         result["league_history"] = {"seasons": []}
+    _sanitize_json_floats(result)
     return result
 
 
@@ -9978,21 +10026,7 @@ def finish_season(
         runner_up = str(playoffs.get("runner_up") or "")
         bracket_results = list(playoffs.get("bracket_results") or [])
     elif phase_s == "playoffs":
-        while True:
-            p = state.get("playoffs") if isinstance(state.get("playoffs"), dict) else None
-            if p and p.get("completed"):
-                _sync_playoff_top_level_champion_runner(p)
-            if p and p.get("completed") and str(p.get("champion") or "").strip():
-                champion = str(p.get("champion") or "")
-                runner_up = str(p.get("runner_up") or "")
-                bracket_results = list(p.get("bracket_results") or [])
-                break
-            if p and p.get("completed"):
-                champion = ""
-                runner_up = str(p.get("runner_up") or "")
-                bracket_results = list(p.get("bracket_results") or [])
-                break
-            state = _advance_playoff_one_round_state(state)
+        champion, runner_up, bracket_results = _run_remaining_playoff_rounds(state)
     else:
         # Fallback: finish_season called from outside the playoffs phase.
         # Build the bracket(s) from scratch using the active playoff system

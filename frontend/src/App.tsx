@@ -101,6 +101,11 @@ async function formatApiErrorBody(r: Response): Promise<string> {
       const trimmed = d.trim()
       if (trimmed && trimmed.toLowerCase() !== 'none') return trimmed
     }
+    if (d && typeof d === 'object' && !Array.isArray(d)) {
+      const rec = d as { message?: unknown; msg?: unknown }
+      const nested = rec.message ?? rec.msg
+      if (typeof nested === 'string' && nested.trim()) return nested.trim()
+    }
     if (Array.isArray(d))
       return d.map((x: any) => (typeof x?.msg === 'string' ? x.msg : JSON.stringify(x))).join('; ')
   } catch {
@@ -111,7 +116,27 @@ async function formatApiErrorBody(r: Response): Promise<string> {
 }
 
 function apiConnectionHint() {
-  return ' Start the API: python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000'
+  if (import.meta.env.DEV) {
+    return ' If this is local, start the API: python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000'
+  }
+  return ' Wait a few seconds and try again — finishing a season is a heavy request and the server may still be working or restarting.'
+}
+
+function requestFailedUserMessage(e: unknown, action = 'the request'): string {
+  const msg = e instanceof Error ? e.message : String(e ?? 'network error')
+  const lower = msg.toLowerCase()
+  if (lower.includes('unexpected token') || lower.includes('is not valid json') || lower.includes('json.parse')) {
+    return `Server returned invalid data during ${action}. Wait a moment and try again.`
+  }
+  if (
+    lower.includes('failed to fetch') ||
+    lower.includes('networkerror') ||
+    lower.includes('load failed') ||
+    lower.includes('abort')
+  ) {
+    return `Could not reach the server during ${action} (timeout or disconnect).${apiConnectionHint()}`
+  }
+  return `Request failed (${msg}).${apiConnectionHint()}`
 }
 
 /** True when save JSON still has preseason stages to complete (even if season_phase is missing or wrong). */
@@ -1487,7 +1512,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
         }
         return true
       } catch (e: any) {
-        setError(`Request failed (${e?.message ?? 'network error'}).${apiConnectionHint()}`)
+        setError(requestFailedUserMessage(e, 'simulation'))
         return false
       }
     }
@@ -1511,12 +1536,18 @@ export default function App({ devNoFirebase = false }: AppProps) {
           setError((await formatApiErrorBody(r)) || 'Failed to advance season')
           return false
         }
-        const data = await r.json()
+        let data: { state?: any }
+        try {
+          data = await r.json()
+        } catch {
+          setError('Server returned invalid JSON while finishing the season. Try again in a moment.')
+          return false
+        }
         if (data?.state) applyDynastySimulationResult(data)
         else await loadSave(saveId)
         return true
       } catch (e: any) {
-        setError(`Request failed (${e?.message ?? 'network error'}).${apiConnectionHint()}`)
+        setError(requestFailedUserMessage(e, 'finish season'))
         return false
       }
     }
@@ -1534,7 +1565,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
         else await loadSave(saveId)
         return true
       } catch (e: any) {
-        setError(`Request failed (${e?.message ?? 'network error'}).${apiConnectionHint()}`)
+        setError(requestFailedUserMessage(e, 'playoff simulation'))
         return false
       }
     }
@@ -1550,7 +1581,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
         else await loadSave(saveId)
         return true
       } catch (e: any) {
-        setError(`Request failed (${e?.message ?? 'network error'}).${apiConnectionHint()}`)
+        setError(requestFailedUserMessage(e, 'playoff round'))
         return false
       }
     }
@@ -1571,7 +1602,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
         else await loadSave(saveId)
         return true
       } catch (e: any) {
-        setError(`Request failed (${e?.message ?? 'network error'}).${apiConnectionHint()}`)
+        setError(requestFailedUserMessage(e, 'offseason'))
         return false
       }
     }
@@ -1629,7 +1660,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
       else await loadSave(saveId)
       return true
     } catch (e: any) {
-      setError(`Request failed (${e?.message ?? 'network error'}).${apiConnectionHint()}`)
+      setError(requestFailedUserMessage(e, 'week simulation'))
       return false
     }
   }
