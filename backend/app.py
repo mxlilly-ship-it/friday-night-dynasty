@@ -348,6 +348,20 @@ def create_app() -> FastAPI:
                 )
             raise HTTPException(status_code=404)
 
+        @app.get("/FridayNightDynasty-2026-windows.zip")
+        def spa_windows_portable_zip():
+            """Windows portable build for testers (Vite does not auto-serve public files)."""
+            name = "FridayNightDynasty-2026-windows.zip"
+            for p in (dist / name, spa_frontend_dir() / "public" / name):
+                if p.is_file():
+                    return FileResponse(
+                        p,
+                        media_type="application/zip",
+                        filename=name,
+                        headers={"Cache-Control": "public, max-age=3600"},
+                    )
+            raise HTTPException(status_code=404, detail="Windows download is not on this server")
+
         @app.get("/")
         @app.get("/about")
         @app.get("/privacy")

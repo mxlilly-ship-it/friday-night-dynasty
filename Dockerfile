@@ -21,6 +21,10 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 
 COPY . .
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
+# Vite copies public/ into dist, but the API only serves listed files; keep the zip in both places.
+RUN if [ -f frontend/public/FridayNightDynasty-2026-windows.zip ]; then \
+      cp -f frontend/public/FridayNightDynasty-2026-windows.zip frontend/dist/; \
+    fi
 
 # Never ship a developer SQLite snapshot in the image (causes deploys to reset league data).
 RUN rm -f backend/dynasty.sqlite3 backend/dynasty.sqlite3-wal backend/dynasty.sqlite3-shm
