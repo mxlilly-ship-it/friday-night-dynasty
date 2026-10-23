@@ -34,6 +34,7 @@ import { getAuthInstance, resetPassword } from './auth.js'
 import SignupTermsConsent from './SignupTermsConsent'
 import ScreenshotsGallery from './ScreenshotsGallery'
 import SupportContactModal from './SupportContactModal'
+import TipJarAskModal from './TipJarAskModal'
 import { getOrCreateDeviceId } from './deviceId.js'
 import { confirmCheckoutSession, createCheckoutSession, fetchBillingStatus, parseApiError, syncBillingAccess as syncBillingAccessApi, type BillingStatus } from './billing'
 import { REFUND_POLICY_SHORT } from './legalContent'
@@ -75,6 +76,7 @@ import {
 const EMPTY_AUTH_HEADERS: Record<string, string> = Object.freeze({})
 
 const PENDING_CHECKOUT_SESSION_KEY = 'fnd_pending_checkout_session'
+const TIP_JAR_ASK_SEEN_KEY = 'fnd_seen_tip_jar_ask'
 
 /** In dev, use Vite proxy (/api → backend). Production: set VITE_API_BASE or default below. */
 /** Dev: Vite proxy. Production build served from the same host as FastAPI → empty string (same-origin). */
@@ -190,6 +192,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
   const [screen, setScreen] = useState<Screen>('title')
   const [showScreenshotsGallery, setShowScreenshotsGallery] = useState(false)
   const [showSupportContact, setShowSupportContact] = useState(false)
+  const [showTipJarAsk, setShowTipJarAsk] = useState(false)
   const [saves, setSaves] = useState<SaveListItem[]>([])
   const [cloudSaves, setCloudSaves] = useState<CloudSaveListItem[]>([])
   const [saveId, setSaveId] = useState<string>('')
@@ -1715,9 +1718,15 @@ export default function App({ devNoFirebase = false }: AppProps) {
     await startCheckout()
   }
 
+  function dismissTipJarAsk() {
+    localStorage.setItem(TIP_JAR_ASK_SEEN_KEY, '1')
+    setShowTipJarAsk(false)
+  }
+
   function onTipClick() {
     setError('')
     setSuccessMessage('')
+    dismissTipJarAsk()
     if (TIP_JAR_URL) {
       window.open(TIP_JAR_URL, '_blank', 'noopener,noreferrer')
       return
@@ -1739,6 +1748,13 @@ export default function App({ devNoFirebase = false }: AppProps) {
 
   useEffect(() => {
     if (screen !== 'title') setShowScreenshotsGallery(false)
+  }, [screen])
+
+  useEffect(() => {
+    if (screen !== 'title') return
+    if (localStorage.getItem(TIP_JAR_ASK_SEEN_KEY)) return
+    const t = window.setTimeout(() => setShowTipJarAsk(true), 500)
+    return () => window.clearTimeout(t)
   }, [screen])
 
   useEffect(() => {
@@ -3535,6 +3551,11 @@ export default function App({ devNoFirebase = false }: AppProps) {
         </div>
       )}
       <ScreenshotsGallery open={showScreenshotsGallery} onClose={() => setShowScreenshotsGallery(false)} />
+      <TipJarAskModal
+        open={showTipJarAsk && screen === 'title'}
+        onClose={dismissTipJarAsk}
+        onOpenTipJar={onTipClick}
+      />
       <SupportContactModal
         open={showSupportContact}
         onClose={() => setShowSupportContact(false)}
