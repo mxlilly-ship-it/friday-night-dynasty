@@ -133,9 +133,10 @@ function AboutArticle() {
       <section>
         <h2>Free to play</h2>
         <p>
-          The game is free, including single-player dynasties and multiplayer leagues. An optional
-          tip jar helps pay for hosting. You need an account to save a dynasty. The privacy policy
-          explains what the site collects and how advertising cookies work.
+          The game is free, including single-player dynasties and multiplayer leagues. Please help
+          keep it that way — an optional tip jar on the title screen helps pay for hosting. You need
+          an account to save a dynasty. The privacy policy explains what the site collects and how
+          advertising cookies work.
         </p>
       </section>
     </article>

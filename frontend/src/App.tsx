@@ -2953,7 +2953,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
           <iframe
             className="fnd-title-iframe"
             title="Friday Night Dynasty"
-            src={`${import.meta.env.BASE_URL}fnd_homepage.html?v=20261018a`}
+            src={`${import.meta.env.BASE_URL}fnd_homepage.html?v=20261023a`}
           />
           <button
             type="button"
