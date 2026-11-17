@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import './index.css'
 import './TitleScreen.css'
 import { NewSaveFlow } from './NewSaveFlow'
@@ -1737,24 +1737,8 @@ export default function App({ devNoFirebase = false }: AppProps) {
     setShowSupportContact(true)
   }
 
-  const titleNavRef = useRef({
-    onNewSaveClick,
-    onLoadSaveClick,
-    onPurchaseClick,
-    onTipClick,
-    onMultiplayerClick: () => setScreen('multiplayer'),
-  })
-  titleNavRef.current = { onNewSaveClick, onLoadSaveClick, onPurchaseClick, onTipClick, onMultiplayerClick }
-
   useEffect(() => {
     if (screen !== 'title') setShowScreenshotsGallery(false)
-  }, [screen])
-
-  useEffect(() => {
-    if (screen !== 'title') return
-    if (localStorage.getItem(TIP_JAR_ASK_SEEN_KEY)) return
-    const t = window.setTimeout(() => setShowTipJarAsk(true), 500)
-    return () => window.clearTimeout(t)
   }, [screen])
 
   useEffect(() => {
@@ -1762,11 +1746,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
       if (e.origin !== window.location.origin) return
       const d = e.data as { type?: string; action?: string } | null
       if (!d || d.type !== 'fnd-title') return
-      if (d.action === 'new') void titleNavRef.current.onNewSaveClick()
-      else if (d.action === 'load') void titleNavRef.current.onLoadSaveClick()
-      else if (d.action === 'purchase' || d.action === 'tip') titleNavRef.current.onTipClick()
-      else if (d.action === 'multiplayer') void titleNavRef.current.onMultiplayerClick()
-      else if (d.action === 'screenshots') setShowScreenshotsGallery(true)
+      if (d.action === 'screenshots') setShowScreenshotsGallery(true)
       else if (d.action === 'support') setShowSupportContact(true)
     }
     window.addEventListener('message', onMessage)
@@ -2969,7 +2949,7 @@ export default function App({ devNoFirebase = false }: AppProps) {
           <iframe
             className="fnd-title-iframe"
             title="Friday Night Dynasty"
-            src={`${import.meta.env.BASE_URL}fnd_homepage.html?v=20261023a`}
+            src={`${import.meta.env.BASE_URL}fnd_homepage.html?v=20261117b`}
           />
           <button
             type="button"

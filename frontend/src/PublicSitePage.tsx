@@ -43,7 +43,7 @@ export default function PublicSitePage({ page }: { page: Page }) {
         </a>
         <nav className="fnd-public-nav" aria-label="Site">
           <a href="/" aria-current={undefined}>
-            Play
+            Home
           </a>
           <a href="/about" aria-current={page === 'about' ? 'page' : undefined}>
             About
@@ -64,7 +64,7 @@ export default function PublicSitePage({ page }: { page: Page }) {
           <a href={`mailto:${SUPPORT_CONTACT_EMAIL}`}>{SUPPORT_CONTACT_EMAIL}</a>
         </p>
         <nav aria-label="Site">
-          <a href="/">Play</a>
+          <a href="/">Home</a>
           <a href="/about">About</a>
           <a href="/privacy">Privacy</a>
         </nav>
@@ -131,12 +131,12 @@ function AboutArticle() {
       </section>
 
       <section>
-        <h2>Free to play</h2>
+        <h2>Available for purchase</h2>
         <p>
-          The game is free, including single-player dynasties and multiplayer leagues. Please help
-          keep it that way — an optional tip jar on the title screen helps pay for hosting. You need
-          an account to save a dynasty. The privacy policy explains what the site collects and how
-          advertising cookies work.
+          Thank you for playing this season. The game is available for purchase. If you want access,
+          email <a href="mailto:mxlilly@gmail.com">Mxlilly@gmail.com</a>. FND 27 has been announced,
+          with updates coming soon. The privacy policy explains
+          what the site collects and how advertising cookies work.
         </p>
       </section>
     </article>

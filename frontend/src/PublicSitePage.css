@@ -143,6 +143,7 @@
   color: var(--gold-light);
 }
 
+.fnd-public section a,
 .fnd-public-legal .legal-modal-section a,
 .fnd-public-legal .legal-modal-contact a,
 .fnd-public-footer p a {
