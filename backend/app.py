@@ -348,6 +348,19 @@ def create_app() -> FastAPI:
                 )
             raise HTTPException(status_code=404)
 
+        @app.get("/december-boys-basketball")
+        @app.get("/december-boys-basketball/")
+        def december_boys_basketball():
+            """Unlinked staff page. Not referenced from the game UI."""
+            page = dist / "december-boys-basketball" / "index.html"
+            if page.is_file():
+                return FileResponse(
+                    page,
+                    media_type="text/html; charset=utf-8",
+                    headers={"Cache-Control": "no-cache, must-revalidate"},
+                )
+            raise HTTPException(status_code=404)
+
         @app.get("/")
         @app.get("/about")
         @app.get("/privacy")

@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>December boys basketball · Friday Night Dynasty</title>
+  <meta name="description" content="West Virginia boys basketball for December 2026. State tab and a tab for each region. MaxPreps snapshot from Nov. 18." />
+  <style>
+    :root {
+      --paper: #f4efe4;
+      --ink: #2a241c;
+      --muted: #6b5e4e;
+      --line: #ddd2c0;
+      --pine: #1f6b45;
+      --pine-wash: #e5f3ea;
+      --rust: #9a4b24;
+      --rust-wash: #f8ebe3;
+      --white: #fffdf8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: "Source Sans 3", "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+    header, main { max-width: 72rem; margin: 0 auto; padding: 1.25rem 1rem 0; }
+    main { padding-bottom: 2.5rem; }
+    .eyebrow {
+      margin: 0;
+      color: var(--pine);
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: 0.25rem 0 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(2.2rem, 5vw, 3.6rem);
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      line-height: 0.95;
+    }
+    .lead { max-width: 42rem; color: var(--muted); }
+    .top {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: flex-end;
+      justify-content: space-between;
+    }
+    button, .ghost {
+      border: 1px solid var(--line);
+      background: var(--white);
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 0.4rem 0.8rem;
+      font: inherit;
+      font-size: 0.92rem;
+      cursor: pointer;
+    }
+    button.solid { background: var(--pine); color: white; border-color: var(--pine); }
+    button.warn-on { background: var(--rust); color: white; border-color: var(--rust); }
+    button:focus-visible, input:focus-visible { outline: 2px solid var(--pine); outline-offset: 2px; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+      margin: 1.25rem 0 0;
+      padding-top: 1rem;
+      border-top: 1px solid var(--line);
+    }
+    .stats span { display: block; color: var(--muted); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; }
+    .stats strong { font-family: Georgia, serif; font-size: 2rem; font-weight: 600; }
+    .stats .cover strong { color: var(--pine); }
+    .stats .conflict strong { color: var(--rust); }
+    details {
+      border: 1px solid #cfe3d6;
+      background: var(--pine-wash);
+      padding: 0.7rem 0.9rem;
+      margin-top: 1rem;
+    }
+    details.warn { border-color: #efd2c4; background: var(--rust-wash); }
+    summary { cursor: pointer; font-weight: 700; }
+    details p { margin: 0.5rem 0 0; color: var(--muted); }
+    .notes { display: grid; gap: 0.75rem; }
+    @media (min-width: 800px) { .notes { grid-template-columns: 1fr 1fr; } }
+    .bar {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: var(--paper);
+      border-bottom: 1px solid var(--line);
+      padding: 0.75rem 0 0.9rem;
+      margin-top: 0.5rem;
+    }
+    .bar-row, .pills { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; }
+    .bar-row { justify-content: space-between; }
+    h2 { font-family: Georgia, serif; font-weight: 600; margin: 0; }
+    input {
+      width: min(100%, 18rem);
+      border: 1px solid var(--line);
+      background: var(--white);
+      border-radius: 999px;
+      padding: 0.45rem 0.8rem;
+      font: inherit;
+    }
+    .hint, .count, footer { color: var(--muted); font-size: 0.92rem; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+    th.time, td.time { text-align: right; }
+    td, th { padding: 0.55rem 0.6rem 0.55rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+    tr.cover td { background: var(--pine-wash); }
+    tr.conflict td { background: var(--rust-wash); }
+    .cards { display: none; }
+    .card { border: 1px solid var(--line); padding: 0.75rem; margin-bottom: 0.5rem; background: var(--white); }
+    .card.cover { background: var(--pine-wash); border-color: #cfe3d6; }
+    .card.conflict { background: var(--rust-wash); border-color: #efd2c4; }
+    .card .when { color: var(--muted); font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 700; }
+    .card .game { font-weight: 700; margin: 0.2rem 0; }
+    .empty { border: 1px dashed var(--line); padding: 1.5rem 1rem; color: var(--muted); }
+    footer { border-top: 1px solid var(--line); margin-top: 1.5rem; padding-top: 0.8rem; font-size: 0.8rem; }
+    @media (max-width: 760px) {
+      table { display: none; }
+      .cards { display: block; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="top">
+      <div>
+        <p class="eyebrow">Friday Night Dynasty</p>
+        <h1>December boys basketball</h1>
+        <p class="lead">The West Virginia boys scoreboard for Dec. 1 through Dec. 31, 2026, as MaxPreps had it on Wednesday, Nov. 18 (Eastern). Public schools cannot play until Tuesday, Dec. 8. Send this address. It opens on the tab, filter, and school you have selected.</p>
+      </div>
+      <button type="button" class="solid" id="copy">Copy this view</button>
+    </div>
+    <dl class="stats">
+      <div><span id="posted-label">Games posted</span><strong id="posted">0</strong></div>
+      <div class="cover"><span>Worth covering</span><strong id="cover">0</strong></div>
+      <div class="conflict"><span>Double-booked</span><strong id="conflicts">0</strong></div>
+    </dl>
+    <div class="notes">
+      <details>
+        <summary>How the regions are split</summary>
+        <p>Southeast is the 24 correspondent schools, plus other boys teams in those same counties. Southwest is the Kanawha Valley and the western coalfields. Northwest is the panhandle, the Ohio Valley, and north-central. Northeast is the eastern panhandle and the Potomac highlands. Those three follow county lines, because the correspondent lists for them were not in the file. A game shows on every region tab that has a team in it. Shady Spring still has no December game posted. Team pages still show two TBA listings the scoreboard dropped: Liberty against PikeView on Dec. 28, and Meadow Bridge on Dec. 19.</p>
+      </details>
+      <details class="warn">
+        <summary>Three tip times are posted twice</summary>
+        <p>Dec. 15 at 7:00, Bridgeport is listed at Cameron and at home against Mountain Ridge. Dec. 15 at 7:30, Greenbrier East is listed at Oak Hill and at Wyoming East. Dec. 29 at 3:00, Buffalo is listed at Philip Barbour and at home against Indian Valley.</p>
+      </details>
+    </div>
+  </header>
+  <main>
+    <div class="bar">
+      <div class="bar-row">
+        <h2>The slate</h2>
+        <input id="q" type="search" placeholder="Find a school" aria-label="Find a school" />
+      </div>
+      <p class="hint">Worth covering means both teams reached the state tournament last March, or one of them played in a championship game. Home gym is the second school. Green rows are worth covering. Rust rows are double-booked.</p>
+      <div class="pills" id="regions" role="group" aria-label="Region"></div>
+      <div class="pills" id="filters" role="group" aria-label="Filter"></div>
+    </div>
+    <p class="count" id="count"></p>
+    <div id="list"></div>
+    <footer>Source: MaxPreps West Virginia boys basketball scoreboard, pulled Nov. 18, 2026. Times are as posted, Eastern. Games before Dec. 8 are private and homeschool. Two private matchups the scoreboard repeated across Christmas week are listed once. Out-of-state opponents stay on the tab of the West Virginia team. This page is a snapshot, not a live feed.</footer>
+  </main>
+  <script>
+    const GAMES = [{"d":1,"t":"7:00","a":"Calvary Baptist Academy","h":"Mount Hope Christian Academy","ra":"SW","rh":"SE"},{"d":1,"t":"7:00","a":"Morgantown Christian Academy","h":"Heritage Christian","ra":"NW","rh":"NW"},{"d":1,"t":"7:15","a":"Elk Valley Christian","h":"Heritage Christian Prep","ra":"SW","rh":"SW"},{"d":1,"t":"7:30","a":"Cross Lanes Christian","h":"Bloomingdale","ra":"SW","rh":"SW"},{"d":3,"t":"7:00","a":"Morgantown Christian Academy","h":"Emmanuel Christian","ra":"NW","rh":"NW"},{"d":3,"t":"7:30","a":"Beth Haven Christian","h":"Bible Center School","ra":"SW","rh":"SW"},{"d":4,"t":"7:00","a":"TPLS Christian Academy","h":"Teays Valley Christian Prep","ra":"","rh":"SW"},{"d":4,"t":"7:30","a":"Bloomingdale","h":"Mount Hope Christian Academy","ra":"SW","rh":"SE"},{"d":4,"t":"7:30","a":"Maranatha Christian Academy","h":"Bible Center School","ra":"SE","rh":"SW"},{"d":4,"t":"7:30","a":"Victory Baptist Academy","h":"Elk Valley Christian","ra":"SE","rh":"SW"},{"d":5,"t":"11:00 a.m.","a":"Ripley Christian Academy","h":"Carter Christian Academy","ra":"SW","rh":""},{"d":5,"t":"12:00","a":"Ripley Christian Academy","h":"Sugar Creek Christian Academy","ra":"SW","rh":""},{"d":5,"t":"5:30","a":"Ohio Valley Christian","h":"Ignite Athletics","ra":"","rh":"SW"},{"d":5,"t":"7:30","a":"Morgantown Christian Academy","h":"Varsity Opponent","ra":"NW","rh":""},{"d":6,"t":"6:00","a":"MACHS","h":"Cornerstone Christian","ra":"NE","rh":""},{"d":6,"t":"7:00","a":"Ignite Athletics","h":"Heritage Christian Prep","ra":"SW","rh":"SW"},{"d":7,"t":"6:00","a":"Ripley Christian Academy","h":"Heritage Christian Academy","ra":"SW","rh":"SW"},{"d":7,"t":"7:00","a":"Teays Valley Christian Prep","h":"Wesley Christian","ra":"SW","rh":""},{"d":7,"t":"7:15","a":"Cross Lanes Christian","h":"Elk Valley Christian","ra":"SW","rh":"SW"},{"d":8,"t":"6:00","a":"John Marshall","h":"Magnolia","ra":"NW","rh":"NW"},{"d":8,"t":"6:00","a":"VSDB","h":"WVSDAB","ra":"","rh":"NE"},{"d":8,"t":"6:30","a":"Keyser","h":"Musselman","ra":"NE","rh":"NE"},{"d":8,"t":"7:00","a":"Fairmont Senior","h":"Brownsville","ra":"NW","rh":""},{"d":8,"t":"7:00","a":"Frankfort","h":"Mountain Ridge","ra":"NE","rh":""},{"d":8,"t":"7:00","a":"Madonna","h":"Toronto","ra":"NW","rh":""},{"d":8,"t":"7:00","a":"Meadow Bridge","h":"Bath County","ra":"SE","rh":""},{"d":8,"t":"7:00","a":"Montcalm","h":"Sherman","ra":"SE","rh":"SW"},{"d":8,"t":"7:00","a":"Mount View","h":"Van","ra":"SE","rh":"SW"},{"d":8,"t":"7:00","a":"Oak Hill","h":"PikeView","ra":"SE","rh":"SE"},{"d":8,"t":"7:00","a":"St. Albans","h":"Winfield","ra":"SW","rh":"SW"},{"d":8,"t":"7:30","a":"Bloomingdale","h":"Rose Hill Christian","ra":"SW","rh":""},{"d":8,"t":"7:30","a":"Capital","h":"Greenbrier East","ra":"SW","rh":"SE"},{"d":8,"t":"7:30","a":"Gilmer County","h":"Richwood","ra":"SW","rh":"SE"},{"d":8,"t":"7:30","a":"Lighthouse Christian Academy","h":"Trinity Christian","ra":"","rh":"NW"},{"d":8,"t":"7:30","a":"Mount Hope Christian Academy","h":"Teays Valley Christian","ra":"SE","rh":"SW"},{"d":8,"t":"7:30","a":"Parkersburg Christian","h":"Wood County Christian","ra":"NW","rh":"NW"},{"d":8,"t":"7:30","a":"Paw Paw","h":"Berkeley Springs","ra":"NE","rh":"NE"},{"d":8,"t":"7:30","a":"Pipestem Christian Academy","h":"Maranatha Christian Academy","ra":"SE","rh":"SE"},{"d":8,"t":"7:30","a":"Poca","h":"Clay County","ra":"SW","rh":"SE"},{"d":8,"t":"7:30","a":"South Harrison","h":"Ritchie County","ra":"NW","rh":"NW"},{"d":8,"t":"7:30","a":"The Linsly School","h":"Parkersburg Catholic","ra":"NW","rh":"NW"},{"d":8,"t":"7:30","a":"Tug Valley","h":"Lawrence County","ra":"SW","rh":""},{"d":8,"t":"7:30","a":"Tyler","h":"Doddridge County","ra":"NW","rh":"NW"},{"d":8,"t":"7:30","a":"Weir","h":"Oak Glen","ra":"NW","rh":"NW"},{"d":8,"t":"7:30","a":"Wirt County","h":"Ravenswood","ra":"NW","rh":"SW"},{"d":8,"t":"7:30","a":"Wyoming East","h":"Summit Christian Academy","ra":"SE","rh":"SE"},{"d":9,"t":"6:30","a":"Petersburg","h":"Union","ra":"NE","rh":"NE"},{"d":9,"t":"7:00","a":"Brooke","h":"Harrison Central","ra":"NW","rh":""},{"d":9,"t":"7:00","a":"Hannan","h":"Lincoln County","ra":"SW","rh":"SW"},{"d":9,"t":"7:00","a":"Wahama","h":"Williamstown","ra":"SW","rh":"NW"},{"d":9,"t":"7:00","a":"Wayne","h":"Buffalo","ra":"SW","rh":"SW"},{"d":9,"t":"7:30","a":"Clarke County","h":"Hedgesville","ra":"","rh":"NE"},{"d":9,"t":"7:30","a":"Roane County","h":"Braxton County","ra":"NW","rh":"SW"},{"d":9,"t":"7:30","a":"Tolsia","h":"Calhoun","ra":"SW","rh":"SW"},{"d":10,"t":"6:00","a":"Tri-County HomeSchool","h":"Ripley Christian Academy","ra":"SW","rh":"SW"},{"d":10,"t":"7:00","a":"Charleston Catholic","h":"Cabell Midland","ra":"SW","rh":"SW"},{"d":10,"t":"7:00","a":"Lincoln County","h":"Nitro","ra":"SW","rh":"SW"},{"d":10,"t":"7:00","a":"Teays Valley Christian Prep","h":"Varsity Opponent","ra":"SW","rh":""},{"d":10,"t":"7:30","a":"Calvary Baptist Academy","h":"Teays Valley Christian","ra":"SW","rh":"SW"},{"d":10,"t":"7:30","a":"John Marshall","h":"Robert C. Byrd","ra":"NW","rh":"NW"},{"d":10,"t":"7:30","a":"Lewis County","h":"Buckhannon-Upshur","ra":"NW","rh":"NW"},{"d":10,"t":"7:30","a":"Mount Hope Christian Academy","h":"Greenbrier East","ra":"SE","rh":"SE"},{"d":10,"t":"7:30","a":"Mountain Mission","h":"Pipestem Christian Academy","ra":"","rh":"SE"},{"d":10,"t":"7:30","a":"Preston","h":"North Marion","ra":"NE","rh":"NW"},{"d":10,"t":"7:30","a":"Tucker County","h":"Webster County","ra":"NE","rh":"SE"},{"d":10,"t":"7:30","a":"Wirt County","h":"Gilmer County","ra":"NW","rh":"SW"},{"d":11,"t":"7:30 a.m.","a":"Richwood","h":"Calhoun","ra":"SE","rh":"SW"},{"d":11,"t":"6:00","a":"Boyd County","h":"South Charleston","ra":"","rh":"SW"},{"d":11,"t":"6:00","a":"Greenbrier West","h":"Faith Christian Academy","ra":"SE","rh":"NE"},{"d":11,"t":"6:00","a":"James Monroe","h":"Giles","ra":"SE","rh":""},{"d":11,"t":"6:00","a":"Nicholas County","h":"Hampshire","ra":"SE","rh":"NE"},{"d":11,"t":"6:30","a":"Saint James","h":"Washington","ra":"","rh":"NE"},{"d":11,"t":"7:00","a":"Bible Center School","h":"Calvary Baptist Academy","ra":"SW","rh":"SW"},{"d":11,"t":"7:00","a":"Heritage","h":"Spring Mills","ra":"","rh":"NE"},{"d":11,"t":"7:00","a":"Maranatha Christian Academy","h":"Mount View","ra":"SE","rh":"SE"},{"d":11,"t":"7:00","a":"Point Pleasant","h":"St. Albans","ra":"SW","rh":"SW"},{"d":11,"t":"7:00","a":"Steubenville","h":"Wheeling Central Catholic","ra":"","rh":"NW"},{"d":11,"t":"7:00","a":"Tazewell","h":"PikeView","ra":"","rh":"SE"},{"d":11,"t":"7:00","a":"Union Local","h":"Wheeling Park","ra":"","rh":"NW"},{"d":11,"t":"7:00","a":"Westside","h":"Liberty","ra":"SE","rh":"SE"},{"d":11,"t":"7:15","a":"Buckeye Local","h":"Brooke","ra":"","rh":"NW"},{"d":11,"t":"7:15","a":"Union","h":"Paw Paw","ra":"NE","rh":"NE"},{"d":11,"t":"7:30","a":"Adams County Christian","h":"Bloomingdale","ra":"","rh":"SW"},{"d":11,"t":"7:30","a":"Braxton County","h":"Clay County","ra":"SW","rh":"SE"},{"d":11,"t":"7:30","a":"Buffalo","h":"Scott","ra":"SW","rh":"SW"},{"d":11,"t":"7:30","a":"Covenant","h":"St. Joseph Central","ra":"SW","rh":"SW"},{"d":11,"t":"7:30","a":"Cross Lanes Christian","h":"Pipestem Christian Academy","ra":"SW","rh":"SE"},{"d":11,"t":"7:30","a":"Doddridge County","h":"Poca","ra":"NW","rh":"SW"},{"d":11,"t":"7:30","a":"Elkins","h":"Southern","ra":"NE","rh":""},{"d":11,"t":"7:30","a":"Indian Creek","h":"Weir","ra":"","rh":"NW"},{"d":11,"t":"7:30","a":"Madonna","h":"Oak Glen","ra":"NW","rh":"NW"},{"d":11,"t":"7:30","a":"Montcalm","h":"Man","ra":"SE","rh":"SW"},{"d":11,"t":"7:30","a":"Petersburg","h":"Tygarts Valley","ra":"NE","rh":"NE"},{"d":11,"t":"7:30","a":"Pocahontas County","h":"Meadow Bridge","ra":"SE","rh":"SE"},{"d":11,"t":"7:30","a":"Roane County","h":"Ravenswood","ra":"NW","rh":"SW"},{"d":11,"t":"7:30","a":"Sissonville","h":"Logan","ra":"SW","rh":"SW"},{"d":11,"t":"7:30","a":"Summit Christian Academy","h":"George Washington","ra":"SE","rh":"SW"},{"d":11,"t":"7:30","a":"Trinity Christian","h":"Notre Dame","ra":"NW","rh":"NW"},{"d":11,"t":"8:00","a":"Expression Prep Academy","h":"Clay County","ra":"SW","rh":"SE"},{"d":11,"t":"8:00","a":"New Hope Academy Regional","h":"Jefferson","ra":"","rh":"NE"},{"d":11,"t":"8:15","a":"Oak Hill","h":"Hurricane","ra":"SE","rh":"SW"},{"d":11,"t":"8:30","a":"Philip Barbour","h":"Grafton","ra":"NW","rh":"NW"},{"d":12,"t":"12:00","a":"Nicholas County","h":"Keyser","ra":"SE","rh":"NE"},{"d":12,"t":"12:00","a":"South Charleston","h":"Summit Christian Academy","ra":"SW","rh":"SE"},{"d":12,"t":"1:00","a":"Midland Trail","h":"Sherman","ra":"SE","rh":"SW"},{"d":12,"t":"1:00","a":"Washington","h":"New Hope Academy Regional","ra":"NE","rh":""},{"d":12,"t":"1:30","a":"Boyd County","h":"George Washington","ra":"","rh":"SW"},{"d":12,"t":"1:30","a":"Greenbrier West","h":"Hedgesville","ra":"SE","rh":"NE"},{"d":12,"t":"1:30","a":"Wood County Christian","h":"Calvary Baptist Academy","ra":"NW","rh":"SW"},{"d":12,"t":"2:00","a":"Bridgeport","h":"Fairmont Senior","ra":"NW","rh":"NW"},{"d":12,"t":"2:30","a":"Saint James","h":"Jefferson","ra":"","rh":"NE"},{"d":12,"t":"2:30","a":"Tri-State HomeSchool","h":"Ripley Christian Academy","ra":"SW","rh":"SW"},{"d":12,"t":"4:00","a":"Princeton","h":"Cabell Midland","ra":"SE","rh":"SW"},{"d":12,"t":"6:00","a":"Fort Frye","h":"Tyler","ra":"","rh":"NW"},{"d":12,"t":"6:00","a":"Wahama","h":"Ritchie County","ra":"SW","rh":"NW"},{"d":12,"t":"7:00","a":"Chapmanville Regional","h":"Paintsville","ra":"SW","rh":""},{"d":12,"t":"7:00","a":"East Carter","h":"Spring Valley","ra":"","rh":"SW"},{"d":12,"t":"7:00","a":"East Fairmont","h":"Parkersburg South","ra":"NW","rh":"NW"},{"d":12,"t":"7:00","a":"Huntington Expression Prep","h":"West Charlotte","ra":"SW","rh":""},{"d":12,"t":"7:00","a":"Meadow Bridge","h":"Calhoun","ra":"SE","rh":"SW"},{"d":12,"t":"7:00","a":"Parkersburg Christian","h":"Ignite Athletics","ra":"NW","rh":"SW"},{"d":12,"t":"7:15","a":"Nitro","h":"Hurricane","ra":"SW","rh":"SW"},{"d":12,"t":"7:30","a":"Grafton","h":"Williamstown","ra":"NW","rh":"NW"},{"d":12,"t":"7:30","a":"Greenbrier East","h":"Wyoming East","ra":"SE","rh":"SE"},{"d":12,"t":"7:30","a":"Huntington Expression Prep","h":"Rowan County","ra":"SW","rh":""},{"d":12,"t":"7:30","a":"South Harrison","h":"St. Marys","ra":"NW","rh":"NW"},{"d":12,"t":"7:30","a":"Tug Valley","h":"Greater Beckley Christian","ra":"SW","rh":"SE"},{"d":12,"t":"7:30","a":"West Logan Christian Academy","h":"Man","ra":"SW","rh":"SW"},{"d":13,"t":"6:00","a":"MACHS","h":"Cornerstone Christian","ra":"NE","rh":""},{"d":13,"t":"7:00","a":"Ignite Athletics","h":"Heritage Christian Prep","ra":"SW","rh":"SW"},{"d":14,"t":"5:30","a":"Pendleton County","h":"Bath County","ra":"NE","rh":""},{"d":14,"t":"6:00","a":"Roane County","h":"Gilmer County","ra":"NW","rh":"SW"},{"d":14,"t":"7:00","a":"Paw Paw","h":"Hancock","ra":"NE","rh":""},{"d":14,"t":"7:00","a":"Teays Valley Christian Prep","h":"Huntington Expression Prep","ra":"SW","rh":"SW"},{"d":14,"t":"7:00","a":"The Linsly School","h":"Wheeling Central Catholic","ra":"NW","rh":"NW"},{"d":14,"t":"7:30","a":"Buffalo","h":"Braxton County","ra":"SW","rh":"SW"},{"d":14,"t":"7:30","a":"Calhoun","h":"Wirt County","ra":"SW","rh":"NW"},{"d":14,"t":"7:30","a":"Elk Valley Christian","h":"Calvary Baptist Academy","ra":"SW","rh":"SW"},{"d":14,"t":"7:30","a":"New Life Christian Academy","h":"Bible Center School","ra":"SE","rh":"SW"},{"d":14,"t":"7:30","a":"Webster County","h":"Greater Beckley Christian","ra":"SE","rh":"SE"},{"d":14,"t":"7:30","a":"West Logan Christian Academy","h":"Mount Hope Christian Academy","ra":"SW","rh":"SE"},{"d":15,"t":"7:00 a.m.","a":"Hampshire","h":"Allegany","ra":"NE","rh":""},{"d":15,"t":"5:45","a":"Oak Glen","h":"John Marshall","ra":"NW","rh":"NW"},{"d":15,"t":"6:00","a":"WPSD","h":"WVSDAB","ra":"","rh":"NE"},{"d":15,"t":"6:30","a":"Ripley Christian Academy","h":"Parkersburg Christian","ra":"SW","rh":"NW"},{"d":15,"t":"7:00","a":"Bridgeport","h":"Cameron","ra":"NW","rh":"NW"},{"d":15,"t":"7:00","a":"Cabell Midland","h":"George Washington","ra":"SW","rh":"SW"},{"d":15,"t":"7:00","a":"Chapmanville Regional","h":"Teays Valley Christian Prep","ra":"SW","rh":"SW"},{"d":15,"t":"7:00","a":"Independence","h":"Summers County","ra":"SE","rh":"SE"},{"d":15,"t":"7:00","a":"Man","h":"Liberty","ra":"SW","rh":"SE"},{"d":15,"t":"7:00","a":"Mountain Ridge","h":"Bridgeport","ra":"","rh":"NW"},{"d":15,"t":"7:00","a":"Parkersburg South","h":"Capital","ra":"NW","rh":"SW"},{"d":15,"t":"7:00","a":"PikeView","h":"James Monroe","ra":"SE","rh":"SE"},{"d":15,"t":"7:00","a":"Poca","h":"Nitro","ra":"SW","rh":"SW"},{"d":15,"t":"7:00","a":"River Valley","h":"Point Pleasant","ra":"","rh":"SW"},{"d":15,"t":"7:00","a":"Riverside","h":"Hurricane","ra":"SW","rh":"SW"},{"d":15,"t":"7:00","a":"Sissonville","h":"Ripley","ra":"SW","rh":"SW"},{"d":15,"t":"7:00","a":"Spring Valley","h":"South Charleston","ra":"SW","rh":"SW"},{"d":15,"t":"7:00","a":"St. Albans","h":"Parkersburg","ra":"SW","rh":"NW"},{"d":15,"t":"7:00","a":"Tygarts Valley","h":"Union","ra":"NE","rh":"NE"},{"d":15,"t":"7:00","a":"University","h":"Fort Hill","ra":"NW","rh":""},{"d":15,"t":"7:00","a":"Wayne","h":"St. Joseph Central","ra":"SW","rh":"SW"},{"d":15,"t":"7:15","a":"Indian Creek","h":"Brooke","ra":"","rh":"NW"},{"d":15,"t":"7:15","a":"Summit Christian Academy","h":"Bluefield","ra":"SE","rh":"SE"},{"d":15,"t":"7:15","a":"Tri-State HomeSchool","h":"Scioto Christian","ra":"SW","rh":""},{"d":15,"t":"7:30","a":"Berkeley Springs","h":"Southern Fulton","ra":"NE","rh":""},{"d":15,"t":"7:30","a":"Calhoun","h":"Wirt County","ra":"SW","rh":"NW"},{"d":15,"t":"7:30","a":"Cross Lanes Christian","h":"Covenant","ra":"SW","rh":"SW"},{"d":15,"t":"7:30","a":"Fairmont Senior","h":"Elkins","ra":"NW","rh":"NE"},{"d":15,"t":"7:30","a":"Frankfort","h":"Pendleton County","ra":"NE","rh":"NE"},{"d":15,"t":"7:30","a":"Grafton","h":"Lincoln","ra":"NW","rh":"NW"},{"d":15,"t":"7:30","a":"Greenbrier East","h":"Oak Hill","ra":"SE","rh":"SE"},{"d":15,"t":"7:30","a":"Greenbrier East","h":"Wyoming East","ra":"SE","rh":"SE"},{"d":15,"t":"7:30","a":"Greenbrier West","h":"Midland Trail","ra":"SE","rh":"SE"},{"d":15,"t":"7:30","a":"Herbert Hoover","h":"Nicholas County","ra":"SW","rh":"SE"},{"d":15,"t":"7:30","a":"Moorefield","h":"Musselman","ra":"NE","rh":"NE"},{"d":15,"t":"7:30","a":"Philip Barbour","h":"Buckhannon-Upshur","ra":"NW","rh":"NW"},{"d":15,"t":"7:30","a":"Pipestem Christian Academy","h":"Victory Baptist Academy","ra":"SE","rh":"SE"},{"d":15,"t":"7:30","a":"Pocahontas County","h":"Richwood","ra":"SE","rh":"SE"},{"d":15,"t":"7:30","a":"Preston","h":"Lewis County","ra":"NE","rh":"NW"},{"d":15,"t":"7:30","a":"Ravenswood","h":"Doddridge County","ra":"SW","rh":"NW"},{"d":15,"t":"7:30","a":"River View","h":"Tolsia","ra":"SE","rh":"SW"},{"d":15,"t":"7:30","a":"Southern","h":"Keyser","ra":"","rh":"NE"},{"d":15,"t":"7:30","a":"St. Joseph Central","h":"Bloomingdale","ra":"SW","rh":"SW"},{"d":15,"t":"7:30","a":"St. Marys","h":"Ritchie County","ra":"NW","rh":"NW"},{"d":15,"t":"7:30","a":"Toronto","h":"Weir","ra":"","rh":"NW"},{"d":15,"t":"7:30","a":"Trinity Christian","h":"Parkersburg Catholic","ra":"NW","rh":"NW"},{"d":15,"t":"7:30","a":"Wahama","h":"Hannan","ra":"SW","rh":"SW"},{"d":15,"t":"7:30","a":"Winfield","h":"Logan","ra":"SW","rh":"SW"},{"d":15,"t":"7:30","a":"Wood County Christian","h":"Frontier","ra":"NW","rh":""},{"d":16,"t":"7:00","a":"Clay County","h":"Buffalo","ra":"SE","rh":"SW"},{"d":16,"t":"7:30","a":"East Hardy","h":"Petersburg","ra":"NE","rh":"NE"},{"d":16,"t":"7:30","a":"James Wood","h":"Hedgesville","ra":"","rh":"NE"},{"d":17,"t":"6:00","a":"Greater Beckley Christian","h":"Montcalm","ra":"SE","rh":"SE"},{"d":17,"t":"6:45","a":"The Linsly School","h":"Steubenville","ra":"NW","rh":""},{"d":17,"t":"7:00","a":"Beth Haven Christian","h":"Ripley Christian Academy","ra":"SW","rh":"SW"},{"d":17,"t":"7:00","a":"Ignite Athletics","h":"Sugar Creek Christian Academy","ra":"SW","rh":""},{"d":17,"t":"7:00","a":"Roane County","h":"Poca","ra":"NW","rh":"SW"},{"d":17,"t":"7:00","a":"Scott","h":"Lincoln County","ra":"SW","rh":"SW"},{"d":17,"t":"7:00","a":"Varsity Opponent","h":"Morgantown Christian Academy","ra":"","rh":"NW"},{"d":17,"t":"7:15","a":"Moorefield","h":"Keyser","ra":"NE","rh":"NE"},{"d":17,"t":"7:30","a":"East Fairmont","h":"Philip Barbour","ra":"NW","rh":"NW"},{"d":17,"t":"7:30","a":"Lewis County","h":"Robert C. Byrd","ra":"NW","rh":"NW"},{"d":17,"t":"7:30","a":"Lincoln","h":"Elkins","ra":"NW","rh":"NE"},{"d":17,"t":"7:30","a":"Midland Trail","h":"Braxton County","ra":"SE","rh":"SW"},{"d":17,"t":"7:30","a":"Musselman","h":"Millbrook","ra":"NE","rh":""},{"d":17,"t":"7:30","a":"Pocahontas County","h":"Tygarts Valley","ra":"SE","rh":"NE"},{"d":17,"t":"7:30","a":"Ravenswood","h":"Tyler","ra":"SW","rh":"NW"},{"d":17,"t":"7:30","a":"Richwood","h":"Greenbrier West","ra":"SE","rh":"SE"},{"d":17,"t":"7:30","a":"Ritchie County","h":"Trinity Christian","ra":"NW","rh":"NW"},{"d":17,"t":"7:30","a":"University","h":"Grafton","ra":"NW","rh":"NW"},{"d":18,"t":"3:00","a":"Lanham Christian","h":"Teays Valley Christian Prep","ra":"","rh":"SW"},{"d":18,"t":"4:30","a":"Wayne","h":"St. Albans","ra":"SW","rh":"SW"},{"d":18,"t":"5:30","a":"Brooke","h":"Wheeling Park","ra":"NW","rh":"NW"},{"d":18,"t":"5:30","a":"Washington","h":"Buckhannon-Upshur","ra":"NE","rh":"NW"},{"d":18,"t":"6:00","a":"Parkersburg Christian","h":"Elk Valley Christian","ra":"NW","rh":"SW"},{"d":18,"t":"6:00","a":"Potomac Falls","h":"George Washington","ra":"","rh":"SW"},{"d":18,"t":"6:00","a":"Preston","h":"Cabell Midland","ra":"NE","rh":"SW"},{"d":18,"t":"6:00","a":"Sissonville","h":"Frankfort","ra":"SW","rh":"NE"},{"d":18,"t":"6:00","a":"Trinity Christian","h":"Magnolia","ra":"NW","rh":"NW"},{"d":18,"t":"6:00","a":"Wesley Christian","h":"Greater Beckley Christian","ra":"","rh":"SE"},{"d":18,"t":"7:00","a":"Bath County","h":"Pocahontas County","ra":"","rh":"SE"},{"d":18,"t":"7:00","a":"Mount View","h":"Man","ra":"SE","rh":"SW"},{"d":18,"t":"7:00","a":"Nicholas County","h":"Ripley","ra":"SE","rh":"SW"},{"d":18,"t":"7:00","a":"Poca","h":"Buffalo","ra":"SW","rh":"SW"},{"d":18,"t":"7:00","a":"Point Pleasant","h":"Nitro","ra":"SW","rh":"SW"},{"d":18,"t":"7:00","a":"Scott","h":"Liberty","ra":"SW","rh":"SE"},{"d":18,"t":"7:00","a":"St. Joseph Central","h":"Lincoln County","ra":"SW","rh":"SW"},{"d":18,"t":"7:00","a":"Varsity Opponent","h":"Morgantown Christian Academy","ra":"","rh":"NW"},{"d":18,"t":"7:00","a":"Winfield","h":"Herbert Hoover","ra":"SW","rh":"SW"},{"d":18,"t":"7:30","a":"East Hardy","h":"Pendleton County","ra":"NE","rh":"NE"},{"d":18,"t":"7:30","a":"East Richland Christian","h":"Wood County Christian","ra":"","rh":"NW"},{"d":18,"t":"7:30","a":"Greenbrier West","h":"Webster County","ra":"SE","rh":"SE"},{"d":18,"t":"7:30","a":"Hancock","h":"Berkeley Springs","ra":"","rh":"NE"},{"d":18,"t":"7:30","a":"Independence","h":"Midland Trail","ra":"SE","rh":"SE"},{"d":18,"t":"7:30","a":"Oak Glen","h":"Heartland Christian","ra":"NW","rh":""},{"d":18,"t":"7:30","a":"Parkersburg","h":"Martinsburg","ra":"NW","rh":"NE"},{"d":18,"t":"7:30","a":"Riverside","h":"Woodrow Wilson","ra":"SW","rh":"SE"},{"d":18,"t":"7:30","a":"Roane County","h":"Clay County","ra":"NW","rh":"SE"},{"d":18,"t":"7:30","a":"South Harrison","h":"Doddridge County","ra":"NW","rh":"NW"},{"d":18,"t":"7:30","a":"Williamstown","h":"St. Marys","ra":"NW","rh":"NW"},{"d":18,"t":"8:00","a":"Capital","h":"North Marion","ra":"SW","rh":"NW"},{"d":18,"t":"8:00","a":"Grace Christian Academy","h":"Washington","ra":"","rh":"NE"},{"d":18,"t":"8:00","a":"John Marshall","h":"Marietta","ra":"NW","rh":""},{"d":18,"t":"8:30","a":"Victory Baptist Academy","h":"Bloomingdale","ra":"SE","rh":"SW"},{"d":18,"t":"9:00","a":"Spring Valley","h":"Sissonville","ra":"SW","rh":"SW"},{"d":19,"t":"10:30 a.m.","a":"Fairview","h":"Mingo Central","ra":"","rh":"SW"},{"d":19,"t":"12:00","a":"Bridgeport","h":"Morgantown","ra":"NW","rh":"NW"},{"d":19,"t":"12:00","a":"Calvary Baptist Academy","h":"Summit Christian Academy","ra":"SW","rh":"SE"},{"d":19,"t":"12:30","a":"The Linsly School","h":"Portsmouth West","ra":"NW","rh":""},{"d":19,"t":"12:30","a":"Wheeling Central Catholic","h":"Steubenville","ra":"NW","rh":""},{"d":19,"t":"1:00","a":"Jefferson","h":"Grace Christian Academy","ra":"NE","rh":""},{"d":19,"t":"1:45","a":"Wyoming East","h":"North Marion","ra":"SE","rh":"NW"},{"d":19,"t":"2:00","a":"Wirt County","h":"Eastern","ra":"NW","rh":""},{"d":19,"t":"2:30","a":"Jefferson","h":"Buckhannon-Upshur","ra":"NE","rh":"NW"},{"d":19,"t":"2:30","a":"Keyser","h":"Robert C. Byrd","ra":"NE","rh":"NW"},{"d":19,"t":"2:30","a":"Tyler","h":"Fort Frye","ra":"NW","rh":""},{"d":19,"t":"3:30","a":"Capital","h":"Morgantown","ra":"SW","rh":"NW"},{"d":19,"t":"5:00","a":"Mount View","h":"West Logan Christian Academy","ra":"SE","rh":"SW"},{"d":19,"t":"6:00","a":"South Harrison","h":"Frankfort","ra":"NW","rh":"NE"},{"d":19,"t":"7:00","a":"Bluefield","h":"Princeton","ra":"SE","rh":"SE"},{"d":19,"t":"7:00","a":"Fairfield","h":"John Marshall","ra":"","rh":"NW"},{"d":19,"t":"7:30","a":"Expression Prep Academy","h":"Ironton","ra":"SW","rh":""},{"d":19,"t":"7:30","a":"Sissonville","h":"Doddridge County","ra":"SW","rh":"NW"},{"d":19,"t":"7:30","a":"St. Joseph Central","h":"Tolsia","ra":"SW","rh":"SW"},{"d":19,"t":"8:00","a":"Wayne","h":"Chapmanville Regional","ra":"SW","rh":"SW"},{"d":20,"t":"6:00","a":"MACHS","h":"Cornerstone Christian","ra":"NE","rh":""},{"d":20,"t":"7:00","a":"Ignite Athletics","h":"Heritage Christian Prep","ra":"SW","rh":"SW"},{"d":21,"t":"12:00","a":"Madonna","h":"Our Lady of the Sacred Heart","ra":"NW","rh":""},{"d":21,"t":"3:30","a":"West Greene","h":"St. Joseph Central","ra":"","rh":"SW"},{"d":21,"t":"5:15","a":"Jefferson-Morgan","h":"Lewis County","ra":"","rh":"NW"},{"d":21,"t":"6:00","a":"Parkersburg Catholic","h":"Pendleton County","ra":"NW","rh":"NE"},{"d":21,"t":"7:00","a":"Calhoun","h":"Poca","ra":"SW","rh":"SW"},{"d":21,"t":"7:00","a":"Heritage Christian Prep","h":"Calvary Baptist Academy","ra":"SW","rh":"SW"},{"d":21,"t":"7:00","a":"Keyser","h":"Mountain Ridge","ra":"NE","rh":""},{"d":21,"t":"7:00","a":"Spring Valley","h":"Lincoln County","ra":"SW","rh":"SW"},{"d":21,"t":"7:00","a":"Tygarts Valley","h":"Clay-Battelle","ra":"NE","rh":"NW"},{"d":21,"t":"7:30","a":"Buffalo","h":"Roane County","ra":"SW","rh":"NW"},{"d":21,"t":"7:30","a":"Gilmer County","h":"Ritchie County","ra":"SW","rh":"NW"},{"d":21,"t":"7:30","a":"Ripley Christian Academy","h":"Varsity Opponent","ra":"SW","rh":""},{"d":21,"t":"8:00","a":"Summit Christian Academy","h":"Mount Hope Christian Academy","ra":"SE","rh":"SE"},{"d":22,"t":"12:00","a":"Jefferson-Morgan","h":"Madonna","ra":"","rh":"NW"},{"d":22,"t":"1:45","a":"Cameron","h":"Tygarts Valley","ra":"NW","rh":"NE"},{"d":22,"t":"3:30","a":"Wheeling Central Catholic","h":"St. Joseph Central","ra":"NW","rh":"SW"},{"d":22,"t":"3:45","a":"Gilmer County","h":"Pendleton County","ra":"SW","rh":"NE"},{"d":22,"t":"5:15","a":"Lewis County","h":"Wheeling Park","ra":"NW","rh":"NW"},{"d":22,"t":"5:30","a":"Robert C. Byrd","h":"Musselman","ra":"NW","rh":"NE"},{"d":22,"t":"5:45","a":"Beaver Local","h":"Brooke","ra":"","rh":"NW"},{"d":22,"t":"6:00","a":"Non Varsity Opponent","h":"Hannan","ra":"","rh":"SW"},{"d":22,"t":"6:00","a":"Poca","h":"Scott","ra":"SW","rh":"SW"},{"d":22,"t":"7:00","a":"Capital","h":"Herbert Hoover","ra":"SW","rh":"SW"},{"d":22,"t":"7:00","a":"East Hardy","h":"Tucker County","ra":"NE","rh":"NE"},{"d":22,"t":"7:00","a":"George Washington","h":"Hurricane","ra":"SW","rh":"SW"},{"d":22,"t":"7:00","a":"Greenbrier West","h":"Montcalm","ra":"SE","rh":"SE"},{"d":22,"t":"7:00","a":"Liberty","h":"Sherman","ra":"SE","rh":"SW"},{"d":22,"t":"7:00","a":"Magnolia","h":"Bridgeport","ra":"NW","rh":"NW"},{"d":22,"t":"7:00","a":"Morgantown","h":"Parkersburg South","ra":"NW","rh":"NW"},{"d":22,"t":"7:00","a":"Mount View","h":"Bluefield","ra":"SE","rh":"SE"},{"d":22,"t":"7:00","a":"Nitro","h":"St. Albans","ra":"SW","rh":"SW"},{"d":22,"t":"7:00","a":"Ripley","h":"Winfield","ra":"SW","rh":"SW"},{"d":22,"t":"7:00","a":"Sissonville","h":"Calvary Baptist Academy","ra":"SW","rh":"SW"},{"d":22,"t":"7:00","a":"South Charleston","h":"Chapmanville Regional","ra":"SW","rh":"SW"},{"d":22,"t":"7:00","a":"University","h":"Parkersburg","ra":"NW","rh":"NW"},{"d":22,"t":"7:00","a":"Wesley Christian","h":"Huntington","ra":"","rh":"SW"},{"d":22,"t":"7:30","a":"Braxton County","h":"South Harrison","ra":"SW","rh":"NW"},{"d":22,"t":"7:30","a":"Buckhannon-Upshur","h":"Preston","ra":"NW","rh":"NE"},{"d":22,"t":"7:30","a":"Doddridge County","h":"Williamstown","ra":"NW","rh":"NW"},{"d":22,"t":"7:30","a":"Elk Valley Christian","h":"Hannan","ra":"SW","rh":"SW"},{"d":22,"t":"7:30","a":"Fairmont Senior","h":"Grafton","ra":"NW","rh":"NW"},{"d":22,"t":"7:30","a":"Frankfort","h":"Petersburg","ra":"NE","rh":"NE"},{"d":22,"t":"7:30","a":"John Marshall","h":"East Fairmont","ra":"NW","rh":"NW"},{"d":22,"t":"7:30","a":"Lincoln","h":"Oak Glen","ra":"NW","rh":"NW"},{"d":22,"t":"7:30","a":"Meadow Bridge","h":"Richwood","ra":"SE","rh":"SE"},{"d":22,"t":"7:30","a":"Midland Trail","h":"Wyoming East","ra":"SE","rh":"SE"},{"d":22,"t":"7:30","a":"Moorefield","h":"Philip Barbour","ra":"NE","rh":"NW"},{"d":22,"t":"7:30","a":"Princeton","h":"Oak Hill","ra":"SE","rh":"SE"},{"d":22,"t":"7:30","a":"Southern","h":"Elkins","ra":"","rh":"NE"},{"d":22,"t":"7:30","a":"St. Marys","h":"Tyler","ra":"NW","rh":"NW"},{"d":22,"t":"7:30","a":"Tolsia","h":"Man","ra":"SW","rh":"SW"},{"d":22,"t":"7:30","a":"Weir","h":"Edison","ra":"NW","rh":""},{"d":23,"t":"7:30","a":"Southern","h":"Ravenswood","ra":"","rh":"SW"},{"d":23,"t":"7:30","a":"Tug Valley","h":"Rowan County","ra":"SW","rh":""},{"d":23,"t":"7:30","a":"Wirt County","h":"Wahama","ra":"NW","rh":"SW"},{"d":24,"t":"6:00","a":"MACHS","h":"Cornerstone Christian","ra":"NE","rh":""},{"d":24,"t":"7:00","a":"Ignite Athletics","h":"Heritage Christian Prep","ra":"SW","rh":"SW"},{"d":25,"t":"6:00","a":"MACHS","h":"Cornerstone Christian","ra":"NE","rh":""},{"d":25,"t":"7:00","a":"Ignite Athletics","h":"Heritage Christian Prep","ra":"SW","rh":"SW"},{"d":26,"t":"6:00","a":"MACHS","h":"Cornerstone Christian","ra":"NE","rh":""},{"d":26,"t":"7:00","a":"Ignite Athletics","h":"Heritage Christian Prep","ra":"SW","rh":"SW"},{"d":27,"t":"6:00","a":"MACHS","h":"Cornerstone Christian","ra":"NE","rh":""},{"d":27,"t":"7:00","a":"Ignite Athletics","h":"Heritage Christian Prep","ra":"SW","rh":"SW"},{"d":28,"t":"9:30 a.m.","a":"Greenbrier West","h":"Tygarts Valley","ra":"SE","rh":"NE"},{"d":28,"t":"11:00 a.m.","a":"Clay County","h":"Meadow Bridge","ra":"SE","rh":"SE"},{"d":28,"t":"3:30","a":"Oak Glen","h":"Indian Creek","ra":"NW","rh":""},{"d":28,"t":"5:10","a":"Carrollton","h":"Wheeling Park","ra":"","rh":"NW"},{"d":28,"t":"6:00","a":"South Lakes","h":"Washington","ra":"","rh":"NE"},{"d":28,"t":"6:15","a":"Ripley Christian Academy","h":"New Life Christian Academy","ra":"SW","rh":"SE"},{"d":28,"t":"7:00","a":"Fleming","h":"Summit Christian Academy","ra":"","rh":"SE"},{"d":28,"t":"7:15","a":"Harrison Central","h":"Brooke","ra":"","rh":"NW"},{"d":28,"t":"7:30","a":"East Fairmont","h":"Robert C. Byrd","ra":"NW","rh":"NW"},{"d":28,"t":"7:30","a":"Southern Fulton","h":"Berkeley Springs","ra":"","rh":"NE"},{"d":28,"t":"7:30","a":"St. Marys","h":"Gilmer County","ra":"NW","rh":"SW"},{"d":28,"t":"8:00","a":"James Monroe","h":"Woodrow Wilson","ra":"SE","rh":"SE"},{"d":28,"t":"9:15","a":"Oak Hill","h":"Nicholas County","ra":"SE","rh":"SE"},{"d":29,"t":"3:00","a":"Buffalo","h":"Philip Barbour","ra":"SW","rh":"NW"},{"d":29,"t":"3:00","a":"Indian Valley","h":"Buffalo","ra":"","rh":"SW"},{"d":29,"t":"4:00","a":"Princeton","h":"Greater Beckley Christian","ra":"SE","rh":"SE"},{"d":29,"t":"5:00","a":"Bluefield","h":"Philip Barbour","ra":"SE","rh":"NW"},{"d":29,"t":"5:00","a":"Richwood","h":"Wahama","ra":"SE","rh":"SW"},{"d":29,"t":"6:00","a":"Moorefield","h":"East Hardy","ra":"NE","rh":"NE"},{"d":29,"t":"6:00","a":"Nicholas County","h":"Lewis County","ra":"SE","rh":"NW"},{"d":29,"t":"6:15","a":"Buckhannon-Upshur","h":"Bridgeport","ra":"NW","rh":"NW"},{"d":29,"t":"7:00","a":"Herbert Hoover","h":"Nitro","ra":"SW","rh":"SW"},{"d":29,"t":"7:00","a":"Huntington Expression Prep","h":"Christ School","ra":"SW","rh":""},{"d":29,"t":"7:00","a":"Liberty","h":"Independence","ra":"SE","rh":"SE"},{"d":29,"t":"7:00","a":"Meadow Bridge","h":"Summers County","ra":"SE","rh":"SE"},{"d":29,"t":"7:00","a":"Parkersburg South","h":"Spring Valley","ra":"NW","rh":"SW"},{"d":29,"t":"7:00","a":"Ravenswood","h":"Ripley","ra":"SW","rh":"SW"},{"d":29,"t":"7:00","a":"Rowan County","h":"St. Joseph Central","ra":"","rh":"SW"},{"d":29,"t":"7:00","a":"Wayne","h":"Poca","ra":"SW","rh":"SW"},{"d":29,"t":"7:30","a":"Hampshire","h":"Frankfort","ra":"NE","rh":"NE"},{"d":29,"t":"7:30","a":"Hannan","h":"Tolsia","ra":"SW","rh":"SW"},{"d":29,"t":"7:30","a":"Madonna","h":"Ritchie County","ra":"NW","rh":"NW"},{"d":29,"t":"7:30","a":"Petersburg","h":"Pendleton County","ra":"NE","rh":"NE"},{"d":29,"t":"7:30","a":"Point Pleasant","h":"Lincoln","ra":"SW","rh":"NW"},{"d":29,"t":"7:30","a":"Tucker County","h":"Wyoming East","ra":"NE","rh":"SE"},{"d":29,"t":"7:30","a":"Valley","h":"Trinity Christian","ra":"NW","rh":"NW"},{"d":29,"t":"7:30","a":"Williamstown","h":"South Harrison","ra":"NW","rh":"NW"},{"d":29,"t":"9:00","a":"PikeView","h":"Summit Christian Academy","ra":"SE","rh":"SE"},{"d":29,"t":"9:30","a":"Logan","h":"North Marion","ra":"SW","rh":"NW"},{"d":30,"t":"8:00 a.m.","a":"Union","h":"Montcalm","ra":"NE","rh":"SE"},{"d":30,"t":"3:30","a":"Riverside","h":"Preston","ra":"SW","rh":"NE"},{"d":30,"t":"5:00","a":"Cabell Midland","h":"Greenbrier East","ra":"SW","rh":"SE"},{"d":30,"t":"5:00","a":"Wheeling Central Catholic","h":"Brooke","ra":"NW","rh":"NW"},{"d":30,"t":"5:30","a":"Wheeling Park","h":"Hampshire","ra":"NW","rh":"NE"},{"d":30,"t":"6:00","a":"Tournament Opponent","h":"Pendleton County","ra":"","rh":"NE"},{"d":30,"t":"6:30","a":"Philip Barbour","h":"Braxton County","ra":"NW","rh":"SW"},{"d":30,"t":"7:00","a":"John Marshall","h":"Fairmont Senior","ra":"NW","rh":"NW"},{"d":30,"t":"7:00","a":"Parkersburg Catholic","h":"Notre Dame","ra":"NW","rh":"NW"},{"d":30,"t":"7:00","a":"South Charleston","h":"Parkersburg","ra":"SW","rh":"NW"},{"d":30,"t":"7:00","a":"St. Joseph Central","h":"Lincoln County","ra":"SW","rh":"SW"},{"d":30,"t":"7:30","a":"Fairview","h":"Hannan","ra":"","rh":"SW"},{"d":30,"t":"7:30","a":"Point Pleasant","h":"Lincoln","ra":"SW","rh":"NW"},{"d":30,"t":"7:30","a":"Sherman","h":"Man","ra":"SW","rh":"SW"},{"d":30,"t":"7:30","a":"St. Marys","h":"Calhoun","ra":"NW","rh":"SW"},{"d":30,"t":"7:30","a":"Wirt County","h":"Roane County","ra":"NW","rh":"NW"},{"d":30,"t":"9:00","a":"Teays Valley Christian Prep","h":"Elkins","ra":"SW","rh":"NE"},{"d":30,"t":"9:30","a":"Webster County","h":"Elkins","ra":"SE","rh":"NE"},{"d":31,"t":"8:30 a.m.","a":"Teays Valley Christian Prep","h":"North Marion","ra":"SW","rh":"NW"},{"d":31,"t":"11:00 a.m.","a":"Richwood","h":"Montcalm","ra":"SE","rh":"SE"},{"d":31,"t":"12:30","a":"Midland Trail","h":"Clay County","ra":"SE","rh":"SE"},{"d":31,"t":"5:00","a":"Elkins","h":"Nicholas County","ra":"NE","rh":"SE"}];
+    const REGIONS = ["State", "Southeast", "Southwest", "Northwest", "Northeast"];
+    const FILTERS = ["Worth covering", "All posted", "Conflicts"];
+    const REGION_SLUG = { State: "state", Southeast: "southeast", Southwest: "southwest", Northwest: "northwest", Northeast: "northeast" };
+    const FILTER_SLUG = { "Worth covering": "cover", "All posted": "all", Conflicts: "conflicts" };
+    const FROM_REGION = Object.fromEntries(REGIONS.map((name) => [REGION_SLUG[name], name]));
+    const FROM_FILTER = Object.fromEntries(FILTERS.map((name) => [FILTER_SLUG[name], name]));
+    const DOW = ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Mon"];
+    const CODE = { SE: "Southeast", SW: "Southwest", NW: "Northwest", NE: "Northeast" };
+    const NOTABLE = new Set(["George Washington","Spring Mills","Washington","Morgantown","Parkersburg South","University","Huntington","Riverside","Chapmanville Regional","North Marion","Bridgeport","Winfield","Ripley","Shady Spring","East Fairmont","Robert C. Byrd","Wheeling Central Catholic","Wyoming East","Bluefield","Wayne","Doddridge County","James Monroe","Petersburg","Frankfort","Tug Valley","Greater Beckley Christian","Webster County","Tucker County","East Hardy","Parkersburg Catholic","St. Joseph Central","Ritchie County"]);
+    const CHAMP = new Set(["George Washington","Spring Mills","Chapmanville Regional","North Marion","Wheeling Central Catholic","Wyoming East","Tug Valley","Greater Beckley Christian"]);
+    const PLACEHOLDER = new Set(["Non Varsity Opponent","Tournament Opponent","Varsity Opponent"]);
+    const REPEAT = new Set(["MACHS|Cornerstone Christian","Ignite Athletics|Heritage Christian Prep"]);
+    const CLEAN = (() => {
+      const seen = new Set();
+      return GAMES.filter((game) => {
+        const key = game.a + "|" + game.h;
+        if (!REPEAT.has(key)) return true;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    })();
+    function gameKey(game) { return game.d + "|" + game.t + "|" + game.a + "|" + game.h; }
+    const CONFLICTS = (() => {
+      const seen = new Map();
+      for (const game of CLEAN) {
+        for (const team of [game.a, game.h]) {
+          if (PLACEHOLDER.has(team)) continue;
+          const key = game.d + "|" + game.t + "|" + team;
+          seen.set(key, (seen.get(key) || 0) + 1);
+        }
+      }
+      const bad = new Set();
+      for (const game of CLEAN) {
+        for (const team of [game.a, game.h]) {
+          if ((seen.get(game.d + "|" + game.t + "|" + team) || 0) > 1) bad.add(gameKey(game));
+        }
+      }
+      return bad;
+    })();
+    const dateLabel = (day) => DOW[(day - 1) % 7] + ", Dec " + day;
+    const inRegion = (game, region) => region === "State" || CODE[game.ra] === region || CODE[game.rh] === region;
+    const isCover = (game) => (NOTABLE.has(game.a) && NOTABLE.has(game.h)) || (CHAMP.has(game.a) && !PLACEHOLDER.has(game.h)) || (CHAMP.has(game.h) && !PLACEHOLDER.has(game.a));
+    const isConflict = (game) => CONFLICTS.has(gameKey(game));
+    function why(game) {
+      if (isConflict(game)) return "Same team is posted twice at this time. Confirm it before you go.";
+      if (NOTABLE.has(game.a) && NOTABLE.has(game.h)) return "Both teams were in the state tournament last March.";
+      if (CHAMP.has(game.a) || CHAMP.has(game.h)) return "One side played for a state title last March.";
+      return "Posted on the MaxPreps boys scoreboard.";
+    }
+    const params = new URLSearchParams(location.search);
+    let region = FROM_REGION[params.get("region")] || "State";
+    let filter = FROM_FILTER[params.get("filter")] || "Worth covering";
+    let query = params.get("q") || "";
+    const qInput = document.getElementById("q");
+    qInput.value = query;
+    function writeUrl() {
+      const search = new URLSearchParams();
+      if (region !== "State") search.set("region", REGION_SLUG[region]);
+      if (filter !== "Worth covering") search.set("filter", FILTER_SLUG[filter]);
+      if (query.trim()) search.set("q", query);
+      const next = search.toString();
+      history.replaceState(null, "", next ? "?" + next : location.pathname);
+    }
+    function renderPills(host, names, current, onPick) {
+      host.replaceChildren();
+      for (const name of names) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = name;
+        button.setAttribute("aria-pressed", name === current ? "true" : "false");
+        if (name === current) button.className = name === "Conflicts" ? "warn-on" : "solid";
+        button.addEventListener("click", () => onPick(name));
+        host.appendChild(button);
+      }
+    }
+    function render() {
+      const regionGames = CLEAN.filter((game) => inRegion(game, region));
+      document.getElementById("posted-label").textContent = region === "State" ? "Games posted" : region + " games";
+      document.getElementById("posted").textContent = String(regionGames.length);
+      document.getElementById("cover").textContent = String(regionGames.filter(isCover).length);
+      document.getElementById("conflicts").textContent = String(regionGames.filter(isConflict).length);
+      const needle = query.trim().toLowerCase();
+      const rows = regionGames.filter((game) => {
+        if (filter === "Conflicts" && !isConflict(game)) return false;
+        if (filter === "Worth covering" && !isCover(game)) return false;
+        if (needle && !(game.a + " " + game.h).toLowerCase().includes(needle)) return false;
+        return true;
+      });
+      const count = document.getElementById("count");
+      count.textContent = (rows.length === 1 ? "1 game" : rows.length + " games") + (needle ? " matching “" + query.trim() + "”" : "") + " on this tab.";
+      const list = document.getElementById("list");
+      list.replaceChildren();
+      if (!rows.length) {
+        const empty = document.createElement("p");
+        empty.className = "empty";
+        empty.textContent = needle
+          ? "No game on the " + region + " tab matches “" + query.trim() + "”."
+          : filter === "Conflicts"
+            ? "No double-booked games on the " + region + " tab."
+            : filter === "Worth covering"
+              ? "No games on the " + region + " tab meet the covering rule."
+              : "No games are posted on the " + region + " tab.";
+        list.appendChild(empty);
+        return;
+      }
+      const cards = document.createElement("div");
+      cards.className = "cards";
+      const table = document.createElement("table");
+      const caption = document.createElement("caption");
+      caption.className = "hint";
+      caption.textContent = "December boys basketball games for " + region + ", " + filter;
+      table.appendChild(caption);
+      const thead = document.createElement("thead");
+      const head = document.createElement("tr");
+      ["Date", "Time", "Game", "Why it is here"].forEach((label, index) => {
+        const th = document.createElement("th");
+        th.textContent = label;
+        if (index === 1) th.className = "time";
+        head.appendChild(th);
+      });
+      thead.appendChild(head);
+      table.appendChild(thead);
+      const tbody = document.createElement("tbody");
+      for (const game of rows) {
+        const tone = isConflict(game) ? "conflict" : isCover(game) ? "cover" : "";
+        const card = document.createElement("article");
+        card.className = "card" + (tone ? " " + tone : "");
+        const when = document.createElement("p");
+        when.className = "when";
+        when.textContent = dateLabel(game.d) + " · " + game.t;
+        const matchup = document.createElement("p");
+        matchup.className = "game";
+        matchup.textContent = game.a + " at " + game.h;
+        const reason = document.createElement("p");
+        reason.textContent = why(game);
+        card.append(when, matchup, reason);
+        cards.appendChild(card);
+        const tr = document.createElement("tr");
+        if (tone) tr.className = tone;
+        [dateLabel(game.d), game.t, game.a + " at " + game.h, why(game)].forEach((value, index) => {
+          const td = document.createElement("td");
+          td.textContent = value;
+          if (index === 1) td.className = "time";
+          if (index === 2) td.style.fontWeight = "700";
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+      list.append(cards, table);
+    }
+    function bind() {
+      renderPills(document.getElementById("regions"), REGIONS, region, (name) => { region = name; writeUrl(); render(); bind(); });
+      renderPills(document.getElementById("filters"), FILTERS, filter, (name) => { filter = name; writeUrl(); render(); bind(); });
+    }
+    bind();
+    qInput.addEventListener("input", () => { query = qInput.value; writeUrl(); render(); });
+    document.getElementById("copy").addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      try {
+        await navigator.clipboard.writeText(location.href);
+        button.textContent = "Link copied";
+        setTimeout(() => { button.textContent = "Copy this view"; }, 2000);
+      } catch {
+        button.textContent = "Copy the address in the bar";
+      }
+    });
+    render();
+  </script>
+</body>
+</html>
